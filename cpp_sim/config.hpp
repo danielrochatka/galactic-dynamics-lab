@@ -19,8 +19,8 @@ SimulationMode parse_mode(const std::string& s);
 struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
 
-  int n_stars = 1000;
-  double star_mass = 0.5;
+  int n_stars = 5000;
+  double star_mass = 0.2;
   double bh_mass = 1000.0;
 
   double inner_radius = 5.0;
@@ -28,7 +28,7 @@ struct Config {
 
   double dt = 0.01;
   int n_steps = 20000;
-  int snapshot_every = 10;
+  int snapshot_every = 20;
 
   double softening = 1.0;
   bool enable_star_star_gravity = true;
@@ -50,7 +50,7 @@ struct Config {
   int validation_snapshot_every = 5;
 
   std::string output_dir = "outputs";
-  std::string run_id;  // set at runtime (e.g. YYYYMMDD_HHMMSS)
+  std::string run_id;
 };
 
 }  // namespace galaxy
