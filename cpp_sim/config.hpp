@@ -34,6 +34,10 @@ struct Config {
   bool enable_star_star_gravity = true;
 
   double velocity_noise = 0.05;
+  double initial_velocity_scale = 1.0;
+
+  bool save_snapshots = true;
+  bool save_run_info = true;
 
   // Validation-only
   double validation_two_body_radius = 20.0;

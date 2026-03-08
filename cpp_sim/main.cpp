@@ -149,11 +149,16 @@ int main(int argc, char** argv) {
 
   auto snapshots = galaxy::run_simulation(config, state, n_steps, snapshot_every);
 
-  galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n());
-  galaxy::write_snapshots(config.output_dir, snapshots);
+  if (config.save_run_info) {
+    galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n());
+    std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+  }
+  if (config.save_snapshots) {
+    galaxy::write_snapshots(config.output_dir, snapshots);
+    std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
+  }
 
   std::cout << "Snapshots: " << snapshots.size() << "\n";
-  std::cout << "Wrote " << config.output_dir << "/run_info.txt and snapshot_*.csv\n";
   std::cout << "Output directory: " << config.output_dir << "\n";
 
   return 0;

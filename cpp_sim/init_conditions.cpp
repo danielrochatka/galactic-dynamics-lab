@@ -62,8 +62,8 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
       vx += scale * normal(rng);
       vy += scale * normal(rng);
     }
-    state.vx[i] = vx;
-    state.vy[i] = vy;
+    state.vx[i] = config.initial_velocity_scale * vx;
+    state.vy[i] = config.initial_velocity_scale * vy;
     state.mass[i] = star_mass;
   }
 }
@@ -72,7 +72,7 @@ void init_two_body(const Config& config, State& state) {
   state.resize(1);
   double r0 = config.validation_two_body_radius;
   double v_circ = std::sqrt(config.bh_mass / r0);
-  double v0 = config.validation_two_body_speed_ratio * v_circ;
+  double v0 = config.initial_velocity_scale * config.validation_two_body_speed_ratio * v_circ;
 
   state.x[0] = r0;
   state.y[0] = 0.0;
@@ -84,7 +84,7 @@ void init_two_body(const Config& config, State& state) {
 void init_symmetric_pair(const Config& config, State& state) {
   state.resize(2);
   double a = config.validation_symmetric_separation;
-  double v = config.validation_symmetric_speed;
+  double v = config.initial_velocity_scale * config.validation_symmetric_speed;
   double m = config.star_mass;
 
   state.x[0] = -a; state.y[0] = 0.0;
@@ -114,12 +114,13 @@ void init_small_n(const Config& config, State& state) {
     r[i] = 20.0 + u(rng);
   }
 
+  const double v_scale = config.initial_velocity_scale;
   for (int i = 0; i < n; ++i) {
     state.x[i] = r[i] * std::cos(theta[i]);
     state.y[i] = r[i] * std::sin(theta[i]);
     double v_circ = std::sqrt(bh_mass / r[i]);
-    state.vx[i] = -v_circ * std::sin(theta[i]);
-    state.vy[i] = v_circ * std::cos(theta[i]);
+    state.vx[i] = v_scale * (-v_circ * std::sin(theta[i]));
+    state.vy[i] = v_scale * (v_circ * std::cos(theta[i]));
     state.mass[i] = star_mass;
   }
 }
