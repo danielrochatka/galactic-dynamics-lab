@@ -27,7 +27,7 @@ struct Config {
   double outer_radius = 50.0;
 
   double dt = 0.01;
-  int n_steps = 120000;
+  int n_steps = 20000;
   int snapshot_every = 10;
 
   double softening = 1.0;
