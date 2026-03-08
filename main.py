@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config import SimulationConfig
+from config import VALIDATION_MODES, SimulationConfig
 from init_conditions import generate_disk
 from physics import (
     compute_accelerations_newtonian,
@@ -41,6 +41,17 @@ def main() -> None:
     print("2D Galaxy N-Body Simulation")
     print("=" * 50)
     print(f"Output directory: {config.output_dir.resolve()}")
+    print(f"Mode: {config.simulation_mode}")
+
+    if config.simulation_mode != "galaxy":
+        if config.simulation_mode not in VALIDATION_MODES:
+            print("Invalid simulation_mode. Allowed:", list(VALIDATION_MODES))
+            return
+        from validation import run_validation
+        run_validation(config)
+        print(f"\nOutput directory: {config.output_dir.resolve()}")
+        return
+
     print(f"Stars: {config.n_stars}")
     print(f"Steps: {config.n_steps}, dt = {config.dt}")
     print(f"Snapshot every: {config.snapshot_every} steps")
