@@ -1,0 +1,54 @@
+#ifndef GALAXY_CONFIG_HPP
+#define GALAXY_CONFIG_HPP
+
+#include <string>
+
+namespace galaxy {
+
+// Simulation mode: matches Python VALIDATION_MODES + "galaxy"
+enum class SimulationMode {
+  galaxy,
+  two_body_orbit,
+  symmetric_pair,
+  small_n_conservation,
+  timestep_convergence
+};
+
+SimulationMode parse_mode(const std::string& s);
+
+struct Config {
+  SimulationMode simulation_mode = SimulationMode::galaxy;
+
+  int n_stars = 1000;
+  double star_mass = 0.5;
+  double bh_mass = 1000.0;
+
+  double inner_radius = 5.0;
+  double outer_radius = 50.0;
+
+  double dt = 0.01;
+  int n_steps = 120000;
+  int snapshot_every = 10;
+
+  double softening = 1.0;
+  bool enable_star_star_gravity = true;
+
+  double velocity_noise = 0.05;
+
+  // Validation-only
+  double validation_two_body_radius = 20.0;
+  double validation_two_body_speed_ratio = 1.0;
+  bool validation_symmetric_include_bh = true;
+  double validation_symmetric_separation = 30.0;
+  double validation_symmetric_speed = 4.0;
+  int validation_small_n = 5;
+  int validation_n_steps = 5000;
+  int validation_snapshot_every = 5;
+
+  std::string output_dir = "outputs";
+  std::string run_id;  // set at runtime (e.g. YYYYMMDD_HHMMSS)
+};
+
+}  // namespace galaxy
+
+#endif
