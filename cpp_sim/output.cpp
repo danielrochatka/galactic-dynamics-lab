@@ -8,11 +8,14 @@ namespace galaxy {
 void write_run_info(const std::string& output_dir,
                     const Config& config,
                     int n_steps_done,
-                    int n_snapshots) {
+                    int n_snapshots,
+                    int n_particles) {
   std::ostringstream path;
   path << output_dir << "/run_info.txt";
   std::ofstream f(path.str());
   if (!f) return;
+
+  int n_star = (n_particles >= 0) ? n_particles : config.n_stars;
 
   f << "dt\t" << config.dt << "\n";
   f << "n_steps\t" << n_steps_done << "\n";
@@ -23,7 +26,7 @@ void write_run_info(const std::string& output_dir,
   f << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
   f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
   f << "number_of_snapshots\t" << n_snapshots << "\n";
-  f << "n_stars\t" << config.n_stars << "\n";
+  f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
 }
 

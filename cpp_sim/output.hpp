@@ -9,10 +9,12 @@
 namespace galaxy {
 
 // Write run_info.txt with key config (dt, n_steps, softening, etc.) and run summary.
+// n_particles: actual particle count (if < 0, use config.n_stars).
 void write_run_info(const std::string& output_dir,
                     const Config& config,
                     int n_steps_done,
-                    int n_snapshots);
+                    int n_snapshots,
+                    int n_particles = -1);
 
 // Write each snapshot to output_dir/snapshot_<step>.csv (columns: i,x,y,vx,vy,mass).
 void write_snapshots(const std::string& output_dir,

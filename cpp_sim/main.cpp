@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 
   auto snapshots = galaxy::run_simulation(config, state, n_steps, snapshot_every);
 
-  galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()));
+  galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n());
   galaxy::write_snapshots(config.output_dir, snapshots);
 
   std::cout << "Snapshots: " << snapshots.size() << "\n";
