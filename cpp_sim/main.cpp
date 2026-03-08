@@ -45,6 +45,23 @@ double L_z_total(const galaxy::State& s) {
   return L;
 }
 
+// Format seconds as HH:MM:SS or MM:SS
+std::string format_elapsed(double sec) {
+  int s = static_cast<int>(sec + 0.5);
+  if (s < 0) s = 0;
+  int m = s / 60;
+  s %= 60;
+  int h = m / 60;
+  m %= 60;
+  std::ostringstream os;
+  os << std::setfill('0');
+  if (h > 0)
+    os << std::setw(2) << h << ":" << std::setw(2) << m << ":" << std::setw(2) << s;
+  else
+    os << std::setw(2) << m << ":" << std::setw(2) << s;
+  return os.str();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -78,7 +95,10 @@ int main(int argc, char** argv) {
   switch (config.simulation_mode) {
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
-      std::cout << "Stars: " << config.n_stars << ", steps: " << n_steps << "\n";
+      std::cout << "Running galaxy: n_stars=" << config.n_stars
+                << ", n_steps=" << n_steps
+                << ", dt=" << config.dt
+                << ", sim_time=" << (n_steps * config.dt) << "\n";
       break;
     }
     case galaxy::SimulationMode::two_body_orbit: {
@@ -147,7 +167,39 @@ int main(int argc, char** argv) {
     }
   }
 
-  auto snapshots = galaxy::run_simulation(config, state, n_steps, snapshot_every);
+  // Progress reporting: only for galaxy (long runs); interval = every 1% or 1000 steps, whichever is less frequent
+  int progress_interval = 0;
+  galaxy::ProgressCallback progress_callback;
+  if (config.simulation_mode == galaxy::SimulationMode::galaxy && n_steps > 0) {
+    progress_interval = std::max(1, std::min(1000, n_steps / 100));
+    auto start_wall = std::chrono::steady_clock::now();
+    progress_callback = [start_wall, &config](int step, int n_steps, double sim_time) {
+      auto now = std::chrono::steady_clock::now();
+      double elapsed_sec = 1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
+      double eta_sec = (step > 0 && step < n_steps)
+          ? (elapsed_sec / step) * (n_steps - step)
+          : 0.0;
+      double pct = 100.0 * step / n_steps;
+      std::cout << "[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
+                << "step " << step << "/" << n_steps
+                << ", sim t=" << std::setprecision(2) << sim_time
+                << ", elapsed=" << format_elapsed(elapsed_sec)
+                << ", eta=" << format_elapsed(eta_sec) << "\n"
+                << std::flush;
+    };
+  }
+
+  auto run_start = std::chrono::steady_clock::now();
+  auto snapshots = galaxy::run_simulation(config, state, n_steps, snapshot_every,
+                                          progress_callback, progress_interval);
+  double run_elapsed_sec = 1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now() - run_start).count();
+
+  if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
+    std::cout << "Completed in " << format_elapsed(run_elapsed_sec)
+              << ". Snapshots: " << snapshots.size()
+              << ". Output: " << config.output_dir << "\n";
+  }
 
   if (config.save_run_info) {
     galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n());

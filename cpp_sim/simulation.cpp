@@ -7,7 +7,9 @@ namespace galaxy {
 std::vector<Snapshot> run_simulation(const Config& config,
                                      State state,
                                      int n_steps,
-                                     int snapshot_every) {
+                                     int snapshot_every,
+                                     ProgressCallback progress_callback,
+                                     int progress_interval) {
   std::vector<Snapshot> snapshots;
   Snapshot initial;
   initial.step = 0;
@@ -20,6 +22,7 @@ std::vector<Snapshot> run_simulation(const Config& config,
   const double bh_mass = config.bh_mass;
   const double softening = config.softening;
   const bool star_star = config.enable_star_star_gravity;
+  const bool use_progress = (progress_interval > 0 && progress_callback);
 
   for (int step = 1; step <= n_steps; ++step) {
     velocity_verlet_step(state, bh_mass, softening, star_star, dt, ax, ay);
@@ -30,6 +33,10 @@ std::vector<Snapshot> run_simulation(const Config& config,
       snap.time = step * dt;
       snap.state = state;
       snapshots.push_back(std::move(snap));
+    }
+
+    if (use_progress && (step % progress_interval == 0 || step == n_steps)) {
+      progress_callback(step, n_steps, step * dt);
     }
   }
 
