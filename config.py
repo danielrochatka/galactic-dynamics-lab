@@ -15,7 +15,7 @@ class SimulationConfig:
     """Configuration for the galaxy simulation."""
 
     # Mode: galaxy (default) or validation mode
-    simulation_mode: str = "galaxy"
+    simulation_mode: str = "timestep_convergence"
 
     # Star distribution
     n_stars: int = 1000
