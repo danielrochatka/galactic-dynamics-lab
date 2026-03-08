@@ -9,7 +9,11 @@ std::vector<Snapshot> run_simulation(const Config& config,
                                      int n_steps,
                                      int snapshot_every) {
   std::vector<Snapshot> snapshots;
-  snapshots.push_back({0, 0.0, state});
+  Snapshot initial;
+  initial.step = 0;
+  initial.time = 0.0;
+  initial.state = state;
+  snapshots.push_back(std::move(initial));
 
   std::vector<double> ax, ay;
   const double dt = config.dt;
