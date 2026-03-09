@@ -78,6 +78,7 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_dump_invariant_profile") { config.tpfcore_dump_invariant_profile = parse_bool(val); continue; }
       if (key == "tpfcore_dump_theta_profile") { config.tpfcore_dump_theta_profile = parse_bool(val); continue; }
       if (key == "tpfcore_source_softening") { config.tpfcore_source_softening = std::stod(val); continue; }
+      if (key == "tpfcore_residual_step") { config.tpfcore_residual_step = std::stod(val); continue; }
       if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
       if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
       if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }

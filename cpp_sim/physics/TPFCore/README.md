@@ -26,6 +26,18 @@ This is a **provisional weak-field point-source ansatz**, NOT the full nonlinear
 - **`source_ansatz.hpp`** — Declaration, `PointSourceField`, `provisional_point_source_field`
 - **`source_ansatz.cpp`** — Closed-form Phi, Xi, Theta derivatives
 
+## Field-equation residual
+
+TPFCore inspection modes compute the **configuration-equation residual** from the paper’s weak-field form:
+
+> R_ν = ∂_i (Θ^i_ν − λ δ^i_ν Θ)
+
+with λ = 1/4 and Θ = Θ_xx + Θ_yy. This is the spatial part of nabla_μ(Θ^μ_ν − λ δ^μ_ν Θ).
+
+- **Computation**: Analytic. Third derivatives of Phi are closed-form, so the residual is evaluated directly from the ansatz.
+- **Meaning of near-zero**: If the ansatz satisfied the paper’s configuration equation, R would be zero. A small residual indicates the ansatz is structurally closer; a large residual indicates a mismatch.
+- **Scope**: This is a **structural field-equation sanity check**, not proof of full TPF dynamics. It helps judge whether the Hessian-based point-source ansatz approximates the configuration equation in the weak-field limit.
+
 ## CSV output columns
 
 **theta_profile.csv** (single source: no axis column; symmetric pair: `axis` = x or y)
@@ -39,6 +51,7 @@ This is a **provisional weak-field point-source ansatz**, NOT the full nonlinear
 | theta_xx, theta_xy, theta_yy | Theta tensor components |
 | theta_trace | Theta_xx + Theta_yy |
 | invariant_I | I = Theta_mn Theta^mn - λ Theta² |
+| residual_x, residual_y, residual_norm | Configuration-equation residual components and norm |
 
 **invariant_profile.csv**
 
@@ -47,16 +60,23 @@ This is a **provisional weak-field point-source ansatz**, NOT the full nonlinear
 | radius | (or axis, radius for symmetric pair) |
 | invariant_I | Scalar invariant |
 | theta_trace | Trace of Theta |
+| residual_norm | ||R|| = sqrt(R_x² + R_y²) |
 
-## Symmetry behavior on +x probe line
+## Symmetry behavior on probe lines
 
 For **single-source** at origin, probing along +x (y=0):
 
 - **theta_xy ≈ 0** — by symmetry (y=0 is a principal axis)
+- **residual_y ≈ 0** — by symmetry (configuration equation)
 - **theta_xx ≠ theta_yy** — radial vs transverse structure (anisotropy)
 - **invariant_I** — decays smoothly with radius
 
-`field_summary.txt` reports whether these expectations hold numerically.
+For **symmetric pair** at (±d, 0):
+
+- **residual_y ≈ 0** on +x axis (y=0 symmetry)
+- **residual_x ≈ 0** on +y axis (x=0 symmetry)
+
+`field_summary.txt` reports max residual magnitudes and whether these symmetry expectations hold.
 
 ## Config (defaults.cfg)
 
@@ -64,6 +84,7 @@ For **single-source** at origin, probing along +x (y=0):
 - `tpfcore_probe_radius_min`, `tpfcore_probe_radius_max`, `tpfcore_probe_samples`
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
+- `tpfcore_residual_step` — step size for numerical residual (default 1e-6); not used when analytic.
 
 ## How to run
 

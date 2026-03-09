@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::cout << "Inspection mode: tpf_single_source_inspect\n";
+    std::cout << "Residual checking: enabled (analytic)\n";
     std::cout << "Probe: +x axis, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << "\n";
     tpfcore->run_single_source_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
@@ -168,6 +169,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::cout << "Inspection mode: tpf_symmetric_pair_inspect\n";
+    std::cout << "Residual checking: enabled (analytic)\n";
     std::cout << "Probe: +x and +y axes, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << " per axis\n";
     tpfcore->run_symmetric_pair_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";

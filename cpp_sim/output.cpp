@@ -39,6 +39,8 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_probe_radius_min\t" << config.tpfcore_probe_radius_min << "\n";
     f << "tpfcore_probe_radius_max\t" << config.tpfcore_probe_radius_max << "\n";
     f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
+    f << "tpfcore_residual_method\tanalytic\n";
+    f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";
