@@ -101,7 +101,7 @@ cpp_sim/physics/
 
 ### Selecting a package in config
 
-In your config file (e.g. `configs/my.local.cfg`):
+In your run config in **root** `configs/` (e.g. `configs/my.local.cfg` or `../configs/my.local.cfg` when run from `cpp_sim/`):
 
 ```
 physics_package = Newtonian
@@ -147,50 +147,51 @@ Packages are **compiled C++** implementing the shared interface; there are no Py
 
 ## Configuration
 
-The simulator uses a **layered config system**: built-in defaults → package defaults → user run config. No recompilation needed.
+The simulator uses a **layered config system** with a single canonical place for run configs. No recompilation needed.
 
-### Shared run config vs package-local defaults
+### Canonical locations (no duplicates)
 
-| Layer | Location | Purpose |
-|-------|----------|---------|
-| **Built-in defaults** | `Config` in `config.hpp` | Fallback when no file supplies a value |
-| **Package defaults** | `cpp_sim/physics/<PackageName>/defaults.cfg` | Package-specific options (e.g. TPFCore: `tpfcore_probe_radius_min`, etc.) |
-| **User run config** | `configs/my.local.cfg` (or `configs/local/my.local.cfg`) | Your personal overrides; overrides everything |
+- **Run configs** — **only** in the **repository root** `configs/` directory (e.g. `../configs/my.local.cfg` when running from `cpp_sim/`, or `configs/my.local.cfg` when running from repo root). The simulator **never** reads run configs from `cpp_sim/configs/`; if that directory exists it is ignored (with a warning) or the program exits with an error if you had a config only there.
+- **Package defaults** — **only** in `cpp_sim/physics/<Package>/defaults.cfg` (e.g. `physics/Newtonian/defaults.cfg`, `physics/TPFCore/defaults.cfg` when run from `cpp_sim/`).
 
 ### Config precedence
 
-**Order (lowest to highest):** built-in defaults → package defaults → run config → **CLI override** (if applicable).
+**Order (lowest to highest):** built-in defaults → package defaults → root run config → **CLI override**.
 
 1. **Built-in defaults** — `Config` in `config.hpp`
-2. **Package defaults** — `physics/<PackageName>/defaults.cfg` (chosen by `physics_package` probed from run config)
-3. **Run config** — first existing of `configs/my.local.cfg`, `../configs/my.local.cfg`, etc. (depends on current working directory)
+2. **Package defaults** — `cpp_sim/physics/<Package>/defaults.cfg` (chosen by `physics_package` probed from run config)
+3. **Root run config** — repository root `configs/my.local.cfg` or `configs/local/my.local.cfg` (only; no `cpp_sim/configs/`)
 4. **CLI override** — `./galaxy_sim <mode>` overrides `simulation_mode` only
 
 On startup the simulator prints **Run config selected: …**, **CLI override applied: …** (if any), and a **Resolved config** banner (RUN CONFIG, PACKAGE DEFAULTS, PHYSICS PACKAGE, SIMULATION MODE, OUTPUT DIR, and key values). The same resolved block is written at the top of **run_info.txt**. Use these to confirm which config and mode were actually used.
 
 ### Where config files live
 
-- **Run config**: `configs/my.local.cfg`, `configs/local/my.local.cfg` (tried in order). Works from repo root or `cpp_sim/`.
-- **Package defaults**: `cpp_sim/physics/Newtonian/defaults.cfg`, `cpp_sim/physics/TPFCore/defaults.cfg`, etc. Version-controlled with each package.
+| What | Location |
+|------|----------|
+| **Run config** | Repository root **`configs/my.local.cfg`** or **`configs/local/my.local.cfg`** only. When you run from `cpp_sim/`, that is `../configs/`. |
+| **Package defaults** | **`cpp_sim/physics/<Package>/defaults.cfg`** only (e.g. `physics/TPFCore/defaults.cfg` when run from `cpp_sim/`). Version-controlled with each package. |
 
 ### Personal local config
 
-1. Copy **`configs/example.cfg`** to **`configs/my.local.cfg`**
-2. Edit `configs/my.local.cfg` — it is gitignored
-3. Override any setting, including package-specific ones (e.g. `tpfcore_probe_radius_max`)
+1. Copy **`configs/example.cfg`** (in repo root) to **`configs/my.local.cfg`** (repo root).
+2. Edit **`configs/my.local.cfg`** — it is gitignored.
+3. Override any setting, including package-specific ones (e.g. `tpfcore_probe_radius_max`).
+
+Do **not** put run configs under `cpp_sim/configs/`; use root **`configs/`** only.
 
 On startup you'll see:
 ```
+Run config selected: ../configs/my.local.cfg
 Loaded package defaults: physics/TPFCore/defaults.cfg
-Loaded run config: configs/my.local.cfg
 ```
 
 ### Adding a new package with defaults
 
-1. Create `cpp_sim/physics/MyPackage/defaults.cfg` with your package's keys
-2. Register the package in `physics/registry.cpp`
-3. Users select it with `physics_package = MyPackage` in the run config
-4. Your package defaults apply first; run config overrides them
+1. Create **`cpp_sim/physics/MyPackage/defaults.cfg`** with your package's keys (package defaults live only there).
+2. Register the package in `physics/registry.cpp`.
+3. Users select it with `physics_package = MyPackage` in the **root** run config (`configs/my.local.cfg`).
+4. Precedence: package defaults then root run config; CLI overrides `simulation_mode` only.
 
 - Command-line mode (e.g. `./galaxy_sim two_body_orbit`) overrides `simulation_mode` after the config is loaded.
 

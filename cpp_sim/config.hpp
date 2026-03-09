@@ -32,10 +32,13 @@ bool load_config_file(const std::string& path, Config& config);
 // Returns empty if file does not exist or key not found.
 std::string probe_config_key(const std::string& path, const std::string& key);
 
-// Find first existing run config path. Returns empty if none found.
+// Find first existing run config path (root configs/ only). Returns empty if none found.
 std::string find_run_config_path();
 
-// Find package defaults path for given package name. Returns first existing path, else empty.
+// If cpp_sim/configs/ exists: warn when using root configs, fail when run config was only there. Returns false to exit(1).
+bool check_run_config_canonical(const std::string& run_config_path);
+
+// Find package defaults path for given package name. Returns path if exists, else empty.
 std::string find_package_defaults_path(const std::string& package_name);
 
 struct Config {

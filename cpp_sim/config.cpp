@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
@@ -139,24 +140,42 @@ std::string probe_config_key(const std::string& path, const std::string& key) {
   return "";
 }
 
+// Root configs only: try repo-root configs/ (../configs when run from cpp_sim, configs when run from repo root).
+// We never use cpp_sim/configs/; if it exists we warn or fail (see check_run_config_canonical).
 std::string find_run_config_path() {
-  const char* candidates[] = {
-    "configs/my.local.cfg",
-    "../configs/my.local.cfg",
-    "configs/local/my.local.cfg",
-    "../configs/local/my.local.cfg",
-  };
-  for (const char* p : candidates) {
-    if (file_exists(p)) return p;
+  // 1. Root configs when run from cpp_sim/
+  if (file_exists("../configs/my.local.cfg")) return "../configs/my.local.cfg";
+  if (file_exists("../configs/local/my.local.cfg")) return "../configs/local/my.local.cfg";
+  // 2. Root configs when run from repo root (only if ../configs is not the repo root = we are at repo root)
+  if (!file_exists("../configs/example.cfg")) {
+    if (file_exists("configs/my.local.cfg")) return "configs/my.local.cfg";
+    if (file_exists("configs/local/my.local.cfg")) return "configs/local/my.local.cfg";
   }
   return "";
 }
 
+// If cpp_sim/configs/ exists (configs/ when cwd is cpp_sim): warn when we're using root configs, fail when we'd have used it.
+// Returns false if caller should exit(1).
+bool check_run_config_canonical(const std::string& run_config_path) {
+  bool have_local = file_exists("configs/my.local.cfg") || file_exists("configs/local/my.local.cfg");
+  if (run_config_path.empty()) {
+    if (have_local) {
+      std::cerr << "Error: run config found under configs/ but run configs must live in repository root configs/, "
+                   "not cpp_sim/configs/. Use root configs/ (e.g. ../configs/my.local.cfg when running from cpp_sim).\n";
+      return false;
+    }
+    return true;
+  }
+  if (have_local && run_config_path.find("../configs/") == 0u) {
+    std::cout << "Warning: configs/ (cpp_sim/configs/) exists but is ignored. Run configs must live in root configs/ only.\n";
+  }
+  return true;
+}
+
+// Package defaults only in cpp_sim/physics/<Package>/defaults.cfg (relative to cpp_sim when run from cpp_sim).
 std::string find_package_defaults_path(const std::string& package_name) {
-  const std::string rel = "physics/" + package_name + "/defaults.cfg";
-  const std::string alt = "cpp_sim/physics/" + package_name + "/defaults.cfg";
-  if (file_exists(rel)) return rel;
-  if (file_exists(alt)) return alt;
+  const std::string path = "physics/" + package_name + "/defaults.cfg";
+  if (file_exists(path)) return path;
   return "";
 }
 

@@ -70,8 +70,10 @@ std::string format_elapsed(double sec) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  // 1. Find run config path (first existing candidate wins)
+  // 1. Find run config path (root configs/ only; cpp_sim/configs/ is not used)
   std::string run_config_path = galaxy::find_run_config_path();
+  if (!galaxy::check_run_config_canonical(run_config_path))
+    return 1;
   if (!run_config_path.empty()) {
     std::cout << "Run config selected: " << run_config_path << "\n";
   } else {
