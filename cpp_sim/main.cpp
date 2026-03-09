@@ -70,8 +70,13 @@ std::string format_elapsed(double sec) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  // 1. Find run config path (for probe and later full load)
+  // 1. Find run config path (first existing candidate wins)
   std::string run_config_path = galaxy::find_run_config_path();
+  if (!run_config_path.empty()) {
+    std::cout << "Run config selected: " << run_config_path << "\n";
+  } else {
+    std::cout << "Run config selected: (none)\n";
+  }
 
   // 2. Probe run config for physics_package (needed to load package defaults)
   std::string physics_pkg = "Newtonian";
@@ -86,25 +91,54 @@ int main(int argc, char** argv) {
   std::string package_defaults_path = galaxy::find_package_defaults_path(physics_pkg);
   if (!package_defaults_path.empty()) {
     galaxy::load_config_file(package_defaults_path, config);
-    std::cout << "Loaded package defaults: " << package_defaults_path << "\n";
   }
-
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
-    std::cout << "Loaded run config: " << run_config_path << "\n";
   }
 
   config.run_id = run_id_from_time();
   config.output_dir = "outputs/" + config.run_id;
 
+  bool cli_override_mode = false;
   if (argc >= 2) {
     try {
       config.simulation_mode = galaxy::parse_mode(argv[1]);
+      cli_override_mode = true;
+      std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
       std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c\n";
       return 1;
     }
   }
+
+  /* Probe run config for consistency check (what did the file say?) */
+  std::string run_cfg_physics = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "physics_package");
+  std::string run_cfg_mode_str = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "simulation_mode");
+
+  /* Hard failure: run config says TPFCore + two_body_orbit but resolved is galaxy with no CLI override */
+  if (!run_config_path.empty() && cli_override_mode == false) {
+    if (run_cfg_physics == "TPFCore" && run_cfg_mode_str == "two_body_orbit" &&
+        config.simulation_mode == galaxy::SimulationMode::galaxy) {
+      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPFCore and simulation_mode=two_body_orbit, "
+                << "but resolved simulation_mode is galaxy. Refusing to run. Fix config precedence or run: ./galaxy_sim two_body_orbit\n";
+      return 1;
+    }
+  }
+
+  /* Startup banner: resolved config */
+  std::cout << "--- Resolved config ---\n";
+  std::cout << "RUN CONFIG: " << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
+  std::cout << "PACKAGE DEFAULTS: " << (package_defaults_path.empty() ? "(none)" : package_defaults_path) << "\n";
+  std::cout << "PHYSICS PACKAGE: " << config.physics_package << "\n";
+  std::cout << "SIMULATION MODE: " << galaxy::mode_to_string(config.simulation_mode) << "\n";
+  std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
+  std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
+  if (config.physics_package == "TPFCore") {
+    std::cout << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
+              << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode
+              << "  tpfcore_isotropic_correction_c: " << config.tpfcore_isotropic_correction_c << "\n";
+  }
+  std::cout << "------------------------\n";
 
   if (config.physics_package.empty())
     config.physics_package = "Newtonian";
@@ -147,8 +181,6 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "Galaxy N-body (C++)\n";
-  std::cout << "Output directory: " << config.output_dir << "\n";
-  std::cout << "Mode: " << static_cast<int>(config.simulation_mode) << "\n";
 
   galaxy::TPFCorePackage* tpfcore = dynamic_cast<galaxy::TPFCorePackage*>(physics);
 

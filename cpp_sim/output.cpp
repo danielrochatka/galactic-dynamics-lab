@@ -19,6 +19,22 @@ void write_run_info(const std::string& output_dir,
 
   int n_star = (n_particles >= 0) ? n_particles : config.n_stars;
 
+  /* Resolved config banner at top so it is obvious what was used */
+  f << "=== Resolved config (built-in < package defaults < run config < CLI) ===\n";
+  f << "run_config\t" << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
+  f << "package_defaults\t" << (package_defaults_path.empty() ? "(none)" : package_defaults_path) << "\n";
+  f << "physics_package\t" << config.physics_package << "\n";
+  f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
+  f << "output_dir\t" << output_dir << "\n";
+  f << "n_stars\t" << n_star << "\n";
+  f << "bh_mass\t" << config.bh_mass << "\n";
+  if (config.physics_package == "TPFCore") {
+    f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+    f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
+  }
+  f << "=== End resolved config ===\n\n";
+
   f << "dt\t" << config.dt << "\n";
   f << "n_steps\t" << n_steps_done << "\n";
   f << "snapshot_every\t" << config.snapshot_every << "\n";

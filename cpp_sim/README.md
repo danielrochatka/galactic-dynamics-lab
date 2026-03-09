@@ -157,13 +157,16 @@ The simulator uses a **layered config system**: built-in defaults → package de
 | **Package defaults** | `cpp_sim/physics/<PackageName>/defaults.cfg` | Package-specific options (e.g. TPFCore: `tpfcore_probe_radius_min`, etc.) |
 | **User run config** | `configs/my.local.cfg` (or `configs/local/my.local.cfg`) | Your personal overrides; overrides everything |
 
-### Load precedence
+### Config precedence
 
-1. **Built-in defaults** (C++ `Config` struct)
-2. **Package defaults** — when `physics_package = X` is selected, load `physics/X/defaults.cfg` if it exists
-3. **User run config** — overrides all (including package defaults)
+**Order (lowest to highest):** built-in defaults → package defaults → run config → **CLI override** (if applicable).
 
-Package authors own their package defaults. Users override from the run config when needed.
+1. **Built-in defaults** — `Config` in `config.hpp`
+2. **Package defaults** — `physics/<PackageName>/defaults.cfg` (chosen by `physics_package` probed from run config)
+3. **Run config** — first existing of `configs/my.local.cfg`, `../configs/my.local.cfg`, etc. (depends on current working directory)
+4. **CLI override** — `./galaxy_sim <mode>` overrides `simulation_mode` only
+
+On startup the simulator prints **Run config selected: …**, **CLI override applied: …** (if any), and a **Resolved config** banner (RUN CONFIG, PACKAGE DEFAULTS, PHYSICS PACKAGE, SIMULATION MODE, OUTPUT DIR, and key values). The same resolved block is written at the top of **run_info.txt**. Use these to confirm which config and mode were actually used.
 
 ### Where config files live
 

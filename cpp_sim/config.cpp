@@ -43,6 +43,20 @@ SimulationMode parse_mode(const std::string& s) {
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
+std::string mode_to_string(SimulationMode m) {
+  switch (m) {
+    case SimulationMode::galaxy: return "galaxy";
+    case SimulationMode::two_body_orbit: return "two_body_orbit";
+    case SimulationMode::symmetric_pair: return "symmetric_pair";
+    case SimulationMode::small_n_conservation: return "small_n_conservation";
+    case SimulationMode::timestep_convergence: return "timestep_convergence";
+    case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
+    case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
+    case SimulationMode::tpf_single_source_optimize_c: return "tpf_single_source_optimize_c";
+  }
+  return "unknown";
+}
+
 bool load_config_file(const std::string& path, Config& config) {
   std::ifstream f(path);
   if (!f) return false;

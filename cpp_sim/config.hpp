@@ -19,6 +19,9 @@ enum class SimulationMode {
 
 SimulationMode parse_mode(const std::string& s);
 
+/** Return canonical string for mode (for display and run_info). */
+std::string mode_to_string(SimulationMode m);
+
 struct Config;
 
 // Load key=value pairs from a .cfg file into config. Returns true if file was read.
