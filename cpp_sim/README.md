@@ -57,6 +57,11 @@ Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 - **Galaxy ICs**: Disk uniform in area, v_circ from enclosed mass (BH + stars inside r), tangential direction + velocity noise.
 - **Validation ICs**: two_body (r0, v0 from speed_ratio×v_circ), symmetric_pair (±a, ±v), small_n (ring, seed 42).
 
+## Configuration
+
+- C++ defaults live in **`config.hpp`** (`Config`). Edit and rebuild to change.
+- The repo **`configs/`** folder holds shared example config (see root README): `configs/example.cfg` documents options; local overrides go in `configs/local/` or `configs/*.local.cfg` (gitignored). The C++ binary does not read `.cfg` files; the example is for reference and consistency with the Python side.
+
 ## Not ported (use Python)
 
 - Matplotlib rendering, diagnostic plots, MP4/GIF.
