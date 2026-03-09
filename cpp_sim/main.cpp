@@ -17,10 +17,14 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #define MKDIR(path, mode) _mkdir(path)
+#define IS_STDOUT_TERMINAL() (_isatty(_fileno(stdout)) != 0)
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #define MKDIR(path, mode) mkdir(path, mode)
+#define IS_STDOUT_TERMINAL() (isatty(STDOUT_FILENO) != 0)
 #endif
 
 namespace {
@@ -167,25 +171,35 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Progress reporting: only for galaxy (long runs); interval = every 1% or 1000 steps, whichever is less frequent
+  // Progress reporting: only for galaxy (long runs); in-place line when stdout is a terminal
   int progress_interval = 0;
   galaxy::ProgressCallback progress_callback;
+  bool progress_to_terminal = false;
   if (config.simulation_mode == galaxy::SimulationMode::galaxy && n_steps > 0) {
     progress_interval = std::max(1, std::min(1000, n_steps / 100));
     auto start_wall = std::chrono::steady_clock::now();
-    progress_callback = [start_wall, &config](int step, int n_steps, double sim_time) {
+    progress_to_terminal = IS_STDOUT_TERMINAL();
+    progress_callback = [start_wall, &config, progress_to_terminal](int step, int n_steps, double sim_time) {
       auto now = std::chrono::steady_clock::now();
       double elapsed_sec = 1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
       double eta_sec = (step > 0 && step < n_steps)
           ? (elapsed_sec / step) * (n_steps - step)
           : 0.0;
       double pct = 100.0 * step / n_steps;
-      std::cout << "[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                << "step " << step << "/" << n_steps
-                << ", sim t=" << std::setprecision(2) << sim_time
-                << ", elapsed=" << format_elapsed(elapsed_sec)
-                << ", eta=" << format_elapsed(eta_sec) << "\n"
-                << std::flush;
+      if (progress_to_terminal) {
+        std::cout << "\r[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
+                  << "step " << step << "/" << n_steps
+                  << ", sim t=" << std::setprecision(2) << sim_time
+                  << ", elapsed=" << format_elapsed(elapsed_sec)
+                  << ", eta=" << format_elapsed(eta_sec) << "    " << std::flush;
+      } else {
+        std::cout << "[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
+                  << "step " << step << "/" << n_steps
+                  << ", sim t=" << std::setprecision(2) << sim_time
+                  << ", elapsed=" << format_elapsed(elapsed_sec)
+                  << ", eta=" << format_elapsed(eta_sec) << "\n"
+                  << std::flush;
+      }
     };
   }
 
@@ -196,6 +210,8 @@ int main(int argc, char** argv) {
       std::chrono::steady_clock::now() - run_start).count();
 
   if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
+    if (progress_to_terminal)
+      std::cout << "\n";
     std::cout << "Completed in " << format_elapsed(run_elapsed_sec)
               << ". Snapshots: " << snapshots.size()
               << ". Output: " << config.output_dir << "\n";
