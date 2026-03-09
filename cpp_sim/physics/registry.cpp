@@ -1,6 +1,6 @@
 #include "physics_package.hpp"
 #include "Newtonian/newtonian.hpp"
-#include "TPF/tpf_package.hpp"
+#include "TPFCore/tpf_core_package.hpp"
 #include <stdexcept>
 
 namespace galaxy {
@@ -15,11 +15,11 @@ double compute_kinetic_energy(const State& state) {
 namespace {
 
 NewtonianPackage s_newtonian;
-TPFPackage s_tpf;
+TPFCorePackage s_tpfcore;
 
 PhysicsPackage* s_packages[] = {
   &s_newtonian,
-  &s_tpf,
+  &s_tpfcore,
 };
 const int s_num_packages = sizeof(s_packages) / sizeof(s_packages[0]);
 

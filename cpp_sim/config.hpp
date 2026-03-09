@@ -5,13 +5,15 @@
 
 namespace galaxy {
 
-// Simulation mode: matches Python VALIDATION_MODES + "galaxy"
+// Simulation mode: matches Python VALIDATION_MODES + "galaxy" + TPFCore inspection modes
 enum class SimulationMode {
   galaxy,
   two_body_orbit,
   symmetric_pair,
   small_n_conservation,
-  timestep_convergence
+  timestep_convergence,
+  tpf_single_source_inspect,
+  tpf_symmetric_pair_inspect
 };
 
 SimulationMode parse_mode(const std::string& s);
@@ -49,15 +51,21 @@ struct Config {
   double softening = 1.0;
   bool enable_star_star_gravity = true;
 
-  /** Physics package name (e.g. "Newtonian"). Must match a registered package. Default: Newtonian. */
+  /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
   std::string physics_package = "Newtonian";
 
-  /** TPF weak-field package only: coupling alpha in nabla^2 phi = alpha*rho. Default 4*pi for Newtonian-scale. */
-  double tpf_alpha = -1.0;  // -1 = use tpf_match_newtonian_scale
-  /** TPF: use alpha=4*pi to match Newtonian magnitudes for comparison. Overrides tpf_alpha when true. */
-  bool tpf_match_newtonian_scale = true;
-  /** TPF: softening for Green-function evaluation. If <= 0, use global softening. */
-  double tpf_softening = 0.0;
+  /** TPFCore only: enable provisional acceleration readout for dynamical modes. Default false. */
+  bool tpfcore_enable_provisional_readout = false;
+  /** TPFCore inspection: probe radius min. */
+  double tpfcore_probe_radius_min = 1.0;
+  /** TPFCore inspection: probe radius max. */
+  double tpfcore_probe_radius_max = 50.0;
+  /** TPFCore inspection: number of probe samples along axis. */
+  int tpfcore_probe_samples = 100;
+  /** TPFCore inspection: write invariant_profile.csv. */
+  bool tpfcore_dump_invariant_profile = true;
+  /** TPFCore inspection: write theta_profile.csv. */
+  bool tpfcore_dump_theta_profile = true;
 
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;

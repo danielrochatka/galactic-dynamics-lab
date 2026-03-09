@@ -5,10 +5,6 @@
 
 namespace galaxy {
 
-namespace {
-const double FOUR_PI = 4.0 * 3.14159265358979323846;
-}
-
 void write_run_info(const std::string& output_dir,
                     const Config& config,
                     int n_steps_done,
@@ -35,12 +31,12 @@ void write_run_info(const std::string& output_dir,
   f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
-  if (config.physics_package == "TPF") {
-    double alpha = config.tpf_match_newtonian_scale ? FOUR_PI
-        : (config.tpf_alpha > 0.0 ? config.tpf_alpha : FOUR_PI);
-    f << "tpf_alpha\t" << std::scientific << alpha << "\n";
-    f << "tpf_match_newtonian_scale\t" << (config.tpf_match_newtonian_scale ? 1 : 0) << "\n";
-    f << "tpf_softening\t" << config.tpf_softening << "\n";
+  if (config.physics_package == "TPFCore") {
+    f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+    f << "tpfcore_provisional_source_ansatz\t1\n";
+    f << "tpfcore_probe_radius_min\t" << config.tpfcore_probe_radius_min << "\n";
+    f << "tpfcore_probe_radius_max\t" << config.tpfcore_probe_radius_max << "\n";
+    f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

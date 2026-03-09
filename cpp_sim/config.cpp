@@ -37,6 +37,8 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "symmetric_pair") return SimulationMode::symmetric_pair;
   if (t == "small_n_conservation") return SimulationMode::small_n_conservation;
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
+  if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
+  if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -69,9 +71,12 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "softening") { config.softening = std::stod(val); continue; }
       if (key == "enable_star_star_gravity") { config.enable_star_star_gravity = parse_bool(val); continue; }
       if (key == "physics_package") { config.physics_package = val; continue; }
-      if (key == "tpf_alpha") { config.tpf_alpha = std::stod(val); continue; }
-      if (key == "tpf_match_newtonian_scale") { config.tpf_match_newtonian_scale = parse_bool(val); continue; }
-      if (key == "tpf_softening") { config.tpf_softening = std::stod(val); continue; }
+      if (key == "tpfcore_enable_provisional_readout") { config.tpfcore_enable_provisional_readout = parse_bool(val); continue; }
+      if (key == "tpfcore_probe_radius_min") { config.tpfcore_probe_radius_min = std::stod(val); continue; }
+      if (key == "tpfcore_probe_radius_max") { config.tpfcore_probe_radius_max = std::stod(val); continue; }
+      if (key == "tpfcore_probe_samples") { config.tpfcore_probe_samples = std::stoi(val); continue; }
+      if (key == "tpfcore_dump_invariant_profile") { config.tpfcore_dump_invariant_profile = parse_bool(val); continue; }
+      if (key == "tpfcore_dump_theta_profile") { config.tpfcore_dump_theta_profile = parse_bool(val); continue; }
       if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
       if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
       if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }

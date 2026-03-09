@@ -28,24 +28,40 @@ From the `cpp_sim/` directory:
 | `symmetric_pair` | Two mirrored stars (validation). |
 | `small_n_conservation` | Small N-body, n=3..10 (validation). |
 | `timestep_convergence` | Two-body at dt, dt/2, dt/4 (validation). |
+| `tpf_single_source_inspect` | TPFCore: one source at origin, probe Theta/I along +x (requires `physics_package = TPFCore`). |
+| `tpf_symmetric_pair_inspect` | TPFCore: symmetric pair, probe Theta/I along +x (requires `physics_package = TPFCore`). |
 
-Example:
+Example (Newtonian dynamics):
 
 ```bash
 ./galaxy_sim two_body_orbit
 ./galaxy_sim symmetric_pair
-./galaxy_sim small_n_conservation
-./galaxy_sim timestep_convergence
 ./galaxy_sim galaxy
+```
+
+Example (TPFCore inspection):
+
+```bash
+# In config: physics_package = TPFCore
+./galaxy_sim tpf_single_source_inspect
+./galaxy_sim tpf_symmetric_pair_inspect
 ```
 
 Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 
 ## Output files
 
+**Dynamical modes (Newtonian):**
+
 - **`run_info.txt`** — dt, n_steps, softening, bh_mass, star_mass, enable_star_star_gravity, total_simulated_time, number_of_snapshots, n_stars, simulation_mode, physics_package.
 - **`snapshot_00000.csv`**, **`snapshot_00010.csv`**, … — Per-snapshot state: header `# step,<step>,time,<time>`, then rows `i,x,y,vx,vy,mass`.
 - **`validation_timestep_convergence.txt`** — Only for `timestep_convergence`: dt vs final_x, final_y, final_r, L_z, E_drift.
+
+**TPFCore inspection modes** (`tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`):
+
+- **`theta_profile.csv`** — radius, theta_xx, theta_xy, theta_yy, theta_trace, invariant_I.
+- **`invariant_profile.csv`** — radius, invariant_I.
+- **`field_summary.txt`** — geometry, source positions, provisional-ansatz flag.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
@@ -53,11 +69,13 @@ Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
 The simulator loads the physics model by **package name** from config. All packages are compiled into the binary; dispatch is by name at runtime.
 
+**Available packages:** Newtonian, TPFCore. The old misleading TPF package (which collapsed to Newtonian-style scalar potential) has been **removed**.
+
 ### Structure
 
 - **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `init_from_config`, `validation_name`.
 - **`physics/Newtonian/`** — Default package: Newtonian gravity (BH at origin + optional star–star with softening).
-- **`physics/TPF/`** — TPF weak-field correspondence package (linearized sector only; see below).
+- **`physics/TPFCore/`** — Primitive TPF structure (Theta, I). Inspection-first; see below.
 - **`physics/Template/`** — Stub package and README for adding a new package.
 - **`physics/registry.cpp`** — Registry: maps package name → implementation. Add new packages here.
 
@@ -68,7 +86,7 @@ cpp_sim/physics/
   physics_package.hpp
   registry.cpp
   Newtonian/
-  TPF/
+  TPFCore/
   Template/
   MyCustomPhysics/   (your package)
 ```
@@ -82,17 +100,12 @@ physics_package = Newtonian
 ```
 
 - **Default**: If `physics_package` is omitted or empty, **Newtonian** is used.
-- If the name is unknown, the program exits with a clear error and lists available packages (Newtonian, TPF, etc.).
+- If the name is unknown, the program exits with a clear error and lists available packages (Newtonian, TPFCore).
 - The chosen package name is written to **`run_info.txt`** as `physics_package\t<name>`.
 
-### TPF weak-field package
+### TPFCore (inspection-first)
 
-The **TPF** package implements the paper’s **weak-field correspondence sector only**. It is **not** a full variational TPF solver.
-
-- **Selection**: Set `physics_package = TPF` in your run config.
-- **Package defaults**: `physics/TPF/defaults.cfg` defines `tpf_alpha`, `tpf_match_newtonian_scale`, `tpf_softening`. Override from run config if desired.
-- **Output**: When TPF is used, `run_info.txt` includes `tpf_alpha`, `tpf_match_newtonian_scale`, `tpf_softening`. Console prints `Physics: TPF weak-field correspondence package`.
-- **Scope**: Linearized Poisson-type sector (nabla² phi = alpha×rho). No full nonlinear/dynamic TPF. See `physics/TPF/README.md`.
+**WARNING:** TPFCore is incomplete/provisional. Use Newtonian for dynamics. See `physics/TPFCore/README.md`.
 
 ### Adding a new package
 
@@ -123,7 +136,7 @@ The simulator uses a **layered config system**: built-in defaults → package de
 | Layer | Location | Purpose |
 |-------|----------|---------|
 | **Built-in defaults** | `Config` in `config.hpp` | Fallback when no file supplies a value |
-| **Package defaults** | `cpp_sim/physics/<PackageName>/defaults.cfg` | Package-specific options (e.g. TPF: `tpf_alpha`, `tpf_match_newtonian_scale`) |
+| **Package defaults** | `cpp_sim/physics/<PackageName>/defaults.cfg` | Package-specific options (e.g. TPFCore: `tpfcore_probe_radius_min`, etc.) |
 | **User run config** | `configs/my.local.cfg` (or `configs/local/my.local.cfg`) | Your personal overrides; overrides everything |
 
 ### Load precedence
@@ -137,17 +150,17 @@ Package authors own their package defaults. Users override from the run config w
 ### Where config files live
 
 - **Run config**: `configs/my.local.cfg`, `configs/local/my.local.cfg` (tried in order). Works from repo root or `cpp_sim/`.
-- **Package defaults**: `cpp_sim/physics/Newtonian/defaults.cfg`, `cpp_sim/physics/TPF/defaults.cfg`, etc. Version-controlled with each package.
+- **Package defaults**: `cpp_sim/physics/Newtonian/defaults.cfg`, `cpp_sim/physics/TPFCore/defaults.cfg`, etc. Version-controlled with each package.
 
 ### Personal local config
 
 1. Copy **`configs/example.cfg`** to **`configs/my.local.cfg`**
 2. Edit `configs/my.local.cfg` — it is gitignored
-3. Override any setting, including package-specific ones (e.g. `tpf_alpha`)
+3. Override any setting, including package-specific ones (e.g. `tpfcore_probe_radius_max`)
 
 On startup you'll see:
 ```
-Loaded package defaults: physics/TPF/defaults.cfg
+Loaded package defaults: physics/TPFCore/defaults.cfg
 Loaded run config: configs/my.local.cfg
 ```
 

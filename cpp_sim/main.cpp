@@ -2,6 +2,7 @@
 #include "init_conditions.hpp"
 #include "output.hpp"
 #include "physics/physics_package.hpp"
+#include "physics/TPFCore/tpf_core_package.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
 
@@ -100,7 +101,7 @@ int main(int argc, char** argv) {
     try {
       config.simulation_mode = galaxy::parse_mode(argv[1]);
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect\n";
       return 1;
     }
   }
@@ -109,13 +110,29 @@ int main(int argc, char** argv) {
     config.physics_package = "Newtonian";
   galaxy::PhysicsPackage* physics = galaxy::get_physics_package(config.physics_package);
   if (!physics) {
-    std::cerr << "Unknown physics_package: '" << config.physics_package << "'. Available: Newtonian, TPF (add more in physics/registry.cpp).\n";
+    std::cerr << "Unknown physics_package: '" << config.physics_package << "'. Available: Newtonian, TPFCore (add more in physics/registry.cpp).\n";
     return 1;
   }
   physics->init_from_config(config);
 
-  if (config.physics_package == "TPF") {
-    std::cout << "Physics: TPF weak-field correspondence package\n";
+  if (config.physics_package == "TPFCore") {
+    galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
+    std::cout << "Physics: TPFCore (primitive TPF structure)\n";
+    std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled") << "\n";
+    std::cout << "  Provisional source ansatz: in use (see source_ansatz.hpp)\n";
+
+    if (!tpf->provisional_readout_enabled()) {
+      bool is_dynamical = (config.simulation_mode == galaxy::SimulationMode::galaxy ||
+                           config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
+                           config.simulation_mode == galaxy::SimulationMode::symmetric_pair ||
+                           config.simulation_mode == galaxy::SimulationMode::small_n_conservation ||
+                           config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
+      if (is_dynamical) {
+        std::cerr << "TPFCore does not support dynamical modes (galaxy, two_body_orbit, etc.) unless provisional readout is enabled.\n";
+        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
+        return 1;
+      }
+    }
   }
 
   if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
@@ -127,12 +144,46 @@ int main(int argc, char** argv) {
   std::cout << "Output directory: " << config.output_dir << "\n";
   std::cout << "Mode: " << static_cast<int>(config.simulation_mode) << "\n";
 
+  galaxy::TPFCorePackage* tpfcore = dynamic_cast<galaxy::TPFCorePackage*>(physics);
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_single_source_inspect) {
+    if (!tpfcore) {
+      std::cerr << "tpf_single_source_inspect requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    tpfcore->run_single_source_inspect(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_symmetric_pair_inspect) {
+    if (!tpfcore) {
+      std::cerr << "tpf_symmetric_pair_inspect requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    tpfcore->run_symmetric_pair_inspect(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
   double bh_mass = config.bh_mass;
 
   switch (config.simulation_mode) {
+    case galaxy::SimulationMode::tpf_single_source_inspect:
+    case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
+      std::cerr << "Internal error: inspection modes should have returned earlier.\n";
+      return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
       std::cout << "Running galaxy: n_stars=" << config.n_stars
