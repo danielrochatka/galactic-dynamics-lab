@@ -60,6 +60,7 @@ bool load_config_file(const std::string& path, Config& config) {
     if (key == "snapshot_every") { config.snapshot_every = std::stoi(val); continue; }
     if (key == "softening") { config.softening = std::stod(val); continue; }
     if (key == "enable_star_star_gravity") { config.enable_star_star_gravity = parse_bool(val); continue; }
+    if (key == "physics_package") { config.physics_package = val; continue; }
     if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
     if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
     if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }

@@ -39,6 +39,9 @@ struct Config {
   double softening = 1.0;
   bool enable_star_star_gravity = true;
 
+  /** Physics package name (e.g. "Newtonian"). Must match a registered package. Default: Newtonian. */
+  std::string physics_package = "Newtonian";
+
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
 

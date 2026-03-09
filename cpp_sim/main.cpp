@@ -1,7 +1,7 @@
 #include "config.hpp"
 #include "init_conditions.hpp"
 #include "output.hpp"
-#include "physics.hpp"
+#include "physics/physics_package.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
 
@@ -97,6 +97,14 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (config.physics_package.empty())
+    config.physics_package = "Newtonian";
+  const galaxy::PhysicsPackage* physics = galaxy::get_physics_package(config.physics_package);
+  if (!physics) {
+    std::cerr << "Unknown physics_package: '" << config.physics_package << "'. Available: Newtonian (add more in physics/registry.cpp).\n";
+    return 1;
+  }
+
   if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
     std::cerr << "Failed to create output dir " << config.output_dir << "\n";
     return 1;
@@ -161,7 +169,7 @@ int main(int argc, char** argv) {
       double E0 = 0;
       galaxy::State state0;
       galaxy::init_two_body(config, state0);
-      E0 = galaxy::compute_kinetic_energy(state0) + galaxy::compute_potential_energy(state0, config.bh_mass, config.softening);
+      E0 = galaxy::compute_kinetic_energy(state0) + physics->compute_potential_energy(state0, config.bh_mass, config.softening);
 
       for (double dt : dts) {
         int steps = static_cast<int>(std::round(total_time / dt));
@@ -169,11 +177,11 @@ int main(int argc, char** argv) {
         c2.dt = dt;
         galaxy::State s0;
         galaxy::init_two_body(c2, s0);
-        auto snaps = galaxy::run_simulation(c2, s0, steps, std::max(1, config.validation_snapshot_every));
+        auto snaps = galaxy::run_simulation(c2, s0, physics, steps, std::max(1, config.validation_snapshot_every));
         const auto& last = snaps.back().state;
         double r_final = std::sqrt(last.x[0] * last.x[0] + last.y[0] * last.y[0]);
         double Lz = L_z_total(last);
-        double E_final = galaxy::compute_kinetic_energy(last) + galaxy::compute_potential_energy(last, config.bh_mass, config.softening);
+        double E_final = galaxy::compute_kinetic_energy(last) + physics->compute_potential_energy(last, config.bh_mass, config.softening);
         double E_drift = std::abs(E_final - E0);
         summary << std::scientific << dt << "\t" << last.x[0] << "\t" << last.y[0] << "\t"
                 << r_final << "\t" << Lz << "\t" << E_drift << "\n";
@@ -219,7 +227,7 @@ int main(int argc, char** argv) {
   }
 
   auto run_start = std::chrono::steady_clock::now();
-  auto snapshots = galaxy::run_simulation(config, state, n_steps, snapshot_every,
+  auto snapshots = galaxy::run_simulation(config, state, physics, n_steps, snapshot_every,
                                           progress_callback, progress_interval);
   double run_elapsed_sec = 1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now() - run_start).count();

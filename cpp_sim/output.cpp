@@ -28,6 +28,7 @@ void write_run_info(const std::string& output_dir,
   f << "number_of_snapshots\t" << n_snapshots << "\n";
   f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
+  f << "physics_package\t" << config.physics_package << "\n";
 }
 
 void write_snapshots(const std::string& output_dir,

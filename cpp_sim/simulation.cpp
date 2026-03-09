@@ -6,6 +6,7 @@ namespace galaxy {
 
 std::vector<Snapshot> run_simulation(const Config& config,
                                      State state,
+                                     const PhysicsPackage* physics,
                                      int n_steps,
                                      int snapshot_every,
                                      ProgressCallback progress_callback,
@@ -25,7 +26,7 @@ std::vector<Snapshot> run_simulation(const Config& config,
   const bool use_progress = (progress_interval > 0 && progress_callback);
 
   for (int step = 1; step <= n_steps; ++step) {
-    velocity_verlet_step(state, bh_mass, softening, star_star, dt, ax, ay);
+    velocity_verlet_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
 
     if (step % snapshot_every == 0) {
       Snapshot snap;

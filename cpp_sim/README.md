@@ -43,15 +43,60 @@ Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 
 ## Output files
 
-- **`run_info.txt`** — dt, n_steps, softening, bh_mass, star_mass, enable_star_star_gravity, total_simulated_time, number_of_snapshots, n_stars.
+- **`run_info.txt`** — dt, n_steps, softening, bh_mass, star_mass, enable_star_star_gravity, total_simulated_time, number_of_snapshots, n_stars, simulation_mode, physics_package.
 - **`snapshot_00000.csv`**, **`snapshot_00010.csv`**, … — Per-snapshot state: header `# step,<step>,time,<time>`, then rows `i,x,y,vx,vy,mass`.
 - **`validation_timestep_convergence.txt`** — Only for `timestep_convergence`: dt vs final_x, final_y, final_r, L_z, E_drift.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
+## Physics packages
+
+The simulator loads the physics model by **package name** from config. All packages are compiled into the binary; dispatch is by name at runtime.
+
+### Structure
+
+- **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `validation_name`.
+- **`physics/Newtonian/`** — Default package: Newtonian gravity (BH at origin + optional star–star with softening).
+- **`physics/Template/`** — Stub package and README for adding a new package.
+- **`physics/registry.cpp`** — Registry: maps package name → implementation (e.g. `"Newtonian"` → Newtonian package). Add new packages here.
+
+Example layout:
+
+```
+cpp_sim/physics/
+  physics_package.hpp
+  registry.cpp
+  Newtonian/
+  Template/
+  MyCustomPhysics/   (your package)
+```
+
+### Selecting a package in config
+
+In your config file (e.g. `configs/my.local.cfg`):
+
+```
+physics_package = Newtonian
+```
+
+- **Default**: If `physics_package` is omitted or empty, **Newtonian** is used.
+- If the name is unknown, the program exits with a clear error and lists that Newtonian is available (and that more can be added in `physics/registry.cpp`).
+- The chosen package name is written to **`run_info.txt`** as `physics_package\t<name>`.
+
+### Adding a new package
+
+1. Create a folder under `physics/`, e.g. **`physics/MyCustomPhysics/`**.
+2. Implement the **physics package interface** (see `physics/physics_package.hpp` and `physics/Template/`):
+   - **Required**: `name()` and `compute_accelerations(state, bh_mass, softening, star_star, ax, ay)`.
+   - Optional: `compute_potential_energy`, `init()`, `validation_name()`.
+3. **Register** the package in **`physics/registry.cpp`**: `#include "MyCustomPhysics/mycustom.hpp"`, add a static instance, and append it to the `s_packages` array.
+4. Set `physics_package = MyCustomPhysics` in config.
+
+Packages are **compiled C++** implementing the shared interface; there are no Python or interpreted plugins. The integrator and simulation loop call only the interface, so behavior is unchanged except which implementation is selected.
+
 ## Ported behavior (Python reference)
 
-- **Physics**: Newtonian acceleration (BH at origin + optional star–star pairwise), same softening. `compute_accelerations` → `physics.cpp`.
+- **Physics**: By default the **Newtonian** package: BH at origin + optional star–star pairwise, same softening. Other packages can be added under `physics/`.
 - **Integrator**: Velocity Verlet; same step formula as Python.
 - **Config**: Same meaning of dt, n_steps, snapshot_every, softening, bh_mass, star_mass, n_stars, enable_star_star_gravity.
 - **Galaxy ICs**: Disk uniform in area, v_circ from enclosed mass (BH + stars inside r), tangential direction + velocity noise.
