@@ -5,6 +5,7 @@
 
 #include "tpf_core_package.hpp"
 #include "../../config.hpp"
+#include "provisional_readout.hpp"
 #include "source_ansatz.hpp"
 #include <cmath>
 #include <fstream>
@@ -15,24 +16,43 @@
 
 namespace galaxy {
 
-TPFCorePackage::TPFCorePackage() : provisional_readout_(false) {}
+TPFCorePackage::TPFCorePackage()
+    : provisional_readout_(false),
+      readout_mode_("tensor_radial_projection"),
+      readout_scale_(1.0),
+      isotropic_c_(0.0),
+      source_softening_(0.0) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
+  readout_mode_ = config.tpfcore_readout_mode;
+  readout_scale_ = config.tpfcore_readout_scale;
+  isotropic_c_ = config.tpfcore_isotropic_correction_c;
+  source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
 }
 
-void TPFCorePackage::compute_accelerations(const State&,
-                                            double,
-                                            double,
-                                            bool,
+void TPFCorePackage::compute_accelerations(const State& state,
+                                            double bh_mass,
+                                            double softening,
+                                            bool star_star,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
-  (void)ax;
-  (void)ay;
-  throw std::runtime_error(
-      "TPFCore does not support acceleration readout. Use Newtonian for dynamics, "
-      "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c). "
-      "Provisional readout is not yet implemented.");
+  if (!provisional_readout_) {
+    throw std::runtime_error(
+        "TPFCore does not support acceleration readout unless provisional readout is enabled. "
+        "Set tpfcore_enable_provisional_readout = true in config, or use Newtonian for dynamics, "
+        "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c).");
+  }
+
+  const int n = state.n();
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+
+  for (int i = 0; i < n; ++i) {
+    tpfcore::compute_provisional_readout_acceleration(
+        state, i, bh_mass, star_star, softening, source_softening_,
+        isotropic_c_, readout_mode_, readout_scale_, ax[i], ay[i]);
+  }
 }
 
 static double effective_source_softening(const Config& config) {

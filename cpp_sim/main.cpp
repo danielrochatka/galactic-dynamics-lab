@@ -118,8 +118,11 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
-    std::cout << "  Hessian-based provisional point-source ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess Phi\n";
-    std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled") << "\n";
+    std::cout << "  Hessian-based provisional ansatz: Phi=-M/sqrt(r^2+eps^2), Theta=Hess(Phi)+B(r)*delta\n";
+    std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
+    if (tpf && tpf->provisional_readout_enabled())
+      std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << ")";
+    std::cout << "\n";
 
     if (!tpf->provisional_readout_enabled()) {
       bool is_dynamical = (config.simulation_mode == galaxy::SimulationMode::galaxy ||

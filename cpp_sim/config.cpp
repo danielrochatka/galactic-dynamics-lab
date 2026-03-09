@@ -73,6 +73,8 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "enable_star_star_gravity") { config.enable_star_star_gravity = parse_bool(val); continue; }
       if (key == "physics_package") { config.physics_package = val; continue; }
       if (key == "tpfcore_enable_provisional_readout") { config.tpfcore_enable_provisional_readout = parse_bool(val); continue; }
+      if (key == "tpfcore_readout_mode") { config.tpfcore_readout_mode = trim(val); continue; }
+      if (key == "tpfcore_readout_scale") { config.tpfcore_readout_scale = std::stod(val); continue; }
       if (key == "tpfcore_probe_radius_min") { config.tpfcore_probe_radius_min = std::stod(val); continue; }
       if (key == "tpfcore_probe_radius_max") { config.tpfcore_probe_radius_max = std::stod(val); continue; }
       if (key == "tpfcore_probe_samples") { config.tpfcore_probe_samples = std::stoi(val); continue; }

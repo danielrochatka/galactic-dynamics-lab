@@ -22,10 +22,10 @@ With c = 0, Theta is the pure Hessian; c ≠ 0 adds a minimal isotropic tensor t
 - **I = Theta_{mu nu} Theta^{mu nu} - lambda Theta^2** — scalar invariant
 - **lambda = 1/4** in 4D (fixed)
 
-## Where the ansatz lives
+## Where the code lives
 
-- **`source_ansatz.hpp`** — Declaration, `PointSourceField`, `provisional_point_source_field`
-- **`source_ansatz.cpp`** — Closed-form Phi, Xi, Theta derivatives
+- **`source_ansatz.hpp`**, **`source_ansatz.cpp`** — Primitive field: Phi, Xi, Theta (closed-form derivatives)
+- **`provisional_readout.hpp`**, **`provisional_readout.cpp`** — Provisional motion layer: maps Theta → acceleration (exploratory; isolated from ansatz)
 
 ## Field-equation residual
 
@@ -81,7 +81,9 @@ For **symmetric pair** at (±d, 0):
 
 ## Config (defaults.cfg)
 
-- `tpfcore_enable_provisional_readout` — false (dynamics not available)
+- `tpfcore_enable_provisional_readout` — false. Set true to enable tensor-driven motion (exploratory).
+- `tpfcore_readout_mode` — `tensor_radial_projection` (Theta·r_hat per source)
+- `tpfcore_readout_scale` — scale factor for readout magnitude (default 1.0)
 - `tpfcore_probe_radius_min`, `tpfcore_probe_radius_max`, `tpfcore_probe_samples`
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
@@ -136,13 +138,37 @@ Lower values indicate the ansatz better satisfies the configuration equation for
 ./galaxy_sim tpf_single_source_optimize_c
 ```
 
+## Provisional motion/readout layer
+
+A **provisional**, **exploratory** motion/readout layer maps the local tensor field (Theta) into an acceleration vector for the simulator. This is **NOT** the full derived TPF dynamics. It exists solely to test particle motion driven by the tensor field without reverting to Newtonian scalar-potential dynamics.
+
+**Design:**
+- Motion derived from local TPF tensor structure (Theta), **not** from Phi or −grad(Phi)
+- Tensor-driven: Theta_ij contracted with radial unit vector r_hat
+- Explicitly isolated in `provisional_readout.cpp`; easy to swap out later
+
+**Enabling:** Set `tpfcore_enable_provisional_readout = true` in config.
+
+**Readout mode** `tensor_radial_projection`:
+- Per source: compute Theta_s at particle location
+- r_hat = unit vector from source to particle
+- Contribution: `scale × (Theta_s · r_hat)` — tensor-vector contraction
+- Superpose over BH (if any) and other particles (when star_star)
+
+**Config:**
+- `tpfcore_readout_mode` — `tensor_radial_projection` (default)
+- `tpfcore_readout_scale` — magnitude scale (default 1.0)
+
+**Supported simulation modes** (with readout enabled):
+- `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`
+
+**run_info.txt** includes `tpfcore_readout_mode` and `tpfcore_readout_scale`.
+
 ## What is NOT implemented
 
-- Full nonlinear/dynamic TPF field equations
-- Galaxy-scale dynamics
-- Acceleration readout (no -grad(phi) dynamics)
-- Newtonian-style substitution
+- Full nonlinear/dynamic TPF field equations (the readout is exploratory, not derived)
+- Newtonian-style substitution (−grad(Phi) acceleration)
 
 ## Warning
 
-TPFCore is inspection-first, not a completed galaxy-dynamics solver. The ansatz is provisional where the paper remains underspecified.
+TPFCore is inspection-first. The provisional readout is exploratory and not the final TPF dynamics. The ansatz remains provisional where the paper remains underspecified.

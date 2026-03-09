@@ -113,14 +113,17 @@ physics_package = Newtonian
 
 ### TPFCore (inspection-first)
 
-**WARNING:** TPFCore is incomplete/provisional. Use Newtonian for dynamics. TPFCore is NOT a completed galaxy-dynamics solver.
+**Two usage modes:**
 
-**Run inspection modes:** Set `physics_package = TPFCore` in config, then:
-- `./galaxy_sim tpf_single_source_inspect` — one source at origin, probe along +x
-- `./galaxy_sim tpf_symmetric_pair_inspect` — sources at (±d,0), probe along +x and +y
-- `./galaxy_sim tpf_single_source_optimize_c` — sweep c, fit against residual (exploratory; fitted c is NOT a final constant)
+1. **Inspection-only** (default): Set `physics_package = TPFCore`. Run inspection/utility modes:
+   - `./galaxy_sim tpf_single_source_inspect` — one source at origin, probe along +x
+   - `./galaxy_sim tpf_symmetric_pair_inspect` — sources at (±d,0), probe along +x and +y
+   - `./galaxy_sim tpf_single_source_optimize_c` — sweep c, fit against residual (exploratory)
+   - Dynamical modes (galaxy, two_body_orbit, etc.) will fail with a clear message.
 
-**Outputs** appear in `outputs/<run_id>/`: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt` for inspection; `c_sweep.csv`, `c_sweep_summary.txt` for the c-sweep utility. See `physics/TPFCore/README.md`.
+2. **With provisional readout** (exploratory): Add `tpfcore_enable_provisional_readout = true` to config. Allows dynamical modes: `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`. Motion is tensor-driven (Theta·r_hat), **not** Newtonian −grad(Φ). This is **NOT** the full derived TPF dynamics—see `physics/TPFCore/README.md`.
+
+**Outputs:** Inspection: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. C-sweep: `c_sweep.csv`, `c_sweep_summary.txt`. Dynamical: `run_info.txt`, `snapshot_*.csv`. `run_info.txt` includes `tpfcore_readout_mode`, `tpfcore_readout_scale` when readout is enabled.
 
 ### Adding a new package
 

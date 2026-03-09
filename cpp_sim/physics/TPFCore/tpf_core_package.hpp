@@ -7,9 +7,9 @@
  * Implements Xi^mu, Theta_{mu nu}, I = Theta_mn Theta^mn - lambda Theta^2.
  * Lambda fixed at 1/4 in 4D.
  *
- * NOT the removed weak-field Newtonian-like package.
- * NOT a full nonlinear/dynamic TPF solver.
- * Inspection-first; dynamics require provisional readout (not yet implemented).
+ * When tpfcore_enable_provisional_readout=true, a PROVISIONAL motion/readout layer
+ * maps Theta into acceleration. EXPLORATORY—not the full derived TPF dynamics.
+ * Inspection-first; dynamics require provisional readout to be enabled.
  */
 
 #include "../physics_package.hpp"
@@ -27,7 +27,7 @@ class TPFCorePackage : public PhysicsPackage {
 
   void init_from_config(const Config& config) override;
 
-  /** TPFCore does NOT implement acceleration readout unless provisional (not yet impl). Always throws. */
+  /** When provisional readout enabled: tensor-driven acceleration. Otherwise throws. */
   void compute_accelerations(const State& state,
                             double bh_mass,
                             double softening,
@@ -38,6 +38,7 @@ class TPFCorePackage : public PhysicsPackage {
   double compute_potential_energy(const State&, double, double, bool) const override { return 0.0; }
 
   bool provisional_readout_enabled() const { return provisional_readout_; }
+  const std::string& readout_mode() const { return readout_mode_; }
   bool provisional_source_ansatz_in_use() const { return true; }  // source_ansatz is always provisional
 
   /** Run single-source inspection: one source at origin, probe along +x. */
@@ -54,6 +55,10 @@ class TPFCorePackage : public PhysicsPackage {
 
  private:
   bool provisional_readout_;
+  std::string readout_mode_;
+  double readout_scale_;
+  double isotropic_c_;
+  double source_softening_;
 };
 
 }  // namespace galaxy
