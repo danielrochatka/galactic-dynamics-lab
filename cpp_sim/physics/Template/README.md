@@ -28,5 +28,6 @@ Copy this folder to create a new physics package (e.g. `MyCustomPhysics/`).
 1. Add your header to `physics/registry.cpp`:  
    `#include "MyCustomPhysics/mycustom.hpp"`
 2. Instantiate your package (e.g. a static instance) and add it to the `s_packages` array in `registry.cpp`.
+3. Optionally add **`defaults.cfg`** in your package folder with package-specific keys. Users can override from the run config. See `physics/TPF/defaults.cfg` for an example.
 
-Then set `physics_package = MyCustomPhysics` in your config.
+Then set `physics_package = MyCustomPhysics` in your run config.

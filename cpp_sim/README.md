@@ -89,9 +89,9 @@ physics_package = Newtonian
 
 The **TPF** package implements the paper’s **weak-field correspondence sector only**. It is **not** a full variational TPF solver.
 
-- **Selection**: Set `physics_package = TPF` in config.
-- **Config**: `tpf_alpha` (weak-field coupling), `tpf_match_newtonian_scale` (use alpha=4π for Newtonian-scale comparison), `tpf_softening` (override global softening when > 0).
-- **Output**: When TPF is used, `run_info.txt` includes `tpf_alpha`, `tpf_match_newtonian_scale`. Console prints `Physics: TPF weak-field correspondence package`.
+- **Selection**: Set `physics_package = TPF` in your run config.
+- **Package defaults**: `physics/TPF/defaults.cfg` defines `tpf_alpha`, `tpf_match_newtonian_scale`, `tpf_softening`. Override from run config if desired.
+- **Output**: When TPF is used, `run_info.txt` includes `tpf_alpha`, `tpf_match_newtonian_scale`, `tpf_softening`. Console prints `Physics: TPF weak-field correspondence package`.
 - **Scope**: Linearized Poisson-type sector (nabla² phi = alpha×rho). No full nonlinear/dynamic TPF. See `physics/TPF/README.md`.
 
 ### Adding a new package
@@ -99,9 +99,10 @@ The **TPF** package implements the paper’s **weak-field correspondence sector 
 1. Create a folder under `physics/`, e.g. **`physics/MyCustomPhysics/`**.
 2. Implement the **physics package interface** (see `physics/physics_package.hpp` and `physics/Template/`):
    - **Required**: `name()` and `compute_accelerations(state, bh_mass, softening, star_star, ax, ay)`.
-   - Optional: `compute_potential_energy`, `init()`, `validation_name()`.
+   - Optional: `compute_potential_energy`, `init()`, `init_from_config`, `validation_name()`.
 3. **Register** the package in **`physics/registry.cpp`**: `#include "MyCustomPhysics/mycustom.hpp"`, add a static instance, and append it to the `s_packages` array.
-4. Set `physics_package = MyCustomPhysics` in config.
+4. Add **`physics/MyCustomPhysics/defaults.cfg`** for package-specific options (optional; see package config system).
+5. Set `physics_package = MyCustomPhysics` in run config.
 
 Packages are **compiled C++** implementing the shared interface; there are no Python or interpreted plugins. The integrator and simulation loop call only the interface, so behavior is unchanged except which implementation is selected.
 
@@ -115,9 +116,49 @@ Packages are **compiled C++** implementing the shared interface; there are no Py
 
 ## Configuration
 
-- **Defaults** are in **`config.hpp`** (`Config`). You can override them without recompiling by using a local config file.
-- **Config file**: If present, the binary loads **`configs/my.local.cfg`** (or `configs/local/my.local.cfg`). It tries, in order: `configs/my.local.cfg`, `../configs/my.local.cfg`, `configs/local/my.local.cfg`, `../configs/local/my.local.cfg` so it works whether you run from the repo root or from `cpp_sim/`. Keys match the option names (e.g. `n_steps`, `simulation_mode`, `dt`). On startup you’ll see `Config loaded from: ...` when a file was used.
-- Copy **`configs/example.cfg`** to **`configs/my.local.cfg`** and edit; that file is gitignored. Command-line mode (e.g. `./galaxy_sim two_body_orbit`) still overrides `simulation_mode` after the file is loaded.
+The simulator uses a **layered config system**: built-in defaults → package defaults → user run config. No recompilation needed.
+
+### Shared run config vs package-local defaults
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Built-in defaults** | `Config` in `config.hpp` | Fallback when no file supplies a value |
+| **Package defaults** | `cpp_sim/physics/<PackageName>/defaults.cfg` | Package-specific options (e.g. TPF: `tpf_alpha`, `tpf_match_newtonian_scale`) |
+| **User run config** | `configs/my.local.cfg` (or `configs/local/my.local.cfg`) | Your personal overrides; overrides everything |
+
+### Load precedence
+
+1. **Built-in defaults** (C++ `Config` struct)
+2. **Package defaults** — when `physics_package = X` is selected, load `physics/X/defaults.cfg` if it exists
+3. **User run config** — overrides all (including package defaults)
+
+Package authors own their package defaults. Users override from the run config when needed.
+
+### Where config files live
+
+- **Run config**: `configs/my.local.cfg`, `configs/local/my.local.cfg` (tried in order). Works from repo root or `cpp_sim/`.
+- **Package defaults**: `cpp_sim/physics/Newtonian/defaults.cfg`, `cpp_sim/physics/TPF/defaults.cfg`, etc. Version-controlled with each package.
+
+### Personal local config
+
+1. Copy **`configs/example.cfg`** to **`configs/my.local.cfg`**
+2. Edit `configs/my.local.cfg` — it is gitignored
+3. Override any setting, including package-specific ones (e.g. `tpf_alpha`)
+
+On startup you'll see:
+```
+Loaded package defaults: physics/TPF/defaults.cfg
+Loaded run config: configs/my.local.cfg
+```
+
+### Adding a new package with defaults
+
+1. Create `cpp_sim/physics/MyPackage/defaults.cfg` with your package's keys
+2. Register the package in `physics/registry.cpp`
+3. Users select it with `physics_package = MyPackage` in the run config
+4. Your package defaults apply first; run config overrides them
+
+- Command-line mode (e.g. `./galaxy_sim two_body_orbit`) overrides `simulation_mode` after the config is loaded.
 
 ## Not ported (use Python)
 

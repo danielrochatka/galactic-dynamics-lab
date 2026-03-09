@@ -69,20 +69,28 @@ std::string format_elapsed(double sec) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  // 1. Find run config path (for probe and later full load)
+  std::string run_config_path = galaxy::find_run_config_path();
+
+  // 2. Probe run config for physics_package (needed to load package defaults)
+  std::string physics_pkg = "Newtonian";
+  if (!run_config_path.empty()) {
+    std::string probed = galaxy::probe_config_key(run_config_path, "physics_package");
+    if (!probed.empty()) physics_pkg = probed;
+  }
+
+  // 3. Layered load: built-in -> package defaults -> run config
   galaxy::Config config;
 
-  // Load local config if present (try paths for both run-from-repo-root and run-from-cpp_sim)
-  const char* config_paths[] = {
-    "configs/my.local.cfg",
-    "../configs/my.local.cfg",
-    "configs/local/my.local.cfg",
-    "../configs/local/my.local.cfg",
-  };
-  for (const char* p : config_paths) {
-    if (galaxy::load_config_file(p, config)) {
-      std::cout << "Config loaded from: " << p << "\n";
-      break;
-    }
+  std::string package_defaults_path = galaxy::find_package_defaults_path(physics_pkg);
+  if (!package_defaults_path.empty()) {
+    galaxy::load_config_file(package_defaults_path, config);
+    std::cout << "Loaded package defaults: " << package_defaults_path << "\n";
+  }
+
+  if (!run_config_path.empty()) {
+    galaxy::load_config_file(run_config_path, config);
+    std::cout << "Loaded run config: " << run_config_path << "\n";
   }
 
   config.run_id = run_id_from_time();
@@ -246,7 +254,8 @@ int main(int argc, char** argv) {
   }
 
   if (config.save_run_info) {
-    galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n());
+    galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
+                           run_config_path, package_defaults_path);
     std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
   }
   if (config.save_snapshots) {

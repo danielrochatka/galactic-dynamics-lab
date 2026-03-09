@@ -13,7 +13,9 @@ void write_run_info(const std::string& output_dir,
                     const Config& config,
                     int n_steps_done,
                     int n_snapshots,
-                    int n_particles) {
+                    int n_particles,
+                    const std::string& run_config_path,
+                    const std::string& package_defaults_path) {
   std::ostringstream path;
   path << output_dir << "/run_info.txt";
   std::ofstream f(path.str());
@@ -38,7 +40,12 @@ void write_run_info(const std::string& output_dir,
         : (config.tpf_alpha > 0.0 ? config.tpf_alpha : FOUR_PI);
     f << "tpf_alpha\t" << std::scientific << alpha << "\n";
     f << "tpf_match_newtonian_scale\t" << (config.tpf_match_newtonian_scale ? 1 : 0) << "\n";
+    f << "tpf_softening\t" << config.tpf_softening << "\n";
   }
+  if (!run_config_path.empty())
+    f << "config_loaded_run\t" << run_config_path << "\n";
+  if (!package_defaults_path.empty())
+    f << "config_loaded_package_defaults\t" << package_defaults_path << "\n";
 }
 
 void write_snapshots(const std::string& output_dir,

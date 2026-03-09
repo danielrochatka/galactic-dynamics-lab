@@ -33,6 +33,8 @@
 
 ## Configuration
 
+Package-specific options live in **`physics/TPF/defaults.cfg`**. Users can override them from the run config (`configs/my.local.cfg`).
+
 | Key | Meaning | Default |
 |-----|---------|---------|
 | `physics_package` | `TPF` to select this package | `Newtonian` |
@@ -42,9 +44,11 @@
 
 When `tpf_match_newtonian_scale = true`, alpha is set to 4π so the weak-field readout reproduces Newtonian-scale accelerations for comparison runs. When false, `tpf_alpha` is used directly (must be > 0).
 
+See the main README for the layered config system (built-in → package defaults → run config).
+
 ## Output
 
-- `run_info.txt` includes: `physics_package`, `tpf_alpha`, `tpf_match_newtonian_scale`
+- `run_info.txt` includes: `physics_package`, `tpf_alpha`, `tpf_match_newtonian_scale`, `tpf_softening`, and the loaded config paths
 - Console indicates when the TPF weak-field package is in use
 
 ## Warning

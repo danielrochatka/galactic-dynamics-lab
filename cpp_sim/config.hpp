@@ -19,8 +19,18 @@ SimulationMode parse_mode(const std::string& s);
 struct Config;
 
 // Load key=value pairs from a .cfg file into config. Returns true if file was read.
-// Keys match Config member names (e.g. n_steps, simulation_mode). Unknown keys are skipped.
+// Throws on malformed values (invalid number, etc.). Unknown keys are skipped.
 bool load_config_file(const std::string& path, Config& config);
+
+// Probe a config file for a single key. Returns value if found, else empty string.
+// Returns empty if file does not exist or key not found.
+std::string probe_config_key(const std::string& path, const std::string& key);
+
+// Find first existing run config path. Returns empty if none found.
+std::string find_run_config_path();
+
+// Find package defaults path for given package name. Returns first existing path, else empty.
+std::string find_package_defaults_path(const std::string& package_name);
 
 struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
