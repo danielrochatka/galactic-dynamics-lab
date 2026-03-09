@@ -2,18 +2,27 @@
 #define GALAXY_PHYSICS_TPFCORE_SOURCE_ANSATZ_HPP
 
 /**
- * PROVISIONAL source ansatz for TPFCore.
+ * PROVISIONAL weak-field point-source ansatz for TPFCore.
  *
- * The paper defines Theta_{mu nu} = nabla_mu Xi_nu but does not fully specify
- * the point-source primitive field. This module isolates a clearly labeled
- * PROVISIONAL ansatz until the paper provides a complete specification.
+ * Uses the paper's weak-field point-source construction:
+ *   Xi_i = partial_i Phi
+ *   Theta_ij = partial_i partial_j Phi
+ * with a softened point-source scalar Phi for numerical regularization.
  *
- * WARNING: This is NOT derived from the full variational TPF equations.
- * It is a placeholder to enable inspection of the invariant I.
+ * Phi = -M / sqrt(r^2 + eps^2)  (softened 1/r)
+ * r^2 = dx^2 + dy^2, dx = x - xs, dy = y - ys
+ *
+ * WARNING: This is a provisional weak-field point-source ansatz, NOT the full
+ * nonlinear TPF source law. Kept for inspection-only use.
  */
 
 namespace galaxy {
 namespace tpfcore {
+
+/** Displacement field Xi in 2D plane. */
+struct Xi2D {
+  double x, y;
+};
 
 /** Theta tensor components in 2D plane (xx, xy, yy). */
 struct Theta2D {
@@ -21,14 +30,22 @@ struct Theta2D {
   double trace() const { return xx + yy; }
 };
 
+/** Combined Xi and Theta from a single evaluation. */
+struct PointSourceField {
+  Xi2D xi;
+  Theta2D theta;
+};
+
 /**
- * PROVISIONAL: Point-source contribution to Theta at a field point.
- * Source at (xs, ys) with mass m; field point (x, y); softening eps.
+ * PROVISIONAL weak-field point-source: Phi = -M/sqrt(r^2+eps^2).
+ * Xi_i = partial_i Phi, Theta_ij = partial_i partial_j Phi.
  *
- * Ansatz: Radially isotropic Theta_xx = Theta_yy = A*m/(r_soft), Theta_xy = 0,
- * with r_soft = sqrt(dx^2 + dy^2 + eps^2). A=1 provisional (dimensionally G-like).
- * This is NOT the paper's full point-source specification.
+ * Source at (xs, ys) with mass m; field point (x, y); eps = softening.
  */
+PointSourceField provisional_point_source_field(double xs, double ys, double m,
+                                                double x, double y, double eps);
+
+/** Legacy: Theta only (superposition by caller). */
 Theta2D provisional_point_source_theta(double xs, double ys, double m,
                                        double x, double y, double eps);
 

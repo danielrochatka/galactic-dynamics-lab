@@ -118,8 +118,8 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
+    std::cout << "  Hessian-based provisional point-source ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess Phi\n";
     std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled") << "\n";
-    std::cout << "  Provisional source ansatz: in use (see source_ansatz.hpp)\n";
 
     if (!tpf->provisional_readout_enabled()) {
       bool is_dynamical = (config.simulation_mode == galaxy::SimulationMode::galaxy ||
@@ -151,6 +151,8 @@ int main(int argc, char** argv) {
       std::cerr << "tpf_single_source_inspect requires physics_package = TPFCore.\n";
       return 1;
     }
+    std::cout << "Inspection mode: tpf_single_source_inspect\n";
+    std::cout << "Probe: +x axis, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << "\n";
     tpfcore->run_single_source_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
     if (config.save_run_info) {
@@ -165,6 +167,8 @@ int main(int argc, char** argv) {
       std::cerr << "tpf_symmetric_pair_inspect requires physics_package = TPFCore.\n";
       return 1;
     }
+    std::cout << "Inspection mode: tpf_symmetric_pair_inspect\n";
+    std::cout << "Probe: +x and +y axes, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << " per axis\n";
     tpfcore->run_symmetric_pair_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
     if (config.save_run_info) {

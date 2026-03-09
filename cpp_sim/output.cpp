@@ -32,8 +32,10 @@ void write_run_info(const std::string& output_dir,
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
   if (config.physics_package == "TPFCore") {
+    double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
     f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
     f << "tpfcore_provisional_source_ansatz\t1\n";
+    f << "tpfcore_source_softening\t" << src_eps << "\n";
     f << "tpfcore_probe_radius_min\t" << config.tpfcore_probe_radius_min << "\n";
     f << "tpfcore_probe_radius_max\t" << config.tpfcore_probe_radius_max << "\n";
     f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";

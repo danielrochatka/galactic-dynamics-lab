@@ -29,7 +29,7 @@ From the `cpp_sim/` directory:
 | `small_n_conservation` | Small N-body, n=3..10 (validation). |
 | `timestep_convergence` | Two-body at dt, dt/2, dt/4 (validation). |
 | `tpf_single_source_inspect` | TPFCore: one source at origin, probe Theta/I along +x (requires `physics_package = TPFCore`). |
-| `tpf_symmetric_pair_inspect` | TPFCore: symmetric pair, probe Theta/I along +x (requires `physics_package = TPFCore`). |
+| `tpf_symmetric_pair_inspect` | TPFCore: symmetric pair at (±d,0), probe Theta/I along +x and +y (requires `physics_package = TPFCore`). |
 
 Example (Newtonian dynamics):
 
@@ -59,9 +59,9 @@ Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 
 **TPFCore inspection modes** (`tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`):
 
-- **`theta_profile.csv`** — radius, theta_xx, theta_xy, theta_yy, theta_trace, invariant_I.
-- **`invariant_profile.csv`** — radius, invariant_I.
-- **`field_summary.txt`** — geometry, source positions, provisional-ansatz flag.
+- **`theta_profile.csv`** — radius, x, y, xi_x, xi_y, theta_xx, theta_xy, theta_yy, theta_trace, invariant_I (symmetric pair adds `axis` column: x or y).
+- **`invariant_profile.csv`** — radius, invariant_I, theta_trace (symmetric pair adds `axis` column).
+- **`field_summary.txt`** — geometry, source positions, symmetry checks, provisional-ansatz flag.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
@@ -75,7 +75,7 @@ The simulator loads the physics model by **package name** from config. All packa
 
 - **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `init_from_config`, `validation_name`.
 - **`physics/Newtonian/`** — Default package: Newtonian gravity (BH at origin + optional star–star with softening).
-- **`physics/TPFCore/`** — Primitive TPF structure (Theta, I). Inspection-first; see below.
+- **`physics/TPFCore/`** — Primitive TPF structure (Xi, Theta, I). Hessian-based provisional ansatz. Inspection-first; see below.
 - **`physics/Template/`** — Stub package and README for adding a new package.
 - **`physics/registry.cpp`** — Registry: maps package name → implementation. Add new packages here.
 
@@ -105,7 +105,13 @@ physics_package = Newtonian
 
 ### TPFCore (inspection-first)
 
-**WARNING:** TPFCore is incomplete/provisional. Use Newtonian for dynamics. See `physics/TPFCore/README.md`.
+**WARNING:** TPFCore is incomplete/provisional. Use Newtonian for dynamics. TPFCore is NOT a completed galaxy-dynamics solver.
+
+**Run inspection modes:** Set `physics_package = TPFCore` in config, then:
+- `./galaxy_sim tpf_single_source_inspect` — one source at origin, probe along +x
+- `./galaxy_sim tpf_symmetric_pair_inspect` — sources at (±d,0), probe along +x and +y
+
+**Outputs** appear in `outputs/<run_id>/`: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. See `physics/TPFCore/README.md`.
 
 ### Adding a new package
 

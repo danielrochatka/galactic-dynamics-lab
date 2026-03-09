@@ -66,6 +66,8 @@ struct Config {
   bool tpfcore_dump_invariant_profile = true;
   /** TPFCore inspection: write theta_profile.csv. */
   bool tpfcore_dump_theta_profile = true;
+  /** TPFCore source ansatz: softening for Phi. If <= 0, use global softening. */
+  double tpfcore_source_softening = 0.0;
 
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
