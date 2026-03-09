@@ -123,7 +123,7 @@ physics_package = Newtonian
 
 2. **With provisional readout** (exploratory): Add `tpfcore_enable_provisional_readout = true` to config. Allows dynamical modes: `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`. Motion is tensor-driven (Theta·r_hat), **not** Newtonian −grad(Φ). This is **NOT** the full derived TPF dynamics—see `physics/TPFCore/README.md`.
 
-**Outputs:** Inspection: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. C-sweep: `c_sweep.csv`, `c_sweep_summary.txt`. Dynamical: `run_info.txt`, `snapshot_*.csv`. `run_info.txt` includes `tpfcore_readout_mode`, `tpfcore_readout_scale` when readout is enabled.
+**Outputs:** Inspection: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. C-sweep: `c_sweep.csv`, `c_sweep_summary.txt`. Dynamical: `run_info.txt`, `snapshot_*.csv`. When `tpfcore_dump_readout_debug=true`: `tpf_readout_debug.csv` with per-snapshot readout diagnostics (a_radial, a_inward, a_tangential, Theta, etc.) to diagnose runaway vs bound behavior. See `physics/TPFCore/README.md`.
 
 ### Adding a new package
 

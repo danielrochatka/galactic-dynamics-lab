@@ -12,6 +12,7 @@
  * Inspection-first; dynamics require provisional readout to be enabled.
  */
 
+#include "../../types.hpp"
 #include "../physics_package.hpp"
 #include "source_ansatz.hpp"
 #include <string>
@@ -52,6 +53,11 @@ class TPFCorePackage : public PhysicsPackage {
    * Exploratory ansatz-tuning tool. Fitted c is NOT a final paper-derived constant.
    */
   void run_single_source_optimize_c(const Config& config, const std::string& output_dir);
+
+  /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
+  void write_readout_debug(const std::vector<Snapshot>& snapshots,
+                           const Config& config,
+                           const std::string& output_dir) const;
 
  private:
   bool provisional_readout_;

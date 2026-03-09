@@ -61,6 +61,8 @@ struct Config {
   std::string tpfcore_readout_mode = "tensor_radial_projection";
   /** TPFCore readout: scale factor for magnitude. Default 1.0. */
   double tpfcore_readout_scale = 1.0;
+  /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
+  bool tpfcore_dump_readout_debug = true;
   /** TPFCore inspection: probe radius min. */
   double tpfcore_probe_radius_min = 1.0;
   /** TPFCore inspection: probe radius max. */

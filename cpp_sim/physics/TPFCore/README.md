@@ -82,8 +82,9 @@ For **symmetric pair** at (±d, 0):
 ## Config (defaults.cfg)
 
 - `tpfcore_enable_provisional_readout` — false. Set true to enable tensor-driven motion (exploratory).
-- `tpfcore_readout_mode` — `tensor_radial_projection` (Theta·r_hat per source)
+- `tpfcore_readout_mode` — `tensor_radial_projection` or `tensor_radial_projection_negated` (negated = same projection, opposite sign; for debugging sign errors).
 - `tpfcore_readout_scale` — scale factor for readout magnitude (default 1.0)
+- `tpfcore_dump_readout_debug` — write `tpf_readout_debug.csv` for dynamical runs (default true)
 - `tpfcore_probe_radius_min`, `tpfcore_probe_radius_max`, `tpfcore_probe_samples`
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
@@ -162,7 +163,18 @@ A **provisional**, **exploratory** motion/readout layer maps the local tensor fi
 **Supported simulation modes** (with readout enabled):
 - `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`
 
-**run_info.txt** includes `tpfcore_readout_mode` and `tpfcore_readout_scale`.
+**Readout debug CSV** (`tpf_readout_debug.csv`, when `tpfcore_dump_readout_debug=true`):
+Per-snapshot, per-particle: `time`, `particle`, `x`, `y`, `vx`, `vy`, `ax`, `ay`, `radius`, `radial_unit_x`, `radial_unit_y`, `a_radial`, `a_inward`, `a_tangential`, `theta_xx`, `theta_xy`, `theta_yy`, `theta_trace`, `invariant_I`.
+
+- **a_radial** = a · r_hat (acceleration component along radial direction from origin)
+- **a_inward** = a · (−r_hat) = −a_radial (component toward origin; positive = attraction)
+- **a_tangential** = component perpendicular to r_hat
+
+Used to diagnose runaway vs bound behavior. For bound orbits, a_inward should be positive (attraction).
+
+**tensor_radial_projection_negated**: Same projection as `tensor_radial_projection` but with opposite sign. For debugging only—determines whether runaway is a simple sign error. Not a final theory result.
+
+**run_info.txt** includes `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_dump_readout_debug`.
 
 ## What is NOT implemented
 

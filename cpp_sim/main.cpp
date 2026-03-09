@@ -120,8 +120,11 @@ int main(int argc, char** argv) {
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
     std::cout << "  Hessian-based provisional ansatz: Phi=-M/sqrt(r^2+eps^2), Theta=Hess(Phi)+B(r)*delta\n";
     std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
-    if (tpf && tpf->provisional_readout_enabled())
+    if (tpf && tpf->provisional_readout_enabled()) {
       std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << ")";
+      if (config.tpfcore_dump_readout_debug)
+        std::cout << " [readout debug CSV enabled]";
+    }
     std::cout << "\n";
 
     if (!tpf->provisional_readout_enabled()) {
@@ -340,6 +343,15 @@ int main(int argc, char** argv) {
   if (config.save_snapshots) {
     galaxy::write_snapshots(config.output_dir, snapshots);
     std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
+  }
+
+  if (config.physics_package == "TPFCore") {
+    galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
+    if (tpf && tpf->provisional_readout_enabled()) {
+      tpf->write_readout_debug(snapshots, config, config.output_dir);
+      if (config.tpfcore_dump_readout_debug)
+        std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
+    }
   }
 
   std::cout << "Snapshots: " << snapshots.size() << "\n";
