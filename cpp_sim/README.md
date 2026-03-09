@@ -30,6 +30,7 @@ From the `cpp_sim/` directory:
 | `timestep_convergence` | Two-body at dt, dt/2, dt/4 (validation). |
 | `tpf_single_source_inspect` | TPFCore: one source at origin, probe Theta/I along +x (requires `physics_package = TPFCore`). |
 | `tpf_symmetric_pair_inspect` | TPFCore: symmetric pair at (±d,0), probe Theta/I along +x and +y (requires `physics_package = TPFCore`). |
+| `tpf_single_source_optimize_c` | TPFCore: sweep c, fit against field-equation residual. Exploratory ansatz-tuning; fitted c is NOT a final constant. |
 
 Example (Newtonian dynamics):
 
@@ -63,7 +64,12 @@ Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 - **`invariant_profile.csv`** — radius, invariant_I, theta_trace, residual_norm (symmetric pair adds `axis` column).
 - **`field_summary.txt`** — geometry, source positions, isotropic correction coefficient c, max residual magnitudes, symmetry checks (e.g. residual_y ≈ 0 on +x axis), provisional-ansatz flag.
 
-Ansatz: Theta = Hess(Phi) + B(r)·δ with B(r) = c·M/(r²+eps²)^(3/2). Default c=0 (pure Hessian); c≠0 tests residual reduction. Residual columns are the configuration-equation residual. See `physics/TPFCore/README.md`.
+**TPFCore c-sweep utility** (`tpf_single_source_optimize_c`): Exploratory ansatz-tuning. Numerically fits c against field-equation residual. **Fitted c is NOT a final paper-derived constant.**
+
+- **`c_sweep.csv`** — c, max_residual_norm, mean_residual_norm, l2_residual_norm
+- **`c_sweep_summary.txt`** — sweep range, steps, chosen objective, best c, best objective value
+
+See `physics/TPFCore/README.md` for how to run the c sweep and what the objective metrics mean.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
@@ -112,8 +118,9 @@ physics_package = Newtonian
 **Run inspection modes:** Set `physics_package = TPFCore` in config, then:
 - `./galaxy_sim tpf_single_source_inspect` — one source at origin, probe along +x
 - `./galaxy_sim tpf_symmetric_pair_inspect` — sources at (±d,0), probe along +x and +y
+- `./galaxy_sim tpf_single_source_optimize_c` — sweep c, fit against residual (exploratory; fitted c is NOT a final constant)
 
-**Outputs** appear in `outputs/<run_id>/`: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. See `physics/TPFCore/README.md`.
+**Outputs** appear in `outputs/<run_id>/`: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt` for inspection; `c_sweep.csv`, `c_sweep_summary.txt` for the c-sweep utility. See `physics/TPFCore/README.md`.
 
 ### Adding a new package
 

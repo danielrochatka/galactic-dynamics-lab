@@ -46,6 +46,12 @@ class TPFCorePackage : public PhysicsPackage {
   /** Run symmetric-pair inspection: sources at (+d,0) and (-d,0), probe along axes. */
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
 
+  /**
+   * Run c-sweep optimization: numerically fit c against field-equation residual.
+   * Exploratory ansatz-tuning tool. Fitted c is NOT a final paper-derived constant.
+   */
+  void run_single_source_optimize_c(const Config& config, const std::string& output_dir);
+
  private:
   bool provisional_readout_;
 };

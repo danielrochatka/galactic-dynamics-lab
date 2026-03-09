@@ -39,6 +39,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
   if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
   if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
+  if (t == "tpf_single_source_optimize_c") return SimulationMode::tpf_single_source_optimize_c;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -80,6 +81,10 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_source_softening") { config.tpfcore_source_softening = std::stod(val); continue; }
       if (key == "tpfcore_residual_step") { config.tpfcore_residual_step = std::stod(val); continue; }
       if (key == "tpfcore_isotropic_correction_c") { config.tpfcore_isotropic_correction_c = std::stod(val); continue; }
+      if (key == "tpfcore_c_sweep_min") { config.tpfcore_c_sweep_min = std::stod(val); continue; }
+      if (key == "tpfcore_c_sweep_max") { config.tpfcore_c_sweep_max = std::stod(val); continue; }
+      if (key == "tpfcore_c_sweep_steps") { config.tpfcore_c_sweep_steps = std::stoi(val); continue; }
+      if (key == "tpfcore_c_objective") { config.tpfcore_c_objective = trim(val); continue; }
       if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
       if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
       if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }

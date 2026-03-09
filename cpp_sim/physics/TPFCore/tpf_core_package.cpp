@@ -9,6 +9,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 
@@ -30,7 +31,7 @@ void TPFCorePackage::compute_accelerations(const State&,
   (void)ay;
   throw std::runtime_error(
       "TPFCore does not support acceleration readout. Use Newtonian for dynamics, "
-      "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect). "
+      "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c). "
       "Provisional readout is not yet implemented.");
 }
 
@@ -140,6 +141,108 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "  invariant_I should decay smoothly with radius\n";
     }
   }
+}
+
+void TPFCorePackage::run_single_source_optimize_c(const Config& config, const std::string& output_dir) {
+  /*
+   * Exploratory ansatz-tuning: numerically fit c against field-equation residual.
+   * Fitted c is NOT a final paper-derived constant. This sweeps c over a range,
+   * runs the single-source inspection geometry for each, and selects the c that
+   * minimizes the chosen objective (max/mean/l2 residual norm).
+   */
+  using namespace tpfcore;
+
+  double r_min = config.tpfcore_probe_radius_min;
+  double r_max = config.tpfcore_probe_radius_max;
+  int n_samples = config.tpfcore_probe_samples;
+  double eps = effective_source_softening(config);
+  double m = config.bh_mass;
+  double c_min = config.tpfcore_c_sweep_min;
+  double c_max = config.tpfcore_c_sweep_max;
+  int n_steps = config.tpfcore_c_sweep_steps;
+  const std::string& objective_name = config.tpfcore_c_objective;
+
+  if (r_min >= r_max || n_samples < 2 || n_steps < 2) return;
+
+  /* Resolve objective: we minimize, so lower is better */
+  int obj_code = 0;  /* 0=max, 1=mean, 2=l2 */
+  if (objective_name == "mean_residual_norm") obj_code = 1;
+  else if (objective_name == "l2_residual_norm") obj_code = 2;
+  /* else max_residual_norm (default) */
+
+  std::vector<double> c_vals, max_norm_vals, mean_norm_vals, l2_norm_vals, obj_vals;
+
+  for (int step = 0; step < n_steps; ++step) {
+    double frac = (n_steps > 1) ? static_cast<double>(step) / (n_steps - 1) : 0.0;
+    double c = c_min + frac * (c_max - c_min);
+
+    double sum_norm = 0.0;
+    double sum_norm_sq = 0.0;
+    double max_norm = 0.0;
+
+    for (int i = 0; i < n_samples; ++i) {
+      double r_frac = (n_samples > 1) ? static_cast<double>(i) / (n_samples - 1) : 0.0;
+      double r = r_min + r_frac * (r_max - r_min);
+      double x = r, y = 0.0;
+
+      Residual2D res = provisional_point_source_residual(0, 0, m, x, y, eps, c);
+      double rn = res.norm();
+      sum_norm += rn;
+      sum_norm_sq += rn * rn;
+      if (rn > max_norm) max_norm = rn;
+    }
+
+    double mean_norm = sum_norm / n_samples;
+    double l2_norm = std::sqrt(sum_norm_sq);
+
+    double obj = max_norm;
+    if (obj_code == 1) obj = mean_norm;
+    else if (obj_code == 2) obj = l2_norm;
+
+    c_vals.push_back(c);
+    max_norm_vals.push_back(max_norm);
+    mean_norm_vals.push_back(mean_norm);
+    l2_norm_vals.push_back(l2_norm);
+    obj_vals.push_back(obj);
+  }
+
+  /* Find best c (minimum objective) */
+  size_t best_idx = 0;
+  for (size_t i = 1; i < obj_vals.size(); ++i) {
+    if (obj_vals[i] < obj_vals[best_idx]) best_idx = i;
+  }
+  double best_c = c_vals[best_idx];
+  double best_obj = obj_vals[best_idx];
+
+  /* Write c_sweep.csv */
+  {
+    std::ofstream f(output_dir + "/c_sweep.csv");
+    if (f) {
+      f << "c,max_residual_norm,mean_residual_norm,l2_residual_norm\n";
+      for (size_t i = 0; i < c_vals.size(); ++i) {
+        f << std::scientific << c_vals[i] << "," << max_norm_vals[i] << ","
+          << mean_norm_vals[i] << "," << l2_norm_vals[i] << "\n";
+      }
+    }
+  }
+
+  /* Write c_sweep_summary.txt */
+  {
+    std::ofstream f(output_dir + "/c_sweep_summary.txt");
+    if (f) {
+      f << "TPFCore c-sweep (exploratory ansatz-tuning)\n";
+      f << "Numerically fitting c against field-equation residual. Fitted c is NOT a final paper-derived constant.\n";
+      f << "Sweep range: c in [" << std::scientific << c_min << ", " << c_max << "]\n";
+      f << "Number of steps: " << n_steps << "\n";
+      f << "Chosen objective (minimize): " << objective_name << "\n";
+      f << "Best c: " << best_c << "\n";
+      f << "Best objective value: " << best_obj << "\n";
+      f << "Probe geometry: single-source at origin, +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
+    }
+  }
+
+  std::cout << "Best c: " << std::scientific << best_c << "\n";
+  std::cout << "Best objective value (" << objective_name << "): " << best_obj << "\n";
 }
 
 void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std::string& output_dir) {

@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     try {
       config.simulation_mode = galaxy::parse_mode(argv[1]);
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c\n";
       return 1;
     }
   }
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
                            config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
       if (is_dynamical) {
         std::cerr << "TPFCore does not support dynamical modes (galaxy, two_body_orbit, etc.) unless provisional readout is enabled.\n";
-        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
+        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c.\n";
         return 1;
       }
     }
@@ -180,6 +180,24 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_single_source_optimize_c) {
+    if (!tpfcore) {
+      std::cerr << "tpf_single_source_optimize_c requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Utility mode: tpf_single_source_optimize_c (exploratory ansatz-tuning)\n";
+    std::cout << "Sweep range: c in [" << config.tpfcore_c_sweep_min << ", " << config.tpfcore_c_sweep_max << "]\n";
+    std::cout << "Number of steps: " << config.tpfcore_c_sweep_steps << "\n";
+    std::cout << "Chosen objective: " << config.tpfcore_c_objective << "\n";
+    tpfcore->run_single_source_optimize_c(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/c_sweep.csv, c_sweep_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -188,7 +206,8 @@ int main(int argc, char** argv) {
   switch (config.simulation_mode) {
     case galaxy::SimulationMode::tpf_single_source_inspect:
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
-      std::cerr << "Internal error: inspection modes should have returned earlier.\n";
+    case galaxy::SimulationMode::tpf_single_source_optimize_c:
+      std::cerr << "Internal error: inspection/utility modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);

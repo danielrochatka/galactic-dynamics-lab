@@ -42,6 +42,10 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_residual_method\tanalytic\n";
     f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
     f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
+    f << "tpfcore_c_sweep_min\t" << config.tpfcore_c_sweep_min << "\n";
+    f << "tpfcore_c_sweep_max\t" << config.tpfcore_c_sweep_max << "\n";
+    f << "tpfcore_c_sweep_steps\t" << config.tpfcore_c_sweep_steps << "\n";
+    f << "tpfcore_c_objective\t" << config.tpfcore_c_objective << "\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

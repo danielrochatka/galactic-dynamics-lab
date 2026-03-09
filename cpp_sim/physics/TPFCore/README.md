@@ -87,6 +87,39 @@ For **symmetric pair** at (±d, 0):
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
 - `tpfcore_residual_step` — step size for numerical residual (default 1e-6); not used when analytic.
 - `tpfcore_isotropic_correction_c` — dimensionless coefficient for B(r) = c·M/(r²+eps²)^(3/2). Default 0.0 (pure Hessian). Try e.g. 0.1, 0.25, 0.5, 1.0 to test residual reduction.
+- `tpfcore_c_sweep_min`, `tpfcore_c_sweep_max`, `tpfcore_c_sweep_steps` — c-sweep range and resolution (for `tpf_single_source_optimize_c`).
+- `tpfcore_c_objective` — objective to minimize: `max_residual_norm`, `mean_residual_norm`, or `l2_residual_norm`.
+
+## c-sweep utility (exploratory ansatz-tuning)
+
+**`tpf_single_source_optimize_c`** is an exploratory ansatz-tuning tool. It numerically fits c against the field-equation residual of the current provisional ansatz. The optimal c may be irrational or otherwise non-obvious, so manual guessing is not enough—this utility sweeps c over a configurable range and selects the value that minimizes the chosen objective.
+
+**Important:** The fitted c is **NOT** a final paper-derived constant. It is a numerically tuned value for this ansatz and geometry. Do not present it as a derived TPF parameter.
+
+### How to run the c sweep
+
+```bash
+# In config: physics_package = TPFCore
+
+./galaxy_sim tpf_single_source_optimize_c
+```
+
+Config keys: `tpfcore_c_sweep_min`, `tpfcore_c_sweep_max`, `tpfcore_c_sweep_steps`, `tpfcore_c_objective`.
+
+### Output files
+
+- **`c_sweep.csv`** — per-c row: `c`, `max_residual_norm`, `mean_residual_norm`, `l2_residual_norm`
+- **`c_sweep_summary.txt`** — sweep range, number of steps, chosen objective, best c, best objective value
+
+### Objective metrics (minimized)
+
+| Objective | Meaning |
+|-----------|---------|
+| `max_residual_norm` | max over probe points of ‖R‖. Penalizes worst-case residual (e.g. near source). |
+| `mean_residual_norm` | mean of ‖R‖ over probe points. Balances overall fit. |
+| `l2_residual_norm` | sqrt(sum ‖R‖²). Stronger penalty on large local residuals. |
+
+Lower values indicate the ansatz better satisfies the configuration equation for that c.
 
 ## How to run
 
@@ -98,6 +131,9 @@ For **symmetric pair** at (±d, 0):
 
 # Symmetric pair at (±d,0), probe along +x and +y
 ./galaxy_sim tpf_symmetric_pair_inspect
+
+# Numerically fit c against residual (exploratory; fitted c is not a final constant)
+./galaxy_sim tpf_single_source_optimize_c
 ```
 
 ## What is NOT implemented

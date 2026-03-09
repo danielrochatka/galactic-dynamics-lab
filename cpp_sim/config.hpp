@@ -13,7 +13,8 @@ enum class SimulationMode {
   small_n_conservation,
   timestep_convergence,
   tpf_single_source_inspect,
-  tpf_symmetric_pair_inspect
+  tpf_symmetric_pair_inspect,
+  tpf_single_source_optimize_c
 };
 
 SimulationMode parse_mode(const std::string& s);
@@ -72,6 +73,14 @@ struct Config {
   double tpfcore_residual_step = 1e-6;
   /** TPFCore ansatz: isotropic correction B(r)=c*M/(r^2+eps^2)^(3/2). Default 0.0 reproduces pure Hessian. */
   double tpfcore_isotropic_correction_c = 0.0;
+  /** TPFCore c-sweep: min c (default -0.5). */
+  double tpfcore_c_sweep_min = -0.5;
+  /** TPFCore c-sweep: max c (default 1.0). */
+  double tpfcore_c_sweep_max = 1.0;
+  /** TPFCore c-sweep: number of steps (default 31). */
+  int tpfcore_c_sweep_steps = 31;
+  /** TPFCore c-sweep: objective to minimize. max_residual_norm, mean_residual_norm, or l2_residual_norm. */
+  std::string tpfcore_c_objective = "max_residual_norm";
 
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
