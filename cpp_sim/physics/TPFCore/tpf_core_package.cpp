@@ -46,6 +46,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
   int n_samples = config.tpfcore_probe_samples;
   double eps = effective_source_softening(config);
   double m = config.bh_mass;
+  double c = config.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -62,9 +63,9 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     double r = r_min + frac * (r_max - r_min);
     double x = r, y = 0.0;
 
-    PointSourceField f = provisional_point_source_field(0, 0, m, x, y, eps);
+    PointSourceField f = provisional_point_source_field(0, 0, m, x, y, eps, c);
     double I = compute_invariant_I(f.theta);
-    Residual2D res = provisional_point_source_residual(0, 0, m, x, y, eps);
+    Residual2D res = provisional_point_source_residual(0, 0, m, x, y, eps, c);
 
     radii.push_back(r);
     x_v.push_back(x);
@@ -120,11 +121,12 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     std::ofstream f(output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore single-source inspection\n";
-      f << "Ansatz: Hessian-based Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess Phi\n";
+      f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
       f << "Source: (0,0), mass=" << m << "\n";
+      f << "Isotropic correction coefficient c=" << std::scientific << c << "\n";
       f << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
       f << "Source softening eps=" << eps << "\n";
-      f << "Provisional weak-field point-source ansatz: yes\n";
+      f << "Provisional weak-field point-source ansatz: yes (exploratory correction)\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
@@ -149,6 +151,7 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   double r_max = config.tpfcore_probe_radius_max;
   int n_samples = config.tpfcore_probe_samples;
   double eps = effective_source_softening(config);
+  double c = config.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -167,10 +170,10 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       double r = r_min + frac * (r_max - r_min);
       double x = px(r), y = py(r);
 
-      PointSourceField f1 = provisional_point_source_field(d, 0, m, x, y, eps);
-      PointSourceField f2 = provisional_point_source_field(-d, 0, m, x, y, eps);
-      Residual2D res1 = provisional_point_source_residual(d, 0, m, x, y, eps);
-      Residual2D res2 = provisional_point_source_residual(-d, 0, m, x, y, eps);
+      PointSourceField f1 = provisional_point_source_field(d, 0, m, x, y, eps, c);
+      PointSourceField f2 = provisional_point_source_field(-d, 0, m, x, y, eps, c);
+      Residual2D res1 = provisional_point_source_residual(d, 0, m, x, y, eps, c);
+      Residual2D res2 = provisional_point_source_residual(-d, 0, m, x, y, eps, c);
       Residual2D res = { res1.x + res2.x, res1.y + res2.y };
 
       Xi2D xi = { f1.xi.x + f2.xi.x, f1.xi.y + f2.xi.y };
@@ -246,9 +249,10 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
     std::ofstream f(output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore symmetric-pair inspection\n";
-      f << "Ansatz: Hessian-based Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess Phi\n";
+      f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
       f << "Source positions: (" << d << ",0) and (-" << d << ",0)\n";
       f << "Source masses: " << m << " each\n";
+      f << "Isotropic correction coefficient c=" << std::scientific << c << "\n";
       f << "Probe geometry: +x axis and +y axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
       f << "Source softening eps=" << eps << "\n";
       f << "Provisional weak-field point-source ansatz: yes\n";

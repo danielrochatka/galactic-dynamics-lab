@@ -8,14 +8,16 @@
  *
  * Uses the paper's weak-field point-source construction:
  *   Xi_i = partial_i Phi
- *   Theta_ij = partial_i partial_j Phi
+ *   Theta_ij = Hess_ij(Phi) + B(r) delta_ij
  * with a softened point-source scalar Phi for numerical regularization.
  *
  * Phi = -M / sqrt(r^2 + eps^2)  (softened 1/r)
+ * B(r) = c * M / (r^2 + eps^2)^(3/2)  (exploratory isotropic correction; c configurable, default 0)
  * r^2 = dx^2 + dy^2, dx = x - xs, dy = y - ys
  *
  * WARNING: This is a provisional weak-field point-source ansatz, NOT the full
- * nonlinear TPF source law. Kept for inspection-only use.
+ * nonlinear TPF source law. Kept for inspection-only use. The B(r) term is an
+ * exploratory residual-reduction correction, not a derived TPF source law.
  */
 
 namespace galaxy {
@@ -40,16 +42,17 @@ struct PointSourceField {
 
 /**
  * PROVISIONAL weak-field point-source: Phi = -M/sqrt(r^2+eps^2).
- * Xi_i = partial_i Phi, Theta_ij = partial_i partial_j Phi.
+ * Xi_i = partial_i Phi (unchanged).
+ * Theta_ij = Hess_ij(Phi) + B(r) delta_ij, with B(r) = c*M/(r^2+eps^2)^(3/2).
  *
- * Source at (xs, ys) with mass m; field point (x, y); eps = softening.
+ * Source at (xs, ys) with mass m; field point (x, y); eps = softening; c = isotropic correction coefficient.
  */
 PointSourceField provisional_point_source_field(double xs, double ys, double m,
-                                                double x, double y, double eps);
+                                                double x, double y, double eps, double c = 0.0);
 
 /** Legacy: Theta only (superposition by caller). */
 Theta2D provisional_point_source_theta(double xs, double ys, double m,
-                                       double x, double y, double eps);
+                                       double x, double y, double eps, double c = 0.0);
 
 /** Lambda = 1/4 in 4D (paper-fixed, not tunable). */
 constexpr double LAMBDA_4D = 0.25;
@@ -63,10 +66,10 @@ struct Residual2D {
 /**
  * Analytic residual for the configuration equation nabla_mu(Theta^mu_nu - lambda delta^mu_nu Theta).
  * Spatial weak-field form: R_nu = partial_x(...) + partial_y(...).
- * Computed from closed-form third derivatives of Phi. Single source only.
+ * Computed from closed-form derivatives of Phi and B(r). Single source only.
  */
 Residual2D provisional_point_source_residual(double xs, double ys, double m,
-                                             double x, double y, double eps);
+                                             double x, double y, double eps, double c = 0.0);
 
 /**
  * Invariant I = Theta_{mu nu} Theta^{mu nu} - lambda * Theta^2.

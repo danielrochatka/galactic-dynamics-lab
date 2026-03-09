@@ -61,9 +61,9 @@ Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 
 - **`theta_profile.csv`** — radius, x, y, xi_x, xi_y, theta_xx, theta_xy, theta_yy, theta_trace, invariant_I, residual_x, residual_y, residual_norm (symmetric pair adds `axis` column: x or y).
 - **`invariant_profile.csv`** — radius, invariant_I, theta_trace, residual_norm (symmetric pair adds `axis` column).
-- **`field_summary.txt`** — geometry, source positions, max residual magnitudes, symmetry checks (e.g. residual_y ≈ 0 on +x axis), provisional-ansatz flag.
+- **`field_summary.txt`** — geometry, source positions, isotropic correction coefficient c, max residual magnitudes, symmetry checks (e.g. residual_y ≈ 0 on +x axis), provisional-ansatz flag.
 
-Residual columns are the configuration-equation residual R_ν = ∂_i(Θ^i_ν − λ δ^i_ν Θ). A near-zero residual suggests the ansatz matches the field equation; large values indicate a structural mismatch. See `physics/TPFCore/README.md`.
+Ansatz: Theta = Hess(Phi) + B(r)·δ with B(r) = c·M/(r²+eps²)^(3/2). Default c=0 (pure Hessian); c≠0 tests residual reduction. Residual columns are the configuration-equation residual. See `physics/TPFCore/README.md`.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 

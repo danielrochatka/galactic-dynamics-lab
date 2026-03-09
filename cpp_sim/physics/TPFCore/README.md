@@ -7,12 +7,13 @@
 The implementation uses the paper's weak-field point-source construction:
 
 - **Phi** = -M / sqrt(r² + eps²) — softened point-source scalar (numerical regularization)
-- **Xi_i** = partial_i Phi — displacement field
-- **Theta_ij** = partial_i partial_j Phi — configuration gradient (Hessian of Phi)
+- **Xi_i** = partial_i Phi — displacement field (unchanged)
+- **Theta_ij** = Hess_ij(Phi) + B(r) δ_ij — configuration gradient with optional isotropic correction
+- **B(r)** = c·M / (r² + eps²)^(3/2) — exploratory isotropic correction (c configurable, default 0)
 
 r² = dx² + dy², dx = x - xs, dy = y - ys. eps is the source softening (`tpfcore_source_softening` or global `softening`).
 
-This is a **provisional weak-field point-source ansatz**, NOT the full nonlinear TPF source law.
+With c = 0, Theta is the pure Hessian; c ≠ 0 adds a minimal isotropic tensor term to test whether near-source residuals decrease. This is an **exploratory correction to improve structural consistency**, NOT a fully derived final TPF source law. The ansatz remains provisional.
 
 ## What is directly paper-derived
 
@@ -85,6 +86,7 @@ For **symmetric pair** at (±d, 0):
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
 - `tpfcore_residual_step` — step size for numerical residual (default 1e-6); not used when analytic.
+- `tpfcore_isotropic_correction_c` — dimensionless coefficient for B(r) = c·M/(r²+eps²)^(3/2). Default 0.0 (pure Hessian). Try e.g. 0.1, 0.25, 0.5, 1.0 to test residual reduction.
 
 ## How to run
 

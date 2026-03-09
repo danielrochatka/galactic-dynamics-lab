@@ -1,15 +1,11 @@
 /**
  * PROVISIONAL weak-field point-source ansatz implementation.
  * Phi = -M / sqrt(r^2 + eps^2)
- * Xi_i = partial_i Phi, Theta_ij = partial_i partial_j Phi
+ * Xi_i = partial_i Phi (unchanged)
+ * Theta_ij = Hess_ij(Phi) + B(r) delta_ij
+ * B(r) = c*M/(r^2+eps^2)^(3/2) = c*M/R^3 (exploratory isotropic residual-reduction term)
  *
- * Closed-form derivatives:
- * R = sqrt(dx^2 + dy^2 + eps^2)
- * Phi = -M/R
- * Xi_x = M*dx/R^3, Xi_y = M*dy/R^3
- * Theta_xx = M*(1/R^3 - 3*dx^2/R^5)
- * Theta_xy = -3*M*dx*dy/R^5
- * Theta_yy = M*(1/R^3 - 3*dy^2/R^5)
+ * Closed-form: R = sqrt(dx^2+dy^2+eps^2), Hess_xx = M*(1/R^3 - 3*dx^2/R^5), etc.
  */
 
 #include "source_ansatz.hpp"
@@ -19,7 +15,7 @@ namespace galaxy {
 namespace tpfcore {
 
 PointSourceField provisional_point_source_field(double xs, double ys, double m,
-                                                double x, double y, double eps) {
+                                                double x, double y, double eps, double c) {
   double dx = x - xs;
   double dy = y - ys;
   double r2 = dx * dx + dy * dy + eps * eps;
@@ -34,20 +30,27 @@ PointSourceField provisional_point_source_field(double xs, double ys, double m,
   out.xi.x = m * dx / R3;
   out.xi.y = m * dy / R3;
 
-  out.theta.xx = m * (1.0 / R3 - 3.0 * dx * dx / R5);
-  out.theta.xy = -3.0 * m * dx * dy / R5;
-  out.theta.yy = m * (1.0 / R3 - 3.0 * dy * dy / R5);
+  /* Hessian of Phi */
+  double Hess_xx = m * (1.0 / R3 - 3.0 * dx * dx / R5);
+  double Hess_xy = -3.0 * m * dx * dy / R5;
+  double Hess_yy = m * (1.0 / R3 - 3.0 * dy * dy / R5);
+
+  /* Isotropic correction B(r) = c*M/R^3 on diagonal only */
+  double B = (c != 0.0) ? (c * m / R3) : 0.0;
+  out.theta.xx = Hess_xx + B;
+  out.theta.xy = Hess_xy;
+  out.theta.yy = Hess_yy + B;
 
   return out;
 }
 
 Theta2D provisional_point_source_theta(double xs, double ys, double m,
-                                       double x, double y, double eps) {
-  return provisional_point_source_field(xs, ys, m, x, y, eps).theta;
+                                       double x, double y, double eps, double c) {
+  return provisional_point_source_field(xs, ys, m, x, y, eps, c).theta;
 }
 
 Residual2D provisional_point_source_residual(double xs, double ys, double m,
-                                             double x, double y, double eps) {
+                                             double x, double y, double eps, double c) {
   double dx = x - xs;
   double dy = y - ys;
   double r2 = dx * dx + dy * dy + eps * eps;
@@ -58,8 +61,7 @@ Residual2D provisional_point_source_residual(double xs, double ys, double m,
   double R7 = R5 * R * R;
   const double lam = LAMBDA_4D;
 
-  /* Third derivatives of Phi: Theta_ij = Phi_ij, so Theta_ij,k = Phi_ijk.
-   * Phi = -M/R => closed-form derivatives. */
+  /* Third derivatives of Phi: Hess_ij,k = Phi_ijk. Theta_ij = Hess_ij + B*delta_ij. */
   double dTh_xx_dx = m * (-9.0 * dx / R5 + 15.0 * dx * dx * dx / R7);
   double dTh_xy_dx = -3.0 * m * (dy / R5 - 5.0 * dx * dx * dy / R7);
   double dTh_xy_dy = -3.0 * m * (dx / R5 - 5.0 * dx * dy * dy / R7);
@@ -72,6 +74,15 @@ Residual2D provisional_point_source_residual(double xs, double ys, double m,
   Residual2D out;
   out.x = dTh_xx_dx - lam * dTheta_dx + dTh_xy_dy;
   out.y = dTh_xy_dx + dTh_yy_dy - lam * dTheta_dy;
+
+  /* Correction from B(r): Theta gets +B on diagonal, so Theta += 2B, and
+   * Theta_xx-lam*Theta gains B*(1-2*lam). With lam=1/4: (1-2*lam)=0.5.
+   * partial_x(B) = -3*c*m*dx/R^5, partial_y(B) = -3*c*m*dy/R^5. */
+  if (c != 0.0) {
+    const double fac = (1.0 - 2.0 * lam) * (-3.0 * c * m / R5);
+    out.x += fac * dx;
+    out.y += fac * dy;
+  }
   return out;
 }
 

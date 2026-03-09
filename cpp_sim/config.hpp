@@ -70,6 +70,8 @@ struct Config {
   double tpfcore_source_softening = 0.0;
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
+  /** TPFCore ansatz: isotropic correction B(r)=c*M/(r^2+eps^2)^(3/2). Default 0.0 reproduces pure Hessian. */
+  double tpfcore_isotropic_correction_c = 0.0;
 
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;

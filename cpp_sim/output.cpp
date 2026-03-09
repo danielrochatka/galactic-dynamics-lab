@@ -41,6 +41,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
     f << "tpfcore_residual_method\tanalytic\n";
     f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
+    f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";
