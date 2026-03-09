@@ -20,15 +20,15 @@ struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
 
   int n_stars = 5000;
-  double star_mass = 0.2;
+  double star_mass = 0.05;
   double bh_mass = 1000.0;
 
   double inner_radius = 5.0;
   double outer_radius = 50.0;
 
   double dt = 0.01;
-  int n_steps = 20000;
-  int snapshot_every = 20;
+  int n_steps = 50000;
+  int snapshot_every = 50;
 
   double softening = 1.0;
   bool enable_star_star_gravity = true;
