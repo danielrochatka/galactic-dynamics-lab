@@ -7,6 +7,7 @@
  * The simulator and integrator depend only on this interface, not on any specific implementation.
  */
 
+#include "../config.hpp"
 #include "../types.hpp"
 #include <memory>
 #include <string>
@@ -34,19 +35,25 @@ class PhysicsPackage {
 
   /**
    * Optional: total gravitational potential energy for diagnostics/validation.
+   * star_star: include star-star contributions (must match compute_accelerations).
    * Default returns 0. Override in packages that define a potential.
    */
   virtual double compute_potential_energy(const State& state,
                                          double bh_mass,
-                                         double softening) const {
+                                         double softening,
+                                         bool star_star = true) const {
     (void)state;
     (void)bh_mass;
     (void)softening;
+    (void)star_star;
     return 0.0;
   }
 
   /** Optional: called once before simulation (e.g. load tables). Default no-op. */
   virtual void init() {}
+
+  /** Optional: called with config before run. Packages may cache package-specific params. Default no-op. */
+  virtual void init_from_config(const Config&) {}
 
   /** Optional: validation/reporting name or hook. Default returns name(). */
   virtual const char* validation_name() const { return name(); }

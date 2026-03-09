@@ -44,7 +44,8 @@ void NewtonianPackage::compute_accelerations(const State& state,
 
 double NewtonianPackage::compute_potential_energy(const State& state,
                                                   double bh_mass,
-                                                  double softening) const {
+                                                  double softening,
+                                                  bool star_star) const {
   const int n = state.n();
   double pe = 0.0;
   const double eps2 = softening * softening;
@@ -53,6 +54,7 @@ double NewtonianPackage::compute_potential_energy(const State& state,
     double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i] + eps2);
     pe -= bh_mass * state.mass[i] / r;
   }
+  if (!star_star) return pe;
   for (int i = 0; i < n; ++i) {
     for (int j = i + 1; j < n; ++j) {
       double dx = state.x[j] - state.x[i];

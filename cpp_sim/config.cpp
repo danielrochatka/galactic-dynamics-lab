@@ -61,6 +61,9 @@ bool load_config_file(const std::string& path, Config& config) {
     if (key == "softening") { config.softening = std::stod(val); continue; }
     if (key == "enable_star_star_gravity") { config.enable_star_star_gravity = parse_bool(val); continue; }
     if (key == "physics_package") { config.physics_package = val; continue; }
+    if (key == "tpf_alpha") { config.tpf_alpha = std::stod(val); continue; }
+    if (key == "tpf_match_newtonian_scale") { config.tpf_match_newtonian_scale = parse_bool(val); continue; }
+    if (key == "tpf_softening") { config.tpf_softening = std::stod(val); continue; }
     if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
     if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
     if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }

@@ -19,7 +19,8 @@ class NewtonianPackage : public PhysicsPackage {
 
   double compute_potential_energy(const State& state,
                                  double bh_mass,
-                                 double softening) const override;
+                                 double softening,
+                                 bool star_star = true) const override;
 };
 
 }  // namespace galaxy

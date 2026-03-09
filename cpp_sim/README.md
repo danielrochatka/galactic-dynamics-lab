@@ -55,10 +55,11 @@ The simulator loads the physics model by **package name** from config. All packa
 
 ### Structure
 
-- **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `validation_name`.
+- **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `init_from_config`, `validation_name`.
 - **`physics/Newtonian/`** — Default package: Newtonian gravity (BH at origin + optional star–star with softening).
+- **`physics/TPF/`** — TPF weak-field correspondence package (linearized sector only; see below).
 - **`physics/Template/`** — Stub package and README for adding a new package.
-- **`physics/registry.cpp`** — Registry: maps package name → implementation (e.g. `"Newtonian"` → Newtonian package). Add new packages here.
+- **`physics/registry.cpp`** — Registry: maps package name → implementation. Add new packages here.
 
 Example layout:
 
@@ -67,6 +68,7 @@ cpp_sim/physics/
   physics_package.hpp
   registry.cpp
   Newtonian/
+  TPF/
   Template/
   MyCustomPhysics/   (your package)
 ```
@@ -80,8 +82,17 @@ physics_package = Newtonian
 ```
 
 - **Default**: If `physics_package` is omitted or empty, **Newtonian** is used.
-- If the name is unknown, the program exits with a clear error and lists that Newtonian is available (and that more can be added in `physics/registry.cpp`).
+- If the name is unknown, the program exits with a clear error and lists available packages (Newtonian, TPF, etc.).
 - The chosen package name is written to **`run_info.txt`** as `physics_package\t<name>`.
+
+### TPF weak-field package
+
+The **TPF** package implements the paper’s **weak-field correspondence sector only**. It is **not** a full variational TPF solver.
+
+- **Selection**: Set `physics_package = TPF` in config.
+- **Config**: `tpf_alpha` (weak-field coupling), `tpf_match_newtonian_scale` (use alpha=4π for Newtonian-scale comparison), `tpf_softening` (override global softening when > 0).
+- **Output**: When TPF is used, `run_info.txt` includes `tpf_alpha`, `tpf_match_newtonian_scale`. Console prints `Physics: TPF weak-field correspondence package`.
+- **Scope**: Linearized Poisson-type sector (nabla² phi = alpha×rho). No full nonlinear/dynamic TPF. See `physics/TPF/README.md`.
 
 ### Adding a new package
 

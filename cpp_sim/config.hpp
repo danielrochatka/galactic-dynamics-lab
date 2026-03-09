@@ -42,6 +42,13 @@ struct Config {
   /** Physics package name (e.g. "Newtonian"). Must match a registered package. Default: Newtonian. */
   std::string physics_package = "Newtonian";
 
+  /** TPF weak-field package only: coupling alpha in nabla^2 phi = alpha*rho. Default 4*pi for Newtonian-scale. */
+  double tpf_alpha = -1.0;  // -1 = use tpf_match_newtonian_scale
+  /** TPF: use alpha=4*pi to match Newtonian magnitudes for comparison. Overrides tpf_alpha when true. */
+  bool tpf_match_newtonian_scale = true;
+  /** TPF: softening for Green-function evaluation. If <= 0, use global softening. */
+  double tpf_softening = 0.0;
+
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
 
