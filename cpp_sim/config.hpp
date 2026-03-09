@@ -16,6 +16,12 @@ enum class SimulationMode {
 
 SimulationMode parse_mode(const std::string& s);
 
+struct Config;
+
+// Load key=value pairs from a .cfg file into config. Returns true if file was read.
+// Keys match Config member names (e.g. n_steps, simulation_mode). Unknown keys are skipped.
+bool load_config_file(const std::string& path, Config& config);
+
 struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
 

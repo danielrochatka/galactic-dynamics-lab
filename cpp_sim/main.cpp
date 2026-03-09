@@ -70,6 +70,21 @@ std::string format_elapsed(double sec) {
 
 int main(int argc, char** argv) {
   galaxy::Config config;
+
+  // Load local config if present (try paths for both run-from-repo-root and run-from-cpp_sim)
+  const char* config_paths[] = {
+    "configs/my.local.cfg",
+    "../configs/my.local.cfg",
+    "configs/local/my.local.cfg",
+    "../configs/local/my.local.cfg",
+  };
+  for (const char* p : config_paths) {
+    if (galaxy::load_config_file(p, config)) {
+      std::cout << "Config loaded from: " << p << "\n";
+      break;
+    }
+  }
+
   config.run_id = run_id_from_time();
   config.output_dir = "outputs/" + config.run_id;
 

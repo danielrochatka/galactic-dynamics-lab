@@ -59,8 +59,9 @@ Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
 ## Configuration
 
-- C++ defaults live in **`config.hpp`** (`Config`). Edit and rebuild to change.
-- The repo **`configs/`** folder holds shared example config (see root README): `configs/example.cfg` documents options; local overrides go in `configs/local/` or `configs/*.local.cfg` (gitignored). The C++ binary does not read `.cfg` files; the example is for reference and consistency with the Python side.
+- **Defaults** are in **`config.hpp`** (`Config`). You can override them without recompiling by using a local config file.
+- **Config file**: If present, the binary loads **`configs/my.local.cfg`** (or `configs/local/my.local.cfg`). It tries, in order: `configs/my.local.cfg`, `../configs/my.local.cfg`, `configs/local/my.local.cfg`, `../configs/local/my.local.cfg` so it works whether you run from the repo root or from `cpp_sim/`. Keys match the option names (e.g. `n_steps`, `simulation_mode`, `dt`). On startup you’ll see `Config loaded from: ...` when a file was used.
+- Copy **`configs/example.cfg`** to **`configs/my.local.cfg`** and edit; that file is gitignored. Command-line mode (e.g. `./galaxy_sim two_body_orbit`) still overrides `simulation_mode` after the file is loaded.
 
 ## Not ported (use Python)
 
