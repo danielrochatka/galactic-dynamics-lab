@@ -27,7 +27,7 @@ Use `plot_cpp_run.py` to generate plots from C++ outputs (see below).
   - Put local config files in **`configs/local/`** (entire directory is gitignored), or
   - Use any **`configs/*.local.cfg`** file (e.g. `configs/dev.local.cfg`).
 
-Copy `configs/example.cfg` to `configs/local/my.cfg` or `configs/my.local.cfg` and edit as needed. The Python runner currently uses in-code defaults; the example config documents the options and supports future or external config loading.
+Copy `configs/example.cfg` to `configs/my.local.cfg` or `configs/local/my.cfg` and edit as needed. **Python** `main.py` automatically loads (in order) `configs/my.local.cfg`, `configs/local/my.local.cfg`, and any `configs/local/*.cfg`; later files override earlier. Keys match option names (e.g. `n_steps`, `simulation_mode`). On startup, a line like `Config loaded from: ['configs/my.local.cfg']` confirms your file was used.
 
 ## Project layout
 

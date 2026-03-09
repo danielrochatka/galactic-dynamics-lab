@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config import VALIDATION_MODES, SimulationConfig
+from config import VALIDATION_MODES, load_config, _config_file_paths
 from init_conditions import generate_disk
 from physics import (
     compute_accelerations_newtonian,
@@ -32,13 +32,16 @@ from diagnostics import compute_diagnostics, plot_and_save_all
 
 
 def main() -> None:
-    config = SimulationConfig()
+    config = load_config()
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     config.output_dir = Path("outputs") / run_id
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 50)
     print("2D Galaxy N-Body Simulation")
+    config_paths = _config_file_paths()
+    if config_paths:
+        print(f"Config loaded from: {[str(p) for p in config_paths]}")
     print("=" * 50)
     print(f"Output directory: {config.output_dir.resolve()}")
     print(f"Mode: {config.simulation_mode}")
