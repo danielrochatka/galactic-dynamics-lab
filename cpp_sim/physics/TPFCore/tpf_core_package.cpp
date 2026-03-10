@@ -65,64 +65,10 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                          const std::string& output_dir) const {
   if (!provisional_readout_ || !config.tpfcore_dump_readout_debug || snapshots.empty())
     return;
-
-  const double softening = config.softening;
-  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  const double bh_mass = config.bh_mass;
-  const bool star_star = config.enable_star_star_gravity;
-
-  std::ofstream f(output_dir + "/tpf_readout_debug.csv");
-  if (!f) return;
-
-  const bool tr_coherence = (readout_mode_ == "tr_coherence_readout");
-  if (tr_coherence) {
-    f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
-      << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential\n";
-  } else {
-    f << "time,particle,x,y,vx,vy,ax,ay,radius,radial_unit_x,radial_unit_y,"
-      << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I\n";
-  }
-
-  for (const auto& snap : snapshots) {
-    const State& s = snap.state;
-    const double t = snap.time;
-    for (int i = 0; i < s.n(); ++i) {
-      double x = s.x[i], y = s.y[i];
-      double vx = s.vx[i], vy = s.vy[i];
-
-      double ax = 0, ay = 0;
-      tpfcore::ReadoutDiagnostics diag;
-      tpfcore::compute_provisional_readout_with_diagnostics(
-          s, i, bh_mass, star_star, softening, source_softening_,
-          isotropic_c_, readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax, ay, diag);
-
-      double r2 = x * x + y * y + eps * eps;
-      double r = std::sqrt(r2);
-      double radial_unit_x = (r > 1e-30) ? (x / r) : 1.0;
-      double radial_unit_y = (r > 1e-30) ? (y / r) : 0.0;
-
-      double a_radial = ax * radial_unit_x + ay * radial_unit_y;
-      double a_inward = -a_radial;
-      double tangential_unit_x = -radial_unit_y;
-      double tangential_unit_y = radial_unit_x;
-      double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
-
-      if (tr_coherence) {
-        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
-          << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
-          << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","
-          << diag.provisional_tangential_readout << "," << ax << "," << ay << ","
-          << a_radial << "," << a_inward << "," << a_tangential << "\n";
-      } else {
-        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
-          << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
-          << a_radial << "," << a_inward << "," << a_tangential << ","
-          << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
-          << diag.theta_trace << "," << diag.invariant_I << "\n";
-      }
-    }
-  }
+  tpfcore::write_readout_debug_csv(snapshots, output_dir,
+                                   config.softening, config.bh_mass, config.enable_star_star_gravity,
+                                   source_softening_, isotropic_c_,
+                                   readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
 }
 
 static double effective_source_softening(const Config& config) {

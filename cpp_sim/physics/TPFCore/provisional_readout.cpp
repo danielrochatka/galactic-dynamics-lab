@@ -2,18 +2,16 @@
  * PROVISIONAL motion/readout layer for TPFCore.
  *
  * EXPLORATORY: This is NOT the full derived TPF dynamics.
- *
- * tensor_radial_projection: Theta·r_hat (spatial projection). Did not produce bound motion.
- * tr_coherence_readout: Paper-aligned t-r structure (Theta_rr, Theta_tt, Theta_tr) as
- *   provisional radial/tangential readout. Still exploratory, not the final derived law.
- *
- * What we use from the ansatz: Theta_ij only (no Phi for acceleration).
+ * Closures are downstream of the ansatz (see readout_closure.hpp).
  */
 
 #include "provisional_readout.hpp"
+#include "readout_closure.hpp"
 #include "source_ansatz.hpp"
 #include "../../types.hpp"
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 
 namespace galaxy {
 namespace tpfcore {
@@ -26,7 +24,8 @@ static bool is_negated_mode(const std::string& mode) {
   return mode == "tensor_radial_projection_negated";
 }
 
-static void compute_raw_readout(const State& state,
+// --- Closure: tensor_radial (per-source Theta·r_hat, superposed; optional negated) ---
+static void apply_tensor_radial_closure(const State& state,
                                  int i,
                                  double bh_mass,
                                  bool star_star,
@@ -82,7 +81,7 @@ static void compute_raw_readout(const State& state,
   }
 }
 
-// Fill Theta sum at (x,y) from all sources. Used by tr_coherence_readout.
+// --- Superposition: Theta at particle from all sources (used by tr_coherence closure) ---
 static void compute_theta_sum(const State& state,
                               int i,
                               double bh_mass,
@@ -110,10 +109,8 @@ static void compute_theta_sum(const State& state,
   }
 }
 
-// tr_coherence_readout: paper-aligned provisional t-r readout. EXPLORATORY.
-// Theta_rr = r_hat^T Theta r_hat; Theta_tt = theta_tt_scale * (-Theta_rr); Theta_tr = t_hat^T Theta r_hat.
-// a = (readout_scale * (Theta_rr + Theta_tt)) * r_hat + (readout_scale * theta_tr_scale * Theta_tr) * t_hat.
-static void compute_tr_coherence_readout(const State& state,
+// --- Closure: tr_coherence (superposed Theta -> Theta_rr/Theta_tt/Theta_tr formula). EXPLORATORY. ---
+static void apply_tr_coherence_closure(const State& state,
                                          int i,
                                          double bh_mass,
                                          bool star_star,
@@ -185,15 +182,15 @@ void compute_provisional_readout_acceleration(const State& state,
   const double eps = effective_eps(source_softening, softening);
 
   if (readout_mode == "tr_coherence_readout") {
-    compute_tr_coherence_readout(state, i, bh_mass, star_star, eps, c,
-                                 readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, nullptr);
+    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
+                               readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, nullptr);
     return;
   }
 
   if (readout_mode != "tensor_radial_projection" && readout_mode != "tensor_radial_projection_negated")
     return;
 
-  compute_raw_readout(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, nullptr, nullptr);
+  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, nullptr, nullptr);
 
   if (is_negated_mode(readout_mode)) {
     ax = -ax;
@@ -218,8 +215,8 @@ void compute_provisional_readout_with_diagnostics(const State& state,
   const double eps = effective_eps(source_softening, softening);
 
   if (readout_mode == "tr_coherence_readout") {
-    compute_tr_coherence_readout(state, i, bh_mass, star_star, eps, c,
-                                readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, &diag);
+    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
+                               readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, &diag);
     diag.ax = ax;
     diag.ay = ay;
     return;
@@ -233,7 +230,7 @@ void compute_provisional_readout_with_diagnostics(const State& state,
 
   Theta2D theta_sum;
   bool has_theta;
-  compute_raw_readout(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, &theta_sum, &has_theta);
+  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, &theta_sum, &has_theta);
 
   if (is_negated_mode(readout_mode)) {
     ax = -ax;
@@ -250,6 +247,75 @@ void compute_provisional_readout_with_diagnostics(const State& state,
     diag.invariant_I = compute_invariant_I(theta_sum);
   } else {
     diag.theta_xx = diag.theta_xy = diag.theta_yy = diag.theta_trace = diag.invariant_I = 0.0;
+  }
+}
+
+// --- Debug CSV: owned by readout module (column layout by mode) ---
+void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
+                             const std::string& output_dir,
+                             double softening,
+                             double bh_mass,
+                             bool star_star,
+                             double source_softening,
+                             double isotropic_c,
+                             const std::string& readout_mode,
+                             double readout_scale,
+                             double theta_tt_scale,
+                             double theta_tr_scale) {
+  if (snapshots.empty()) return;
+
+  const double eps = effective_eps(source_softening, softening);
+  std::ofstream f(output_dir + "/tpf_readout_debug.csv");
+  if (!f) return;
+
+  const bool tr_coherence = (readout_mode == "tr_coherence_readout");
+  if (tr_coherence) {
+    f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
+      << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential\n";
+  } else {
+    f << "time,particle,x,y,vx,vy,ax,ay,radius,radial_unit_x,radial_unit_y,"
+      << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I\n";
+  }
+
+  for (const auto& snap : snapshots) {
+    const State& s = snap.state;
+    const double t = snap.time;
+    for (int i = 0; i < s.n(); ++i) {
+      double x = s.x[i], y = s.y[i];
+      double vx = s.vx[i], vy = s.vy[i];
+
+      double ax = 0, ay = 0;
+      ReadoutDiagnostics diag;
+      compute_provisional_readout_with_diagnostics(
+          s, i, bh_mass, star_star, softening, source_softening,
+          isotropic_c, readout_mode, readout_scale,
+          theta_tt_scale, theta_tr_scale, ax, ay, diag);
+
+      double r2 = x * x + y * y + eps * eps;
+      double r = std::sqrt(r2);
+      double radial_unit_x = (r > 1e-30) ? (x / r) : 1.0;
+      double radial_unit_y = (r > 1e-30) ? (y / r) : 0.0;
+
+      double a_radial = ax * radial_unit_x + ay * radial_unit_y;
+      double a_inward = -a_radial;
+      double tangential_unit_x = -radial_unit_y;
+      double tangential_unit_y = radial_unit_x;
+      double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
+
+      if (tr_coherence) {
+        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
+          << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
+          << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","
+          << diag.provisional_tangential_readout << "," << ax << "," << ay << ","
+          << a_radial << "," << a_inward << "," << a_tangential << "\n";
+      } else {
+        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
+          << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
+          << a_radial << "," << a_inward << "," << a_tangential << ","
+          << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
+          << diag.theta_trace << "," << diag.invariant_I << "\n";
+      }
+    }
   }
 }
 

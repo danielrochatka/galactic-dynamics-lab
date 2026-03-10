@@ -10,16 +10,13 @@
  *
  * Design:
  * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
- * - Explicitly isolated from source_ansatz and superposition logic.
- * - Easy to swap out later when proper TPF motion laws are derived.
- *
- * Supported readout_mode:
- * - tensor_radial_projection: spatial Theta·r_hat per source (exploratory; did not produce bound motion).
- * - tr_coherence_readout: paper-aligned t-r structure: Theta_rr, Theta_tt, Theta_tr; provisional radial/tangential readout.
+ * - Closures are downstream of the ansatz; see readout_closure.hpp for the boundary.
+ * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated, tr_coherence_readout.
  */
 
 #include "../../types.hpp"
 #include <string>
+#include <vector>
 
 namespace galaxy {
 struct Config;
@@ -77,6 +74,23 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double& ax,
                                                    double& ay,
                                                    ReadoutDiagnostics& diag);
+
+/**
+ * Write tpf_readout_debug.csv for dynamical runs.
+ * Column layout and mode-specific fields are owned by the readout module.
+ * Caller passes resolved run params (no Config dependency in readout).
+ */
+void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
+                             const std::string& output_dir,
+                             double softening,
+                             double bh_mass,
+                             bool star_star,
+                             double source_softening,
+                             double isotropic_c,
+                             const std::string& readout_mode,
+                             double readout_scale,
+                             double theta_tt_scale,
+                             double theta_tr_scale);
 
 }  // namespace tpfcore
 }  // namespace galaxy
