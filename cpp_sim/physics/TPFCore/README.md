@@ -82,8 +82,10 @@ For **symmetric pair** at (±d, 0):
 ## Config (defaults.cfg)
 
 - `tpfcore_enable_provisional_readout` — false. Set true to enable tensor-driven motion (exploratory).
-- `tpfcore_readout_mode` — `tensor_radial_projection` or `tensor_radial_projection_negated` (negated = same projection, opposite sign; for debugging sign errors).
+- `tpfcore_readout_mode` — `tensor_radial_projection`, `tensor_radial_projection_negated`, or `tr_coherence_readout` (see below).
 - `tpfcore_readout_scale` — scale factor for readout magnitude (default 1.0)
+- `tpfcore_theta_tt_scale` — (tr_coherence_readout only) Theta_tt balancing companion scale (default 1.0)
+- `tpfcore_theta_tr_scale` — (tr_coherence_readout only) Theta_tr mixed coupling scale (default 1.0)
 - `tpfcore_dump_readout_debug` — write `tpf_readout_debug.csv` for dynamical runs (default true)
 - `tpfcore_probe_radius_min`, `tpfcore_probe_radius_max`, `tpfcore_probe_samples`
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
@@ -141,40 +143,54 @@ Lower values indicate the ansatz better satisfies the configuration equation for
 
 ## Provisional motion/readout layer
 
-A **provisional**, **exploratory** motion/readout layer maps the local tensor field (Theta) into an acceleration vector for the simulator. This is **NOT** the full derived TPF dynamics. It exists solely to test particle motion driven by the tensor field without reverting to Newtonian scalar-potential dynamics.
+A **provisional**, **exploratory** motion/readout layer maps the local tensor field (Theta) into an acceleration vector for the simulator. This is **NOT** the full derived TPF dynamics. It exists solely to test particle motion driven by the tensor field without reverting to Newtonian scalar-potential dynamics. All readout modes are explicitly exploratory; no silent fallback to Newtonian.
 
 **Design:**
-- Motion derived from local TPF tensor structure (Theta), **not** from Phi or −grad(Phi)
-- Tensor-driven: Theta_ij contracted with radial unit vector r_hat
+- Motion derived from local TPF tensor structure (Theta), **not** from Phi or −grad(Φ)
 - Explicitly isolated in `provisional_readout.cpp`; easy to swap out later
 
 **Enabling:** Set `tpfcore_enable_provisional_readout = true` in config.
 
-**Readout mode** `tensor_radial_projection`:
+### Readout mode: `tensor_radial_projection` (spatial)
+
 - Per source: compute Theta_s at particle location
 - r_hat = unit vector from source to particle
 - Contribution: `scale × (Theta_s · r_hat)` — tensor-vector contraction
 - Superpose over BH (if any) and other particles (when star_star)
 
-**Config:**
-- `tpfcore_readout_mode` — `tensor_radial_projection` (default)
-- `tpfcore_readout_scale` — magnitude scale (default 1.0)
+**Note:** This spatial projection is exploratory only. It **did not produce bound two-body motion** (particle moved outward continuously in two_body_orbit). It is conceptually misaligned with the paper’s orbit/coherence discussion, which uses time–radial structure (Theta_tt, Theta_rr, Theta_tr).
 
-**Supported simulation modes** (with readout enabled):
+**tensor_radial_projection_negated**: Same projection, opposite sign. For debugging sign errors only. Not a final theory result.
+
+### Readout mode: `tr_coherence_readout` (paper-aligned t–r structure)
+
+**Exploratory** readout inspired by the paper’s weak-field t–r orbit/coherence discussion (Theta_tt, Theta_rr, Theta_tr). It is **not** the final derived TPF motion law; it moves the provisional motion layer closer to the paper than the spatial projection.
+
+- **Theta_rr**: spatial tensor projected onto local radial: r_hat^T Theta r_hat (from superposed Theta at particle).
+- **Theta_tt**: configurable balancing companion term: `tpfcore_theta_tt_scale × (−Theta_rr)` so that Theta_rr + Theta_tt can be tuned (e.g. toward balance).
+- **Theta_tr**: provisional mixed time–radial coupling: t_hat^T Theta r_hat (tangential unit t_hat ⊥ r_hat).
+- **Provisional radial readout**: `readout_scale × (Theta_rr + Theta_tt)` along r_hat.
+- **Provisional tangential readout**: `readout_scale × tpfcore_theta_tr_scale × Theta_tr` along t_hat.
+- **Acceleration**: radial component + tangential component (no Phi gradient).
+
+**Config:** `tpfcore_readout_mode = tr_coherence_readout`, `tpfcore_theta_tt_scale` (default 1.0), `tpfcore_theta_tr_scale` (default 1.0).
+
+**Supported simulation modes** (with any readout enabled):
 - `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`
 
-**Readout debug CSV** (`tpf_readout_debug.csv`, when `tpfcore_dump_readout_debug=true`):
-Per-snapshot, per-particle: `time`, `particle`, `x`, `y`, `vx`, `vy`, `ax`, `ay`, `radius`, `radial_unit_x`, `radial_unit_y`, `a_radial`, `a_inward`, `a_tangential`, `theta_xx`, `theta_xy`, `theta_yy`, `theta_trace`, `invariant_I`.
+### Readout debug CSV (`tpf_readout_debug.csv`, when `tpfcore_dump_readout_debug=true`)
 
-- **a_radial** = a · r_hat (acceleration component along radial direction from origin)
-- **a_inward** = a · (−r_hat) = −a_radial (component toward origin; positive = attraction)
-- **a_tangential** = component perpendicular to r_hat
+**For `tensor_radial_projection` (and negated):**  
+`time`, `particle`, `x`, `y`, `vx`, `vy`, `ax`, `ay`, `radius`, `radial_unit_x`, `radial_unit_y`, `a_radial`, `a_inward`, `a_tangential`, `theta_xx`, `theta_xy`, `theta_yy`, `theta_trace`, `invariant_I`.
+
+**For `tr_coherence_readout`:**  
+`time`, `particle`, `x`, `y`, `vx`, `vy`, `radius`, `theta_rr`, `theta_tt`, `theta_tr`, `theta_rr_plus_theta_tt`, `provisional_radial_readout`, `provisional_tangential_readout`, `ax`, `ay`, `a_radial`, `a_inward`, `a_tangential`.
+
+- **a_radial** = a · r_hat; **a_inward** = −a_radial (positive = toward origin); **a_tangential** = component perpendicular to r_hat.
 
 Used to diagnose runaway vs bound behavior. For bound orbits, a_inward should be positive (attraction).
 
-**tensor_radial_projection_negated**: Same projection as `tensor_radial_projection` but with opposite sign. For debugging only—determines whether runaway is a simple sign error. Not a final theory result.
-
-**run_info.txt** includes `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_dump_readout_debug`.
+**run_info.txt** includes `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_theta_tt_scale`, `tpfcore_theta_tr_scale` (when applicable), `tpfcore_dump_readout_debug`.
 
 ## What is NOT implemented
 

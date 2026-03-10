@@ -20,6 +20,8 @@ TPFCorePackage::TPFCorePackage()
     : provisional_readout_(false),
       readout_mode_("tensor_radial_projection"),
       readout_scale_(1.0),
+      theta_tt_scale_(1.0),
+      theta_tr_scale_(1.0),
       isotropic_c_(0.0),
       source_softening_(0.0) {}
 
@@ -27,6 +29,8 @@ void TPFCorePackage::init_from_config(const Config& config) {
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
   readout_scale_ = config.tpfcore_readout_scale;
+  theta_tt_scale_ = config.tpfcore_theta_tt_scale;
+  theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   isotropic_c_ = config.tpfcore_isotropic_correction_c;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
 }
@@ -51,7 +55,8 @@ void TPFCorePackage::compute_accelerations(const State& state,
   for (int i = 0; i < n; ++i) {
     tpfcore::compute_provisional_readout_acceleration(
         state, i, bh_mass, star_star, softening, source_softening_,
-        isotropic_c_, readout_mode_, readout_scale_, ax[i], ay[i]);
+        isotropic_c_, readout_mode_, readout_scale_,
+        theta_tt_scale_, theta_tr_scale_, ax[i], ay[i]);
   }
 }
 
@@ -69,8 +74,14 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
   std::ofstream f(output_dir + "/tpf_readout_debug.csv");
   if (!f) return;
 
-  f << "time,particle,x,y,vx,vy,ax,ay,radius,radial_unit_x,radial_unit_y,"
-    << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I\n";
+  const bool tr_coherence = (readout_mode_ == "tr_coherence_readout");
+  if (tr_coherence) {
+    f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
+      << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential\n";
+  } else {
+    f << "time,particle,x,y,vx,vy,ax,ay,radius,radial_unit_x,radial_unit_y,"
+      << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I\n";
+  }
 
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
@@ -83,7 +94,8 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
       tpfcore::ReadoutDiagnostics diag;
       tpfcore::compute_provisional_readout_with_diagnostics(
           s, i, bh_mass, star_star, softening, source_softening_,
-          isotropic_c_, readout_mode_, readout_scale_, ax, ay, diag);
+          isotropic_c_, readout_mode_, readout_scale_,
+          theta_tt_scale_, theta_tr_scale_, ax, ay, diag);
 
       double r2 = x * x + y * y + eps * eps;
       double r = std::sqrt(r2);
@@ -96,11 +108,19 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
       double tangential_unit_y = radial_unit_x;
       double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
 
-      f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
-        << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
-        << a_radial << "," << a_inward << "," << a_tangential << ","
-        << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
-        << diag.theta_trace << "," << diag.invariant_I << "\n";
+      if (tr_coherence) {
+        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
+          << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
+          << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","
+          << diag.provisional_tangential_readout << "," << ax << "," << ay << ","
+          << a_radial << "," << a_inward << "," << a_tangential << "\n";
+      } else {
+        f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
+          << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
+          << a_radial << "," << a_inward << "," << a_tangential << ","
+          << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
+          << diag.theta_trace << "," << diag.invariant_I << "\n";
+      }
     }
   }
 }

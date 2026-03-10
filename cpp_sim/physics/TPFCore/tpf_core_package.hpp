@@ -63,6 +63,8 @@ class TPFCorePackage : public PhysicsPackage {
   bool provisional_readout_;
   std::string readout_mode_;
   double readout_scale_;
+  double theta_tt_scale_;
+  double theta_tr_scale_;
   double isotropic_c_;
   double source_softening_;
 };

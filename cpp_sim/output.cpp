@@ -31,6 +31,9 @@ void write_run_info(const std::string& output_dir,
   if (config.physics_package == "TPFCore") {
     f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
     f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
+    f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
+    f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
   }
   f << "=== End resolved config ===\n\n";
@@ -60,6 +63,8 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
     f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
+    f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
+    f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
     f << "tpfcore_c_sweep_min\t" << config.tpfcore_c_sweep_min << "\n";
     f << "tpfcore_c_sweep_max\t" << config.tpfcore_c_sweep_max << "\n";

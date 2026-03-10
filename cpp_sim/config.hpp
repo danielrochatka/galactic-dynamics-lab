@@ -63,10 +63,14 @@ struct Config {
 
   /** TPFCore only: enable provisional acceleration readout for dynamical modes. Default false. */
   bool tpfcore_enable_provisional_readout = false;
-  /** TPFCore readout: mode. tensor_radial_projection = Theta·r_hat per source. */
+  /** TPFCore readout: mode. tensor_radial_projection (spatial) or tr_coherence_readout (paper t-r). */
   std::string tpfcore_readout_mode = "tensor_radial_projection";
   /** TPFCore readout: scale factor for magnitude. Default 1.0. */
   double tpfcore_readout_scale = 1.0;
+  /** TPFCore tr_coherence_readout: Theta_tt balancing companion scale. Default 1.0. */
+  double tpfcore_theta_tt_scale = 1.0;
+  /** TPFCore tr_coherence_readout: Theta_tr mixed coupling scale. Default 1.0. */
+  double tpfcore_theta_tr_scale = 1.0;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
   /** TPFCore inspection: probe radius min. */

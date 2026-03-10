@@ -4,21 +4,18 @@
 /**
  * PROVISIONAL motion/readout layer for TPFCore.
  *
- * This is EXPLORATORY and NOT the full derived TPF dynamics. It maps the local
+ * EXPLORATORY: This is NOT the full derived TPF dynamics. It maps the local
  * tensor field (Theta_ij) into an acceleration-like vector for the simulator,
  * without reverting to Newtonian scalar-potential dynamics.
  *
  * Design:
  * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
- * - Tensor-driven readout: Theta_ij contracted with a local directional vector.
  * - Explicitly isolated from source_ansatz and superposition logic.
  * - Easy to swap out later when proper TPF motion laws are derived.
  *
- * Supported readout_mode: tensor_radial_projection
- * - Per source: Theta_s from that source at particle location.
- * - r_hat = unit vector from source to particle.
- * - Contribution: scale * (Theta_s · r_hat)  [tensor-vector contraction]
- * - Superpose over all sources (BH + other particles when star_star).
+ * Supported readout_mode:
+ * - tensor_radial_projection: spatial Theta·r_hat per source (exploratory; did not produce bound motion).
+ * - tr_coherence_readout: paper-aligned t-r structure: Theta_rr, Theta_tt, Theta_tr; provisional radial/tangential readout.
  */
 
 #include "../../types.hpp"
@@ -32,19 +29,8 @@ namespace tpfcore {
  * Compute provisional readout acceleration for one particle from all sources.
  * EXPLORATORY: not the full TPF dynamics. Tensor-driven, no Phi gradient.
  *
- * Supported modes: tensor_radial_projection, tensor_radial_projection_negated
- * (negated = same projection, opposite sign; for debugging sign errors).
- *
- * @param state     Full state (particle positions, masses)
- * @param i         Index of particle to compute acceleration for
- * @param bh_mass   Fixed BH mass at origin (use 0 if no BH)
- * @param star_star Include contributions from other particles
- * @param softening Global softening
- * @param c         Isotropic correction coefficient (from ansatz)
- * @param readout_mode "tensor_radial_projection" or "tensor_radial_projection_negated"
- * @param readout_scale Scale factor for readout magnitude
- * @param[out] ax   x-component of acceleration
- * @param[out] ay   y-component of acceleration
+ * Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
+ * tr_coherence_readout (paper t-r structure; uses theta_tt_scale, theta_tr_scale).
  */
 void compute_provisional_readout_acceleration(const State& state,
                                                int i,
@@ -55,6 +41,8 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double c,
                                                const std::string& readout_mode,
                                                double readout_scale,
+                                               double theta_tt_scale,
+                                               double theta_tr_scale,
                                                double& ax,
                                                double& ay);
 
@@ -62,11 +50,18 @@ void compute_provisional_readout_acceleration(const State& state,
 struct ReadoutDiagnostics {
   double ax, ay;
   double theta_xx, theta_xy, theta_yy, theta_trace, invariant_I;
+  /* tr_coherence_readout only (0 otherwise): paper-aligned t-r provisional terms */
+  double theta_rr = 0.0;
+  double theta_tt = 0.0;
+  double theta_tr = 0.0;
+  double theta_rr_plus_theta_tt = 0.0;
+  double provisional_radial_readout = 0.0;
+  double provisional_tangential_readout = 0.0;
 };
 
 /**
  * Compute readout acceleration and Theta for diagnostics.
- * Same logic as compute_provisional_readout_acceleration but also returns Theta and I.
+ * Same logic as compute_provisional_readout_acceleration but also returns Theta, I, and (for tr_coherence) t-r terms.
  */
 void compute_provisional_readout_with_diagnostics(const State& state,
                                                    int i,
@@ -77,6 +72,8 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double c,
                                                    const std::string& readout_mode,
                                                    double readout_scale,
+                                                   double theta_tt_scale,
+                                                   double theta_tr_scale,
                                                    double& ax,
                                                    double& ay,
                                                    ReadoutDiagnostics& diag);

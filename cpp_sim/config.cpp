@@ -90,6 +90,8 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_enable_provisional_readout") { config.tpfcore_enable_provisional_readout = parse_bool(val); continue; }
       if (key == "tpfcore_readout_mode") { config.tpfcore_readout_mode = trim(val); continue; }
       if (key == "tpfcore_readout_scale") { config.tpfcore_readout_scale = std::stod(val); continue; }
+      if (key == "tpfcore_theta_tt_scale") { config.tpfcore_theta_tt_scale = std::stod(val); continue; }
+      if (key == "tpfcore_theta_tr_scale") { config.tpfcore_theta_tr_scale = std::stod(val); continue; }
       if (key == "tpfcore_dump_readout_debug") { config.tpfcore_dump_readout_debug = parse_bool(val); continue; }
       if (key == "tpfcore_probe_radius_min") { config.tpfcore_probe_radius_min = std::stod(val); continue; }
       if (key == "tpfcore_probe_radius_max") { config.tpfcore_probe_radius_max = std::stod(val); continue; }
