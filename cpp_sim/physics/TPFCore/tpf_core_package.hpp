@@ -68,6 +68,11 @@ class TPFCorePackage : public PhysicsPackage {
                                 const Config& config,
                                 const std::string& output_dir) const;
 
+  /** Write tpf_trajectory_diagnostics.txt for dynamical runs (geometry/time-series classification). */
+  void write_trajectory_diagnostics(const std::vector<Snapshot>& snapshots,
+                                    const Config& config,
+                                    const std::string& output_dir) const;
+
  private:
   bool provisional_readout_;
   std::string readout_mode_;
