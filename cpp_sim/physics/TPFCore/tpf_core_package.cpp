@@ -8,6 +8,7 @@
 #include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
 #include "source_ansatz.hpp"
+#include "tpf_core_params.hpp"
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -16,6 +17,31 @@
 #include <stdexcept>
 
 namespace galaxy {
+
+/** Single place that maps simulator Config -> TPFCore params. Keeps TPFCore decoupled from Config. */
+static tpfcore::TPFCoreParams build_params(const Config& config, const std::string& output_dir) {
+  tpfcore::TPFCoreParams p;
+  p.output_dir = output_dir;
+  p.softening = config.softening;
+  p.bh_mass = config.bh_mass;
+  p.star_mass = config.star_mass;
+  p.enable_star_star_gravity = config.enable_star_star_gravity;
+  p.tpfcore_source_softening = config.tpfcore_source_softening;
+  p.effective_source_softening = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+  p.tpfcore_isotropic_correction_c = config.tpfcore_isotropic_correction_c;
+  p.tpfcore_probe_radius_min = config.tpfcore_probe_radius_min;
+  p.tpfcore_probe_radius_max = config.tpfcore_probe_radius_max;
+  p.tpfcore_probe_samples = config.tpfcore_probe_samples;
+  p.tpfcore_dump_theta_profile = config.tpfcore_dump_theta_profile;
+  p.tpfcore_dump_invariant_profile = config.tpfcore_dump_invariant_profile;
+  p.tpfcore_dump_readout_debug = config.tpfcore_dump_readout_debug;
+  p.tpfcore_c_sweep_min = config.tpfcore_c_sweep_min;
+  p.tpfcore_c_sweep_max = config.tpfcore_c_sweep_max;
+  p.tpfcore_c_sweep_steps = config.tpfcore_c_sweep_steps;
+  p.tpfcore_c_objective = config.tpfcore_c_objective;
+  p.validation_symmetric_separation = config.validation_symmetric_separation;
+  return p;
+}
 
 TPFCorePackage::TPFCorePackage()
     : provisional_readout_(false),
@@ -64,27 +90,25 @@ void TPFCorePackage::compute_accelerations(const State& state,
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                          const Config& config,
                                          const std::string& output_dir) const {
-  if (!provisional_readout_ || !config.tpfcore_dump_readout_debug || snapshots.empty())
+  tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  if (!provisional_readout_ || !params.tpfcore_dump_readout_debug || snapshots.empty())
     return;
-  tpfcore::write_readout_debug_csv(snapshots, output_dir,
-                                   config.softening, config.bh_mass, config.enable_star_star_gravity,
+  tpfcore::write_readout_debug_csv(snapshots, params.output_dir,
+                                   params.softening, params.bh_mass, params.enable_star_star_gravity,
                                    source_softening_, isotropic_c_,
                                    readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
-}
-
-static double effective_source_softening(const Config& config) {
-  return (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
 }
 
 void TPFCorePackage::run_single_source_inspect(const Config& config, const std::string& output_dir) {
   using namespace tpfcore;
 
-  double r_min = config.tpfcore_probe_radius_min;
-  double r_max = config.tpfcore_probe_radius_max;
-  int n_samples = config.tpfcore_probe_samples;
-  double eps = effective_source_softening(config);
-  double m = config.bh_mass;
-  double c = config.tpfcore_isotropic_correction_c;
+  TPFCoreParams params = build_params(config, output_dir);
+  double r_min = params.tpfcore_probe_radius_min;
+  double r_max = params.tpfcore_probe_radius_max;
+  int n_samples = params.tpfcore_probe_samples;
+  double eps = params.effective_source_softening;
+  double m = params.bh_mass;
+  double c = params.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -128,8 +152,8 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
 
   bool residual_y_near_zero = (max_residual_y_abs < 1e-10);
 
-  if (config.tpfcore_dump_theta_profile) {
-    std::ofstream f(output_dir + "/theta_profile.csv");
+  if (params.tpfcore_dump_theta_profile) {
+    std::ofstream f(params.output_dir + "/theta_profile.csv");
     if (f) {
       f << "radius,x,y,xi_x,xi_y,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I,residual_x,residual_y,residual_norm\n";
       for (size_t i = 0; i < radii.size(); ++i) {
@@ -142,8 +166,8 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     }
   }
 
-  if (config.tpfcore_dump_invariant_profile) {
-    std::ofstream f(output_dir + "/invariant_profile.csv");
+  if (params.tpfcore_dump_invariant_profile) {
+    std::ofstream f(params.output_dir + "/invariant_profile.csv");
     if (f) {
       f << "radius,invariant_I,theta_trace,residual_norm\n";
       for (size_t i = 0; i < radii.size(); ++i) {
@@ -154,7 +178,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
   }
 
   {
-    std::ofstream f(output_dir + "/field_summary.txt");
+    std::ofstream f(params.output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore single-source inspection\n";
       f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
@@ -187,15 +211,16 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
    */
   using namespace tpfcore;
 
-  double r_min = config.tpfcore_probe_radius_min;
-  double r_max = config.tpfcore_probe_radius_max;
-  int n_samples = config.tpfcore_probe_samples;
-  double eps = effective_source_softening(config);
-  double m = config.bh_mass;
-  double c_min = config.tpfcore_c_sweep_min;
-  double c_max = config.tpfcore_c_sweep_max;
-  int n_steps = config.tpfcore_c_sweep_steps;
-  const std::string& objective_name = config.tpfcore_c_objective;
+  TPFCoreParams params = build_params(config, output_dir);
+  double r_min = params.tpfcore_probe_radius_min;
+  double r_max = params.tpfcore_probe_radius_max;
+  int n_samples = params.tpfcore_probe_samples;
+  double eps = params.effective_source_softening;
+  double m = params.bh_mass;
+  double c_min = params.tpfcore_c_sweep_min;
+  double c_max = params.tpfcore_c_sweep_max;
+  int n_steps = params.tpfcore_c_sweep_steps;
+  const std::string& objective_name = params.tpfcore_c_objective;
 
   if (r_min >= r_max || n_samples < 2 || n_steps < 2) return;
 
@@ -251,7 +276,7 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
 
   /* Write c_sweep.csv */
   {
-    std::ofstream f(output_dir + "/c_sweep.csv");
+    std::ofstream f(params.output_dir + "/c_sweep.csv");
     if (f) {
       f << "c,max_residual_norm,mean_residual_norm,l2_residual_norm\n";
       for (size_t i = 0; i < c_vals.size(); ++i) {
@@ -263,7 +288,7 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
 
   /* Write c_sweep_summary.txt */
   {
-    std::ofstream f(output_dir + "/c_sweep_summary.txt");
+    std::ofstream f(params.output_dir + "/c_sweep_summary.txt");
     if (f) {
       f << "TPFCore c-sweep (exploratory ansatz-tuning)\n";
       f << "Numerically fitting c against field-equation residual. Fitted c is NOT a final paper-derived constant.\n";
@@ -283,13 +308,14 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
 void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std::string& output_dir) {
   using namespace tpfcore;
 
-  double d = config.validation_symmetric_separation;
-  double m = config.star_mass;
-  double r_min = config.tpfcore_probe_radius_min;
-  double r_max = config.tpfcore_probe_radius_max;
-  int n_samples = config.tpfcore_probe_samples;
-  double eps = effective_source_softening(config);
-  double c = config.tpfcore_isotropic_correction_c;
+  TPFCoreParams params = build_params(config, output_dir);
+  double d = params.validation_symmetric_separation;
+  double m = params.star_mass;
+  double r_min = params.tpfcore_probe_radius_min;
+  double r_max = params.tpfcore_probe_radius_max;
+  int n_samples = params.tpfcore_probe_samples;
+  double eps = params.effective_source_softening;
+  double c = params.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -346,8 +372,8 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   bool residual_y_near_zero_x_axis = (max_residual_y_abs_x_axis < 1e-10);
   bool residual_x_near_zero_y_axis = (max_residual_x_abs_y_axis < 1e-10);
 
-  if (config.tpfcore_dump_theta_profile) {
-    std::ofstream f(output_dir + "/theta_profile.csv");
+  if (params.tpfcore_dump_theta_profile) {
+    std::ofstream f(params.output_dir + "/theta_profile.csv");
     if (f) {
       f << "axis,radius,x,y,xi_x,xi_y,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I,residual_x,residual_y,residual_norm\n";
       for (size_t i = 0; i < axis_v.size(); ++i) {
@@ -361,8 +387,8 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
     }
   }
 
-  if (config.tpfcore_dump_invariant_profile) {
-    std::ofstream f(output_dir + "/invariant_profile.csv");
+  if (params.tpfcore_dump_invariant_profile) {
+    std::ofstream f(params.output_dir + "/invariant_profile.csv");
     if (f) {
       f << "axis,radius,invariant_I,theta_trace,residual_norm\n";
       for (size_t i = 0; i < axis_v.size(); ++i) {
@@ -374,7 +400,7 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   }
 
   {
-    std::ofstream f(output_dir + "/field_summary.txt");
+    std::ofstream f(params.output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore symmetric-pair inspection\n";
       f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
