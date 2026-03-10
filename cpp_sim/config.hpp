@@ -15,7 +15,8 @@ enum class SimulationMode {
   tpf_single_source_inspect,
   tpf_symmetric_pair_inspect,
   tpf_single_source_optimize_c,
-  tpf_two_body_sweep
+  tpf_two_body_sweep,
+  tpf_weak_field_calibration
 };
 
 SimulationMode parse_mode(const std::string& s);

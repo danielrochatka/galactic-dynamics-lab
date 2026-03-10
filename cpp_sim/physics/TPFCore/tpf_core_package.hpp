@@ -49,6 +49,9 @@ class TPFCorePackage : public PhysicsPackage {
   /** Run single-source inspection: one source at origin, probe along +x. */
   void run_single_source_inspect(const Config& config, const std::string& output_dir);
 
+  /** Run weak-field calibration: compare TPF provisional radial acceleration to Newtonian benchmark. */
+  void run_weak_field_calibration(const Config& config, const std::string& output_dir);
+
   /** Run symmetric-pair inspection: sources at (+d,0) and (-d,0), probe along axes. */
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
 

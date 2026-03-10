@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration\n";
       return 1;
     }
   }
@@ -338,6 +338,29 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_weak_field_calibration) {
+    if (!tpfcore) {
+      std::cerr << "tpf_weak_field_calibration requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    if (!tpfcore->provisional_readout_enabled()) {
+      std::cerr << "tpf_weak_field_calibration requires tpfcore_enable_provisional_readout = true.\n";
+      return 1;
+    }
+    if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create output dir " << config.output_dir << "\n";
+      return 1;
+    }
+    std::cout << "Calibration mode: tpf_weak_field_calibration (TPF vs Newtonian benchmark)\n";
+    tpfcore->run_weak_field_calibration(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/tpf_weak_field_calibration.csv, tpf_weak_field_calibration.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -348,7 +371,8 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
     case galaxy::SimulationMode::tpf_single_source_optimize_c:
     case galaxy::SimulationMode::tpf_two_body_sweep:
-      std::cerr << "Internal error: inspection/utility/sweep modes should have returned earlier.\n";
+    case galaxy::SimulationMode::tpf_weak_field_calibration:
+      std::cerr << "Internal error: inspection/utility/sweep/calibration modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);

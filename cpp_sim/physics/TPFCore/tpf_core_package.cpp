@@ -100,6 +100,108 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                    readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
 }
 
+void TPFCorePackage::run_weak_field_calibration(const Config& config, const std::string& output_dir) {
+  if (!provisional_readout_) return;
+
+  tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  double r_min = params.tpfcore_probe_radius_min;
+  double r_max = params.tpfcore_probe_radius_max;
+  int n_samples = params.tpfcore_probe_samples;
+  double M = params.bh_mass;
+  double softening = params.softening;
+  if (r_min >= r_max || n_samples < 2) return;
+
+  /* Single particle at (r,0); BH at origin. Reuse existing readout path. */
+  State state;
+  state.resize(1);
+  state.mass[0] = params.star_mass;
+
+  std::vector<double> r_vals, a_tpf_vals, a_newton_vals, ratio_vals;
+  r_vals.reserve(n_samples);
+  a_tpf_vals.reserve(n_samples);
+  a_newton_vals.reserve(n_samples);
+  ratio_vals.reserve(n_samples);
+
+  for (int i = 0; i < n_samples; ++i) {
+    double frac = (n_samples > 1) ? static_cast<double>(i) / (n_samples - 1) : 0.0;
+    double r = r_min + frac * (r_max - r_min);
+    state.x[0] = r;
+    state.y[0] = 0.0;
+    state.vx[0] = state.vy[0] = 0.0;
+
+    std::vector<double> ax, ay;
+    compute_accelerations(state, M, softening, false, ax, ay);
+    double a_tpf = std::abs(ax[0]);
+    double r_sq = r * r + softening * softening;
+    double a_newton = M / (r_sq * std::sqrt(r_sq));
+    double ratio = (a_newton > 1e-300) ? (a_tpf / a_newton) : 0.0;
+
+    r_vals.push_back(r);
+    a_tpf_vals.push_back(a_tpf);
+    a_newton_vals.push_back(a_newton);
+    ratio_vals.push_back(ratio);
+  }
+
+  /* Best-fit K_eff: minimize sum (K * a_tpf_i - a_newton_i)^2 => K = sum(a_tpf * a_newton) / sum(a_tpf^2) */
+  double sum_prod = 0.0, sum_tpf_sq = 0.0;
+  for (size_t k = 0; k < a_tpf_vals.size(); ++k) {
+    sum_prod += a_tpf_vals[k] * a_newton_vals[k];
+    sum_tpf_sq += a_tpf_vals[k] * a_tpf_vals[k];
+  }
+  double K_eff = (sum_tpf_sq > 1e-300) ? (sum_prod / sum_tpf_sq) : 0.0;
+
+  double ratio_min = ratio_vals[0], ratio_max = ratio_vals[0];
+  for (double q : ratio_vals) {
+    if (q < ratio_min) ratio_min = q;
+    if (q > ratio_max) ratio_max = q;
+  }
+  double ratio_spread = ratio_max - ratio_min;
+
+  std::string csv_path = params.output_dir + "/tpf_weak_field_calibration.csv";
+  std::ofstream csv(csv_path);
+  if (csv) {
+    csv << "radius,a_tpf,a_newton,ratio\n";
+    for (size_t k = 0; k < r_vals.size(); ++k)
+      csv << std::scientific << r_vals[k] << "," << a_tpf_vals[k] << "," << a_newton_vals[k] << "," << ratio_vals[k] << "\n";
+  }
+
+  std::string txt_path = params.output_dir + "/tpf_weak_field_calibration.txt";
+  std::ofstream txt(txt_path);
+  if (txt) {
+    txt << "TPFCore weak-field calibration (diagnostic / provisional)\n";
+    txt << "Compares provisional inward radial acceleration to Newtonian benchmark in same code units (G=1).\n";
+    txt << "Benchmark: a_newton = M / (r^2 + eps^2)^(3/2) with eps = config.softening.\n";
+    txt << "Source mass M = " << std::scientific << M << ", softening = " << softening << "\n";
+    txt << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n = " << n_samples << "\n\n";
+
+    txt << "Best-fit scale factor K_eff (K_eff * a_tpf matches a_newton in least-squares sense):\n";
+    txt << "  K_eff = " << K_eff << "\n";
+    txt << "  (K_eff = sum(a_tpf * a_newton) / sum(a_tpf^2))\n\n";
+
+    txt << "Ratio a_tpf/a_newton: min = " << ratio_min << ", max = " << ratio_max << ", spread = " << ratio_spread << "\n\n";
+
+    const char* interpretation;
+    if (ratio_spread > 0.3)
+      interpretation = "radius-inconsistent (one constant scale factor not sufficient; ratio varies with r)";
+    else if (ratio_max < 0.9)
+      interpretation = "underpowered relative to Newtonian (ratio < 1 over sampled range)";
+    else if (ratio_min > 1.1)
+      interpretation = "overpowered relative to Newtonian (ratio > 1 over sampled range)";
+    else if (ratio_spread < 0.2)
+      interpretation = "roughly matched by one constant scale factor (low spread)";
+    else
+      interpretation = "roughly matched by one constant scale factor (moderate spread)";
+
+    txt << "Interpretation (diagnostic only; not a validation of the motion law):\n";
+    txt << "  " << interpretation << "\n";
+
+    txt << "\n--- Table ---\n";
+    txt << "radius\ta_tpf\ta_newton\tratio\n";
+    for (size_t k = 0; k < r_vals.size(); ++k)
+      txt << std::scientific << r_vals[k] << "\t" << a_tpf_vals[k] << "\t" << a_newton_vals[k] << "\t" << ratio_vals[k] << "\n";
+  }
+}
+
 void TPFCorePackage::run_single_source_inspect(const Config& config, const std::string& output_dir) {
   using namespace tpfcore;
 
