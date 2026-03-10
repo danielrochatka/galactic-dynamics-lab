@@ -77,6 +77,14 @@ Residual2D provisional_point_source_residual(double xs, double ys, double m,
  */
 double compute_invariant_I(const Theta2D& theta);
 
+/**
+ * Frobenius norm of Theta (configuration intensity): sqrt(Theta_xx^2 + Theta_yy^2 + 2*Theta_xy^2).
+ * Used for regime diagnostics only; no change to equations.
+ */
+inline double theta_frobenius_norm(const Theta2D& theta) {
+  return std::sqrt(theta.xx * theta.xx + theta.yy * theta.yy + 2.0 * theta.xy * theta.xy);
+}
+
 }  // namespace tpfcore
 }  // namespace galaxy
 

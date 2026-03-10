@@ -47,6 +47,8 @@ void compute_provisional_readout_acceleration(const State& state,
 struct ReadoutDiagnostics {
   double ax, ay;
   double theta_xx, theta_xy, theta_yy, theta_trace, invariant_I;
+  /** Theta Frobenius norm (configuration intensity); for regime diagnostics. */
+  double theta_norm = 0.0;
   /* tr_coherence_readout only (0 otherwise): paper-aligned t-r provisional terms */
   double theta_rr = 0.0;
   double theta_tt = 0.0;

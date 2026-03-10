@@ -391,6 +391,8 @@ int main(int argc, char** argv) {
       tpf->write_readout_debug(snapshots, config, config.output_dir);
       if (config.tpfcore_dump_readout_debug)
         std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
+      tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
+      std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
     }
   }
 

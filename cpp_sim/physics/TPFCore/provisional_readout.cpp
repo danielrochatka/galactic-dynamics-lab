@@ -8,6 +8,7 @@
 #include "provisional_readout.hpp"
 #include "field_evaluation.hpp"
 #include "readout_closure.hpp"
+#include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
 #include "../../types.hpp"
 #include <cmath>
@@ -150,6 +151,7 @@ static void apply_tr_coherence_closure(const State& state,
     diag->theta_yy = theta_sum.yy;
     diag->theta_trace = theta_sum.trace();
     diag->invariant_I = compute_invariant_I(theta_sum);
+    diag->theta_norm = theta_frobenius_norm(theta_sum);
   }
 }
 
@@ -232,8 +234,9 @@ void compute_provisional_readout_with_diagnostics(const State& state,
     diag.theta_yy = theta_sum.yy;
     diag.theta_trace = theta_sum.trace();
     diag.invariant_I = compute_invariant_I(theta_sum);
+    diag.theta_norm = theta_frobenius_norm(theta_sum);
   } else {
-    diag.theta_xx = diag.theta_xy = diag.theta_yy = diag.theta_trace = diag.invariant_I = 0.0;
+    diag.theta_xx = diag.theta_xy = diag.theta_yy = diag.theta_trace = diag.invariant_I = diag.theta_norm = 0.0;
   }
 }
 
@@ -256,12 +259,15 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
   if (!f) return;
 
   const bool tr_coherence = (readout_mode == "tr_coherence_readout");
+  /* residual_available=0 for multi-source (no analytic residual); residual_norm=0 when not available */
   if (tr_coherence) {
     f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
-      << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential\n";
+      << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential,"
+      << "theta_norm,invariant_I,regime,residual_available,residual_norm\n";
   } else {
     f << "time,particle,x,y,vx,vy,ax,ay,radius,radial_unit_x,radial_unit_y,"
-      << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I\n";
+      << "a_radial,a_inward,a_tangential,theta_xx,theta_xy,theta_yy,theta_trace,invariant_I,"
+      << "theta_norm,regime,residual_available,residual_norm\n";
   }
 
   for (const auto& snap : snapshots) {
@@ -289,18 +295,21 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       double tangential_unit_y = radial_unit_x;
       double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
 
+      const char* regime = regime_label_from_theta_norm(diag.theta_norm);
       if (tr_coherence) {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
           << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","
           << diag.provisional_tangential_readout << "," << ax << "," << ay << ","
-          << a_radial << "," << a_inward << "," << a_tangential << "\n";
+          << a_radial << "," << a_inward << "," << a_tangential << ","
+          << diag.theta_norm << "," << diag.invariant_I << "," << regime << ",0,0\n";
       } else {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
           << a_radial << "," << a_inward << "," << a_tangential << ","
           << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
-          << diag.theta_trace << "," << diag.invariant_I << "\n";
+          << diag.theta_trace << "," << diag.invariant_I << ","
+          << diag.theta_norm << "," << regime << ",0,0\n";
       }
     }
   }

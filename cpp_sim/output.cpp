@@ -81,6 +81,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_c_sweep_max\t" << config.tpfcore_c_sweep_max << "\n";
     f << "tpfcore_c_sweep_steps\t" << config.tpfcore_c_sweep_steps << "\n";
     f << "tpfcore_c_objective\t" << config.tpfcore_c_objective << "\n";
+    f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

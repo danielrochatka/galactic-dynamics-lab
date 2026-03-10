@@ -7,6 +7,7 @@
 #include "../../config.hpp"
 #include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
+#include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
 #include <cmath>
@@ -119,6 +120,8 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
   double max_theta_xy_abs = 0.0;
   bool theta_xx_vs_yy_differ = false;
   double max_residual_x_abs = 0.0, max_residual_y_abs = 0.0, max_residual_norm = 0.0;
+  double max_theta_norm = 0.0;
+  double max_invariant_I = 0.0;
 
   for (int i = 0; i < n_samples; ++i) {
     double frac = (n_samples > 1) ? static_cast<double>(i) / (n_samples - 1) : 0.0;
@@ -148,6 +151,9 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     if (rax > max_residual_x_abs) max_residual_x_abs = rax;
     if (ray > max_residual_y_abs) max_residual_y_abs = ray;
     if (rn > max_residual_norm) max_residual_norm = rn;
+    double tn = tpfcore::theta_frobenius_norm(field.theta);
+    if (tn > max_theta_norm) max_theta_norm = tn;
+    if (std::abs(field.invariant_I) > max_invariant_I) max_invariant_I = std::abs(field.invariant_I);
   }
 
   bool residual_y_near_zero = (max_residual_y_abs < 1e-10);
@@ -194,6 +200,15 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
       f << "Provisional weak-field point-source ansatz: yes (exploratory correction)\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
+      f << "\n--- Regime diagnostics (reporting only; no equation change) ---\n";
+      f << "  Field intensity (Theta Frobenius): max = " << std::scientific << max_theta_norm << "\n";
+      f << "  Invariant I: max|I| = " << max_invariant_I << "\n";
+      f << "  Residual: available (analytic, single-source)\n";
+      f << "  Max residual norm = " << max_residual_norm << "\n";
+      f << "  Regime (at max-intensity probe): " << tpfcore::regime_label_from_theta_norm(max_theta_norm) << "\n";
+      f << "  (Thresholds: low-intensity < " << tpfcore::THETA_NORM_LOW_MAX
+        << ", transitional < " << tpfcore::THETA_NORM_TRANSITIONAL_MAX << ", else high-intensity; heuristic.)\n";
+      f << "---\n";
       f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
       f << "  max|residual_y|=" << max_residual_y_abs << "\n";
@@ -334,6 +349,8 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   double max_residual_x_abs = 0.0, max_residual_y_abs = 0.0, max_residual_norm = 0.0;
   double max_residual_x_abs_x_axis = 0.0, max_residual_y_abs_x_axis = 0.0;
   double max_residual_x_abs_y_axis = 0.0, max_residual_y_abs_y_axis = 0.0;
+  double max_theta_norm = 0.0;
+  double max_invariant_I = 0.0;
 
   auto append = [&](const char* ax, double (*px)(double), double (*py)(double)) {
     for (int i = 0; i < n_samples; ++i) {
@@ -370,6 +387,9 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
         if (rax > max_residual_x_abs_y_axis) max_residual_x_abs_y_axis = rax;
         if (ray > max_residual_y_abs_y_axis) max_residual_y_abs_y_axis = ray;
       }
+      double tn = tpfcore::theta_frobenius_norm(field.theta);
+      if (tn > max_theta_norm) max_theta_norm = tn;
+      if (std::abs(field.invariant_I) > max_invariant_I) max_invariant_I = std::abs(field.invariant_I);
     }
   };
 
@@ -424,6 +444,15 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
       f << "Provisional weak-field point-source ansatz: yes\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
+      f << "\n--- Regime diagnostics (reporting only; no equation change) ---\n";
+      f << "  Field intensity (Theta Frobenius): max = " << std::scientific << max_theta_norm << "\n";
+      f << "  Invariant I: max|I| = " << max_invariant_I << "\n";
+      f << "  Residual: available (analytic, symmetric pair)\n";
+      f << "  Max residual norm = " << max_residual_norm << "\n";
+      f << "  Regime (at max-intensity probe): " << tpfcore::regime_label_from_theta_norm(max_theta_norm) << "\n";
+      f << "  (Thresholds: low-intensity < " << tpfcore::THETA_NORM_LOW_MAX
+        << ", transitional < " << tpfcore::THETA_NORM_TRANSITIONAL_MAX << ", else high-intensity; heuristic.)\n";
+      f << "---\n";
       f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
       f << "  max|residual_y|=" << max_residual_y_abs << "\n";
@@ -433,6 +462,71 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       f << "Output files: theta_profile.csv, invariant_profile.csv (axis column: x or y)\n";
     }
   }
+}
+
+void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snapshots,
+                                              const Config& config,
+                                              const std::string& output_dir) const {
+  using namespace tpfcore;
+  if (snapshots.empty()) return;
+
+  TPFCoreParams params = build_params(config, output_dir);
+  double eps = params.effective_source_softening;
+  double c = params.tpfcore_isotropic_correction_c;
+  double bh_mass = params.bh_mass;
+  bool star_star = params.enable_star_star_gravity;
+
+  double sum_theta_norm = 0.0, sum_I = 0.0;
+  double min_theta_norm = 1e300, max_theta_norm = -1e300;
+  double min_I = 1e300, max_I = -1e300;
+  size_t n_samples = 0;
+  size_t count_low = 0, count_transitional = 0, count_high = 0;
+
+  for (const auto& snap : snapshots) {
+    const State& s = snap.state;
+    for (int i = 0; i < s.n(); ++i) {
+      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps, c);
+      double tn = theta_frobenius_norm(field.theta);
+      double I = field.invariant_I;
+
+      sum_theta_norm += tn;
+      sum_I += I;
+      if (tn < min_theta_norm) min_theta_norm = tn;
+      if (tn > max_theta_norm) max_theta_norm = tn;
+      if (I < min_I) min_I = I;
+      if (I > max_I) max_I = I;
+      ++n_samples;
+
+      if (tn < THETA_NORM_LOW_MAX) ++count_low;
+      else if (tn < THETA_NORM_TRANSITIONAL_MAX) ++count_transitional;
+      else ++count_high;
+    }
+  }
+
+  if (n_samples == 0) return;
+
+  double mean_theta_norm = sum_theta_norm / n_samples;
+  double mean_I = sum_I / n_samples;
+
+  std::ofstream f(params.output_dir + "/tpf_regime_diagnostics.txt");
+  if (!f) return;
+
+  f << "TPFCore regime diagnostics (dynamical run)\n";
+  f << "Reporting only; no equation change. Same TPF law across regimes.\n";
+  f << "Residual: not available (multi-source superposition; no analytic residual in this path).\n";
+  f << "\n--- Field intensity (Theta Frobenius) ---\n";
+  f << "  min = " << std::scientific << min_theta_norm << ", max = " << max_theta_norm
+    << ", mean = " << mean_theta_norm << "\n";
+  f << "\n--- Invariant I ---\n";
+  f << "  min = " << min_I << ", max = " << max_I << ", mean = " << mean_I << "\n";
+  f << "\n--- Regime distribution (heuristic thresholds) ---\n";
+  f << std::fixed << std::setprecision(1);
+  f << "  low-intensity: " << count_low << " (" << (100.0 * count_low / n_samples) << "%)\n";
+  f << "  transitional: " << count_transitional << " (" << (100.0 * count_transitional / n_samples) << "%)\n";
+  f << "  high-intensity (provisional ansatz caution): " << count_high << " (" << (100.0 * count_high / n_samples) << "%)\n";
+  f << std::scientific;
+  f << "  Thresholds: low < " << THETA_NORM_LOW_MAX << ", transitional < " << THETA_NORM_TRANSITIONAL_MAX << "\n";
+  f << "\nTotal sample points: " << n_samples << " (particles x snapshots)\n";
 }
 
 }  // namespace galaxy

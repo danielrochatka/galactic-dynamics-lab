@@ -63,6 +63,11 @@ class TPFCorePackage : public PhysicsPackage {
                            const Config& config,
                            const std::string& output_dir) const;
 
+  /** Write tpf_regime_diagnostics.txt for dynamical runs (field intensity, I, regime distribution). */
+  void write_regime_diagnostics(const std::vector<Snapshot>& snapshots,
+                                const Config& config,
+                                const std::string& output_dir) const;
+
  private:
   bool provisional_readout_;
   std::string readout_mode_;
