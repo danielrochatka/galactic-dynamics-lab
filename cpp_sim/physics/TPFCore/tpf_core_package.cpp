@@ -5,6 +5,7 @@
 
 #include "tpf_core_package.hpp"
 #include "../../config.hpp"
+#include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
 #include "source_ansatz.hpp"
 #include <cmath>
@@ -100,28 +101,26 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     double r = r_min + frac * (r_max - r_min);
     double x = r, y = 0.0;
 
-    PointSourceField f = provisional_point_source_field(0, 0, m, x, y, eps, c);
-    double I = compute_invariant_I(f.theta);
-    Residual2D res = provisional_point_source_residual(0, 0, m, x, y, eps, c);
+    FieldAtPoint field = evaluate_provisional_field_single_source(0, 0, m, x, y, eps, c);
 
     radii.push_back(r);
     x_v.push_back(x);
     y_v.push_back(y);
-    xi_x_v.push_back(f.xi.x);
-    xi_y_v.push_back(f.xi.y);
-    theta_xx_v.push_back(f.theta.xx);
-    theta_xy_v.push_back(f.theta.xy);
-    theta_yy_v.push_back(f.theta.yy);
-    theta_trace_v.push_back(f.theta.trace());
-    invariant_I_v.push_back(I);
-    residual_x_v.push_back(res.x);
-    residual_y_v.push_back(res.y);
-    residual_norm_v.push_back(res.norm());
+    xi_x_v.push_back(field.xi.x);
+    xi_y_v.push_back(field.xi.y);
+    theta_xx_v.push_back(field.theta.xx);
+    theta_xy_v.push_back(field.theta.xy);
+    theta_yy_v.push_back(field.theta.yy);
+    theta_trace_v.push_back(field.theta.trace());
+    invariant_I_v.push_back(field.invariant_I);
+    residual_x_v.push_back(field.residual.x);
+    residual_y_v.push_back(field.residual.y);
+    residual_norm_v.push_back(field.residual.norm());
 
-    double txy = std::abs(f.theta.xy);
+    double txy = std::abs(field.theta.xy);
     if (txy > max_theta_xy_abs) max_theta_xy_abs = txy;
-    if (std::abs(f.theta.xx - f.theta.yy) > 1e-14) theta_xx_vs_yy_differ = true;
-    double rax = std::abs(res.x), ray = std::abs(res.y), rn = res.norm();
+    if (std::abs(field.theta.xx - field.theta.yy) > 1e-14) theta_xx_vs_yy_differ = true;
+    double rax = std::abs(field.residual.x), ray = std::abs(field.residual.y), rn = field.residual.norm();
     if (rax > max_residual_x_abs) max_residual_x_abs = rax;
     if (ray > max_residual_y_abs) max_residual_y_abs = ray;
     if (rn > max_residual_norm) max_residual_norm = rn;
@@ -221,8 +220,8 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
       double r = r_min + r_frac * (r_max - r_min);
       double x = r, y = 0.0;
 
-      Residual2D res = provisional_point_source_residual(0, 0, m, x, y, eps, c);
-      double rn = res.norm();
+      FieldAtPoint field = evaluate_provisional_field_single_source(0, 0, m, x, y, eps, c);
+      double rn = field.residual.norm();
       sum_norm += rn;
       sum_norm_sq += rn * rn;
       if (rn > max_norm) max_norm = rn;
@@ -309,35 +308,25 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       double r = r_min + frac * (r_max - r_min);
       double x = px(r), y = py(r);
 
-      PointSourceField f1 = provisional_point_source_field(d, 0, m, x, y, eps, c);
-      PointSourceField f2 = provisional_point_source_field(-d, 0, m, x, y, eps, c);
-      Residual2D res1 = provisional_point_source_residual(d, 0, m, x, y, eps, c);
-      Residual2D res2 = provisional_point_source_residual(-d, 0, m, x, y, eps, c);
-      Residual2D res = { res1.x + res2.x, res1.y + res2.y };
-
-      Xi2D xi = { f1.xi.x + f2.xi.x, f1.xi.y + f2.xi.y };
-      Theta2D theta = {
-        f1.theta.xx + f2.theta.xx,
-        f1.theta.xy + f2.theta.xy,
-        f1.theta.yy + f2.theta.yy
-      };
-      double I = compute_invariant_I(theta);
+      FieldAtPoint f1 = evaluate_provisional_field_single_source(d, 0, m, x, y, eps, c);
+      FieldAtPoint f2 = evaluate_provisional_field_single_source(-d, 0, m, x, y, eps, c);
+      FieldAtPoint field = add_provisional_fields(f1, f2);
 
       axis_v.push_back(ax);
       x_v.push_back(x);
       y_v.push_back(y);
-      xi_x_v.push_back(xi.x);
-      xi_y_v.push_back(xi.y);
-      theta_xx_v.push_back(theta.xx);
-      theta_xy_v.push_back(theta.xy);
-      theta_yy_v.push_back(theta.yy);
-      theta_trace_v.push_back(theta.trace());
-      invariant_I_v.push_back(I);
-      residual_x_v.push_back(res.x);
-      residual_y_v.push_back(res.y);
-      residual_norm_v.push_back(res.norm());
+      xi_x_v.push_back(field.xi.x);
+      xi_y_v.push_back(field.xi.y);
+      theta_xx_v.push_back(field.theta.xx);
+      theta_xy_v.push_back(field.theta.xy);
+      theta_yy_v.push_back(field.theta.yy);
+      theta_trace_v.push_back(field.theta.trace());
+      invariant_I_v.push_back(field.invariant_I);
+      residual_x_v.push_back(field.residual.x);
+      residual_y_v.push_back(field.residual.y);
+      residual_norm_v.push_back(field.residual.norm());
 
-      double rax = std::abs(res.x), ray = std::abs(res.y), rn = res.norm();
+      double rax = std::abs(field.residual.x), ray = std::abs(field.residual.y), rn = field.residual.norm();
       if (rax > max_residual_x_abs) max_residual_x_abs = rax;
       if (ray > max_residual_y_abs) max_residual_y_abs = ray;
       if (rn > max_residual_norm) max_residual_norm = rn;

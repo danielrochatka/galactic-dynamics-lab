@@ -6,6 +6,7 @@
  */
 
 #include "provisional_readout.hpp"
+#include "field_evaluation.hpp"
 #include "readout_closure.hpp"
 #include "source_ansatz.hpp"
 #include "../../types.hpp"
@@ -57,7 +58,8 @@ static void apply_tensor_radial_closure(const State& state,
     double rx = dx / r;
     double ry = dy / r;
 
-    Theta2D theta = provisional_point_source_theta(xs, ys, m, x, y, eps, c);
+    FieldAtPoint field = evaluate_provisional_field_single_source(xs, ys, m, x, y, eps, c);
+    const Theta2D& theta = field.theta;
     double ax_contrib = theta.xx * rx + theta.xy * ry;
     double ay_contrib = theta.xy * rx + theta.yy * ry;
 
@@ -81,32 +83,17 @@ static void apply_tensor_radial_closure(const State& state,
   }
 }
 
-// --- Superposition: Theta at particle from all sources (used by tr_coherence closure) ---
+// --- Superposition: field at particle from all sources (used by tr_coherence closure) ---
 static void compute_theta_sum(const State& state,
                               int i,
                               double bh_mass,
                               bool star_star,
                               double eps,
                               double c,
-                              double x,
-                              double y,
+                              double /*x*/, double /*y*/,
                               Theta2D& theta_sum) {
-  theta_sum.xx = theta_sum.xy = theta_sum.yy = 0.0;
-  const int n = state.n();
-  auto add = [&](double xs, double ys, double m) {
-    if (m <= 0.0) return;
-    Theta2D th = provisional_point_source_theta(xs, ys, m, x, y, eps, c);
-    theta_sum.xx += th.xx;
-    theta_sum.xy += th.xy;
-    theta_sum.yy += th.yy;
-  };
-  if (bh_mass > 0.0) add(0.0, 0.0, bh_mass);
-  if (star_star) {
-    for (int j = 0; j < n; ++j) {
-      if (j == i) continue;
-      add(state.x[j], state.y[j], state.mass[j]);
-    }
-  }
+  FieldAtPoint field = evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps, c);
+  theta_sum = field.theta;
 }
 
 // --- Closure: tr_coherence (superposed Theta -> Theta_rr/Theta_tt/Theta_tr formula). EXPLORATORY. ---
