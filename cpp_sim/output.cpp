@@ -43,7 +43,7 @@ void write_run_info(const std::string& output_dir,
     f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; manuscript structure; not tunable)\n";
     f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
     f << "exploratory_ansatz\ttpfcore_isotropic_correction_c (c in B(r); NOT a fundamental constant)\n";
-    f << "provisional_readout\ttpfcore_enable_provisional_readout, readout_mode, readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental closure)\n";
+    f << "provisional_readout\ttpfcore_enable_provisional_readout, readout_mode, readout_scale (weak-field calibrated effective scale), theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental closure)\n";
     f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
     f << "c_sweep_exploratory\ttpfcore_c_sweep_min/max/steps, c_objective (fitted c is NOT a paper constant)\n";
     f << "=== End TPFCore parameter roles ===\n\n";
@@ -74,6 +74,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_isotropic_correction_c\t" << config.tpfcore_isotropic_correction_c << "\n";
     f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
+    f << "tpfcore_readout_scale_note\tweak-field calibrated effective scale (K_eff); not proof of final TPF dynamics\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
