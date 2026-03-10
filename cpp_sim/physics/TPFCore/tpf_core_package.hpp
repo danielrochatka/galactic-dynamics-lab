@@ -76,6 +76,11 @@ class TPFCorePackage : public PhysicsPackage {
                                     const Config& config,
                                     const std::string& output_dir) const;
 
+  /** Write tpf_closure_diagnostics (tr_coherence_readout, single-body only): closure-term decomposition. */
+  void write_closure_diagnostics(const std::vector<Snapshot>& snapshots,
+                                 const Config& config,
+                                 const std::string& output_dir) const;
+
   /** Trajectory metrics + class from snapshots (single-body only). For sweep harness. */
   struct TrajectorySummary {
     bool valid = false;

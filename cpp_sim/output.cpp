@@ -84,6 +84,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_c_objective\t" << config.tpfcore_c_objective << "\n";
     f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
     f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
+    f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep)
       f << "tpf_sweep_summary\tsee tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
     if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit)

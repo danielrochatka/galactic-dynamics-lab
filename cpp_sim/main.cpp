@@ -514,6 +514,9 @@ int main(int argc, char** argv) {
       std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
       tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
       std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
+      tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
+      if (config.physics_package == "TPFCore" && config.tpfcore_readout_mode == "tr_coherence_readout" && snapshots[0].state.n() == 1)
+        std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
     }
   }
 
