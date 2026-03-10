@@ -82,6 +82,9 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_c_sweep_steps\t" << config.tpfcore_c_sweep_steps << "\n";
     f << "tpfcore_c_objective\t" << config.tpfcore_c_objective << "\n";
     f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
+    f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
+    if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep)
+      f << "tpf_sweep_summary\tsee tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

@@ -529,4 +529,154 @@ void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snaps
   f << "\nTotal sample points: " << n_samples << " (particles x snapshots)\n";
 }
 
+TPFCorePackage::TrajectorySummary TPFCorePackage::compute_trajectory_summary(const std::vector<Snapshot>& snapshots) const {
+  TrajectorySummary out;
+  if (snapshots.empty()) return out;
+  const int n_part = snapshots[0].state.n();
+  if (n_part != 1) return out;
+
+  std::vector<double> radii;
+  std::vector<double> angles;
+  radii.reserve(snapshots.size());
+  angles.reserve(snapshots.size());
+  for (const auto& snap : snapshots) {
+    const State& s = snap.state;
+    double x = s.x[0], y = s.y[0];
+    radii.push_back(std::sqrt(x * x + y * y));
+    angles.push_back(std::atan2(y, x));
+  }
+
+  double r_initial = radii.front();
+  double r_final = radii.back();
+  double r_min = r_initial, r_max = r_initial;
+  for (double r : radii) {
+    if (r < r_min) r_min = r;
+    if (r > r_max) r_max = r;
+  }
+  double radial_drift = r_final - r_initial;
+
+  double total_angle_sweep = 0.0;
+  double prev = angles[0];
+  for (size_t k = 1; k < angles.size(); ++k) {
+    double a = angles[k];
+    double d = a - prev;
+    if (d > 3.141592653589793) d -= 2.0 * 3.141592653589793;
+    if (d < -3.141592653589793) d += 2.0 * 3.141592653589793;
+    total_angle_sweep += d;
+    prev = a;
+  }
+  double revolutions = total_angle_sweep / (2.0 * 3.141592653589793);
+
+  const double PLUNGE_R_MIN_FRAC = 0.25;
+  const double PLUNGE_FINAL_FRAC = 0.5;
+  const double ESCAPE_R_MAX_FRAC = 2.5;
+  const double ESCAPE_FINAL_FRAC = 1.5;
+  const double BOUNDED_R_MIN_FRAC = 0.2;
+  const double BOUNDED_R_MAX_FRAC = 3.0;
+  const double NEAR_CIRCULAR_BAND = 0.25;
+
+  bool radius_stays_bounded = (r_min >= BOUNDED_R_MIN_FRAC * r_initial && r_max <= BOUNDED_R_MAX_FRAC * r_initial);
+
+  const char* trajectory_class = "strongly drifting / unclear";
+  if (r_min < PLUNGE_R_MIN_FRAC * r_initial && r_final < PLUNGE_FINAL_FRAC * r_initial)
+    trajectory_class = "plunge";
+  else if (r_max > ESCAPE_R_MAX_FRAC * r_initial && r_final > ESCAPE_FINAL_FRAC * r_initial)
+    trajectory_class = "escape";
+  else if (radius_stays_bounded) {
+    if ((r_max - r_min) / r_initial <= NEAR_CIRCULAR_BAND)
+      trajectory_class = "near-circular-candidate";
+    else
+      trajectory_class = "bounded-candidate";
+  }
+
+  out.valid = true;
+  out.r_initial = r_initial;
+  out.r_final = r_final;
+  out.r_min = r_min;
+  out.r_max = r_max;
+  out.radial_drift = radial_drift;
+  out.revolutions = revolutions;
+  out.trajectory_class = trajectory_class;
+  return out;
+}
+
+TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::vector<Snapshot>& snapshots,
+                                                                       const Config& config,
+                                                                       const std::string& output_dir) const {
+  using namespace tpfcore;
+  RegimeSummary out;
+  if (snapshots.empty()) return out;
+
+  TPFCoreParams params = build_params(config, output_dir);
+  double eps = params.effective_source_softening;
+  double c = params.tpfcore_isotropic_correction_c;
+  double bh_mass = params.bh_mass;
+  bool star_star = params.enable_star_star_gravity;
+
+  double sum_theta_norm = 0.0;
+  double min_theta_norm = 1e300, max_theta_norm = -1e300;
+  size_t n_samples = 0;
+
+  for (const auto& snap : snapshots) {
+    const State& s = snap.state;
+    for (int i = 0; i < s.n(); ++i) {
+      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps, c);
+      double tn = theta_frobenius_norm(field.theta);
+      sum_theta_norm += tn;
+      if (tn < min_theta_norm) min_theta_norm = tn;
+      if (tn > max_theta_norm) max_theta_norm = tn;
+      ++n_samples;
+    }
+  }
+
+  if (n_samples == 0) return out;
+  out.valid = true;
+  out.mean_theta_norm = sum_theta_norm / n_samples;
+  out.max_theta_norm = max_theta_norm;
+  out.min_theta_norm = min_theta_norm;
+  out.n_samples = n_samples;
+  return out;
+}
+
+void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& snapshots,
+                                                  const Config& config,
+                                                  const std::string& output_dir) const {
+  if (snapshots.empty()) return;
+
+  tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  const int n_part = snapshots[0].state.n();
+  std::ofstream f(params.output_dir + "/tpf_trajectory_diagnostics.txt");
+  if (!f) return;
+
+  f << "TPFCore trajectory diagnostics (dynamical run)\n";
+  f << "Analysis/reporting only; does not alter integrator or motion law.\n";
+  f << "Conservative geometric/time-series heuristics; labeled diagnostic/provisional.\n";
+
+  TrajectorySummary sum = compute_trajectory_summary(snapshots);
+  if (!sum.valid) {
+    f << "\nTrajectory classification is only computed for single-body dynamical runs (e.g. two_body_orbit).\n";
+    f << "This run has " << n_part << " particles. No trajectory class assigned.\n";
+    return;
+  }
+
+  const double BOUNDED_R_MIN_FRAC = 0.2, BOUNDED_R_MAX_FRAC = 3.0;
+  bool radius_stays_bounded = (sum.r_min >= BOUNDED_R_MIN_FRAC * sum.r_initial && sum.r_max <= BOUNDED_R_MAX_FRAC * sum.r_initial);
+
+  f << "\n--- Tracked body (particle 0) ---\n";
+  f << "  initial_radius = " << std::scientific << sum.r_initial << "\n";
+  f << "  final_radius = " << sum.r_final << "\n";
+  f << "  min_radius_over_run = " << sum.r_min << "\n";
+  f << "  max_radius_over_run = " << sum.r_max << "\n";
+  f << "  radial_drift (final - initial) = " << sum.radial_drift << "\n";
+  f << "  radius_stays_within_bounded_band = " << (radius_stays_bounded ? "yes" : "no");
+  f << " (heuristic: r_min >= " << BOUNDED_R_MIN_FRAC << "*r_initial, r_max <= " << BOUNDED_R_MAX_FRAC << "*r_initial)\n";
+  f << "  approximate_revolutions = " << std::fixed << std::setprecision(2) << sum.revolutions;
+  f << " (from snapshot angle unwrap; approximate)\n";
+  f << std::scientific;
+  f << "\n--- Trajectory classification (diagnostic / provisional) ---\n";
+  f << "  class = " << sum.trajectory_class << "\n";
+  f << "  (Heuristics: plunge / escape / bounded-candidate / near-circular-candidate / strongly drifting / unclear.\n";
+  f << "   Does not validate the provisional motion law.)\n";
+}
+
 }  // namespace galaxy

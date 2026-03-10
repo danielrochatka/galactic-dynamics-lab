@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep\n";
       return 1;
     }
   }
@@ -244,6 +244,100 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep) {
+    if (!tpfcore) {
+      std::cerr << "tpf_two_body_sweep requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    if (!tpfcore->provisional_readout_enabled()) {
+      std::cerr << "tpf_two_body_sweep requires tpfcore_enable_provisional_readout = true.\n";
+      return 1;
+    }
+    if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create output dir " << config.output_dir << "\n";
+      return 1;
+    }
+    /* Conservative default: sweep validation_two_body_speed_ratio only. */
+    const double speed_ratios[] = { 0.5, 0.8, 1.0, 1.2, 1.5 };
+    const int n_speed = sizeof(speed_ratios) / sizeof(speed_ratios[0]);
+
+    std::cout << "Sweep mode: tpf_two_body_sweep (TPFCore two-body trajectory classification)\n";
+    std::cout << "Sweeping speed_ratio over " << n_speed << " values; reusing existing simulation + diagnostics.\n";
+
+    struct SweepRow {
+      double speed_ratio;
+      double r_initial, r_final, r_min, r_max, radial_drift, revolutions;
+      std::string trajectory_class;
+      double mean_theta_norm, max_theta_norm;
+    };
+    std::vector<SweepRow> rows;
+
+    for (int i = 0; i < n_speed; ++i) {
+      galaxy::Config c = config;
+      c.validation_two_body_speed_ratio = speed_ratios[i];
+      c.enable_star_star_gravity = false;
+      physics->init_from_config(c);
+
+      galaxy::State state;
+      galaxy::init_two_body(c, state);
+      int n_steps = c.validation_n_steps;
+      int snapshot_every = c.validation_snapshot_every;
+
+      auto snapshots = galaxy::run_simulation(c, state, physics, n_steps, snapshot_every, nullptr, 0);
+
+      auto traj = tpfcore->compute_trajectory_summary(snapshots);
+      auto regime = tpfcore->compute_regime_summary(snapshots, c, config.output_dir);
+
+      SweepRow row = {};
+      row.speed_ratio = speed_ratios[i];
+      if (traj.valid) {
+        row.r_initial = traj.r_initial;
+        row.r_final = traj.r_final;
+        row.r_min = traj.r_min;
+        row.r_max = traj.r_max;
+        row.radial_drift = traj.radial_drift;
+        row.revolutions = traj.revolutions;
+        row.trajectory_class = traj.trajectory_class;
+      }
+      if (regime.valid) {
+        row.mean_theta_norm = regime.mean_theta_norm;
+        row.max_theta_norm = regime.max_theta_norm;
+      }
+      rows.push_back(row);
+    }
+
+    std::string out_dir = config.output_dir;
+    std::ofstream csv(out_dir + "/tpf_sweep_summary.csv");
+    if (csv) {
+      csv << "speed_ratio,r_initial,r_final,r_min,r_max,radial_drift,revolutions,trajectory_class,mean_theta_norm,max_theta_norm\n";
+      for (const auto& row : rows) {
+        csv << std::scientific << row.speed_ratio << "," << row.r_initial << "," << row.r_final << ","
+            << row.r_min << "," << row.r_max << "," << row.radial_drift << "," << row.revolutions << ","
+            << row.trajectory_class << "," << row.mean_theta_norm << "," << row.max_theta_norm << "\n";
+      }
+    }
+    std::ofstream txt(out_dir + "/tpf_sweep_summary.txt");
+    if (txt) {
+      txt << "TPFCore two-body parameter sweep (exploratory; downstream of physics)\n";
+      txt << "Swept parameter: validation_two_body_speed_ratio\n";
+      txt << "Values: ";
+      for (int i = 0; i < n_speed; ++i) txt << (i ? ", " : "") << speed_ratios[i];
+      txt << "\n\n";
+      txt << "speed_ratio\tr_initial\tr_final\tr_min\tr_max\tr_drift\trevolutions\tclass\tmean_theta_norm\tmax_theta_norm\n";
+      for (const auto& row : rows) {
+        txt << std::scientific << row.speed_ratio << "\t" << row.r_initial << "\t" << row.r_final << "\t"
+            << row.r_min << "\t" << row.r_max << "\t" << row.radial_drift << "\t" << row.revolutions << "\t"
+            << row.trajectory_class << "\t" << row.mean_theta_norm << "\t" << row.max_theta_norm << "\n";
+      }
+    }
+    std::cout << "Wrote " << out_dir << "/tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -253,7 +347,8 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_single_source_inspect:
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
     case galaxy::SimulationMode::tpf_single_source_optimize_c:
-      std::cerr << "Internal error: inspection/utility modes should have returned earlier.\n";
+    case galaxy::SimulationMode::tpf_two_body_sweep:
+      std::cerr << "Internal error: inspection/utility/sweep modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
@@ -393,6 +488,8 @@ int main(int argc, char** argv) {
         std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
       tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
       std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
+      tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
+      std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
     }
   }
 

@@ -73,6 +73,25 @@ class TPFCorePackage : public PhysicsPackage {
                                     const Config& config,
                                     const std::string& output_dir) const;
 
+  /** Trajectory metrics + class from snapshots (single-body only). For sweep harness. */
+  struct TrajectorySummary {
+    bool valid = false;
+    double r_initial = 0.0, r_final = 0.0, r_min = 0.0, r_max = 0.0;
+    double radial_drift = 0.0, revolutions = 0.0;
+    std::string trajectory_class;
+  };
+  TrajectorySummary compute_trajectory_summary(const std::vector<Snapshot>& snapshots) const;
+
+  /** Regime stats from snapshots (mean/max theta norm, etc.). For sweep harness. */
+  struct RegimeSummary {
+    bool valid = false;
+    double mean_theta_norm = 0.0, max_theta_norm = 0.0, min_theta_norm = 0.0;
+    size_t n_samples = 0;
+  };
+  RegimeSummary compute_regime_summary(const std::vector<Snapshot>& snapshots,
+                                       const Config& config,
+                                       const std::string& output_dir) const;
+
  private:
   bool provisional_readout_;
   std::string readout_mode_;
