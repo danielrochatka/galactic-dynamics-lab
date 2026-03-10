@@ -181,11 +181,17 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     std::ofstream f(params.output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore single-source inspection\n";
+      f << "--- Parameter classification for this run ---\n";
+      f << "  fixed_theory:        lambda=" << LAMBDA_4D << " (4D; not tunable)\n";
+      f << "  numerical_reg:       source softening eps=" << std::scientific << eps << "\n";
+      f << "  exploratory_ansatz:  isotropic correction c=" << c << " (NOT a fundamental constant)\n";
+      f << "  inspection:          probe r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
+      f << "---\n";
       f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
       f << "Source: (0,0), mass=" << m << "\n";
-      f << "Isotropic correction coefficient c=" << std::scientific << c << "\n";
+      f << "Isotropic correction coefficient c=" << std::scientific << c << " (exploratory; not theory)\n";
       f << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
-      f << "Source softening eps=" << eps << "\n";
+      f << "Source softening eps=" << eps << " (numerical regularization)\n";
       f << "Provisional weak-field point-source ansatz: yes (exploratory correction)\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
@@ -291,6 +297,7 @@ void TPFCorePackage::run_single_source_optimize_c(const Config& config, const st
     std::ofstream f(params.output_dir + "/c_sweep_summary.txt");
     if (f) {
       f << "TPFCore c-sweep (exploratory ansatz-tuning)\n";
+      f << "Parameter role: c = exploratory ansatz correction (NOT a fundamental constant; NOT fixed theory).\n";
       f << "Numerically fitting c against field-equation residual. Fitted c is NOT a final paper-derived constant.\n";
       f << "Sweep range: c in [" << std::scientific << c_min << ", " << c_max << "]\n";
       f << "Number of steps: " << n_steps << "\n";
@@ -403,12 +410,18 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
     std::ofstream f(params.output_dir + "/field_summary.txt");
     if (f) {
       f << "TPFCore symmetric-pair inspection\n";
+      f << "--- Parameter classification for this run ---\n";
+      f << "  fixed_theory:        lambda=" << LAMBDA_4D << " (4D; not tunable)\n";
+      f << "  numerical_reg:       source softening eps=" << std::scientific << eps << "\n";
+      f << "  exploratory_ansatz:  isotropic correction c=" << c << " (NOT a fundamental constant)\n";
+      f << "  inspection:          probe r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
+      f << "---\n";
       f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
       f << "Source positions: (" << d << ",0) and (-" << d << ",0)\n";
       f << "Source masses: " << m << " each\n";
-      f << "Isotropic correction coefficient c=" << std::scientific << c << "\n";
+      f << "Isotropic correction coefficient c=" << std::scientific << c << " (exploratory; not theory)\n";
       f << "Probe geometry: +x axis and +y axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
-      f << "Source softening eps=" << eps << "\n";
+      f << "Source softening eps=" << eps << " (numerical regularization)\n";
       f << "Provisional weak-field point-source ansatz: yes\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";

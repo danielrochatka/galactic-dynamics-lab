@@ -5,7 +5,11 @@
  * TPFCore: Honest primitive TPF structure package.
  *
  * Implements Xi^mu, Theta_{mu nu}, I = Theta_mn Theta^mn - lambda Theta^2.
- * Lambda fixed at 1/4 in 4D.
+ * Lambda = 1/4 in 4D (fixed theory; not tunable).
+ *
+ * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
+ * exploratory ansatz (isotropic correction c, NOT a fundamental constant);
+ * provisional experimental (readout mode/scale/theta_tt/theta_tr).
  *
  * When tpfcore_enable_provisional_readout=true, a PROVISIONAL motion/readout layer
  * maps Theta into acceleration. EXPLORATORY—not the full derived TPF dynamics.

@@ -54,7 +54,7 @@ PointSourceField provisional_point_source_field(double xs, double ys, double m,
 Theta2D provisional_point_source_theta(double xs, double ys, double m,
                                        double x, double y, double eps, double c = 0.0);
 
-/** Lambda = 1/4 in 4D (paper-fixed, not tunable). */
+/** Lambda = 1/4 in 4D. Fixed by manuscript structure; must not become tunable. */
 constexpr double LAMBDA_4D = 0.25;
 
 /** Residual vector R_nu = partial_i (Theta_i_nu - lambda delta_i_nu Theta). */

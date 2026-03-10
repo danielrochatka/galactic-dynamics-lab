@@ -38,6 +38,17 @@ void write_run_info(const std::string& output_dir,
   }
   f << "=== End resolved config ===\n\n";
 
+  if (config.physics_package == "TPFCore") {
+    f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
+    f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; manuscript structure; not tunable)\n";
+    f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
+    f << "exploratory_ansatz\ttpfcore_isotropic_correction_c (c in B(r); NOT a fundamental constant)\n";
+    f << "provisional_readout\ttpfcore_enable_provisional_readout, readout_mode, readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental closure)\n";
+    f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
+    f << "c_sweep_exploratory\ttpfcore_c_sweep_min/max/steps, c_objective (fitted c is NOT a paper constant)\n";
+    f << "=== End TPFCore parameter roles ===\n\n";
+  }
+
   f << "dt\t" << config.dt << "\n";
   f << "n_steps\t" << n_steps_done << "\n";
   f << "snapshot_every\t" << config.snapshot_every << "\n";

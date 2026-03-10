@@ -158,6 +158,7 @@ int main(int argc, char** argv) {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
     std::cout << "  Hessian-based provisional ansatz: Phi=-M/sqrt(r^2+eps^2), Theta=Hess(Phi)+B(r)*delta\n";
+    std::cout << "  Parameter roles: lambda=1/4 (fixed theory) | eps (numerical regularization) | c (exploratory ansatz) | readout (provisional experimental)\n";
     std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
     if (tpf && tpf->provisional_readout_enabled()) {
       std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << ")";
