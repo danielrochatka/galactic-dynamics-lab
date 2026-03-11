@@ -1125,4 +1125,126 @@ void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& s
     txt << "  live run and static audit are consistent within the 5% threshold over sampled snapshots.\n";
 }
 
+void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapshots,
+                                             const Config& config,
+                                             const std::string& output_dir) const {
+  if (!provisional_readout_ || snapshots.empty()) return;
+  if (config.simulation_mode != SimulationMode::two_body_orbit) return;
+  if (snapshots[0].state.n() != 1) return;
+
+  PhysicsPackage* newton = get_physics_package("Newtonian");
+  if (!newton) return;
+
+  tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  double softening = params.softening;
+  double bh_mass = params.bh_mass;
+  bool star_star = params.enable_star_star_gravity;
+  double eps2 = softening * softening;
+
+  std::ofstream txt(params.output_dir + "/tpf_step0_orbit_audit.txt");
+  if (!txt) return;
+
+  const State& s = snapshots[0].state;
+  double x = s.x[0], y = s.y[0], vx = s.vx[0], vy = s.vy[0];
+
+  double r2 = x * x + y * y + eps2;
+  double r = std::sqrt(r2);
+  double rx = 0.0, ry = 0.0, tx = 0.0, ty = 0.0;
+  if (r > 1e-30) {
+    rx = x / r;
+    ry = y / r;
+    tx = -ry;
+    ty = rx;
+  }
+  double v_radial = vx * rx + vy * ry;
+  double v_tangential = x * vy - y * vx;
+
+  std::vector<double> ax_t(1), ay_t(1), ax_n(1), ay_n(1);
+  compute_accelerations(s, bh_mass, softening, star_star, ax_t, ay_t);
+  newton->compute_accelerations(s, bh_mass, softening, star_star, ax_n, ay_n);
+
+  double a_rad_tpf = ax_t[0] * rx + ay_t[0] * ry;
+  double a_tan_tpf = ax_t[0] * tx + ay_t[0] * ty;
+  double a_rad_newton = ax_n[0] * rx + ay_n[0] * ry;
+  double a_tan_newton = ax_n[0] * tx + ay_n[0] * ty;
+
+  double diff_radial = a_rad_tpf - a_rad_newton;
+  double diff_tangential = a_tan_tpf - a_tan_newton;
+
+  double ratio_radial = 0.0;
+  if (std::abs(a_rad_newton) > 1e-300)
+    ratio_radial = std::abs(a_rad_tpf) / std::abs(a_rad_newton);
+
+  tpfcore::ReadoutDiagnostics diag;
+  double ax_d = 0.0, ay_d = 0.0;
+  tpfcore::compute_provisional_readout_with_diagnostics(
+      s, 0, bh_mass, star_star, softening, source_softening_, isotropic_c_,
+      readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
+      ax_d, ay_d, diag);
+
+  txt << std::scientific << std::setprecision(16);
+  txt << "TPFCore step-0 orbit audit (exact initial state of two_body_orbit)\n";
+  txt << "Diagnostics only; no averaging or summaries. All values exact for step 0.\n\n";
+
+  txt << "x = " << x << "\n";
+  txt << "y = " << y << "\n";
+  txt << "r = " << r << "\n\n";
+
+  txt << "vx = " << vx << "\n";
+  txt << "vy = " << vy << "\n";
+  txt << "v_radial = " << v_radial << "\n";
+  txt << "v_tangential = " << v_tangential << "\n\n";
+
+  txt << "ax_tpf = " << ax_t[0] << "\n";
+  txt << "ay_tpf = " << ay_t[0] << "\n";
+  txt << "a_rad_tpf = " << a_rad_tpf << "\n";
+  txt << "a_tan_tpf = " << a_tan_tpf << "\n\n";
+
+  txt << "ax_newton = " << ax_n[0] << "\n";
+  txt << "ay_newton = " << ay_n[0] << "\n";
+  txt << "a_rad_newton = " << a_rad_newton << "\n";
+  txt << "a_tan_newton = " << a_tan_newton << "\n\n";
+
+  txt << "diff_radial = " << diff_radial << "\n";
+  txt << "diff_tangential = " << diff_tangential << "\n";
+  txt << "ratio_radial = |a_rad_tpf| / |a_rad_newton| = " << ratio_radial << "\n\n";
+
+  txt << "theta_rr = " << diag.theta_rr << "\n";
+  txt << "theta_tt = " << diag.theta_tt << "\n";
+  txt << "theta_tr = " << diag.theta_tr << "\n";
+  txt << "provisional_radial_readout = " << diag.provisional_radial_readout << "\n";
+  txt << "provisional_tangential_readout = " << diag.provisional_tangential_readout << "\n\n";
+
+  double abs_a_rad_newton = std::abs(a_rad_newton);
+  double radial_mismatch_pct = 0.0;
+  if (abs_a_rad_newton > 1e-300)
+    radial_mismatch_pct = 100.0 * std::abs(diff_radial) / abs_a_rad_newton;
+
+  double abs_a_tan_newton = std::abs(a_tan_newton);
+  double tangential_mismatch_pct = 0.0;
+  if (abs_a_tan_newton > 1e-300)
+    tangential_mismatch_pct = 100.0 * std::abs(diff_tangential) / abs_a_tan_newton;
+
+  txt << "--- Conclusion ---\n";
+  txt << "Exact step-0 radial mismatch percentage = " << std::fixed << std::setprecision(4) << radial_mismatch_pct << "%\n";
+  txt << "Exact step-0 tangential mismatch percentage = " << tangential_mismatch_pct << "%\n";
+  if (tangential_mismatch_pct < 1.0)
+    txt << "The mismatch is purely radial (tangential mismatch negligible, < 1%).\n";
+  else if (tangential_mismatch_pct < 5.0)
+    txt << "The mismatch is mostly radial; tangential mismatch is small but non-negligible.\n";
+  else
+    txt << "The mismatch is both radial and tangential (tangential non-negligible).\n";
+
+  double r_min = params.tpfcore_probe_radius_min;
+  double r_max = params.tpfcore_probe_radius_max;
+  bool inside_probe_range = (r >= r_min && r <= r_max);
+  bool ratio_near_one = (ratio_radial >= 0.9 && ratio_radial <= 1.1);
+  if (inside_probe_range && ratio_near_one)
+    txt << "This initial state sits inside the calibration sweet spot (r in [" << r_min << ", " << r_max << "], ratio_radial near 1).\n";
+  else if (inside_probe_range)
+    txt << "This initial state is within the calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
+  else
+    txt << "This initial state is outside the calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
+}
+
 }  // namespace galaxy

@@ -545,6 +545,10 @@ int main(int argc, char** argv) {
       if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
           (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
         std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
+      if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit && snapshots[0].state.n() == 1) {
+        tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
+        std::cout << "Wrote " << config.output_dir << "/tpf_step0_orbit_audit.txt\n";
+      }
       if (config.tpfcore_live_orbit_force_audit) {
         tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
         std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";

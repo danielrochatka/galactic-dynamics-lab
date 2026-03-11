@@ -86,6 +86,11 @@ class TPFCorePackage : public PhysicsPackage {
                                     const Config& config,
                                     const std::string& output_dir) const;
 
+  /** Exact step-0 orbit audit: raw numbers for two_body_orbit initial state only. */
+  void write_step0_orbit_audit(const std::vector<Snapshot>& snapshots,
+                               const Config& config,
+                               const std::string& output_dir) const;
+
   /** Trajectory metrics + class from snapshots (single-body only). For sweep harness. */
   struct TrajectorySummary {
     bool valid = false;
