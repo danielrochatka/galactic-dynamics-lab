@@ -188,11 +188,12 @@ static void apply_experimental_radial_r_scaling_closure(const State& state,
   double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
 
   // Inward radial: magnitude = readout_scale * (-theta_rr) * r (so effective ~ 1/r^2 when theta_rr ~ 1/r^3).
+  // Apply as acceleration = -magnitude * r_hat (inward). r_hat = (rx, ry) points outward; Newtonian a is inward.
   double provisional_radial = readout_scale * (-theta_rr) * r;
   double provisional_tangential = 0.0;
 
-  ax = provisional_radial * rx;
-  ay = provisional_radial * ry;
+  ax = -provisional_radial * rx;
+  ay = -provisional_radial * ry;
 
   if (diag) {
     diag->theta_rr = theta_rr;
