@@ -5,6 +5,7 @@
 
 #include "tpf_core_package.hpp"
 #include "../../config.hpp"
+#include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark */
 #include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
@@ -100,8 +101,25 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                    readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
 }
 
+namespace {
+
+/* Same radial extraction as force_compare: |ax*rx + ay*ry| with r_eff = sqrt(r^2+eps^2), (rx,ry) = (x,y)/r_eff. */
+double newton_radial_magnitude_on_axis(double r, double ax, double ay, double eps_sq) {
+  (void)ay;
+  double r_eff_sq = r * r + eps_sq;
+  double r_eff = std::sqrt(r_eff_sq);
+  if (r_eff < 1e-30) return 0.0;
+  double rx = r / r_eff;
+  return std::abs(ax * rx);
+}
+
+}  // namespace
+
 void TPFCorePackage::run_weak_field_calibration(const Config& config, const std::string& output_dir) {
   if (!provisional_readout_) return;
+
+  PhysicsPackage* newton = get_physics_package("Newtonian");
+  if (!newton) return;
 
   tpfcore::TPFCoreParams params = build_params(config, output_dir);
   double r_min = params.tpfcore_probe_radius_min;
@@ -109,96 +127,175 @@ void TPFCorePackage::run_weak_field_calibration(const Config& config, const std:
   int n_samples = params.tpfcore_probe_samples;
   double M = params.bh_mass;
   double softening = params.softening;
+  const double eps_sq = softening * softening;
   if (r_min >= r_max || n_samples < 2) return;
 
-  /* Single particle at (r,0); BH at origin. Reuse existing readout path. */
+  /* Closure candidates to compare (always run both and write comparison). */
+  static const char* const CALIBRATION_MODES[] = {"tr_coherence_readout", "experimental_radial_r_scaling"};
+  const int num_modes = static_cast<int>(sizeof(CALIBRATION_MODES) / sizeof(CALIBRATION_MODES[0]));
+
+  struct ModeResult {
+    std::string mode;
+    std::vector<double> r_vals, a_tpf_vals, ratio_vals;
+    double K_eff;
+    double ratio_min, ratio_max, ratio_spread;
+    bool one_constant_sufficient;
+  };
+  std::vector<ModeResult> results;
+  results.reserve(num_modes);
+
   State state;
   state.resize(1);
   state.mass[0] = params.star_mass;
 
-  std::vector<double> r_vals, a_tpf_vals, a_newton_vals, ratio_vals;
-  r_vals.reserve(n_samples);
-  a_tpf_vals.reserve(n_samples);
+  /* Precompute Newtonian benchmark at each radius (same for all modes; from simulator path). */
+  std::vector<double> r_vals_common, a_newton_vals;
+  r_vals_common.reserve(n_samples);
   a_newton_vals.reserve(n_samples);
-  ratio_vals.reserve(n_samples);
-
   for (int i = 0; i < n_samples; ++i) {
     double frac = (n_samples > 1) ? static_cast<double>(i) / (n_samples - 1) : 0.0;
     double r = r_min + frac * (r_max - r_min);
     state.x[0] = r;
     state.y[0] = 0.0;
     state.vx[0] = state.vy[0] = 0.0;
-
-    std::vector<double> ax, ay;
-    compute_accelerations(state, M, softening, false, ax, ay);
-    double a_tpf = std::abs(ax[0]);
-    double r_sq = r * r + softening * softening;
-    double a_newton = M / (r_sq * std::sqrt(r_sq));
-    double ratio = (a_newton > 1e-300) ? (a_tpf / a_newton) : 0.0;
-
-    r_vals.push_back(r);
-    a_tpf_vals.push_back(a_tpf);
+    std::vector<double> ax_n, ay_n;
+    newton->compute_accelerations(state, M, softening, false, ax_n, ay_n);
+    double a_newton = newton_radial_magnitude_on_axis(r, ax_n[0], ay_n[0], eps_sq);
+    r_vals_common.push_back(r);
     a_newton_vals.push_back(a_newton);
-    ratio_vals.push_back(ratio);
   }
 
-  /* Best-fit K_eff: minimize sum (K * a_tpf_i - a_newton_i)^2 => K = sum(a_tpf * a_newton) / sum(a_tpf^2) */
-  double sum_prod = 0.0, sum_tpf_sq = 0.0;
-  for (size_t k = 0; k < a_tpf_vals.size(); ++k) {
-    sum_prod += a_tpf_vals[k] * a_newton_vals[k];
-    sum_tpf_sq += a_tpf_vals[k] * a_tpf_vals[k];
-  }
-  double K_eff = (sum_tpf_sq > 1e-300) ? (sum_prod / sum_tpf_sq) : 0.0;
+  std::string current_mode = readout_mode_;
+  double current_scale = readout_scale_;
 
-  double ratio_min = ratio_vals[0], ratio_max = ratio_vals[0];
-  for (double q : ratio_vals) {
-    if (q < ratio_min) ratio_min = q;
-    if (q > ratio_max) ratio_max = q;
+  for (int m = 0; m < num_modes; ++m) {
+    readout_mode_ = CALIBRATION_MODES[m];
+    readout_scale_ = 1.0;
+    ModeResult res;
+    res.mode = readout_mode_;
+    res.r_vals = r_vals_common;
+    res.a_tpf_vals.resize(n_samples);
+    res.ratio_vals.resize(n_samples);
+
+    for (int i = 0; i < n_samples; ++i) {
+      double r = res.r_vals[i];
+      state.x[0] = r;
+      state.y[0] = 0.0;
+      state.vx[0] = state.vy[0] = 0.0;
+      std::vector<double> ax, ay;
+      compute_accelerations(state, M, softening, false, ax, ay);
+      double a_tpf = std::abs(ax[0]);
+      double a_newton = a_newton_vals[i];
+      res.a_tpf_vals[i] = a_tpf;
+      res.ratio_vals[i] = (a_newton > 1e-300) ? (a_tpf / a_newton) : 0.0;
+    }
+
+    double sum_prod = 0.0, sum_tpf_sq = 0.0;
+    for (int k = 0; k < n_samples; ++k) {
+      sum_prod += res.a_tpf_vals[k] * a_newton_vals[k];
+      sum_tpf_sq += res.a_tpf_vals[k] * res.a_tpf_vals[k];
+    }
+    res.K_eff = (sum_tpf_sq > 1e-300) ? (sum_prod / sum_tpf_sq) : 0.0;
+
+    res.ratio_min = res.ratio_vals[0];
+    res.ratio_max = res.ratio_vals[0];
+    for (double q : res.ratio_vals) {
+      if (q < res.ratio_min) res.ratio_min = q;
+      if (q > res.ratio_max) res.ratio_max = q;
+    }
+    res.ratio_spread = res.ratio_max - res.ratio_min;
+    res.one_constant_sufficient = (res.ratio_spread <= 0.3);
+    results.push_back(res);
   }
-  double ratio_spread = ratio_max - ratio_min;
+
+  readout_mode_ = current_mode;
+  readout_scale_ = current_scale;
+
+  /* Per-mode CSV/txt: use config mode if it was one of the two, else first mode. */
+  int current_idx = 0;
+  for (int m = 0; m < num_modes; ++m) {
+    if (results[m].mode == current_mode) { current_idx = m; break; }
+  }
 
   std::string csv_path = params.output_dir + "/tpf_weak_field_calibration.csv";
   std::ofstream csv(csv_path);
   if (csv) {
-    csv << "radius,a_tpf,a_newton,ratio\n";
-    for (size_t k = 0; k < r_vals.size(); ++k)
-      csv << std::scientific << r_vals[k] << "," << a_tpf_vals[k] << "," << a_newton_vals[k] << "," << ratio_vals[k] << "\n";
+    csv << "radius,a_tpf,a_newton,ratio,mode\n";
+    const ModeResult& res = results[current_idx];
+    for (size_t k = 0; k < res.r_vals.size(); ++k)
+      csv << std::scientific << res.r_vals[k] << "," << res.a_tpf_vals[k] << "," << a_newton_vals[k] << "," << res.ratio_vals[k] << "," << res.mode << "\n";
   }
 
   std::string txt_path = params.output_dir + "/tpf_weak_field_calibration.txt";
   std::ofstream txt(txt_path);
   if (txt) {
+    const ModeResult& cur = results[current_idx];
     txt << "TPFCore weak-field calibration (diagnostic / provisional)\n";
-    txt << "Compares provisional inward radial acceleration to Newtonian benchmark in same code units (G=1).\n";
-    txt << "Benchmark: a_newton = M / (r^2 + eps^2)^(3/2) with eps = config.softening.\n";
+    txt << "Newtonian benchmark: from Newtonian package (same path as simulator and force_compare).\n";
+    txt << "Radial extraction: |a_rad| = |ax*rx + ay*ry| with r_eff = sqrt(r^2+eps^2), (rx,ry) = (r,0)/r_eff on x-axis.\n";
+    txt << "Previous scalar formula M/(r^2+eps^2)^(3/2) was wrong by factor r; value 0.2046442 is INVALIDATED.\n\n";
     txt << "Source mass M = " << std::scientific << M << ", softening = " << softening << "\n";
     txt << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n = " << n_samples << "\n\n";
+    txt << "Current mode: " << cur.mode << "\n";
+    txt << "  K_eff = " << std::scientific << cur.K_eff << "\n";
+    txt << "  Ratio a_tpf/a_newton: min = " << cur.ratio_min << ", max = " << cur.ratio_max << ", spread = " << cur.ratio_spread << "\n";
+    txt << "  One constant sufficient: " << (cur.one_constant_sufficient ? "yes" : "no") << "\n\n";
+    const char* interpretation = cur.ratio_spread > 0.3 ? "radius-inconsistent (one constant scale factor not sufficient)"
+      : (cur.ratio_max < 0.9 ? "underpowered relative to Newtonian"
+         : (cur.ratio_min > 1.1 ? "overpowered relative to Newtonian"
+            : (cur.ratio_spread < 0.2 ? "roughly matched by one constant scale factor (low spread)"
+               : "roughly matched by one constant scale factor (moderate spread)")));
+    txt << "Interpretation: " << interpretation << "\n\n";
+    txt << "--- Table ---\nradius\ta_tpf\ta_newton\tratio\n";
+    for (size_t k = 0; k < cur.r_vals.size(); ++k)
+      txt << std::scientific << cur.r_vals[k] << "\t" << cur.a_tpf_vals[k] << "\t" << a_newton_vals[k] << "\t" << cur.ratio_vals[k] << "\n";
+    txt << "\nSee tpf_weak_field_calibration_comparison.txt for both closure candidates.\n";
+  }
 
-    txt << "Best-fit scale factor K_eff (K_eff * a_tpf matches a_newton in least-squares sense):\n";
-    txt << "  K_eff = " << K_eff << "\n";
-    txt << "  (K_eff = sum(a_tpf * a_newton) / sum(a_tpf^2))\n\n";
+  std::string comp_path = params.output_dir + "/tpf_weak_field_calibration_comparison.txt";
+  std::ofstream comp(comp_path);
+  if (comp) {
+    comp << "TPFCore weak-field calibration: comparison of closure candidates\n";
+    comp << "Benchmark: Newtonian package, same radial extraction as simulator/force_compare.\n";
+    comp << "Previous 0.2046442 was invalidated by benchmark formula mismatch (factor r).\n\n";
+    comp << "--- Per-mode results ---\n\n";
+    for (size_t m = 0; m < results.size(); ++m) {
+      const ModeResult& res = results[m];
+      comp << "Mode: " << res.mode << "\n";
+      comp << "  K_eff = " << std::scientific << res.K_eff << "\n";
+      comp << "  ratio min = " << res.ratio_min << ", max = " << res.ratio_max << ", spread = " << res.ratio_spread << "\n";
+      comp << "  One constant sufficient: " << (res.one_constant_sufficient ? "yes" : "no") << "\n\n";
+    }
+    comp << "--- Shape match verdict ---\n";
+    bool tr_ok = results[0].one_constant_sufficient;
+    bool exp_ok = results[1].one_constant_sufficient;
+    double spread_tr = results[0].ratio_spread;
+    double spread_exp = results[1].ratio_spread;
+    if (tr_ok && !exp_ok)
+      comp << "  tr_coherence_readout has better weak-field shape match (one constant sufficient; experimental_radial_r_scaling ratio varies more with r).\n";
+    else if (!tr_ok && exp_ok)
+      comp << "  experimental_radial_r_scaling has better weak-field shape match (one constant sufficient; tr_coherence_readout ratio varies more with r).\n";
+    else if (tr_ok && exp_ok)
+      comp << "  Both closures have acceptable shape (one constant sufficient). Lower spread wins; spread tr=" << std::scientific << spread_tr << " exp=" << spread_exp << ".\n";
+    else {
+      comp << "  Neither closure has one constant sufficient over the probe range; lower ratio spread is better shape match.\n";
+      if (spread_tr < spread_exp)
+        comp << "  tr_coherence_readout is the better weak-field shape match (spread " << std::scientific << spread_tr << " < " << spread_exp << ").\n";
+      else if (spread_exp < spread_tr)
+        comp << "  experimental_radial_r_scaling is the better weak-field shape match (spread " << std::scientific << spread_exp << " < " << spread_tr << ").\n";
+      else
+        comp << "  Tied on spread.\n";
+    }
+  }
 
-    txt << "Ratio a_tpf/a_newton: min = " << ratio_min << ", max = " << ratio_max << ", spread = " << ratio_spread << "\n\n";
-
-    const char* interpretation;
-    if (ratio_spread > 0.3)
-      interpretation = "radius-inconsistent (one constant scale factor not sufficient; ratio varies with r)";
-    else if (ratio_max < 0.9)
-      interpretation = "underpowered relative to Newtonian (ratio < 1 over sampled range)";
-    else if (ratio_min > 1.1)
-      interpretation = "overpowered relative to Newtonian (ratio > 1 over sampled range)";
-    else if (ratio_spread < 0.2)
-      interpretation = "roughly matched by one constant scale factor (low spread)";
-    else
-      interpretation = "roughly matched by one constant scale factor (moderate spread)";
-
-    txt << "Interpretation (diagnostic only; not a validation of the motion law):\n";
-    txt << "  " << interpretation << "\n";
-
-    txt << "\n--- Table ---\n";
-    txt << "radius\ta_tpf\ta_newton\tratio\n";
-    for (size_t k = 0; k < r_vals.size(); ++k)
-      txt << std::scientific << r_vals[k] << "\t" << a_tpf_vals[k] << "\t" << a_newton_vals[k] << "\t" << ratio_vals[k] << "\n";
+  std::string comp_csv_path = params.output_dir + "/tpf_weak_field_calibration_comparison.csv";
+  std::ofstream comp_csv(comp_csv_path);
+  if (comp_csv) {
+    comp_csv << "mode,K_eff,ratio_min,ratio_max,ratio_spread,one_constant_sufficient\n";
+    for (size_t m = 0; m < results.size(); ++m) {
+      const ModeResult& res = results[m];
+      comp_csv << res.mode << "," << std::scientific << res.K_eff << "," << res.ratio_min << "," << res.ratio_max << "," << res.ratio_spread << "," << (res.one_constant_sufficient ? "1" : "0") << "\n";
+    }
   }
 }
 

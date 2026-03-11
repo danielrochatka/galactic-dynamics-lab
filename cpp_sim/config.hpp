@@ -69,8 +69,8 @@ struct Config {
   bool tpfcore_enable_provisional_readout = false;
   /** TPFCore readout: mode. tensor_radial_projection (spatial) or tr_coherence_readout (paper t-r). */
   std::string tpfcore_readout_mode = "tensor_radial_projection";
-  /** TPFCore readout: scale factor for magnitude. Default: weak-field calibrated effective scale (K_eff from tpf_weak_field_calibration; not proof of final TPF dynamics). */
-  double tpfcore_readout_scale = 0.2046442;
+  /** TPFCore readout: scale factor for magnitude. Was 0.2046442 (INVALIDATED by benchmark mismatch). Pending recalibration; default 1.0. */
+  double tpfcore_readout_scale = 1.0;
   /** TPFCore tr_coherence_readout: Theta_tt balancing companion scale. Default 1.0. */
   double tpfcore_theta_tt_scale = 1.0;
   /** TPFCore tr_coherence_readout: Theta_tr mixed coupling scale. Default 1.0. */

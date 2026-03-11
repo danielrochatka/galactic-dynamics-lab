@@ -355,6 +355,7 @@ int main(int argc, char** argv) {
     std::cout << "Calibration mode: tpf_weak_field_calibration (TPF vs Newtonian benchmark)\n";
     tpfcore->run_weak_field_calibration(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/tpf_weak_field_calibration.csv, tpf_weak_field_calibration.txt\n";
+    std::cout << "Wrote " << config.output_dir << "/tpf_weak_field_calibration_comparison.csv, tpf_weak_field_calibration_comparison.txt\n";
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
