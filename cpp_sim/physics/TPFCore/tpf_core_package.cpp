@@ -784,7 +784,8 @@ void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& s
 void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snapshots,
                                                const Config& config,
                                                const std::string& output_dir) const {
-  if (!provisional_readout_ || readout_mode_ != "tr_coherence_readout" || snapshots.empty())
+  const bool closure_diag_mode = (readout_mode_ == "tr_coherence_readout" || readout_mode_ == "experimental_radial_r_scaling");
+  if (!provisional_readout_ || !closure_diag_mode || snapshots.empty())
     return;
   const int n_part = snapshots[0].state.n();
   if (n_part != 1) return;
@@ -850,8 +851,8 @@ void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snap
   std::ofstream txt(params.output_dir + "/tpf_closure_diagnostics.txt");
   if (!txt) return;
 
-  txt << "TPFCore closure-term decomposition (tr_coherence_readout, single-body)\n";
-  txt << "Diagnostics only; no change to formulas or behavior.\n\n";
+  txt << "TPFCore closure-term decomposition (single-body)\n";
+  txt << "Mode: " << readout_mode_ << ". Diagnostics only; no change to formulas or behavior.\n\n";
 
   txt << "--- Per-step CSV: tpf_closure_diagnostics.csv ---\n";
   txt << "Columns: time, r, theta_rr, theta_tt, theta_tr, radial_closure, tangential_closure,\n";

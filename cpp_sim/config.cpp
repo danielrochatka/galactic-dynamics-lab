@@ -43,6 +43,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_single_source_optimize_c") return SimulationMode::tpf_single_source_optimize_c;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
+  if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -58,6 +59,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_single_source_optimize_c: return "tpf_single_source_optimize_c";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
+    case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
   }
   return "unknown";
 }

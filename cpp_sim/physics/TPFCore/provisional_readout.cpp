@@ -155,6 +155,61 @@ static void apply_tr_coherence_closure(const State& state,
   }
 }
 
+// --- EXPERIMENTAL closure: radial only, with r-scaling (Theta ~ 1/r^3 -> a_rad ~ 1/r^2). ---
+static void apply_experimental_radial_r_scaling_closure(const State& state,
+                                                        int i,
+                                                        double bh_mass,
+                                                        bool star_star,
+                                                        double eps,
+                                                        double c,
+                                                        double readout_scale,
+                                                        double& ax,
+                                                        double& ay,
+                                                        ReadoutDiagnostics* diag) {
+  const double x = state.x[i];
+  const double y = state.y[i];
+  double r2 = x * x + y * y + eps * eps;
+  double r = std::sqrt(r2);
+  if (r < 1e-30) {
+    ax = ay = 0.0;
+    if (diag) diag->theta_rr = diag->theta_tt = diag->theta_tr = diag->theta_rr_plus_theta_tt =
+      diag->provisional_radial_readout = diag->provisional_tangential_readout = 0.0;
+    return;
+  }
+  double rx = x / r;
+  double ry = y / r;
+  double tx = -ry;
+  double ty = rx;
+
+  Theta2D theta_sum;
+  compute_theta_sum(state, i, bh_mass, star_star, eps, c, x, y, theta_sum);
+
+  double theta_rr = rx * rx * theta_sum.xx + 2.0 * rx * ry * theta_sum.xy + ry * ry * theta_sum.yy;
+  double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
+
+  // Inward radial: magnitude = readout_scale * (-theta_rr) * r (so effective ~ 1/r^2 when theta_rr ~ 1/r^3).
+  double provisional_radial = readout_scale * (-theta_rr) * r;
+  double provisional_tangential = 0.0;
+
+  ax = provisional_radial * rx;
+  ay = provisional_radial * ry;
+
+  if (diag) {
+    diag->theta_rr = theta_rr;
+    diag->theta_tt = 0.0;
+    diag->theta_tr = theta_tr;
+    diag->theta_rr_plus_theta_tt = theta_rr;
+    diag->provisional_radial_readout = provisional_radial;
+    diag->provisional_tangential_readout = provisional_tangential;
+    diag->theta_xx = theta_sum.xx;
+    diag->theta_xy = theta_sum.xy;
+    diag->theta_yy = theta_sum.yy;
+    diag->theta_trace = theta_sum.trace();
+    diag->invariant_I = compute_invariant_I(theta_sum);
+    diag->theta_norm = theta_frobenius_norm(theta_sum);
+  }
+}
+
 void compute_provisional_readout_acceleration(const State& state,
                                                int i,
                                                double bh_mass,
@@ -173,6 +228,12 @@ void compute_provisional_readout_acceleration(const State& state,
   if (readout_mode == "tr_coherence_readout") {
     apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
                                readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, nullptr);
+    return;
+  }
+
+  if (readout_mode == "experimental_radial_r_scaling") {
+    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps, c,
+                                                readout_scale, ax, ay, nullptr);
     return;
   }
 
@@ -206,6 +267,14 @@ void compute_provisional_readout_with_diagnostics(const State& state,
   if (readout_mode == "tr_coherence_readout") {
     apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
                                readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, &diag);
+    diag.ax = ax;
+    diag.ay = ay;
+    return;
+  }
+
+  if (readout_mode == "experimental_radial_r_scaling") {
+    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps, c,
+                                                readout_scale, ax, ay, &diag);
     diag.ax = ax;
     diag.ay = ay;
     return;
@@ -259,8 +328,10 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
   if (!f) return;
 
   const bool tr_coherence = (readout_mode == "tr_coherence_readout");
+  const bool experimental_r_scaling = (readout_mode == "experimental_radial_r_scaling");
+  const bool use_tr_style_columns = tr_coherence || experimental_r_scaling;
   /* residual_available=0 for multi-source (no analytic residual); residual_norm=0 when not available */
-  if (tr_coherence) {
+  if (use_tr_style_columns) {
     f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
       << "provisional_radial_readout,provisional_tangential_readout,ax,ay,a_radial,a_inward,a_tangential,"
       << "theta_norm,invariant_I,regime,residual_available,residual_norm\n";
@@ -296,7 +367,7 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
 
       const char* regime = regime_label_from_theta_norm(diag.theta_norm);
-      if (tr_coherence) {
+      if (use_tr_style_columns) {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
           << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","

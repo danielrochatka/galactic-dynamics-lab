@@ -4,7 +4,7 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -O2 -Wall -I.
 
-SRCS = config.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp physics/TPFCore/provisional_readout.cpp physics/TPFCore/tpf_core_package.cpp integrator.cpp init_conditions.cpp simulation.cpp output.cpp main.cpp
+SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp physics/TPFCore/provisional_readout.cpp physics/TPFCore/tpf_core_package.cpp integrator.cpp init_conditions.cpp simulation.cpp output.cpp main.cpp
 OBJS = $(SRCS:.cpp=.o)
 TARGET = galaxy_sim
 

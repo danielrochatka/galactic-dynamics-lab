@@ -11,7 +11,8 @@
  * Design:
  * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
  * - Closures are downstream of the ansatz; see readout_closure.hpp for the boundary.
- * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated, tr_coherence_readout.
+ * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated, tr_coherence_readout,
+ *   experimental_radial_r_scaling (experimental; same Theta, radial-only with r-scaling).
  */
 
 #include "../../types.hpp"
@@ -27,7 +28,8 @@ namespace tpfcore {
  * EXPLORATORY: not the full TPF dynamics. Tensor-driven, no Phi gradient.
  *
  * Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- * tr_coherence_readout (paper t-r structure; uses theta_tt_scale, theta_tr_scale).
+ * tr_coherence_readout (paper t-r structure; uses theta_tt_scale, theta_tr_scale),
+ * experimental_radial_r_scaling (experimental radial-only closure with r-scaling).
  */
 void compute_provisional_readout_acceleration(const State& state,
                                                int i,

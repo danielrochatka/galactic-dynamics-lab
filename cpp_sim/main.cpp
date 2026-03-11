@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "force_compare.hpp"
 #include "init_conditions.hpp"
 #include "output.hpp"
 #include "physics/physics_package.hpp"
@@ -108,7 +109,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare\n";
       return 1;
     }
   }
@@ -361,6 +362,29 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_newtonian_force_compare) {
+    if (!tpfcore) {
+      std::cerr << "tpf_newtonian_force_compare requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    if (!tpfcore->provisional_readout_enabled()) {
+      std::cerr << "tpf_newtonian_force_compare requires tpfcore_enable_provisional_readout = true.\n";
+      return 1;
+    }
+    if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create output dir " << config.output_dir << "\n";
+      return 1;
+    }
+    std::cout << "Diagnostic: Newtonian vs TPF acceleration comparison (same positions/states)\n";
+    tpfcore->init_from_config(config);
+    galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -372,7 +396,8 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_single_source_optimize_c:
     case galaxy::SimulationMode::tpf_two_body_sweep:
     case galaxy::SimulationMode::tpf_weak_field_calibration:
-      std::cerr << "Internal error: inspection/utility/sweep/calibration modes should have returned earlier.\n";
+    case galaxy::SimulationMode::tpf_newtonian_force_compare:
+      std::cerr << "Internal error: inspection/utility/sweep/calibration/force_compare modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
@@ -515,7 +540,8 @@ int main(int argc, char** argv) {
       tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
       std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
       tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
-      if (config.physics_package == "TPFCore" && config.tpfcore_readout_mode == "tr_coherence_readout" && snapshots[0].state.n() == 1)
+      if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
+          (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
         std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
     }
   }
