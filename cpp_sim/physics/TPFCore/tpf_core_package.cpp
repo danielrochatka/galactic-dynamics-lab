@@ -5,7 +5,7 @@
 
 #include "tpf_core_package.hpp"
 #include "../../config.hpp"
-#include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark */
+#include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
@@ -988,6 +988,141 @@ void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snap
     txt << "Some steps show outward drift with inward pull (" << n_outward_drift_with_inward_pull << " steps). See CSV.\n";
   else
     txt << "When v_radial > 0, a_inward is typically not positive; see CSV for details.\n";
+}
+
+void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
+                                                  const Config& config,
+                                                  const std::string& output_dir) const {
+  if (!provisional_readout_ || snapshots.empty()) return;
+  if (config.simulation_mode != SimulationMode::two_body_orbit) return;
+  const int n_part = snapshots[0].state.n();
+  if (n_part != 1) return;
+
+  PhysicsPackage* newton = get_physics_package("Newtonian");
+  if (!newton) return;
+
+  tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  double softening = params.softening;
+  double bh_mass = params.bh_mass;
+  bool star_star = params.enable_star_star_gravity;
+  double eps2 = softening * softening;
+
+  std::ofstream csv(params.output_dir + "/tpf_live_orbit_force_audit.csv");
+  std::ofstream txt(params.output_dir + "/tpf_live_orbit_force_audit.txt");
+  if (!csv || !txt) return;
+
+  csv << "step,time,x,y,vx,vy,radius,v_radial,v_tangential,"
+      << "ax_tpf,ay_tpf,a_rad_tpf,a_tan_tpf,"
+      << "ax_newt,ay_newt,a_rad_newt,a_tan_newt,"
+      << "diff_x,diff_y,diff_rad,diff_tan\n";
+
+  txt << "TPFCore live two_body_orbit force audit (Newtonian vs TPF, same evolving state)\n";
+  txt << "Diagnostics only; does not alter integrator or motion law.\n";
+  txt << "Positions, velocities, and accelerations are taken from the same snapshots used by the integrator (every validation_snapshot_every steps). For steps 0,1,2,5,10,20,50,100 set validation_snapshot_every=1 for a short run.\n\n";
+
+  bool agree_step0 = true;
+  int first_diverge_step = -1;
+  double first_diverge_time = 0.0;
+  double first_diff_rad = 0.0, first_diff_tan = 0.0;
+
+  const double REL_TOL = 0.05;
+
+  for (const auto& snap : snapshots) {
+    const State& s = snap.state;
+    double t = snap.time;
+    int step = snap.step;
+    double x = s.x[0], y = s.y[0], vx = s.vx[0], vy = s.vy[0];
+
+    double r2 = x * x + y * y + eps2;
+    double r = std::sqrt(r2);
+    double rx = 0.0, ry = 0.0, tx = 0.0, ty = 0.0;
+    if (r > 1e-30) {
+      rx = x / r;
+      ry = y / r;
+      tx = -ry;
+      ty = rx;
+    }
+    double v_rad = vx * rx + vy * ry;
+    double v_tan = x * vy - y * vx;
+
+    std::vector<double> ax_t(1), ay_t(1), ax_n(1), ay_n(1);
+    compute_accelerations(s, bh_mass, softening, star_star, ax_t, ay_t);
+    newton->compute_accelerations(s, bh_mass, softening, star_star, ax_n, ay_n);
+
+    double a_rad_tpf = ax_t[0] * rx + ay_t[0] * ry;
+    double a_tan_tpf = ax_t[0] * tx + ay_t[0] * ty;
+    double a_rad_newt = ax_n[0] * rx + ay_n[0] * ry;
+    double a_tan_newt = ax_n[0] * tx + ay_n[0] * ty;
+
+    double diff_x = ax_t[0] - ax_n[0];
+    double diff_y = ay_t[0] - ay_n[0];
+    double diff_rad = a_rad_tpf - a_rad_newt;
+    double diff_tan = a_tan_tpf - a_tan_newt;
+
+    csv << step << "," << std::scientific << t << ","
+        << x << "," << y << "," << vx << "," << vy << ","
+        << r << "," << v_rad << "," << v_tan << ","
+        << ax_t[0] << "," << ay_t[0] << "," << a_rad_tpf << "," << a_tan_tpf << ","
+        << ax_n[0] << "," << ay_n[0] << "," << a_rad_newt << "," << a_tan_newt << ","
+        << diff_x << "," << diff_y << "," << diff_rad << "," << diff_tan << "\n";
+
+    double scale_rad = std::max(std::abs(a_rad_newt), 1e-12);
+    double scale_tan = std::max(std::abs(a_tan_newt), 1e-12);
+    bool rad_diff = std::abs(diff_rad) > REL_TOL * scale_rad;
+    bool tan_diff = std::abs(diff_tan) > REL_TOL * scale_tan;
+
+    if (step == 0 && (rad_diff || tan_diff))
+      agree_step0 = false;
+
+    if (first_diverge_step < 0 && (rad_diff || tan_diff)) {
+      first_diverge_step = step;
+      first_diverge_time = t;
+      first_diff_rad = diff_rad;
+      first_diff_tan = diff_tan;
+    }
+  }
+
+  txt << "--- Explicit diagnostic answers ---\n";
+  txt << "  Do TPF and Newtonian agree at step 0 for the actual orbit state?\n";
+  txt << "    -> " << (agree_step0 ? "Yes (within 5% in both radial and tangential components).\n"
+                                : "No (radial and/or tangential components differ by more than 5%).\n");
+
+  txt << "\n  If yes, at what step do they begin to diverge materially?\n";
+  if (first_diverge_step >= 0) {
+    txt << "    -> First material divergence at step " << first_diverge_step
+        << " (t = " << std::scientific << first_diverge_time << ").\n";
+  } else {
+    txt << "    -> No material divergence detected within sampled snapshots (<=5% threshold).\n";
+  }
+
+  txt << "\n  Is the divergence primarily radial, tangential, or both (at first divergence)?\n";
+  if (first_diverge_step >= 0) {
+    double abs_rad = std::abs(first_diff_rad);
+    double abs_tan = std::abs(first_diff_tan);
+    if (abs_rad > 2.0 * abs_tan)
+      txt << "    -> Mostly radial.\n";
+    else if (abs_tan > 2.0 * abs_rad)
+      txt << "    -> Mostly tangential.\n";
+    else
+      txt << "    -> Both radial and tangential are comparable.\n";
+  } else {
+    txt << "    -> Not applicable (no material divergence detected at 5% level).\n";
+  }
+
+  txt << "\n  Is there evidence that the live orbit run is not using the same effective force path as the static force audit?\n";
+  txt << "    Static audits and this live audit both use:\n";
+  txt << "      - TPFCorePackage::compute_accelerations for TPF.\n";
+  txt << "      - NewtonianPackage::compute_accelerations for the Newtonian benchmark.\n";
+  txt << "      - Same softening and radial/tangential decomposition as the simulator.\n";
+  txt << "    Any mismatch is therefore due to closure behavior on the evolving state, not a separate force path.\n\n";
+
+  txt << "--- DECISIVE CONCLUSION ---\n";
+  if (!agree_step0)
+    txt << "  live run already differs at step 0 (beyond 5% in at least one component).\n";
+  else if (first_diverge_step >= 0)
+    txt << "  live run matches static audit initially; divergence develops later along the trajectory.\n";
+  else
+    txt << "  live run and static audit are consistent within the 5% threshold over sampled snapshots.\n";
 }
 
 }  // namespace galaxy

@@ -77,6 +77,8 @@ struct Config {
   double tpfcore_theta_tr_scale = 1.0;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
+  /** TPFCore diagnostics: enable live two_body_orbit Newtonian-vs-TPF force audit. */
+  bool tpfcore_live_orbit_force_audit = false;
   /** TPFCore inspection: probe radius min. */
   double tpfcore_probe_radius_min = 1.0;
   /** TPFCore inspection: probe radius max. */

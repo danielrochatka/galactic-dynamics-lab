@@ -81,6 +81,11 @@ class TPFCorePackage : public PhysicsPackage {
                                  const Config& config,
                                  const std::string& output_dir) const;
 
+  /** Live two_body_orbit force audit (Newtonian vs TPF for the actual evolving state). */
+  void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
+                                    const Config& config,
+                                    const std::string& output_dir) const;
+
   /** Trajectory metrics + class from snapshots (single-body only). For sweep harness. */
   struct TrajectorySummary {
     bool valid = false;
