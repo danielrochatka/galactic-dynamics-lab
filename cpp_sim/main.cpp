@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit\n";
       return 1;
     }
   }
@@ -397,7 +397,8 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_two_body_sweep:
     case galaxy::SimulationMode::tpf_weak_field_calibration:
     case galaxy::SimulationMode::tpf_newtonian_force_compare:
-      std::cerr << "Internal error: inspection/utility/sweep/calibration/force_compare modes should have returned earlier.\n";
+    case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
+      std::cerr << "Internal error: inspection/utility/sweep/calibration/audit modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);

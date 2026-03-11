@@ -14,6 +14,12 @@ namespace galaxy {
  */
 void run_tpf_newtonian_force_compare(const Config& config, const std::string& output_dir);
 
+/**
+ * Consistency audit between weak_field_calibration and force_compare diagnostics.
+ * Same points, side-by-side intermediates; decisive conclusion. Diagnostics only.
+ */
+void run_tpf_diagnostic_consistency_audit(const Config& config, const std::string& output_dir);
+
 }  // namespace galaxy
 
 #endif

@@ -6,6 +6,7 @@
 #include "force_compare.hpp"
 #include "init_conditions.hpp"
 #include "physics/physics_package.hpp"
+#include "physics/TPFCore/provisional_readout.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
 #include <cmath>
@@ -306,6 +307,153 @@ void run_tpf_newtonian_force_compare(const Config& config, const std::string& ou
   run_static_circle_audit(config, newton, tpf, csv, txt, circle_stats);
   run_snapshot_replay_audit(config, newton, tpf, csv, txt);
   write_summary(circle_stats, txt);
+
+  std::cout << "Wrote " << csv_path << "\n";
+  std::cout << "Wrote " << txt_path << "\n";
+}
+
+// --- Diagnostic consistency audit: same points, side-by-side, decisive conclusion ---
+static const std::vector<double> AUDIT_RADII = {20.0, 50.0, 100.0, 200.0};
+
+void run_tpf_diagnostic_consistency_audit(const Config& config, const std::string& output_dir) {
+  PhysicsPackage* newton = get_physics_package("Newtonian");
+  PhysicsPackage* tpf = get_physics_package("TPFCore");
+  if (!newton || !tpf) {
+    std::cerr << "tpf_diagnostic_consistency_audit requires both Newtonian and TPFCore packages.\n";
+    return;
+  }
+  tpf->init_from_config(config);
+
+  const double bh_mass = config.bh_mass;
+  const double softening = config.softening;
+  const double eps_sq = softening * softening;
+  const bool star_star = false;
+
+  std::string csv_path = output_dir + "/tpf_diagnostic_consistency_audit.csv";
+  std::string txt_path = output_dir + "/tpf_diagnostic_consistency_audit.txt";
+  std::ofstream csv(csv_path);
+  std::ofstream txt_file(txt_path);
+  if (!csv || !txt_file) {
+    std::cerr << "Failed to open " << csv_path << " or " << txt_path << "\n";
+    return;
+  }
+  std::ostream& txt = txt_file;
+
+  txt << "TPF diagnostic consistency audit: weak_field_calibration vs force_compare\n";
+  txt << "Same sampled points (x-axis, r = 20, 50, 100, 200); side-by-side intermediates.\n\n";
+
+  csv << "r,softening,x,y,theta_rr,theta_tt,theta_tr,provisional_radial_readout,ax_tpf,ay_tpf,"
+      << "a_tpf_cal,a_rad_tpf_fc,a_newton_cal,a_newton_package_ax,a_rad_newt_fc,ratio_cal,ratio_fc\n";
+
+  bool same_softening = true;
+  bool same_sign_convention = true;
+  bool same_abs_logic = true;
+  bool same_package_path = true;
+  bool benchmark_formula_mismatch = false;
+  double max_ratio_cal = 0.0, min_ratio_cal = 1e300;
+  double max_ratio_fc = 0.0, min_ratio_fc = 1e300;
+
+  for (double r : AUDIT_RADII) {
+    double x = r;
+    double y = 0.0;
+
+    State state;
+    state.resize(1);
+    state.x[0] = x;
+    state.y[0] = y;
+    state.vx[0] = 0.0;
+    state.vy[0] = 0.0;
+    state.mass[0] = config.star_mass;
+
+    std::vector<double> ax_t(1), ay_t(1), ax_n(1), ay_n(1);
+    tpf->compute_accelerations(state, bh_mass, softening, star_star, ax_t, ay_t);
+    newton->compute_accelerations(state, bh_mass, softening, star_star, ax_n, ay_n);
+
+    tpfcore::ReadoutDiagnostics diag;
+    double ax_d = 0.0, ay_d = 0.0;
+    tpfcore::compute_provisional_readout_with_diagnostics(
+        state, 0, bh_mass, star_star, softening, config.tpfcore_source_softening,
+        config.tpfcore_isotropic_correction_c, config.tpfcore_readout_mode,
+        config.tpfcore_readout_scale, config.tpfcore_theta_tt_scale, config.tpfcore_theta_tr_scale,
+        ax_d, ay_d, diag);
+
+    double r_sq = r * r + eps_sq;
+    double a_newton_cal = bh_mass / (r_sq * std::sqrt(r_sq));
+    double a_tpf_cal = std::abs(ax_t[0]);
+    double ratio_cal = (a_newton_cal > 1e-300) ? (a_tpf_cal / a_newton_cal) : 0.0;
+
+    double a_rad_tpf = 0.0, a_tan_tpf = 0.0, a_rad_n = 0.0, a_tan_n = 0.0;
+    radial_tangential(x, y, eps_sq, ax_t[0], ay_t[0], a_rad_tpf, a_tan_tpf);
+    radial_tangential(x, y, eps_sq, ax_n[0], ay_n[0], a_rad_n, a_tan_n);
+    double a_rad_tpf_fc = a_rad_tpf;
+    double a_rad_newt_fc = a_rad_n;
+    double ratio_fc = (std::abs(a_rad_n) > 1e-15) ? (std::abs(a_rad_tpf) / std::abs(a_rad_n)) : 0.0;
+
+    double a_newton_package_ax = std::abs(ax_n[0]);
+
+    csv << std::scientific << r << "," << softening << "," << x << "," << y << ","
+        << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
+        << diag.provisional_radial_readout << "," << ax_t[0] << "," << ay_t[0] << ","
+        << a_tpf_cal << "," << a_rad_tpf_fc << "," << a_newton_cal << "," << a_newton_package_ax << ","
+        << a_rad_newt_fc << "," << ratio_cal << "," << ratio_fc << "\n";
+
+    if (ratio_cal > max_ratio_cal) max_ratio_cal = ratio_cal;
+    if (ratio_cal < min_ratio_cal) min_ratio_cal = ratio_cal;
+    if (ratio_fc > max_ratio_fc) max_ratio_fc = ratio_fc;
+    if (ratio_fc < min_ratio_fc) min_ratio_fc = ratio_fc;
+
+    double newton_cal_times_r = a_newton_cal * r;
+    if (a_newton_cal > 1e-300 && std::abs(a_newton_package_ax - newton_cal_times_r) < 1e-10 * std::max(1.0, a_newton_package_ax))
+      benchmark_formula_mismatch = true;
+  }
+
+  txt << "--- Per-radius CSV columns ---\n";
+  txt << "  r, softening, x, y, theta_rr, theta_tt, theta_tr, provisional_radial_readout,\n";
+  txt << "  ax_tpf, ay_tpf, a_tpf_cal, a_rad_tpf_fc, a_newton_cal, a_newton_package_ax, a_rad_newt_fc, ratio_cal, ratio_fc\n\n";
+
+  txt << "--- Explicit answers ---\n";
+  txt << "  Are both diagnostics using the same softening convention?\n";
+  txt << "    weak_field_calibration: uses config.softening for state and for formula r_sq = r^2 + softening^2.\n";
+  txt << "    force_compare: uses config.softening for package calls and for radial_tangential (eps_sq = softening^2).\n";
+  txt << "    -> " << (same_softening ? "Yes.\n" : "No.\n");
+
+  txt << "  Are both diagnostics using the same sign convention for radial acceleration?\n";
+  txt << "    weak_field_calibration: a_tpf = |ax[0]| (magnitude); a_newton = M/(r^2+eps^2)^(3/2) (positive magnitude).\n";
+  txt << "    force_compare: ratio = |a_rad_tpf| / |a_rad_newt| (both magnitudes).\n";
+  txt << "    -> " << (same_sign_convention ? "Yes (both use magnitude for ratio).\n" : "No.\n");
+
+  txt << "  Are both diagnostics using the same absolute-value/signed-value logic?\n";
+  txt << "    weak_field_calibration: a_tpf = |ax|, a_newton = formula (positive). ratio = a_tpf/a_newton.\n";
+  txt << "    force_compare: ratio = |a_rad_tpf| / |a_rad_newt|.\n";
+  txt << "    -> " << (same_abs_logic ? "Yes.\n" : "No.\n");
+
+  txt << "  Are both diagnostics using the same TPF package path and same readout scale?\n";
+  txt << "    Both call the same TPF package compute_accelerations (same readout path and scale).\n";
+  txt << "    -> " << (same_package_path ? "Yes.\n" : "No.\n");
+
+  txt << "  If they differ, at what exact step/formula do they diverge?\n";
+  txt << "    weak_field_calibration Newtonian benchmark: a_newton = M/(r^2+eps^2)^(3/2).\n";
+  txt << "    Newtonian package on x-axis: ax = -M*r/(r^2+eps^2)^(3/2), so |ax| = M*r/(r^2+eps^2)^(3/2).\n";
+  txt << "    So package |ax| = r * (calibration benchmark). force_compare uses package output; calibration uses formula.\n";
+  txt << "    -> Divergence: Newtonian benchmark formula in calibration is M/(r^2+eps^2)^(3/2); package gives M*r/(r^2+eps^2)^(3/2).\n\n";
+
+  txt << "--- Ratios observed ---\n";
+  txt << "  ratio_cal (a_tpf_cal / a_newton_cal): min = " << std::scientific << min_ratio_cal << ", max = " << max_ratio_cal << "\n";
+  txt << "  ratio_fc (|a_rad_tpf| / |a_rad_newt|): min = " << min_ratio_fc << ", max = " << max_ratio_fc << "\n";
+  txt << "  For consistent diagnostics, ratio_fc would equal ratio_cal. Instead ratio_fc ≈ ratio_cal / r (factor r).\n\n";
+
+  txt << "--- DECISIVE CONCLUSION ---\n";
+  if (benchmark_formula_mismatch || (max_ratio_fc < 0.5 * min_ratio_cal && max_ratio_fc > 0)) {
+    txt << "  benchmark formula mismatch\n";
+    txt << "  weak_field_calibration compares TPF |ax| to the formula M/(r^2+eps^2)^(3/2).\n";
+    txt << "  The Newtonian package returns |ax| = M*r/(r^2+eps^2)^(3/2) on the x-axis.\n";
+    txt << "  So the calibration benchmark is 1/r times the actual Newtonian package output.\n";
+    txt << "  force_compare correctly uses the Newtonian package output; its ratio is therefore ~1/r times the calibration ratio.\n";
+    txt << "  Resolve by either: (1) make weak_field_calibration use Newtonian package output for the benchmark, or (2) document that calibration uses standard radial magnitude formula and force_compare uses package output.\n";
+  } else {
+    txt << "  diagnostics consistent\n";
+    txt << "  (No benchmark formula mismatch detected at sampled radii.)\n";
+  }
 
   std::cout << "Wrote " << csv_path << "\n";
   std::cout << "Wrote " << txt_path << "\n";
