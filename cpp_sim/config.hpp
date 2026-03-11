@@ -18,7 +18,8 @@ enum class SimulationMode {
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
-  tpf_diagnostic_consistency_audit
+  tpf_diagnostic_consistency_audit,
+  tpf_bound_orbit_sweep
 };
 
 SimulationMode parse_mode(const std::string& s);

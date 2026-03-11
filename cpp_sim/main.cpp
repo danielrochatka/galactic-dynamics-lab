@@ -7,6 +7,7 @@
 #include "simulation.hpp"
 #include "types.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -109,7 +110,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
       return 1;
     }
   }
@@ -386,6 +387,165 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_bound_orbit_sweep) {
+    if (!tpfcore) {
+      std::cerr << "tpf_bound_orbit_sweep requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    if (!tpfcore->provisional_readout_enabled()) {
+      std::cerr << "tpf_bound_orbit_sweep requires tpfcore_enable_provisional_readout = true.\n";
+      return 1;
+    }
+    if (config.tpfcore_readout_mode != "experimental_radial_r_scaling") {
+      std::cerr << "tpf_bound_orbit_sweep is for experimental_radial_r_scaling only; current mode is " << config.tpfcore_readout_mode << ".\n";
+      return 1;
+    }
+    if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create output dir " << config.output_dir << "\n";
+      return 1;
+    }
+
+    const double speed_ratios[] = { 0.40, 0.425, 0.45, 0.475, 0.49, 0.495, 0.499, 0.5, 0.505, 0.51, 0.525, 0.55 };
+    const int n_speed = static_cast<int>(sizeof(speed_ratios) / sizeof(speed_ratios[0]));
+    const double APOCENTER_TOL = 0.02;
+    const double R0 = config.validation_two_body_radius;
+
+    struct BoundSweepRow {
+      double speed_ratio;
+      double r_initial, r_final, r_min, r_max, radial_drift, revolutions;
+      std::string trajectory_class;
+      double frac_low, frac_transitional, frac_high;
+      bool remained_inside_initial_apocenter;
+      double returned_near_start;
+      double periapsis_ratio, apocenter_ratio, eccentricity_like;
+    };
+    std::vector<BoundSweepRow> rows;
+
+    std::cout << "Bound orbit sweep: experimental_radial_r_scaling, speed_ratio x " << n_speed << ", same total time\n";
+
+    for (int i = 0; i < n_speed; ++i) {
+      galaxy::Config c = config;
+      c.validation_two_body_speed_ratio = speed_ratios[i];
+      c.enable_star_star_gravity = false;
+      physics->init_from_config(c);
+
+      galaxy::State state;
+      galaxy::init_two_body(c, state);
+      int n_steps = c.validation_n_steps;
+      int snapshot_every = c.validation_snapshot_every;
+
+      auto snapshots = galaxy::run_simulation(c, state, physics, n_steps, snapshot_every, nullptr, 0);
+
+      auto traj = tpfcore->compute_trajectory_summary(snapshots);
+      auto regime = tpfcore->compute_regime_summary(snapshots, c, config.output_dir);
+
+      BoundSweepRow row = {};
+      row.speed_ratio = speed_ratios[i];
+      if (traj.valid) {
+        row.r_initial = traj.r_initial;
+        row.r_final = traj.r_final;
+        row.r_min = traj.r_min;
+        row.r_max = traj.r_max;
+        row.radial_drift = traj.radial_drift;
+        row.revolutions = traj.revolutions;
+        row.trajectory_class = traj.trajectory_class;
+
+        row.remained_inside_initial_apocenter = (traj.r_max <= traj.r_initial + APOCENTER_TOL * traj.r_initial);
+        row.returned_near_start = (traj.r_initial > 1e-30) ? (std::abs(traj.r_final - traj.r_initial) / traj.r_initial) : 0.0;
+        row.periapsis_ratio = (traj.r_initial > 1e-30) ? (traj.r_min / traj.r_initial) : 0.0;
+        row.apocenter_ratio = (traj.r_initial > 1e-30) ? (traj.r_max / traj.r_initial) : 0.0;
+        double sum_r = traj.r_max + traj.r_min;
+        row.eccentricity_like = (sum_r > 1e-30) ? ((traj.r_max - traj.r_min) / sum_r) : 0.0;
+      }
+      if (regime.valid) {
+        row.frac_low = regime.frac_low;
+        row.frac_transitional = regime.frac_transitional;
+        row.frac_high = regime.frac_high;
+      }
+      rows.push_back(row);
+    }
+
+    std::string out_dir = config.output_dir;
+    std::ofstream csv(out_dir + "/tpf_bound_orbit_sweep.csv");
+    if (csv) {
+      csv << "speed_ratio,r_initial,r_final,r_min,r_max,radial_drift,revolutions,trajectory_class,"
+          << "frac_low,frac_transitional,frac_high,remained_inside_apocenter,returned_near_start,"
+          << "periapsis_ratio,apocenter_ratio,eccentricity_like\n";
+      for (const auto& row : rows) {
+        csv << std::scientific << row.speed_ratio << "," << row.r_initial << "," << row.r_final << ","
+            << row.r_min << "," << row.r_max << "," << row.radial_drift << "," << row.revolutions << ","
+            << "\"" << row.trajectory_class << "\","
+            << row.frac_low << "," << row.frac_transitional << "," << row.frac_high << ","
+            << (row.remained_inside_initial_apocenter ? "1" : "0") << "," << row.returned_near_start << ","
+            << row.periapsis_ratio << "," << row.apocenter_ratio << "," << row.eccentricity_like << "\n";
+      }
+    }
+
+    std::ofstream txt(out_dir + "/tpf_bound_orbit_sweep.txt");
+    if (txt) {
+      txt << "TPFCore bound-orbit sweep (experimental_radial_r_scaling, fixed closure)\n";
+      txt << "Orchestration/reporting only; same formulas and total time as production two_body_orbit.\n";
+      txt << "Speed list: 0.40, 0.425, 0.45, 0.475, 0.49, 0.495, 0.499, 0.5, 0.505, 0.51, 0.525, 0.55\n";
+      txt << "Initial radius: " << R0 << ", n_steps: " << config.validation_n_steps << ", snapshot_every: " << config.validation_snapshot_every << "\n\n";
+
+      txt << "Note: The legacy trajectory_class may still say \"strongly drifting\" or \"unclear\" even when the new boundness indicators (remained_inside_initial_apocenter, returned_near_start, periapsis_ratio) show a non-escaping bound-like orbit. The old bounded-band classifier is unchanged.\n\n";
+
+      std::vector<size_t> by_inside(rows.size()), by_returned(rows.size()), by_periapsis(rows.size()), by_regime(rows.size());
+      for (size_t k = 0; k < rows.size(); ++k) by_inside[k] = by_returned[k] = by_periapsis[k] = by_regime[k] = k;
+      std::sort(by_inside.begin(), by_inside.end(), [&rows](size_t a, size_t b) {
+        return rows[a].remained_inside_initial_apocenter != rows[b].remained_inside_initial_apocenter
+          ? rows[a].remained_inside_initial_apocenter
+          : (rows[a].apocenter_ratio < rows[b].apocenter_ratio);
+      });
+      std::sort(by_returned.begin(), by_returned.end(), [&rows](size_t a, size_t b) {
+        return rows[a].returned_near_start < rows[b].returned_near_start;
+      });
+      std::sort(by_periapsis.begin(), by_periapsis.end(), [&rows](size_t a, size_t b) {
+        return rows[a].periapsis_ratio > rows[b].periapsis_ratio;
+      });
+      std::sort(by_regime.begin(), by_regime.end(), [&rows](size_t a, size_t b) {
+        return rows[a].frac_high < rows[b].frac_high;
+      });
+
+      txt << "--- Rank by non-escape / remained_inside_initial_apocenter (then by apocenter_ratio) ---\n";
+      for (size_t j = 0; j < rows.size(); ++j) {
+        size_t k = by_inside[j];
+        const auto& row = rows[k];
+        txt << "  " << (j + 1) << ". speed_ratio=" << std::scientific << row.speed_ratio
+            << " inside_apocenter=" << (row.remained_inside_initial_apocenter ? "yes" : "no")
+            << " apocenter_ratio=" << row.apocenter_ratio << " class=" << row.trajectory_class << "\n";
+      }
+      txt << "\n--- Rank by closeness of final radius to initial (returned_near_start, lower is better) ---\n";
+      for (size_t j = 0; j < rows.size(); ++j) {
+        size_t k = by_returned[j];
+        const auto& row = rows[k];
+        txt << "  " << (j + 1) << ". speed_ratio=" << std::scientific << row.speed_ratio
+            << " returned_near_start=" << row.returned_near_start << " r_final=" << row.r_final << "\n";
+      }
+      txt << "\n--- Rank by shallowness of periapsis dip (periapsis_ratio, higher is better) ---\n";
+      for (size_t j = 0; j < rows.size(); ++j) {
+        size_t k = by_periapsis[j];
+        const auto& row = rows[k];
+        txt << "  " << (j + 1) << ". speed_ratio=" << std::scientific << row.speed_ratio
+            << " periapsis_ratio=" << row.periapsis_ratio << " r_min=" << row.r_min << "\n";
+      }
+      txt << "\n--- Rank by stability of regime mix (lower frac_high preferred) ---\n";
+      for (size_t j = 0; j < rows.size(); ++j) {
+        size_t k = by_regime[j];
+        const auto& row = rows[k];
+        txt << "  " << (j + 1) << ". speed_ratio=" << std::scientific << row.speed_ratio
+            << " frac_low=" << row.frac_low << " frac_trans=" << row.frac_transitional << " frac_high=" << row.frac_high << "\n";
+      }
+    }
+
+    std::cout << "Wrote " << out_dir << "/tpf_bound_orbit_sweep.csv, tpf_bound_orbit_sweep.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -399,6 +559,7 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_weak_field_calibration:
     case galaxy::SimulationMode::tpf_newtonian_force_compare:
     case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
+    case galaxy::SimulationMode::tpf_bound_orbit_sweep:
       std::cerr << "Internal error: inspection/utility/sweep/calibration/audit modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {

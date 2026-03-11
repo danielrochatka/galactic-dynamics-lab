@@ -815,6 +815,7 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
   double sum_theta_norm = 0.0;
   double min_theta_norm = 1e300, max_theta_norm = -1e300;
   size_t n_samples = 0;
+  size_t count_low = 0, count_transitional = 0, count_high = 0;
 
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
@@ -825,6 +826,9 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
       if (tn < min_theta_norm) min_theta_norm = tn;
       if (tn > max_theta_norm) max_theta_norm = tn;
       ++n_samples;
+      if (tn < THETA_NORM_LOW_MAX) ++count_low;
+      else if (tn < THETA_NORM_TRANSITIONAL_MAX) ++count_transitional;
+      else ++count_high;
     }
   }
 
@@ -834,6 +838,9 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
   out.max_theta_norm = max_theta_norm;
   out.min_theta_norm = min_theta_norm;
   out.n_samples = n_samples;
+  out.frac_low = static_cast<double>(count_low) / n_samples;
+  out.frac_transitional = static_cast<double>(count_transitional) / n_samples;
+  out.frac_high = static_cast<double>(count_high) / n_samples;
   return out;
 }
 

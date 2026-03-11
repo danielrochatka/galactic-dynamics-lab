@@ -100,11 +100,12 @@ class TPFCorePackage : public PhysicsPackage {
   };
   TrajectorySummary compute_trajectory_summary(const std::vector<Snapshot>& snapshots) const;
 
-  /** Regime stats from snapshots (mean/max theta norm, etc.). For sweep harness. */
+  /** Regime stats from snapshots (mean/max theta norm, regime fractions). For sweep harness. */
   struct RegimeSummary {
     bool valid = false;
     double mean_theta_norm = 0.0, max_theta_norm = 0.0, min_theta_norm = 0.0;
     size_t n_samples = 0;
+    double frac_low = 0.0, frac_transitional = 0.0, frac_high = 0.0;
   };
   RegimeSummary compute_regime_summary(const std::vector<Snapshot>& snapshots,
                                        const Config& config,
