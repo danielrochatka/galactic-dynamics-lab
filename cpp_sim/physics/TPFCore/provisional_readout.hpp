@@ -12,11 +12,12 @@
  * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
  * - Closures are downstream of the ansatz; see readout_closure.hpp for the boundary.
  * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- *   tr_coherence_readout / derived_tpf_radial_readout (manuscript Hessian + TPF bounce mass m(r)),
+ *   tr_coherence_readout / derived_tpf_radial_readout (hybrid bounce + κ ledger),
  *   experimental_radial_r_scaling (experimental; provisional ansatz Theta, radial-only with r-scaling).
  */
 
 #include "../../types.hpp"
+#include "derived_tpf_radial.hpp"
 #include <string>
 #include <vector>
 
@@ -26,11 +27,9 @@ namespace tpfcore {
 
 /**
  * Compute provisional readout acceleration for one particle from all sources.
- * EXPLORATORY: not the full TPF dynamics. Tensor-driven, no Phi gradient.
  *
- * Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- * tr_coherence_readout / derived_tpf_radial_readout (bounce m(r) + invariant I for diagnostics),
- * experimental_radial_r_scaling (experimental radial-only closure with r-scaling).
+ * Derived radial modes: pass derived_poisson; optional derived_profile avoids rebuilding the radial
+ * profile each particle (batch from TPFCorePackage).
  */
 void compute_provisional_readout_acceleration(const State& state,
                                                int i,
@@ -43,7 +42,9 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double theta_tt_scale,
                                                double theta_tr_scale,
                                                double& ax,
-                                               double& ay);
+                                               double& ay,
+                                               const DerivedTpfPoissonConfig* derived_poisson = nullptr,
+                                               const TpfRadialGravityProfile* derived_profile = nullptr);
 
 /** Per-particle readout diagnostics: a, Theta, I, and derived quantities. */
 struct ReadoutDiagnostics {
@@ -62,10 +63,6 @@ struct ReadoutDiagnostics {
   std::string regime;
 };
 
-/**
- * Compute readout acceleration and Theta for diagnostics.
- * Same logic as compute_provisional_readout_acceleration but also returns Theta, I, and (for tr_coherence) t-r terms.
- */
 void compute_provisional_readout_with_diagnostics(const State& state,
                                                    int i,
                                                    double bh_mass,
@@ -78,13 +75,10 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double theta_tr_scale,
                                                    double& ax,
                                                    double& ay,
-                                                   ReadoutDiagnostics& diag);
+                                                   ReadoutDiagnostics& diag,
+                                                   const DerivedTpfPoissonConfig* derived_poisson = nullptr,
+                                                   const TpfRadialGravityProfile* derived_profile = nullptr);
 
-/**
- * Write tpf_readout_debug.csv for dynamical runs.
- * Column layout and mode-specific fields are owned by the readout module.
- * Caller passes resolved run params (no Config dependency in readout).
- */
 void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              const std::string& output_dir,
                              double softening,
@@ -94,7 +88,8 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              const std::string& readout_mode,
                              double readout_scale,
                              double theta_tt_scale,
-                             double theta_tr_scale);
+                             double theta_tr_scale,
+                             const DerivedTpfPoissonConfig& derived_poisson = DerivedTpfPoissonConfig());
 
 }  // namespace tpfcore
 }  // namespace galaxy

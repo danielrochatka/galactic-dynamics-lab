@@ -80,6 +80,11 @@ struct Config {
   double tpfcore_theta_tt_scale = 1.0;
   /** TPFCore tr_coherence_readout: Theta_tr mixed coupling scale. Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
+  /**
+   * TPFCore hybrid radial: coupling κ from geometric invariant I to effective mass density ρ_eff = κ I (SI ledger).
+   * Default 1e32.
+   */
+  double tpf_kappa = 1.0e32;
   /** TPFCore derived radial profile: number of radial bins (grid for diagnostics / interpolation). Default 100. */
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */

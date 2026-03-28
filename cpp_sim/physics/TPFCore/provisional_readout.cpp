@@ -100,11 +100,13 @@ static void compute_theta_sum(const State& state,
   theta_sum = field.theta;
 }
 
-// --- Closure: derived TPF radial (bounce m(r) + manuscript Hessian superposition). ---
+// --- Closure: hybrid derived TPF radial (bounce baryons + κ ledger + Hessian superposition). ---
 static void apply_derived_tpf_radial_readout_closure(const State& state,
                                                      int i,
                                                      double bh_mass,
                                                      double eps,
+                                                     const DerivedTpfPoissonConfig& dcfg,
+                                                     const TpfRadialGravityProfile* profile_in,
                                                      double readout_scale,
                                                      double theta_tt_scale,
                                                      double theta_tr_scale,
@@ -125,8 +127,15 @@ static void apply_derived_tpf_radial_readout_closure(const State& state,
     return;
   }
 
+  TpfRadialGravityProfile profile_storage;
+  const TpfRadialGravityProfile* profile = profile_in;
+  if (!profile) {
+    profile_storage = build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
+    profile = &profile_storage;
+  }
+
   double r_cyl = std::hypot(x, y);
-  double a_s = radial_acceleration_scalar_derived(state, bh_mass, r_cyl, eps);
+  double a_s = radial_acceleration_scalar_derived(state, bh_mass, *profile, r_cyl, eps);
   ax = a_s * (x / r);
   ay = a_s * (y / r);
 
@@ -225,11 +234,15 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double theta_tt_scale,
                                                double theta_tr_scale,
                                                double& ax,
-                                               double& ay) {
+                                               double& ay,
+                                               const DerivedTpfPoissonConfig* derived_poisson,
+                                               const TpfRadialGravityProfile* derived_profile) {
   const double eps = effective_eps(source_softening, softening);
 
   if (is_derived_tpf_radial_readout_mode(readout_mode)) {
-    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps,
+    static const DerivedTpfPoissonConfig kDefaultDerivedPoisson;
+    const DerivedTpfPoissonConfig& dcfg = derived_poisson ? *derived_poisson : kDefaultDerivedPoisson;
+    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps, dcfg, derived_profile,
                                              readout_scale, theta_tt_scale, theta_tr_scale, ax, ay,
                                              nullptr);
     return;
@@ -265,11 +278,15 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double theta_tr_scale,
                                                    double& ax,
                                                    double& ay,
-                                                   ReadoutDiagnostics& diag) {
+                                                   ReadoutDiagnostics& diag,
+                                                   const DerivedTpfPoissonConfig* derived_poisson,
+                                                   const TpfRadialGravityProfile* derived_profile) {
   const double eps = effective_eps(source_softening, softening);
 
   if (is_derived_tpf_radial_readout_mode(readout_mode)) {
-    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps,
+    static const DerivedTpfPoissonConfig kDefaultDerivedPoisson;
+    const DerivedTpfPoissonConfig& dcfg = derived_poisson ? *derived_poisson : kDefaultDerivedPoisson;
+    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps, dcfg, derived_profile,
                                              readout_scale, theta_tt_scale, theta_tr_scale, ax, ay,
                                              &diag);
     diag.ax = ax;
@@ -324,7 +341,8 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              const std::string& readout_mode,
                              double readout_scale,
                              double theta_tt_scale,
-                             double theta_tr_scale) {
+                             double theta_tr_scale,
+                             const DerivedTpfPoissonConfig& derived_poisson) {
   if (snapshots.empty()) return;
 
   const double eps = effective_eps(source_softening, softening);
@@ -348,6 +366,12 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
     const double t = snap.time;
+    TpfRadialGravityProfile derived_prof;
+    const TpfRadialGravityProfile* derived_prof_ptr = nullptr;
+    if (is_derived_tpf_radial_readout_mode(readout_mode)) {
+      derived_prof = build_tpf_gravity_profile(s, bh_mass, derived_poisson, eps);
+      derived_prof_ptr = &derived_prof;
+    }
     for (int i = 0; i < s.n(); ++i) {
       double x = s.x[i], y = s.y[i];
       double vx = s.vx[i], vy = s.vy[i];
@@ -357,7 +381,9 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       compute_provisional_readout_with_diagnostics(
           s, i, bh_mass, star_star, softening, source_softening,
           readout_mode, readout_scale,
-          theta_tt_scale, theta_tr_scale, ax, ay, diag);
+          theta_tt_scale, theta_tr_scale, ax, ay, diag,
+          is_derived_tpf_radial_readout_mode(readout_mode) ? &derived_poisson : nullptr,
+          derived_prof_ptr);
 
       double r2 = x * x + y * y + eps * eps;
       double r = std::sqrt(r2);

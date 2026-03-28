@@ -1,5 +1,5 @@
 /**
- * Derived TPF radial: bounce closure (Sec. IX) and Hessian diagnostics.
+ * Derived TPF radial: hybrid bounce baryons + κ Poisson ledger.
  */
 
 #include "derived_tpf_radial.hpp"
@@ -11,6 +11,8 @@ namespace galaxy {
 namespace tpfcore {
 
 namespace {
+
+constexpr double kPi = 3.14159265358979323846;
 
 Theta3D add_theta(const Theta3D& a, const Theta3D& b) {
   Theta3D o;
@@ -88,10 +90,7 @@ double get_tpf_mass_at_r(double M_total, double r) {
 }
 
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
-                                                  int bins, double eps) {
-  (void)state;
-  (void)bh_mass;
-  (void)eps;
+                                                  int bins, double tpf_kappa, double eps) {
   TpfRadialGravityProfile p;
   p.bins = std::max(1, bins);
   p.max_radius = std::max(max_radius, 1e-30);
@@ -99,9 +98,30 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
   p.r_outer.resize(static_cast<size_t>(p.bins));
   p.M_eff_enc.resize(static_cast<size_t>(p.bins));
 
+  double r_s_bh = 0.0;
+  if (bh_mass > 0.0) r_s_bh = (2.0 * TPF_G_SI * bh_mass) / (c * c);
+  double rs3_bh = r_s_bh * r_s_bh * r_s_bh;
+
+  double cum = 0.0;
   for (int b = 0; b < p.bins; ++b) {
+    double R_b = (static_cast<double>(b) + 0.5) * p.delta_r;
+    double px = R_b;
+    double py = 0.0;
+    double pz = 0.0;
+    Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
+    double I_total = derived_invariant_I_contracted(theta_tot);
+    /* |I|: geometric invariant can be negative under metric signature; density must be positive. */
+    double rho_raw = std::abs(I_total) * tpf_kappa;
+
+    double r = R_b;
+    double r3 = r * r * r;
+    double bounce_ratio = r3 / (r3 + rs3_bh);
+    double rho_eff = rho_raw * bounce_ratio;
+
+    double dM = rho_eff * (4.0 * kPi * R_b * R_b * p.delta_r);
+    cum += dM;
     p.r_outer[static_cast<size_t>(b)] = (static_cast<double>(b) + 1.0) * p.delta_r;
-    p.M_eff_enc[static_cast<size_t>(b)] = 0.0;
+    p.M_eff_enc[static_cast<size_t>(b)] = cum;
   }
   return p;
 }
@@ -122,12 +142,15 @@ double TpfRadialGravityProfile::M_eff_at_cylindrical_r(double r_cyl) const {
   return M_eff_enc.back();
 }
 
-double radial_acceleration_scalar_derived(const State& state, double bh_mass, double r_cyl, double eps) {
+double radial_acceleration_scalar_derived(const State& state, double bh_mass,
+                                          const TpfRadialGravityProfile& profile, double r_cyl,
+                                          double eps) {
   double r_soft_sq = r_cyl * r_cyl + eps * eps;
   if (r_soft_sq < 1e-60) r_soft_sq = 1e-60;
-  double M_enc = bh_mass + enclosed_stellar_mass_cyl(state, r_cyl);
-  double m_bounce = get_tpf_mass_at_r(M_enc, r_cyl);
-  return -TPF_G_SI * m_bounce / r_soft_sq;
+  double M_stars_enc = enclosed_stellar_mass_cyl(state, r_cyl);
+  double M_baryon_bounced = get_tpf_mass_at_r(bh_mass + M_stars_enc, r_cyl);
+  double M_eff = profile.get_effective_mass_at(r_cyl);
+  return -TPF_G_SI * (M_baryon_bounced + M_eff) / r_soft_sq;
 }
 
 }  // namespace tpfcore

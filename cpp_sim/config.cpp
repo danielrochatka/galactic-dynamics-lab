@@ -101,6 +101,7 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_readout_scale") { config.tpfcore_readout_scale = std::stod(val); continue; }
       if (key == "tpfcore_theta_tt_scale") { config.tpfcore_theta_tt_scale = std::stod(val); continue; }
       if (key == "tpfcore_theta_tr_scale") { config.tpfcore_theta_tr_scale = std::stod(val); continue; }
+      if (key == "tpf_kappa") { config.tpf_kappa = std::stod(val); continue; }
       if (key == "tpf_poisson_bins") { config.tpf_poisson_bins = std::stoi(val); continue; }
       if (key == "tpf_poisson_max_radius") { config.tpf_poisson_max_radius = std::stod(val); continue; }
       if (key == "tpf_cooling_fraction") { config.tpf_cooling_fraction = std::stod(val); continue; }
