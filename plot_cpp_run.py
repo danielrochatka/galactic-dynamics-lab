@@ -15,7 +15,7 @@ Usage:
 Outputs are written into the same run_dir (or run_dir/plots if you prefer;
   currently we write into run_dir to match "same run folder").
 
-Requires: numpy, matplotlib. Optional: ffmpeg or Pillow for animation.
+Requires: numpy, pandas, matplotlib. Optional: ffmpeg or Pillow for animation.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
@@ -167,7 +168,7 @@ def main() -> None:
         "--render-radius",
         type=float,
         default=150.0,
-        help="Axis range for plots (default 150)",
+        help="Fallback half-axis range if snapshot extents are degenerate (default 150)",
     )
     args = parser.parse_args()
 
@@ -187,9 +188,16 @@ def main() -> None:
     if run_info:
         print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
 
-    render_radius = args.render_radius
-    if "outer_radius" in run_info:
-        render_radius = max(render_radius, float(run_info["outer_radius"]) * 1.2)
+    # Dynamic axis half-range from all x,y over the run (matches render.py symmetric limits).
+    xs = np.concatenate([s.positions[:, 0] for s in snapshots])
+    ys = np.concatenate([s.positions[:, 1] for s in snapshots])
+    df = pd.DataFrame({"x": xs, "y": ys})
+    max_range = np.max(
+        np.abs([df["x"].max(), df["x"].min(), df["y"].max(), df["y"].min()])
+    )
+    render_radius = float(max_range * 1.1)
+    if not np.isfinite(render_radius) or render_radius <= 0:
+        render_radius = float(args.render_radius)
 
     # Initial and final scatter plots
     initial = snapshots[0]
