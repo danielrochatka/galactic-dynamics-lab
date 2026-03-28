@@ -57,6 +57,8 @@ struct ReadoutDiagnostics {
   double theta_rr_plus_theta_tt = 0.0;
   double provisional_radial_readout = 0.0;
   double provisional_tangential_readout = 0.0;
+  /** tr_coherence_readout: TPF vs Newtonian regime label (empty for other modes). */
+  std::string regime;
 };
 
 /**

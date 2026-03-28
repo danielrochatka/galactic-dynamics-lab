@@ -14,6 +14,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <string>
 
 namespace galaxy {
 namespace tpfcore {
@@ -116,8 +117,11 @@ static void apply_tr_coherence_closure(const State& state,
   double r = std::sqrt(r2);
   if (r < 1e-30) {
     ax = ay = 0.0;
-    if (diag) diag->theta_rr = diag->theta_tt = diag->theta_tr = diag->theta_rr_plus_theta_tt =
-      diag->provisional_radial_readout = diag->provisional_tangential_readout = 0.0;
+    if (diag) {
+      diag->theta_rr = diag->theta_tt = diag->theta_tr = diag->theta_rr_plus_theta_tt =
+        diag->provisional_radial_readout = diag->provisional_tangential_readout = 0.0;
+      diag->regime.clear();
+    }
     return;
   }
   double rx = x / r;
@@ -133,8 +137,16 @@ static void apply_tr_coherence_closure(const State& state,
   double theta_rr_plus_theta_tt = theta_rr + theta_tt;
   double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
 
-  const double a_inward = -1.0 * readout_scale * theta_rr * r / 2.0;
-  const double a_radial = -a_inward;
+  const double a_mag = std::abs(readout_scale * theta_rr * r / 2.0);
+  const double a0 = 1.2e-10;
+  double a_radial;
+  if (a_mag < a0) {
+    a_radial = -1.0 * std::sqrt(a_mag * a0);
+    if (diag) diag->regime = "low-intensity (TPF-Boosted)";
+  } else {
+    a_radial = -1.0 * a_mag;
+    if (diag) diag->regime = "high-intensity (Newtonian)";
+  }
   double provisional_tangential = readout_scale * theta_tr_scale * theta_tr;
 
   ax = a_radial * rx + provisional_tangential * tx;
@@ -364,21 +376,23 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       double tangential_unit_y = radial_unit_x;
       double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
 
-      const char* regime = regime_label_from_theta_norm(diag.theta_norm);
+      const std::string regime_out =
+          (tr_coherence && !diag.regime.empty()) ? diag.regime
+                                                 : std::string(regime_label_from_theta_norm(diag.theta_norm));
       if (use_tr_style_columns) {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","
           << diag.theta_rr_plus_theta_tt << "," << diag.provisional_radial_readout << ","
           << diag.provisional_tangential_readout << "," << ax << "," << ay << ","
           << a_radial << "," << a_inward << "," << a_tangential << ","
-          << diag.theta_norm << "," << diag.invariant_I << "," << regime << ",0,0\n";
+          << diag.theta_norm << "," << diag.invariant_I << "," << regime_out << ",0,0\n";
       } else {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << ax << "," << ay << "," << r << "," << radial_unit_x << "," << radial_unit_y << ","
           << a_radial << "," << a_inward << "," << a_tangential << ","
           << diag.theta_xx << "," << diag.theta_xy << "," << diag.theta_yy << ","
           << diag.theta_trace << "," << diag.invariant_I << ","
-          << diag.theta_norm << "," << regime << ",0,0\n";
+          << diag.theta_norm << "," << regime_out << ",0,0\n";
       }
     }
   }
