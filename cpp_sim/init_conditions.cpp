@@ -1,4 +1,5 @@
 #include "init_conditions.hpp"
+#include "physics/TPFCore/derived_tpf_radial.hpp"
 #include <cmath>
 #include <random>
 #include <algorithm>
@@ -50,23 +51,55 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
     double th = theta[i];
     state.x[i] = r * std::cos(th);
     state.y[i] = r * std::sin(th);
-
-    double enclosed_mass = bh_mass + n_inside[i] * star_mass;
-    double a_newtonian = (6.6743e-11 * enclosed_mass) / (r * r);
-    const double a0 = 1.2e-10;
-    double a_tpf = (a_newtonian < a0) ? std::sqrt(a_newtonian * a0) : a_newtonian;
-    double v_tpf = std::sqrt(a_tpf * r);
-
-    double vx = -std::sin(th) * v_tpf;
-    double vy = std::cos(th) * v_tpf;
-    if (noise > 0) {
-      double scale = noise * v_tpf;
-      vx += scale * normal(rng);
-      vy += scale * normal(rng);
-    }
-    state.vx[i] = config.initial_velocity_scale * vx;
-    state.vy[i] = config.initial_velocity_scale * vy;
     state.mass[i] = star_mass;
+  }
+
+  const bool use_derived_tpf_init =
+      (config.physics_package == "TPFCore" && config.tpfcore_enable_provisional_readout &&
+       tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode));
+
+  if (use_derived_tpf_init) {
+    const double eps =
+        (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+    tpfcore::DerivedTpfPoissonConfig dcfg;
+    dcfg.density_coupling = config.tpf_density_coupling;
+    dcfg.bins = config.tpf_poisson_bins;
+    dcfg.max_radius = config.tpf_poisson_max_radius;
+    dcfg.galaxy_radius = config.galaxy_radius;
+    tpfcore::TpfRadialGravityProfile profile =
+        tpfcore::build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
+    for (int i = 0; i < n; ++i) {
+      double th = theta[i];
+      double r_cyl = std::hypot(state.x[i], state.y[i]);
+      double a_s = tpfcore::radial_acceleration_scalar_derived(state, bh_mass, profile, r_cyl, eps);
+      double v_circ = std::sqrt(std::max(0.0, std::abs(a_s) * r_cyl));
+      double vx = -std::sin(th) * v_circ;
+      double vy = std::cos(th) * v_circ;
+      if (noise > 0) {
+        double scale = noise * v_circ;
+        vx += scale * normal(rng);
+        vy += scale * normal(rng);
+      }
+      state.vx[i] = config.initial_velocity_scale * vx;
+      state.vy[i] = config.initial_velocity_scale * vy;
+    }
+  } else {
+    constexpr double G_SI = 6.6743e-11;
+    for (int i = 0; i < n; ++i) {
+      double r = radii[i];
+      double th = theta[i];
+      double enclosed_mass = bh_mass + n_inside[i] * star_mass;
+      double v_circ = std::sqrt((G_SI * enclosed_mass) / r);
+      double vx = -std::sin(th) * v_circ;
+      double vy = std::cos(th) * v_circ;
+      if (noise > 0) {
+        double scale = noise * v_circ;
+        vx += scale * normal(rng);
+        vy += scale * normal(rng);
+      }
+      state.vx[i] = config.initial_velocity_scale * vx;
+      state.vy[i] = config.initial_velocity_scale * vy;
+    }
   }
 }
 

@@ -6,6 +6,7 @@
  */
 
 #include "provisional_readout.hpp"
+#include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
 #include "readout_closure.hpp"
 #include "regime_diagnostics.hpp"
@@ -99,18 +100,19 @@ static void compute_theta_sum(const State& state,
   theta_sum = field.theta;
 }
 
-// --- Closure: tr_coherence (superposed Theta -> Theta_rr/Theta_tt/Theta_tr formula). EXPLORATORY. ---
-static void apply_tr_coherence_closure(const State& state,
-                                         int i,
-                                         double bh_mass,
-                                         bool star_star,
-                                         double eps,
-                                         double readout_scale,
-                                         double theta_tt_scale,
-                                         double theta_tr_scale,
-                                         double& ax,
-                                         double& ay,
-                                         ReadoutDiagnostics* diag) {
+// --- Closure: derived TPF radial (1D Poisson profile + manuscript Hessian superposition). ---
+static void apply_derived_tpf_radial_readout_closure(const State& state,
+                                                     int i,
+                                                     double bh_mass,
+                                                     double eps,
+                                                     const DerivedTpfPoissonConfig& dcfg,
+                                                     const TpfRadialGravityProfile* profile_in,
+                                                     double readout_scale,
+                                                     double theta_tt_scale,
+                                                     double theta_tr_scale,
+                                                     double& ax,
+                                                     double& ay,
+                                                     ReadoutDiagnostics* diag) {
   const double x = state.x[i];
   const double y = state.y[i];
   double r2 = x * x + y * y + eps * eps;
@@ -124,47 +126,44 @@ static void apply_tr_coherence_closure(const State& state,
     }
     return;
   }
+  TpfRadialGravityProfile profile_storage;
+  const TpfRadialGravityProfile* profile = profile_in;
+  if (!profile) {
+    profile_storage = build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
+    profile = &profile_storage;
+  }
+
+  double r_cyl = std::hypot(x, y);
+  double a_s = radial_acceleration_scalar_derived(state, bh_mass, *profile, r_cyl, eps);
+  ax = a_s * (x / r);
+  ay = a_s * (y / r);
+
+  Theta3D theta_sum = sum_derived_theta_at_point(state, bh_mass, x, y, 0.0, eps);
   double rx = x / r;
   double ry = y / r;
   double tx = -ry;
   double ty = rx;
-
-  Theta3D theta_sum;
-  compute_theta_sum(state, i, bh_mass, star_star, eps, x, y, theta_sum);
-
   double theta_rr = rx * rx * theta_sum.xx + 2.0 * rx * ry * theta_sum.xy + ry * ry * theta_sum.yy;
   double theta_tt = theta_tt_scale * (-theta_rr);
   double theta_rr_plus_theta_tt = theta_rr + theta_tt;
-  double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
-
-  const double a_mag = std::abs(readout_scale * theta_rr * r / 2.0);
-  const double a0 = 1.2e-10;
-  double a_radial;
-  if (a_mag < a0) {
-    a_radial = -1.0 * std::sqrt(a_mag * a0);
-    if (diag) diag->regime = "low-intensity (TPF-Boosted)";
-  } else {
-    a_radial = -1.0 * a_mag;
-    if (diag) diag->regime = "high-intensity (Newtonian)";
-  }
+  double theta_tr =
+      tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
   double provisional_tangential = readout_scale * theta_tr_scale * theta_tr;
-
-  ax = a_radial * rx + provisional_tangential * tx;
-  ay = a_radial * ry + provisional_tangential * ty;
 
   if (diag) {
     diag->theta_rr = theta_rr;
     diag->theta_tt = theta_tt;
     diag->theta_tr = theta_tr;
     diag->theta_rr_plus_theta_tt = theta_rr_plus_theta_tt;
-    diag->provisional_radial_readout = a_radial;
+    diag->provisional_radial_readout = a_s;
     diag->provisional_tangential_readout = provisional_tangential;
     diag->theta_xx = theta_sum.xx;
     diag->theta_xy = theta_sum.xy;
     diag->theta_yy = theta_sum.yy;
     diag->theta_trace = theta_sum.trace();
-    diag->invariant_I = compute_invariant_I(theta_sum);
+    diag->invariant_I = derived_invariant_I_contracted(theta_sum);
     diag->theta_norm = theta_frobenius_norm(theta_sum);
+    diag->regime = "derived-tpf-radial";
   }
 }
 
@@ -234,12 +233,17 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double theta_tt_scale,
                                                double theta_tr_scale,
                                                double& ax,
-                                               double& ay) {
+                                               double& ay,
+                                               const DerivedTpfPoissonConfig* derived_poisson,
+                                               const TpfRadialGravityProfile* derived_profile) {
   const double eps = effective_eps(source_softening, softening);
 
-  if (readout_mode == "tr_coherence_readout") {
-    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps,
-                               readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, nullptr);
+  if (is_derived_tpf_radial_readout_mode(readout_mode)) {
+    static const DerivedTpfPoissonConfig kDefaultDerivedPoisson;
+    const DerivedTpfPoissonConfig& dcfg = derived_poisson ? *derived_poisson : kDefaultDerivedPoisson;
+    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps, dcfg, derived_profile,
+                                             readout_scale, theta_tt_scale, theta_tr_scale, ax, ay,
+                                             nullptr);
     return;
   }
 
@@ -272,12 +276,17 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double theta_tr_scale,
                                                    double& ax,
                                                    double& ay,
-                                                   ReadoutDiagnostics& diag) {
+                                                   ReadoutDiagnostics& diag,
+                                                   const DerivedTpfPoissonConfig* derived_poisson,
+                                                   const TpfRadialGravityProfile* derived_profile) {
   const double eps = effective_eps(source_softening, softening);
 
-  if (readout_mode == "tr_coherence_readout") {
-    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps,
-                               readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, &diag);
+  if (is_derived_tpf_radial_readout_mode(readout_mode)) {
+    static const DerivedTpfPoissonConfig kDefaultDerivedPoisson;
+    const DerivedTpfPoissonConfig& dcfg = derived_poisson ? *derived_poisson : kDefaultDerivedPoisson;
+    apply_derived_tpf_radial_readout_closure(state, i, bh_mass, eps, dcfg, derived_profile,
+                                             readout_scale, theta_tt_scale, theta_tr_scale, ax, ay,
+                                             &diag);
     diag.ax = ax;
     diag.ay = ay;
     return;
@@ -330,16 +339,17 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              const std::string& readout_mode,
                              double readout_scale,
                              double theta_tt_scale,
-                             double theta_tr_scale) {
+                             double theta_tr_scale,
+                             const DerivedTpfPoissonConfig& derived_poisson) {
   if (snapshots.empty()) return;
 
   const double eps = effective_eps(source_softening, softening);
   std::ofstream f(output_dir + "/tpf_readout_debug.csv");
   if (!f) return;
 
-  const bool tr_coherence = (readout_mode == "tr_coherence_readout");
+  const bool tr_style = is_derived_tpf_radial_readout_mode(readout_mode);
   const bool experimental_r_scaling = (readout_mode == "experimental_radial_r_scaling");
-  const bool use_tr_style_columns = tr_coherence || experimental_r_scaling;
+  const bool use_tr_style_columns = tr_style || experimental_r_scaling;
   /* residual_available=0 for multi-source (no analytic residual); residual_norm=0 when not available */
   if (use_tr_style_columns) {
     f << "time,particle,x,y,vx,vy,radius,theta_rr,theta_tt,theta_tr,theta_rr_plus_theta_tt,"
@@ -354,6 +364,12 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
     const double t = snap.time;
+    TpfRadialGravityProfile derived_prof;
+    const TpfRadialGravityProfile* derived_prof_ptr = nullptr;
+    if (is_derived_tpf_radial_readout_mode(readout_mode)) {
+      derived_prof = build_tpf_gravity_profile(s, bh_mass, derived_poisson, eps);
+      derived_prof_ptr = &derived_prof;
+    }
     for (int i = 0; i < s.n(); ++i) {
       double x = s.x[i], y = s.y[i];
       double vx = s.vx[i], vy = s.vy[i];
@@ -363,7 +379,9 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       compute_provisional_readout_with_diagnostics(
           s, i, bh_mass, star_star, softening, source_softening,
           readout_mode, readout_scale,
-          theta_tt_scale, theta_tr_scale, ax, ay, diag);
+          theta_tt_scale, theta_tr_scale, ax, ay, diag,
+          is_derived_tpf_radial_readout_mode(readout_mode) ? &derived_poisson : nullptr,
+          derived_prof_ptr);
 
       double r2 = x * x + y * y + eps * eps;
       double r = std::sqrt(r2);
@@ -377,8 +395,8 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
 
       const std::string regime_out =
-          (tr_coherence && !diag.regime.empty()) ? diag.regime
-                                                 : std::string(regime_label_from_theta_norm(diag.theta_norm));
+          (tr_style && !diag.regime.empty()) ? diag.regime
+                                           : std::string(regime_label_from_theta_norm(diag.theta_norm));
       if (use_tr_style_columns) {
         f << std::scientific << t << "," << i << "," << x << "," << y << "," << vx << "," << vy << ","
           << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr << ","

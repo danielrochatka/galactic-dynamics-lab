@@ -6,6 +6,7 @@
 #include "tpf_core_package.hpp"
 #include "../../config.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
+#include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
@@ -55,6 +56,10 @@ void TPFCorePackage::init_from_config(const Config& config) {
   theta_tt_scale_ = config.tpfcore_theta_tt_scale;
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
+  derived_poisson_cfg_.density_coupling = config.tpf_density_coupling;
+  derived_poisson_cfg_.bins = config.tpf_poisson_bins;
+  derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
+  derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
 }
 
 void TPFCorePackage::compute_accelerations(const State& state,
@@ -74,11 +79,26 @@ void TPFCorePackage::compute_accelerations(const State& state,
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
 
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+    tpfcore::TpfRadialGravityProfile profile =
+        tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
+    for (int i = 0; i < n; ++i) {
+      tpfcore::compute_provisional_readout_acceleration(
+          state, i, bh_mass, star_star, softening, source_softening_,
+          readout_mode_, readout_scale_,
+          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
+          &derived_poisson_cfg_, &profile);
+    }
+    return;
+  }
+
   for (int i = 0; i < n; ++i) {
     tpfcore::compute_provisional_readout_acceleration(
         state, i, bh_mass, star_star, softening, source_softening_,
         readout_mode_, readout_scale_,
-        theta_tt_scale_, theta_tr_scale_, ax[i], ay[i]);
+        theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
+        nullptr, nullptr);
   }
 }
 
@@ -91,7 +111,8 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
   tpfcore::write_readout_debug_csv(snapshots, params.output_dir,
                                    params.softening, params.bh_mass, params.enable_star_star_gravity,
                                    source_softening_,
-                                   readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
+                                   readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
+                                   derived_poisson_cfg_);
 }
 
 namespace {
@@ -770,7 +791,8 @@ void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& s
 void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snapshots,
                                                const Config& config,
                                                const std::string& output_dir) const {
-  const bool closure_diag_mode = (readout_mode_ == "tr_coherence_readout" || readout_mode_ == "experimental_radial_r_scaling");
+  const bool closure_diag_mode =
+      (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) || readout_mode_ == "experimental_radial_r_scaling");
   if (!provisional_readout_ || !closure_diag_mode || snapshots.empty())
     return;
   const int n_part = snapshots[0].state.n();
@@ -804,9 +826,17 @@ void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snap
     double rx = x / r, ry = y / r;
     double ax = 0.0, ay = 0.0;
     tpfcore::ReadoutDiagnostics diag;
+    tpfcore::TpfRadialGravityProfile prof;
+    const tpfcore::TpfRadialGravityProfile* prof_ptr = nullptr;
+    if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+      prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
+      prof_ptr = &prof;
+    }
     tpfcore::compute_provisional_readout_with_diagnostics(
         s, 0, bh_mass, star_star, softening, source_softening_,
-        readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_, ax, ay, diag);
+        readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_, ax, ay, diag,
+        tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
+        prof_ptr);
 
     double radial_closure = diag.provisional_radial_readout;
     double tangential_closure = diag.provisional_tangential_readout;
@@ -1028,6 +1058,7 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   double softening = params.softening;
   double bh_mass = params.bh_mass;
   bool star_star = params.enable_star_star_gravity;
+  double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
   double eps2 = softening * softening;
 
   std::ofstream txt(params.output_dir + "/tpf_step0_orbit_audit.txt");
@@ -1066,10 +1097,18 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
 
   tpfcore::ReadoutDiagnostics diag;
   double ax_d = 0.0, ay_d = 0.0;
+  tpfcore::TpfRadialGravityProfile step0_prof;
+  const tpfcore::TpfRadialGravityProfile* step0_prof_ptr = nullptr;
+  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+    step0_prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
+    step0_prof_ptr = &step0_prof;
+  }
   tpfcore::compute_provisional_readout_with_diagnostics(
       s, 0, bh_mass, star_star, softening, source_softening_,
       readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
-      ax_d, ay_d, diag);
+      ax_d, ay_d, diag,
+      tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
+      step0_prof_ptr);
 
   txt << std::scientific << std::setprecision(16);
   txt << "TPFCore step-0 orbit audit (exact initial state of two_body_orbit)\n";

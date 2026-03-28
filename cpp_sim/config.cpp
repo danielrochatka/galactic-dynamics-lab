@@ -101,6 +101,9 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_readout_scale") { config.tpfcore_readout_scale = std::stod(val); continue; }
       if (key == "tpfcore_theta_tt_scale") { config.tpfcore_theta_tt_scale = std::stod(val); continue; }
       if (key == "tpfcore_theta_tr_scale") { config.tpfcore_theta_tr_scale = std::stod(val); continue; }
+      if (key == "tpf_density_coupling") { config.tpf_density_coupling = std::stod(val); continue; }
+      if (key == "tpf_poisson_bins") { config.tpf_poisson_bins = std::stoi(val); continue; }
+      if (key == "tpf_poisson_max_radius") { config.tpf_poisson_max_radius = std::stod(val); continue; }
       if (key == "tpfcore_dump_readout_debug") { config.tpfcore_dump_readout_debug = parse_bool(val); continue; }
       if (key == "tpfcore_probe_radius_min") { config.tpfcore_probe_radius_min = std::stod(val); continue; }
       if (key == "tpfcore_probe_radius_max") { config.tpfcore_probe_radius_max = std::stod(val); continue; }

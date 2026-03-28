@@ -34,6 +34,9 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    f << "tpf_density_coupling\t" << config.tpf_density_coupling << "\n";
+    f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
+    f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
   }
   f << "=== End resolved config ===\n\n";
 
@@ -74,6 +77,9 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_readout_scale_note\tweak-field calibrated effective scale (K_eff); not proof of final TPF dynamics\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    f << "tpf_density_coupling\t" << config.tpf_density_coupling << "\n";
+    f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
+    f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
     f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
     f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
     f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
