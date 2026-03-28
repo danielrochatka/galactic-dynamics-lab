@@ -153,7 +153,7 @@ def galaxy_velocity_gated_target_limit(
     degenerate_fallback: float,
 ) -> float:
     """
-    Velocity-gated viewport: mean r of 'stable' stars (mostly tangential motion) + 10% cushion;
+    Velocity-gated viewport: mean r of 'stable' stars (mostly tangential motion) + 30% cushion;
     if too few stable stars, use 1.2 * galaxy_radius_m. Static plots use this directly.
     """
     if positions.size == 0 or len(positions) == 0:
@@ -178,7 +178,7 @@ def galaxy_velocity_gated_target_limit(
     stable_stars = r[stable_mask]
     n = len(r)
     if len(stable_stars) > (0.1 * n):
-        target_limit = float(np.mean(stable_stars) * 1.10)
+        target_limit = float(np.mean(stable_stars) * 1.30)
     else:
         target_limit = float(1.2 * galaxy_radius_m)
     if not np.isfinite(target_limit) or target_limit <= 0:
