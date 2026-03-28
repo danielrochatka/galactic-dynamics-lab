@@ -89,6 +89,7 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "bh_mass") { config.bh_mass = std::stod(val); continue; }
       if (key == "inner_radius") { config.inner_radius = std::stod(val); continue; }
       if (key == "outer_radius") { config.outer_radius = std::stod(val); continue; }
+      if (key == "galaxy_radius") { config.galaxy_radius = std::stod(val); continue; }
       if (key == "dt") { config.dt = std::stod(val); continue; }
       if (key == "n_steps") { config.n_steps = std::stoi(val); continue; }
       if (key == "snapshot_every") { config.snapshot_every = std::stoi(val); continue; }

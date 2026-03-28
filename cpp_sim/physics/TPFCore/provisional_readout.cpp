@@ -133,18 +133,19 @@ static void apply_tr_coherence_closure(const State& state,
   double theta_rr_plus_theta_tt = theta_rr + theta_tt;
   double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
 
-  double provisional_radial = readout_scale * theta_rr_plus_theta_tt;
+  const double a_inward = -1.0 * readout_scale * theta_rr * r / 2.0;
+  const double a_radial = -a_inward;
   double provisional_tangential = readout_scale * theta_tr_scale * theta_tr;
 
-  ax = provisional_radial * rx + provisional_tangential * tx;
-  ay = provisional_radial * ry + provisional_tangential * ty;
+  ax = a_radial * rx + provisional_tangential * tx;
+  ay = a_radial * ry + provisional_tangential * ty;
 
   if (diag) {
     diag->theta_rr = theta_rr;
     diag->theta_tt = theta_tt;
     diag->theta_tr = theta_tr;
     diag->theta_rr_plus_theta_tt = theta_rr_plus_theta_tt;
-    diag->provisional_radial_readout = provisional_radial;
+    diag->provisional_radial_readout = a_radial;
     diag->provisional_tangential_readout = provisional_tangential;
     diag->theta_xx = theta_sum.xx;
     diag->theta_xy = theta_sum.xy;

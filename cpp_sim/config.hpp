@@ -54,6 +54,8 @@ struct Config {
 
   double inner_radius = 5.0;
   double outer_radius = 50.0;
+  /** Galaxy disk: stars sampled uniformly in area between 0.05 * galaxy_radius and galaxy_radius (m). */
+  double galaxy_radius = 50.0;
 
   double dt = 0.01;
   int n_steps = 50000;

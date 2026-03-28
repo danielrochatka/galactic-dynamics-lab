@@ -22,16 +22,18 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
   std::uniform_real_distribution<double> u02pi(0, 2 * PI);
   std::normal_distribution<double> normal(0, 1);
 
-  const double inner = config.inner_radius;
-  const double outer = config.outer_radius;
+  const double R = config.galaxy_radius;
+  const double r_min = 0.05 * R;
   const double bh_mass = config.bh_mass;
   const double star_mass = config.star_mass;
   const double noise = config.velocity_noise;
+  constexpr double G_SI = 6.6743e-11;
 
   std::vector<double> radii(n), theta(n);
   for (int i = 0; i < n; ++i) {
     double u = u01(rng);
-    double r_sq = inner * inner + u * (outer * outer - inner * inner);
+    /* Uniform in area: r^2 uniform between r_min^2 and R^2 */
+    double r_sq = r_min * r_min + u * (R * R - r_min * r_min);
     radii[i] = std::sqrt(r_sq);
     theta[i] = u02pi(rng);
   }
@@ -53,7 +55,7 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
 
     double enclosed = bh_mass + n_inside[i] * star_mass;
     double r_safe = std::max(r, MIN_RADIUS);
-    double v_circ = std::sqrt(enclosed / r_safe);
+    double v_circ = std::sqrt((G_SI * enclosed) / r_safe);
 
     double vx = -v_circ * std::sin(th);
     double vy = v_circ * std::cos(th);
