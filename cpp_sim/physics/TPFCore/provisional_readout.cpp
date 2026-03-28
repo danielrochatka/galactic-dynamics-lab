@@ -32,16 +32,15 @@ static void apply_tensor_radial_closure(const State& state,
                                  double bh_mass,
                                  bool star_star,
                                  double eps,
-                                 double c,
                                  double readout_scale,
                                  double& ax,
                                  double& ay,
-                                 Theta2D* theta_sum,
+                                 Theta3D* theta_sum,
                                  bool* has_theta_sum) {
   ax = 0.0;
   ay = 0.0;
   if (theta_sum) {
-    theta_sum->xx = theta_sum->xy = theta_sum->yy = 0.0;
+    theta_sum->xx = theta_sum->xy = theta_sum->xz = theta_sum->yy = theta_sum->yz = theta_sum->zz = 0.0;
     *has_theta_sum = false;
   }
 
@@ -59,8 +58,8 @@ static void apply_tensor_radial_closure(const State& state,
     double rx = dx / r;
     double ry = dy / r;
 
-    FieldAtPoint field = evaluate_provisional_field_single_source(xs, ys, m, x, y, eps, c);
-    const Theta2D& theta = field.theta;
+    FieldAtPoint field = evaluate_provisional_field_single_source(xs, ys, m, x, y, eps);
+    const Theta3D& theta = field.theta;
     double ax_contrib = theta.xx * rx + theta.xy * ry;
     double ay_contrib = theta.xy * rx + theta.yy * ry;
 
@@ -70,7 +69,10 @@ static void apply_tensor_radial_closure(const State& state,
     if (theta_sum) {
       theta_sum->xx += theta.xx;
       theta_sum->xy += theta.xy;
+      theta_sum->xz += theta.xz;
       theta_sum->yy += theta.yy;
+      theta_sum->yz += theta.yz;
+      theta_sum->zz += theta.zz;
       *has_theta_sum = true;
     }
   };
@@ -90,10 +92,9 @@ static void compute_theta_sum(const State& state,
                               double bh_mass,
                               bool star_star,
                               double eps,
-                              double c,
                               double /*x*/, double /*y*/,
-                              Theta2D& theta_sum) {
-  FieldAtPoint field = evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps, c);
+                              Theta3D& theta_sum) {
+  FieldAtPoint field = evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
   theta_sum = field.theta;
 }
 
@@ -103,7 +104,6 @@ static void apply_tr_coherence_closure(const State& state,
                                          double bh_mass,
                                          bool star_star,
                                          double eps,
-                                         double c,
                                          double readout_scale,
                                          double theta_tt_scale,
                                          double theta_tr_scale,
@@ -125,8 +125,8 @@ static void apply_tr_coherence_closure(const State& state,
   double tx = -ry;
   double ty = rx;
 
-  Theta2D theta_sum;
-  compute_theta_sum(state, i, bh_mass, star_star, eps, c, x, y, theta_sum);
+  Theta3D theta_sum;
+  compute_theta_sum(state, i, bh_mass, star_star, eps, x, y, theta_sum);
 
   double theta_rr = rx * rx * theta_sum.xx + 2.0 * rx * ry * theta_sum.xy + ry * ry * theta_sum.yy;
   double theta_tt = theta_tt_scale * (-theta_rr);
@@ -161,7 +161,6 @@ static void apply_experimental_radial_r_scaling_closure(const State& state,
                                                         double bh_mass,
                                                         bool star_star,
                                                         double eps,
-                                                        double c,
                                                         double readout_scale,
                                                         double& ax,
                                                         double& ay,
@@ -181,8 +180,8 @@ static void apply_experimental_radial_r_scaling_closure(const State& state,
   double tx = -ry;
   double ty = rx;
 
-  Theta2D theta_sum;
-  compute_theta_sum(state, i, bh_mass, star_star, eps, c, x, y, theta_sum);
+  Theta3D theta_sum;
+  compute_theta_sum(state, i, bh_mass, star_star, eps, x, y, theta_sum);
 
   double theta_rr = rx * rx * theta_sum.xx + 2.0 * rx * ry * theta_sum.xy + ry * ry * theta_sum.yy;
   double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
@@ -217,7 +216,6 @@ void compute_provisional_readout_acceleration(const State& state,
                                                bool star_star,
                                                double softening,
                                                double source_softening,
-                                               double c,
                                                const std::string& readout_mode,
                                                double readout_scale,
                                                double theta_tt_scale,
@@ -227,13 +225,13 @@ void compute_provisional_readout_acceleration(const State& state,
   const double eps = effective_eps(source_softening, softening);
 
   if (readout_mode == "tr_coherence_readout") {
-    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
+    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps,
                                readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, nullptr);
     return;
   }
 
   if (readout_mode == "experimental_radial_r_scaling") {
-    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps, c,
+    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps,
                                                 readout_scale, ax, ay, nullptr);
     return;
   }
@@ -241,7 +239,7 @@ void compute_provisional_readout_acceleration(const State& state,
   if (readout_mode != "tensor_radial_projection" && readout_mode != "tensor_radial_projection_negated")
     return;
 
-  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, nullptr, nullptr);
+  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, readout_scale, ax, ay, nullptr, nullptr);
 
   if (is_negated_mode(readout_mode)) {
     ax = -ax;
@@ -255,7 +253,6 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    bool star_star,
                                                    double softening,
                                                    double source_softening,
-                                                   double c,
                                                    const std::string& readout_mode,
                                                    double readout_scale,
                                                    double theta_tt_scale,
@@ -266,7 +263,7 @@ void compute_provisional_readout_with_diagnostics(const State& state,
   const double eps = effective_eps(source_softening, softening);
 
   if (readout_mode == "tr_coherence_readout") {
-    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps, c,
+    apply_tr_coherence_closure(state, i, bh_mass, star_star, eps,
                                readout_scale, theta_tt_scale, theta_tr_scale, ax, ay, &diag);
     diag.ax = ax;
     diag.ay = ay;
@@ -274,7 +271,7 @@ void compute_provisional_readout_with_diagnostics(const State& state,
   }
 
   if (readout_mode == "experimental_radial_r_scaling") {
-    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps, c,
+    apply_experimental_radial_r_scaling_closure(state, i, bh_mass, star_star, eps,
                                                 readout_scale, ax, ay, &diag);
     diag.ax = ax;
     diag.ay = ay;
@@ -287,9 +284,9 @@ void compute_provisional_readout_with_diagnostics(const State& state,
     return;
   }
 
-  Theta2D theta_sum;
+  Theta3D theta_sum;
   bool has_theta;
-  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, c, readout_scale, ax, ay, &theta_sum, &has_theta);
+  apply_tensor_radial_closure(state, i, bh_mass, star_star, eps, readout_scale, ax, ay, &theta_sum, &has_theta);
 
   if (is_negated_mode(readout_mode)) {
     ax = -ax;
@@ -317,7 +314,6 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              double bh_mass,
                              bool star_star,
                              double source_softening,
-                             double isotropic_c,
                              const std::string& readout_mode,
                              double readout_scale,
                              double theta_tt_scale,
@@ -353,7 +349,7 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       ReadoutDiagnostics diag;
       compute_provisional_readout_with_diagnostics(
           s, i, bh_mass, star_star, softening, source_softening,
-          isotropic_c, readout_mode, readout_scale,
+          readout_mode, readout_scale,
           theta_tt_scale, theta_tr_scale, ax, ay, diag);
 
       double r2 = x * x + y * y + eps * eps;

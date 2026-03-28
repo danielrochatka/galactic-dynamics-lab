@@ -18,7 +18,7 @@ namespace tpfcore {
 /** Evaluated provisional field at one point (single- or multi-source). */
 struct FieldAtPoint {
   Xi2D xi;
-  Theta2D theta;
+  Theta3D theta;
   double invariant_I;
   bool has_residual;
   Residual2D residual;
@@ -29,7 +29,7 @@ struct FieldAtPoint {
  * Residual is set (has_residual = true); uses analytic formula.
  */
 FieldAtPoint evaluate_provisional_field_single_source(double xs, double ys, double m,
-                                                      double x, double y, double eps, double c);
+                                                      double x, double y, double eps);
 
 /**
  * Evaluate provisional field at particle i from all sources (BH + optional star_star).
@@ -37,7 +37,7 @@ FieldAtPoint evaluate_provisional_field_single_source(double xs, double ys, doub
  */
 FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
                                                      double bh_mass, bool star_star,
-                                                     double eps, double c);
+                                                     double eps);
 
 /**
  * Combine two single-source field evaluations (e.g. symmetric pair).

@@ -1,19 +1,14 @@
 # TPFCore: Honest primitive TPF structure package
 
-**This is NOT the removed weak-field Newtonian-like TPF package.** TPFCore implements the bare primitive structure from the paper. The previous isotropic placeholder ansatz has been **replaced** with a Hessian-based weak-field point-source ansatz.
+**This is NOT the removed weak-field Newtonian-like TPF package.** TPFCore implements the bare primitive structure from the paper. The source uses the **3D** Hessian of a softened Coulomb potential evaluated on the **z = 0** simulation plane (source and field point at z = 0).
 
 ## Source ansatz (provisional weak-field)
 
-The implementation uses the paper's weak-field point-source construction:
+- **Phi** = -M / R with **R²** = dx² + dy² + eps² — same as 3D distance with z = z_s = 0 and isotropic softening eps² in the radical
+- **Xi** = (∂_x Phi, ∂_y Phi) — in-plane displacement; ∂_z Phi = 0 on the plane
+- **Theta** = full symmetric **3×3** Hessian of Phi; on z = 0: Theta_xz = Theta_yz = 0, Theta_zz = m/R³
 
-- **Phi** = -M / sqrt(r² + eps²) — softened point-source scalar (numerical regularization)
-- **Xi_i** = partial_i Phi — displacement field (unchanged)
-- **Theta_ij** = Hess_ij(Phi) + B(r) δ_ij — configuration gradient with optional isotropic correction
-- **B(r)** = c·M / (r² + eps²)^(3/2) — exploratory isotropic correction (c configurable, default 0)
-
-r² = dx² + dy², dx = x - xs, dy = y - ys. eps is the source softening (`tpfcore_source_softening` or global `softening`).
-
-With c = 0, Theta is the pure Hessian; c ≠ 0 adds a minimal isotropic tensor term to test whether near-source residuals decrease. This is an **exploratory correction to improve structural consistency**, NOT a fully derived final TPF source law. The ansatz remains provisional.
+dx = x − x_s, dy = y − y_s. eps is the source softening (`tpfcore_source_softening` or global `softening`). The field-equation residual uses the **full 3D** spatial divergence (including ∂_z Theta_{xz}, ∂_z Theta_{yz}).
 
 ## What is directly paper-derived
 
@@ -33,7 +28,7 @@ TPFCore inspection modes compute the **configuration-equation residual** from th
 
 > R_ν = ∂_i (Θ^i_ν − λ δ^i_ν Θ)
 
-with λ = 1/4 and Θ = Θ_xx + Θ_yy. This is the spatial part of nabla_μ(Θ^μ_ν − λ δ^μ_ν Θ).
+with λ = 1/4 and **Θ = tr(Theta) = Θ_xx + Θ_yy + Θ_zz**, and **i** summed over **x, y, z** (including contributions from ∂_z even on z = 0). This matches the spatial part of nabla_μ(Θ^μ_ν − λ δ^μ_ν Θ) for ν ∈ {x, y} on the plane.
 
 - **Computation**: Analytic. Third derivatives of Phi are closed-form, so the residual is evaluated directly from the ansatz.
 - **Meaning of near-zero**: If the ansatz satisfied the paper’s configuration equation, R would be zero. A small residual indicates the ansatz is structurally closer; a large residual indicates a mismatch.
@@ -50,7 +45,7 @@ with λ = 1/4 and Θ = Θ_xx + Θ_yy. This is the spatial part of nabla_μ(Θ^μ
 | x, y | Field point coordinates |
 | xi_x, xi_y | Displacement field components |
 | theta_xx, theta_xy, theta_yy | Theta tensor components |
-| theta_trace | Theta_xx + Theta_yy |
+| theta_trace | Theta_xx + Theta_yy + Theta_zz (full 3D trace on slice) |
 | invariant_I | I = Theta_mn Theta^mn - λ Theta² |
 | residual_x, residual_y, residual_norm | Configuration-equation residual components and norm |
 
@@ -91,40 +86,6 @@ For **symmetric pair** at (±d, 0):
 - `tpfcore_dump_theta_profile`, `tpfcore_dump_invariant_profile`
 - `tpfcore_source_softening` — softening for Phi. If ≤ 0, use global `softening`.
 - `tpfcore_residual_step` — step size for numerical residual (default 1e-6); not used when analytic.
-- `tpfcore_isotropic_correction_c` — dimensionless coefficient for B(r) = c·M/(r²+eps²)^(3/2). Default 0.0 (pure Hessian). Try e.g. 0.1, 0.25, 0.5, 1.0 to test residual reduction.
-- `tpfcore_c_sweep_min`, `tpfcore_c_sweep_max`, `tpfcore_c_sweep_steps` — c-sweep range and resolution (for `tpf_single_source_optimize_c`).
-- `tpfcore_c_objective` — objective to minimize: `max_residual_norm`, `mean_residual_norm`, or `l2_residual_norm`.
-
-## c-sweep utility (exploratory ansatz-tuning)
-
-**`tpf_single_source_optimize_c`** is an exploratory ansatz-tuning tool. It numerically fits c against the field-equation residual of the current provisional ansatz. The optimal c may be irrational or otherwise non-obvious, so manual guessing is not enough—this utility sweeps c over a configurable range and selects the value that minimizes the chosen objective.
-
-**Important:** The fitted c is **NOT** a final paper-derived constant. It is a numerically tuned value for this ansatz and geometry. Do not present it as a derived TPF parameter.
-
-### How to run the c sweep
-
-```bash
-# In config: physics_package = TPFCore
-
-./galaxy_sim tpf_single_source_optimize_c
-```
-
-Config keys: `tpfcore_c_sweep_min`, `tpfcore_c_sweep_max`, `tpfcore_c_sweep_steps`, `tpfcore_c_objective`.
-
-### Output files
-
-- **`c_sweep.csv`** — per-c row: `c`, `max_residual_norm`, `mean_residual_norm`, `l2_residual_norm`
-- **`c_sweep_summary.txt`** — sweep range, number of steps, chosen objective, best c, best objective value
-
-### Objective metrics (minimized)
-
-| Objective | Meaning |
-|-----------|---------|
-| `max_residual_norm` | max over probe points of ‖R‖. Penalizes worst-case residual (e.g. near source). |
-| `mean_residual_norm` | mean of ‖R‖ over probe points. Balances overall fit. |
-| `l2_residual_norm` | sqrt(sum ‖R‖²). Stronger penalty on large local residuals. |
-
-Lower values indicate the ansatz better satisfies the configuration equation for that c.
 
 ## How to run
 
@@ -136,9 +97,6 @@ Lower values indicate the ansatz better satisfies the configuration equation for
 
 # Symmetric pair at (±d,0), probe along +x and +y
 ./galaxy_sim tpf_symmetric_pair_inspect
-
-# Numerically fit c against residual (exploratory; fitted c is not a final constant)
-./galaxy_sim tpf_single_source_optimize_c
 ```
 
 ## Provisional motion/readout layer

@@ -40,7 +40,6 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
   if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
   if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
-  if (t == "tpf_single_source_optimize_c") return SimulationMode::tpf_single_source_optimize_c;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
@@ -58,7 +57,6 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::timestep_convergence: return "timestep_convergence";
     case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
     case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
-    case SimulationMode::tpf_single_source_optimize_c: return "tpf_single_source_optimize_c";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
@@ -110,11 +108,6 @@ bool load_config_file(const std::string& path, Config& config) {
       if (key == "tpfcore_dump_theta_profile") { config.tpfcore_dump_theta_profile = parse_bool(val); continue; }
       if (key == "tpfcore_source_softening") { config.tpfcore_source_softening = std::stod(val); continue; }
       if (key == "tpfcore_residual_step") { config.tpfcore_residual_step = std::stod(val); continue; }
-      if (key == "tpfcore_isotropic_correction_c") { config.tpfcore_isotropic_correction_c = std::stod(val); continue; }
-      if (key == "tpfcore_c_sweep_min") { config.tpfcore_c_sweep_min = std::stod(val); continue; }
-      if (key == "tpfcore_c_sweep_max") { config.tpfcore_c_sweep_max = std::stod(val); continue; }
-      if (key == "tpfcore_c_sweep_steps") { config.tpfcore_c_sweep_steps = std::stoi(val); continue; }
-      if (key == "tpfcore_c_objective") { config.tpfcore_c_objective = trim(val); continue; }
       if (key == "tpfcore_live_orbit_force_audit") { config.tpfcore_live_orbit_force_audit = parse_bool(val); continue; }
       if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
       if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }

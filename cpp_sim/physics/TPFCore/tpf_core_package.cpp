@@ -1,6 +1,6 @@
 /**
  * TPFCore package implementation.
- * Honest primitive TPF: Xi, Theta, I. Hessian-based provisional ansatz. No Newtonian substitution.
+ * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0. No Newtonian substitution.
  */
 
 #include "tpf_core_package.hpp"
@@ -30,17 +30,12 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
   p.enable_star_star_gravity = config.enable_star_star_gravity;
   p.tpfcore_source_softening = config.tpfcore_source_softening;
   p.effective_source_softening = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-  p.tpfcore_isotropic_correction_c = config.tpfcore_isotropic_correction_c;
   p.tpfcore_probe_radius_min = config.tpfcore_probe_radius_min;
   p.tpfcore_probe_radius_max = config.tpfcore_probe_radius_max;
   p.tpfcore_probe_samples = config.tpfcore_probe_samples;
   p.tpfcore_dump_theta_profile = config.tpfcore_dump_theta_profile;
   p.tpfcore_dump_invariant_profile = config.tpfcore_dump_invariant_profile;
   p.tpfcore_dump_readout_debug = config.tpfcore_dump_readout_debug;
-  p.tpfcore_c_sweep_min = config.tpfcore_c_sweep_min;
-  p.tpfcore_c_sweep_max = config.tpfcore_c_sweep_max;
-  p.tpfcore_c_sweep_steps = config.tpfcore_c_sweep_steps;
-  p.tpfcore_c_objective = config.tpfcore_c_objective;
   p.validation_symmetric_separation = config.validation_symmetric_separation;
   return p;
 }
@@ -51,7 +46,6 @@ TPFCorePackage::TPFCorePackage()
       readout_scale_(1.0),
       theta_tt_scale_(1.0),
       theta_tr_scale_(1.0),
-      isotropic_c_(0.0),
       source_softening_(0.0) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
@@ -60,7 +54,6 @@ void TPFCorePackage::init_from_config(const Config& config) {
   readout_scale_ = config.tpfcore_readout_scale;
   theta_tt_scale_ = config.tpfcore_theta_tt_scale;
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
-  isotropic_c_ = config.tpfcore_isotropic_correction_c;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
 }
 
@@ -74,7 +67,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
     throw std::runtime_error(
         "TPFCore does not support acceleration readout unless provisional readout is enabled. "
         "Set tpfcore_enable_provisional_readout = true in config, or use Newtonian for dynamics, "
-        "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c).");
+        "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect).");
   }
 
   const int n = state.n();
@@ -84,7 +77,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
   for (int i = 0; i < n; ++i) {
     tpfcore::compute_provisional_readout_acceleration(
         state, i, bh_mass, star_star, softening, source_softening_,
-        isotropic_c_, readout_mode_, readout_scale_,
+        readout_mode_, readout_scale_,
         theta_tt_scale_, theta_tr_scale_, ax[i], ay[i]);
   }
 }
@@ -97,7 +90,7 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
     return;
   tpfcore::write_readout_debug_csv(snapshots, params.output_dir,
                                    params.softening, params.bh_mass, params.enable_star_star_gravity,
-                                   source_softening_, isotropic_c_,
+                                   source_softening_,
                                    readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_);
 }
 
@@ -308,7 +301,6 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
   int n_samples = params.tpfcore_probe_samples;
   double eps = params.effective_source_softening;
   double m = params.bh_mass;
-  double c = params.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -327,7 +319,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     double r = r_min + frac * (r_max - r_min);
     double x = r, y = 0.0;
 
-    FieldAtPoint field = evaluate_provisional_field_single_source(0, 0, m, x, y, eps, c);
+    FieldAtPoint field = evaluate_provisional_field_single_source(0, 0, m, x, y, eps);
 
     radii.push_back(r);
     x_v.push_back(x);
@@ -389,15 +381,13 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "--- Parameter classification for this run ---\n";
       f << "  fixed_theory:        lambda=" << LAMBDA_4D << " (4D; not tunable)\n";
       f << "  numerical_reg:       source softening eps=" << std::scientific << eps << "\n";
-      f << "  exploratory_ansatz:  isotropic correction c=" << c << " (NOT a fundamental constant)\n";
       f << "  inspection:          probe r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
       f << "---\n";
-      f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
+      f << "Ansatz: 3D Phi=-M/R with R^2=dx^2+dy^2+eps^2 on z=0; Xi=(partial_x Phi, partial_y Phi); Theta=Hess_3D(Phi) (xz=yz=0 on plane)\n";
       f << "Source: (0,0), mass=" << m << "\n";
-      f << "Isotropic correction coefficient c=" << std::scientific << c << " (exploratory; not theory)\n";
       f << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
-      f << "Provisional weak-field point-source ansatz: yes (exploratory correction)\n";
+      f << "Provisional weak-field point-source ansatz: yes\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\n--- Regime diagnostics (reporting only; no equation change) ---\n";
       f << "  Field intensity (Theta Frobenius): max = " << std::scientific << max_theta_norm << "\n";
@@ -408,10 +398,11 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "  (Thresholds: low-intensity < " << tpfcore::THETA_NORM_LOW_MAX
         << ", transitional < " << tpfcore::THETA_NORM_TRANSITIONAL_MAX << ", else high-intensity; heuristic.)\n";
       f << "---\n";
-      f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
+      f << "\nField-equation residual (full 3D spatial divergence; i=x,y,z; nu=x,y):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
       f << "  max|residual_y|=" << max_residual_y_abs << "\n";
       f << "  max residual_norm=" << max_residual_norm << "\n";
+      f << "  (Vanishes as eps->0 away from source; O(eps^2) with softening.)\n";
       f << "  residual_y near zero on +x axis (y=0 symmetry): " << (residual_y_near_zero ? "yes [OK]\n" : "no [check]\n");
       f << "\nSymmetry expectations on +x axis:\n";
       f << "  theta_xy should be zero (y=0 symmetry): max|theta_xy|=" << max_theta_xy_abs;
@@ -420,110 +411,6 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "  invariant_I should decay smoothly with radius\n";
     }
   }
-}
-
-void TPFCorePackage::run_single_source_optimize_c(const Config& config, const std::string& output_dir) {
-  /*
-   * Exploratory ansatz-tuning: numerically fit c against field-equation residual.
-   * Fitted c is NOT a final paper-derived constant. This sweeps c over a range,
-   * runs the single-source inspection geometry for each, and selects the c that
-   * minimizes the chosen objective (max/mean/l2 residual norm).
-   */
-  using namespace tpfcore;
-
-  TPFCoreParams params = build_params(config, output_dir);
-  double r_min = params.tpfcore_probe_radius_min;
-  double r_max = params.tpfcore_probe_radius_max;
-  int n_samples = params.tpfcore_probe_samples;
-  double eps = params.effective_source_softening;
-  double m = params.bh_mass;
-  double c_min = params.tpfcore_c_sweep_min;
-  double c_max = params.tpfcore_c_sweep_max;
-  int n_steps = params.tpfcore_c_sweep_steps;
-  const std::string& objective_name = params.tpfcore_c_objective;
-
-  if (r_min >= r_max || n_samples < 2 || n_steps < 2) return;
-
-  /* Resolve objective: we minimize, so lower is better */
-  int obj_code = 0;  /* 0=max, 1=mean, 2=l2 */
-  if (objective_name == "mean_residual_norm") obj_code = 1;
-  else if (objective_name == "l2_residual_norm") obj_code = 2;
-  /* else max_residual_norm (default) */
-
-  std::vector<double> c_vals, max_norm_vals, mean_norm_vals, l2_norm_vals, obj_vals;
-
-  for (int step = 0; step < n_steps; ++step) {
-    double frac = (n_steps > 1) ? static_cast<double>(step) / (n_steps - 1) : 0.0;
-    double c = c_min + frac * (c_max - c_min);
-
-    double sum_norm = 0.0;
-    double sum_norm_sq = 0.0;
-    double max_norm = 0.0;
-
-    for (int i = 0; i < n_samples; ++i) {
-      double r_frac = (n_samples > 1) ? static_cast<double>(i) / (n_samples - 1) : 0.0;
-      double r = r_min + r_frac * (r_max - r_min);
-      double x = r, y = 0.0;
-
-      FieldAtPoint field = evaluate_provisional_field_single_source(0, 0, m, x, y, eps, c);
-      double rn = field.residual.norm();
-      sum_norm += rn;
-      sum_norm_sq += rn * rn;
-      if (rn > max_norm) max_norm = rn;
-    }
-
-    double mean_norm = sum_norm / n_samples;
-    double l2_norm = std::sqrt(sum_norm_sq);
-
-    double obj = max_norm;
-    if (obj_code == 1) obj = mean_norm;
-    else if (obj_code == 2) obj = l2_norm;
-
-    c_vals.push_back(c);
-    max_norm_vals.push_back(max_norm);
-    mean_norm_vals.push_back(mean_norm);
-    l2_norm_vals.push_back(l2_norm);
-    obj_vals.push_back(obj);
-  }
-
-  /* Find best c (minimum objective) */
-  size_t best_idx = 0;
-  for (size_t i = 1; i < obj_vals.size(); ++i) {
-    if (obj_vals[i] < obj_vals[best_idx]) best_idx = i;
-  }
-  double best_c = c_vals[best_idx];
-  double best_obj = obj_vals[best_idx];
-
-  /* Write c_sweep.csv */
-  {
-    std::ofstream f(params.output_dir + "/c_sweep.csv");
-    if (f) {
-      f << "c,max_residual_norm,mean_residual_norm,l2_residual_norm\n";
-      for (size_t i = 0; i < c_vals.size(); ++i) {
-        f << std::scientific << c_vals[i] << "," << max_norm_vals[i] << ","
-          << mean_norm_vals[i] << "," << l2_norm_vals[i] << "\n";
-      }
-    }
-  }
-
-  /* Write c_sweep_summary.txt */
-  {
-    std::ofstream f(params.output_dir + "/c_sweep_summary.txt");
-    if (f) {
-      f << "TPFCore c-sweep (exploratory ansatz-tuning)\n";
-      f << "Parameter role: c = exploratory ansatz correction (NOT a fundamental constant; NOT fixed theory).\n";
-      f << "Numerically fitting c against field-equation residual. Fitted c is NOT a final paper-derived constant.\n";
-      f << "Sweep range: c in [" << std::scientific << c_min << ", " << c_max << "]\n";
-      f << "Number of steps: " << n_steps << "\n";
-      f << "Chosen objective (minimize): " << objective_name << "\n";
-      f << "Best c: " << best_c << "\n";
-      f << "Best objective value: " << best_obj << "\n";
-      f << "Probe geometry: single-source at origin, +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
-    }
-  }
-
-  std::cout << "Best c: " << std::scientific << best_c << "\n";
-  std::cout << "Best objective value (" << objective_name << "): " << best_obj << "\n";
 }
 
 void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std::string& output_dir) {
@@ -536,7 +423,6 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   double r_max = params.tpfcore_probe_radius_max;
   int n_samples = params.tpfcore_probe_samples;
   double eps = params.effective_source_softening;
-  double c = params.tpfcore_isotropic_correction_c;
 
   if (r_min >= r_max || n_samples < 2) return;
 
@@ -557,8 +443,8 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       double r = r_min + frac * (r_max - r_min);
       double x = px(r), y = py(r);
 
-      FieldAtPoint f1 = evaluate_provisional_field_single_source(d, 0, m, x, y, eps, c);
-      FieldAtPoint f2 = evaluate_provisional_field_single_source(-d, 0, m, x, y, eps, c);
+      FieldAtPoint f1 = evaluate_provisional_field_single_source(d, 0, m, x, y, eps);
+      FieldAtPoint f2 = evaluate_provisional_field_single_source(-d, 0, m, x, y, eps);
       FieldAtPoint field = add_provisional_fields(f1, f2);
 
       axis_v.push_back(ax);
@@ -632,13 +518,11 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       f << "--- Parameter classification for this run ---\n";
       f << "  fixed_theory:        lambda=" << LAMBDA_4D << " (4D; not tunable)\n";
       f << "  numerical_reg:       source softening eps=" << std::scientific << eps << "\n";
-      f << "  exploratory_ansatz:  isotropic correction c=" << c << " (NOT a fundamental constant)\n";
       f << "  inspection:          probe r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
       f << "---\n";
-      f << "Ansatz: Phi=-M/sqrt(r^2+eps^2), Xi=grad Phi, Theta=Hess(Phi)+B(r)*delta, B(r)=c*M/(r^2+eps^2)^(3/2)\n";
+      f << "Ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2); Theta=Hess_3D(Phi)\n";
       f << "Source positions: (" << d << ",0) and (-" << d << ",0)\n";
       f << "Source masses: " << m << " each\n";
-      f << "Isotropic correction coefficient c=" << std::scientific << c << " (exploratory; not theory)\n";
       f << "Probe geometry: +x axis and +y axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
       f << "Provisional weak-field point-source ansatz: yes\n";
@@ -671,7 +555,6 @@ void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snaps
 
   TPFCoreParams params = build_params(config, output_dir);
   double eps = params.effective_source_softening;
-  double c = params.tpfcore_isotropic_correction_c;
   double bh_mass = params.bh_mass;
   bool star_star = params.enable_star_star_gravity;
 
@@ -684,7 +567,7 @@ void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snaps
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
     for (int i = 0; i < s.n(); ++i) {
-      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps, c);
+      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps);
       double tn = theta_frobenius_norm(field.theta);
       double I = field.invariant_I;
 
@@ -808,7 +691,6 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
 
   TPFCoreParams params = build_params(config, output_dir);
   double eps = params.effective_source_softening;
-  double c = params.tpfcore_isotropic_correction_c;
   double bh_mass = params.bh_mass;
   bool star_star = params.enable_star_star_gravity;
 
@@ -820,7 +702,7 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
   for (const auto& snap : snapshots) {
     const State& s = snap.state;
     for (int i = 0; i < s.n(); ++i) {
-      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps, c);
+      FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps);
       double tn = theta_frobenius_norm(field.theta);
       sum_theta_norm += tn;
       if (tn < min_theta_norm) min_theta_norm = tn;
@@ -923,7 +805,7 @@ void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snap
     double ax = 0.0, ay = 0.0;
     tpfcore::ReadoutDiagnostics diag;
     tpfcore::compute_provisional_readout_with_diagnostics(
-        s, 0, bh_mass, star_star, softening, source_softening_, isotropic_c_,
+        s, 0, bh_mass, star_star, softening, source_softening_,
         readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_, ax, ay, diag);
 
     double radial_closure = diag.provisional_radial_readout;
@@ -1185,7 +1067,7 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   tpfcore::ReadoutDiagnostics diag;
   double ax_d = 0.0, ay_d = 0.0;
   tpfcore::compute_provisional_readout_with_diagnostics(
-      s, 0, bh_mass, star_star, softening, source_softening_, isotropic_c_,
+      s, 0, bh_mass, star_star, softening, source_softening_,
       readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
       ax_d, ay_d, diag);
 

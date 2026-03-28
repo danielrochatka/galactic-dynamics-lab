@@ -8,7 +8,6 @@
  * Lambda = 1/4 in 4D (fixed theory; not tunable).
  *
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
- * exploratory ansatz (isotropic correction c, NOT a fundamental constant);
  * provisional experimental (readout mode/scale/theta_tt/theta_tr).
  *
  * When tpfcore_enable_provisional_readout=true, a PROVISIONAL motion/readout layer
@@ -54,12 +53,6 @@ class TPFCorePackage : public PhysicsPackage {
 
   /** Run symmetric-pair inspection: sources at (+d,0) and (-d,0), probe along axes. */
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
-
-  /**
-   * Run c-sweep optimization: numerically fit c against field-equation residual.
-   * Exploratory ansatz-tuning tool. Fitted c is NOT a final paper-derived constant.
-   */
-  void run_single_source_optimize_c(const Config& config, const std::string& output_dir);
 
   /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
   void write_readout_debug(const std::vector<Snapshot>& snapshots,
@@ -117,7 +110,6 @@ class TPFCorePackage : public PhysicsPackage {
   double readout_scale_;
   double theta_tt_scale_;
   double theta_tr_scale_;
-  double isotropic_c_;
   double source_softening_;
 };
 

@@ -373,7 +373,7 @@ void run_tpf_diagnostic_consistency_audit(const Config& config, const std::strin
     double ax_d = 0.0, ay_d = 0.0;
     tpfcore::compute_provisional_readout_with_diagnostics(
         state, 0, bh_mass, star_star, softening, config.tpfcore_source_softening,
-        config.tpfcore_isotropic_correction_c, config.tpfcore_readout_mode,
+        config.tpfcore_readout_mode,
         config.tpfcore_readout_scale, config.tpfcore_theta_tt_scale, config.tpfcore_theta_tr_scale,
         ax_d, ay_d, diag);
 

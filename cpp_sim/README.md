@@ -30,7 +30,6 @@ From the `cpp_sim/` directory:
 | `timestep_convergence` | Two-body at dt, dt/2, dt/4 (validation). |
 | `tpf_single_source_inspect` | TPFCore: one source at origin, probe Theta/I along +x (requires `physics_package = TPFCore`). |
 | `tpf_symmetric_pair_inspect` | TPFCore: symmetric pair at (±d,0), probe Theta/I along +x and +y (requires `physics_package = TPFCore`). |
-| `tpf_single_source_optimize_c` | TPFCore: sweep c, fit against field-equation residual. Exploratory ansatz-tuning; fitted c is NOT a final constant. |
 
 Example (Newtonian dynamics):
 
@@ -62,14 +61,7 @@ Outputs go to `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
 
 - **`theta_profile.csv`** — radius, x, y, xi_x, xi_y, theta_xx, theta_xy, theta_yy, theta_trace, invariant_I, residual_x, residual_y, residual_norm (symmetric pair adds `axis` column: x or y).
 - **`invariant_profile.csv`** — radius, invariant_I, theta_trace, residual_norm (symmetric pair adds `axis` column).
-- **`field_summary.txt`** — geometry, source positions, isotropic correction coefficient c, max residual magnitudes, symmetry checks (e.g. residual_y ≈ 0 on +x axis), provisional-ansatz flag.
-
-**TPFCore c-sweep utility** (`tpf_single_source_optimize_c`): Exploratory ansatz-tuning. Numerically fits c against field-equation residual. **Fitted c is NOT a final paper-derived constant.**
-
-- **`c_sweep.csv`** — c, max_residual_norm, mean_residual_norm, l2_residual_norm
-- **`c_sweep_summary.txt`** — sweep range, steps, chosen objective, best c, best objective value
-
-See `physics/TPFCore/README.md` for how to run the c sweep and what the objective metrics mean.
+- **`field_summary.txt`** — geometry, source positions, max residual magnitudes, symmetry checks (e.g. residual_y ≈ 0 on +x axis), provisional-ansatz flag.
 
 Snapshot CSVs can be loaded in Python for plotting/diagnostics.
 
@@ -83,7 +75,7 @@ The simulator loads the physics model by **package name** from config. All packa
 
 - **`physics/physics_package.hpp`** — Shared interface: package name, `compute_accelerations(...)`, optional `compute_potential_energy`, `init`, `init_from_config`, `validation_name`.
 - **`physics/Newtonian/`** — Default package: Newtonian gravity (BH at origin + optional star–star with softening).
-- **`physics/TPFCore/`** — Primitive TPF structure (Xi, Theta, I). Hessian-based provisional ansatz. Inspection-first; see below.
+- **`physics/TPFCore/`** — Primitive TPF structure (Xi, Theta, I). 3D Hessian provisional ansatz on z = 0. Inspection-first; see below.
 - **`physics/Template/`** — Stub package and README for adding a new package.
 - **`physics/registry.cpp`** — Registry: maps package name → implementation. Add new packages here.
 
@@ -118,14 +110,13 @@ physics_package = Newtonian
 1. **Inspection-only** (default): Set `physics_package = TPFCore`. Run inspection/utility modes:
    - `./galaxy_sim tpf_single_source_inspect` — one source at origin, probe along +x
    - `./galaxy_sim tpf_symmetric_pair_inspect` — sources at (±d,0), probe along +x and +y
-   - `./galaxy_sim tpf_single_source_optimize_c` — sweep c, fit against residual (exploratory)
    - Dynamical modes (galaxy, two_body_orbit, etc.) will fail with a clear message.
 
 2. **With provisional readout** (exploratory): Add `tpfcore_enable_provisional_readout = true` to config. Allows dynamical modes: `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`. Motion is tensor-driven, **not** Newtonian −grad(Φ). This is **NOT** the full derived TPF dynamics—see `physics/TPFCore/README.md`.
    - **`tensor_radial_projection`**: spatial Theta·r_hat readout; exploratory only; did **not** produce bound two-body motion.
    - **`tr_coherence_readout`**: paper-aligned t-r structure (Theta_rr, Theta_tt, Theta_tr); provisional experiment closer to the paper’s orbit/coherence discussion; still exploratory, not the final derived motion law.
 
-**Outputs:** Inspection: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. C-sweep: `c_sweep.csv`, `c_sweep_summary.txt`. Dynamical: `run_info.txt`, `snapshot_*.csv`. When `tpfcore_dump_readout_debug=true`: `tpf_readout_debug.csv` with per-snapshot readout diagnostics (mode-dependent columns) to diagnose runaway vs bound behavior. See `physics/TPFCore/README.md`.
+**Outputs:** Inspection: `theta_profile.csv`, `invariant_profile.csv`, `field_summary.txt`. Dynamical: `run_info.txt`, `snapshot_*.csv`. When `tpfcore_dump_readout_debug=true`: `tpf_readout_debug.csv` with per-snapshot readout diagnostics (mode-dependent columns) to diagnose runaway vs bound behavior. See `physics/TPFCore/README.md`.
 
 ### Adding a new package
 

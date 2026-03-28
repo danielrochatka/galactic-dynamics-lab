@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
       cli_override_mode = true;
       std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
     } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
+      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
       return 1;
     }
   }
@@ -139,8 +139,7 @@ int main(int argc, char** argv) {
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
   if (config.physics_package == "TPFCore") {
     std::cout << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
-              << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode
-              << "  tpfcore_isotropic_correction_c: " << config.tpfcore_isotropic_correction_c;
+              << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
     if (config.tpfcore_readout_mode == "tr_coherence_readout")
       std::cout << "  theta_tt_scale: " << config.tpfcore_theta_tt_scale << "  theta_tr_scale: " << config.tpfcore_theta_tr_scale;
     std::cout << "\n";
@@ -159,8 +158,8 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
-    std::cout << "  Hessian-based provisional ansatz: Phi=-M/sqrt(r^2+eps^2), Theta=Hess(Phi)+B(r)*delta\n";
-    std::cout << "  Parameter roles: lambda=1/4 (fixed theory) | eps (numerical regularization) | c (exploratory ansatz) | readout (provisional experimental)\n";
+    std::cout << "  Provisional source ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi)\n";
+    std::cout << "  Parameter roles: lambda=1/4 (fixed theory) | eps (numerical regularization) | readout (provisional experimental)\n";
     std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
     if (tpf && tpf->provisional_readout_enabled()) {
       std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [weak-field calibrated])";
@@ -179,7 +178,7 @@ int main(int argc, char** argv) {
                            config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
       if (is_dynamical) {
         std::cerr << "TPFCore does not support dynamical modes (galaxy, two_body_orbit, etc.) unless provisional readout is enabled.\n";
-        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_single_source_optimize_c.\n";
+        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
         return 1;
       }
     }
@@ -221,24 +220,6 @@ int main(int argc, char** argv) {
     std::cout << "Probe: +x and +y axes, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << " per axis\n";
     tpfcore->run_symmetric_pair_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
-    if (config.save_run_info) {
-      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
-      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
-    }
-    return 0;
-  }
-
-  if (config.simulation_mode == galaxy::SimulationMode::tpf_single_source_optimize_c) {
-    if (!tpfcore) {
-      std::cerr << "tpf_single_source_optimize_c requires physics_package = TPFCore.\n";
-      return 1;
-    }
-    std::cout << "Utility mode: tpf_single_source_optimize_c (exploratory ansatz-tuning)\n";
-    std::cout << "Sweep range: c in [" << config.tpfcore_c_sweep_min << ", " << config.tpfcore_c_sweep_max << "]\n";
-    std::cout << "Number of steps: " << config.tpfcore_c_sweep_steps << "\n";
-    std::cout << "Chosen objective: " << config.tpfcore_c_objective << "\n";
-    tpfcore->run_single_source_optimize_c(config, config.output_dir);
-    std::cout << "Wrote " << config.output_dir << "/c_sweep.csv, c_sweep_summary.txt\n";
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
@@ -554,7 +535,6 @@ int main(int argc, char** argv) {
   switch (config.simulation_mode) {
     case galaxy::SimulationMode::tpf_single_source_inspect:
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
-    case galaxy::SimulationMode::tpf_single_source_optimize_c:
     case galaxy::SimulationMode::tpf_two_body_sweep:
     case galaxy::SimulationMode::tpf_weak_field_calibration:
     case galaxy::SimulationMode::tpf_newtonian_force_compare:
