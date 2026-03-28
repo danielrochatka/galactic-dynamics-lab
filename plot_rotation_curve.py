@@ -5,6 +5,8 @@ Rotation curve from N-body snapshot CSV: compare simulated speeds to a Newtonian
 Primary glob: output_*.csv (highest step inferred from filename). Falls back to snapshot_*.csv
 (C++ galaxy_sim format) if no output_*.csv is found.
 
+`save_rotation_curve_png` is also used by plot_cpp_run.py so rotation_curve.png is written with other outputs.
+
 Usage:
   python plot_rotation_curve.py
   python plot_rotation_curve.py cpp_sim/outputs/20260327_120000
@@ -20,6 +22,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+G_SI = 6.6743e-11
+DEFAULT_M_BH = 1.0e41
+DEFAULT_X_MAX = 1.2e20
 
 
 def _step_from_stem(stem: str) -> int:
@@ -78,7 +84,7 @@ def load_particle_kinematics(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
         raise ValueError(f"No numeric data rows in {path}")
 
     arr = np.array(rows)
-    # Map column names to indices when possible
+
     def idx(name: str) -> int | None:
         try:
             return header.index(name)
@@ -89,7 +95,6 @@ def load_particle_kinematics(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
     iz, ivx, ivy, ivz = idx("z"), idx("vx"), idx("vy"), idx("vz")
 
     if ix is None or iy is None or ivx is None or ivy is None:
-        # C++ layout: i,x,y,vx,vy,mass
         if arr.shape[1] >= 5:
             x = arr[:, 1]
             y = arr[:, 2]
@@ -113,6 +118,62 @@ def load_particle_kinematics(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
     return r, v, title_suffix
 
 
+def rv_from_plane_arrays(positions: np.ndarray, velocities: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    3D r and speed from 2D (n,2) or 3D (n,3) positions/velocities (C++ snapshot arrays).
+    """
+    x = positions[:, 0]
+    y = positions[:, 1]
+    z = positions[:, 2] if positions.shape[1] >= 3 else np.zeros_like(x)
+    vx = velocities[:, 0]
+    vy = velocities[:, 1]
+    vz = velocities[:, 2] if velocities.shape[1] >= 3 else np.zeros_like(vx)
+    r = np.sqrt(x * x + y * y + z * z)
+    v = np.sqrt(vx * vx + vy * vy + vz * vz)
+    return r, v
+
+
+def save_rotation_curve_png(
+    r: np.ndarray,
+    v: np.ndarray,
+    output_path: Path,
+    title_suffix: str,
+    *,
+    M_bh: float = DEFAULT_M_BH,
+    x_max: float = DEFAULT_X_MAX,
+) -> None:
+    """
+    Scatter r vs v and overlay Newtonian v = sqrt(G*M_bh/r). Arrays need not be pre-sorted.
+    """
+    order = np.argsort(r)
+    r_s = r[order]
+    v_s = v[order]
+
+    r_line = np.linspace(max(float(r_s.min()), 1.0), x_max, 2000)
+    v_newton = np.sqrt(np.maximum(0.0, (G_SI * M_bh) / r_line))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(r_s, v_s, s=5, alpha=0.6, c="blue", edgecolors="none", label="TPF Simulated Stars")
+    ax.plot(
+        r_line,
+        v_newton,
+        "r--",
+        linewidth=2,
+        label="Newtonian Prediction (1/sqrt(r))",
+    )
+    ax.set_xlim(0.0, x_max)
+    ax.set_xlabel("Distance from Galactic Center (m)")
+    ax.set_ylabel("Orbital Velocity (m/s)")
+    ax.set_title(f"Rotation curve — {title_suffix}")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    output_path = output_path.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot rotation curve from latest snapshot/output CSV.")
     parser.add_argument(
@@ -132,47 +193,16 @@ def main() -> None:
     parser.add_argument(
         "--M-bh",
         type=float,
-        default=1.0e41,
+        default=DEFAULT_M_BH,
         help="Black hole mass for Newtonian baseline (kg), default 1e41",
     )
     args = parser.parse_args()
 
-    G = 6.6743e-11
-    M_bh = args.M_bh
-    x_max = 1.2e20
-
     csv_path = find_latest_csv(args.search_dir)
     r, v, title_suffix = load_particle_kinematics(csv_path)
-
-    order = np.argsort(r)
-    r = r[order]
-    v = v[order]
-
-    # Newtonian reference curve on a fine radial grid (avoid r=0)
-    r_line = np.linspace(max(r.min(), 1.0), x_max, 2000)
-    v_newton = np.sqrt(np.maximum(0.0, (G * M_bh) / r_line))
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(r, v, s=5, alpha=0.6, c="blue", edgecolors="none", label="TPF Simulated Stars")
-    ax.plot(
-        r_line,
-        v_newton,
-        "r--",
-        linewidth=2,
-        label="Newtonian Prediction (1/sqrt(r))",
-    )
-    ax.set_xlim(0.0, x_max)
-    ax.set_xlabel("Distance from Galactic Center (m)")
-    ax.set_ylabel("Orbital Velocity (m/s)")
-    ax.set_title(f"Rotation curve — {title_suffix}")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    out = args.output.resolve()
-    fig.savefig(out, dpi=150)
-    plt.close(fig)
+    save_rotation_curve_png(r, v, args.output, title_suffix, M_bh=args.M_bh)
     print(f"Loaded: {csv_path}")
-    print(f"Saved: {out}")
+    print(f"Saved: {args.output.resolve()}")
 
 
 if __name__ == "__main__":
