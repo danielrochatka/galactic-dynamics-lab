@@ -8,4 +8,7 @@ __pycache__/
 
 # Local config overrides (keep examples tracked)
 configs/local/
-configs/*.local.cfg
+# Match *.local.cfg in any directory (root configs/ alone missed cpp_sim/configs/ historically)
+**/*.local.cfg
+# Deprecated run-config location; do not commit (use repository root configs/ only)
+cpp_sim/configs/
