@@ -103,6 +103,12 @@ int main(int argc, char** argv) {
   config.run_id = run_id_from_time();
   config.output_dir = "outputs/" + config.run_id;
 
+  bool auto_plot = false;
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--plot")
+      auto_plot = true;
+  }
+
   bool cli_override_mode = false;
   if (argc >= 2) {
     try {
@@ -663,43 +669,57 @@ int main(int argc, char** argv) {
               << ". Output: " << config.output_dir << "\n";
   }
 
-  if (config.save_run_info) {
-    galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
-                           run_config_path, package_defaults_path);
-    std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
-  }
-  if (config.save_snapshots) {
-    galaxy::write_snapshots(config.output_dir, snapshots);
-    std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
-  }
+  {
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
+                             run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    if (config.save_snapshots) {
+      galaxy::write_snapshots(config.output_dir, snapshots);
+      std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
+    }
 
-  if (config.physics_package == "TPFCore") {
-    galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
-    if (tpf && tpf->provisional_readout_enabled()) {
-      tpf->write_readout_debug(snapshots, config, config.output_dir);
-      if (config.tpfcore_dump_readout_debug)
-        std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
-      tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
-      std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
-      tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
-      std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
-      tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
-      if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
-          (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
-        std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
-      if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit && snapshots[0].state.n() == 1) {
-        tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
-        std::cout << "Wrote " << config.output_dir << "/tpf_step0_orbit_audit.txt\n";
-      }
-      if (config.tpfcore_live_orbit_force_audit) {
-        tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
-        std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
+    if (config.physics_package == "TPFCore") {
+      galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
+      if (tpf && tpf->provisional_readout_enabled()) {
+        tpf->write_readout_debug(snapshots, config, config.output_dir);
+        if (config.tpfcore_dump_readout_debug)
+          std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
+        tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
+        std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
+        tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
+        std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
+        tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
+        if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
+            (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
+          std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
+        if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit && snapshots[0].state.n() == 1) {
+          tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
+          std::cout << "Wrote " << config.output_dir << "/tpf_step0_orbit_audit.txt\n";
+        }
+        if (config.tpfcore_live_orbit_force_audit) {
+          tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
+          std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
+        }
       }
     }
   }
 
   std::cout << "Snapshots: " << snapshots.size() << "\n";
   std::cout << "Output directory: " << config.output_dir << "\n";
+
+  std::string output_dir = config.output_dir;
+  if (auto_plot) {
+    std::cout.flush();
+    std::cerr.flush();
+    std::cout << "Simulation complete. Rendering animation..." << std::endl;
+    std::string cmd = "cd .. && ./dev/bin/python plot_cpp_run.py cpp_sim/" + output_dir;
+    int ret = std::system(cmd.c_str());
+    if (ret != 0) {
+      std::cerr << "Warning: Python rendering script returned non-zero exit code." << std::endl;
+    }
+  }
 
   return 0;
 }
