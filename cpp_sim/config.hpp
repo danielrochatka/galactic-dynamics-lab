@@ -83,6 +83,11 @@ struct Config {
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */
   double tpf_poisson_max_radius = 0.0;
+  /**
+   * TPFCore dynamical runs: fraction of n_steps in the artificial radial cooling phase (1% radial
+   * damping per step). Snapshots are not recorded during this phase. Ignored when physics_package != TPFCore.
+   */
+  double tpf_cooling_fraction = 0.2;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
   /** TPFCore diagnostics: enable live two_body_orbit Newtonian-vs-TPF force audit. */
