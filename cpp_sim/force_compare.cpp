@@ -151,7 +151,7 @@ void run_snapshot_replay_audit(const Config& config,
                                std::ostream& csv,
                                std::ostream& txt) {
   State state0;
-  init_two_body(config, state0);
+  init_two_body_star_around_bh(config, state0);
   Config c = config;
   c.enable_star_star_gravity = false;
   int n_steps = config.validation_n_steps;

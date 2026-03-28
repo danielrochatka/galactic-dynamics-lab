@@ -69,6 +69,32 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
 }
 
 void init_two_body(const Config& config, State& state) {
+  (void)config;
+  /* Hardcoded Earth–Moon benchmark (SI). State has no fixed-body flags; both bodies evolve.
+   * Use bh_mass = 0 and enable_star_star_gravity = true so only pairwise masses apply.
+   * Note: NewtonianPackage uses a G=1 convention; these are literal SI storage values. */
+  constexpr double kEarthMass = 5.972e24;
+  constexpr double kMoonMass = 7.348e22;
+  constexpr double kMoonX = 3.844e8;
+  constexpr double kMoonVy = 1022.0;
+
+  state.resize(0);
+  state.resize(2);
+
+  state.mass[0] = kEarthMass;
+  state.x[0] = 0.0;
+  state.y[0] = 0.0;
+  state.vx[0] = 0.0;
+  state.vy[0] = 0.0;
+
+  state.mass[1] = kMoonMass;
+  state.x[1] = kMoonX;
+  state.y[1] = 0.0;
+  state.vx[1] = 0.0;
+  state.vy[1] = kMoonVy;
+}
+
+void init_two_body_star_around_bh(const Config& config, State& state) {
   state.resize(1);
   double r0 = config.validation_two_body_radius;
   double v_circ = std::sqrt(config.bh_mass / r0);

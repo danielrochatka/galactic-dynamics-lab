@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
       physics->init_from_config(c);
 
       galaxy::State state;
-      galaxy::init_two_body(c, state);
+      galaxy::init_two_body_star_around_bh(c, state);
       int n_steps = c.validation_n_steps;
       int snapshot_every = c.validation_snapshot_every;
 
@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
       physics->init_from_config(c);
 
       galaxy::State state;
-      galaxy::init_two_body(c, state);
+      galaxy::init_two_body_star_around_bh(c, state);
       int n_steps = c.validation_n_steps;
       int snapshot_every = c.validation_snapshot_every;
 
@@ -552,11 +552,12 @@ int main(int argc, char** argv) {
     }
     case galaxy::SimulationMode::two_body_orbit: {
       galaxy::init_two_body(config, state);
-      config.enable_star_star_gravity = false;
+      config.bh_mass = 0.0;
+      config.enable_star_star_gravity = true;
       n_steps = config.validation_n_steps;
       snapshot_every = config.validation_snapshot_every;
-      std::cout << "Two-body orbit: r0=" << config.validation_two_body_radius
-                << " speed_ratio=" << config.validation_two_body_speed_ratio << "\n";
+      std::cout << "Two-body orbit: Earth–Moon benchmark (SI), n=" << state.n()
+                << " (pairwise gravity; bh_mass cleared for this mode)\n";
       break;
     }
     case galaxy::SimulationMode::symmetric_pair: {
@@ -590,7 +591,7 @@ int main(int argc, char** argv) {
 
       double E0 = 0;
       galaxy::State state0;
-      galaxy::init_two_body(config, state0);
+      galaxy::init_two_body_star_around_bh(config, state0);
       E0 = galaxy::compute_kinetic_energy(state0) + physics->compute_potential_energy(state0, config.bh_mass, config.softening, config.enable_star_star_gravity);
 
       for (double dt : dts) {
@@ -598,7 +599,7 @@ int main(int argc, char** argv) {
         galaxy::Config c2 = config;
         c2.dt = dt;
         galaxy::State s0;
-        galaxy::init_two_body(c2, s0);
+        galaxy::init_two_body_star_around_bh(c2, s0);
         auto snaps = galaxy::run_simulation(c2, s0, physics, steps, std::max(1, config.validation_snapshot_every));
         const auto& last = snaps.back().state;
         double r_final = std::sqrt(last.x[0] * last.x[0] + last.y[0] * last.y[0]);
