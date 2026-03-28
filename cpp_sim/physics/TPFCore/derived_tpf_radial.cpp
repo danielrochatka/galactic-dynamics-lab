@@ -77,7 +77,8 @@ double enclosed_stellar_mass_cyl(const State& state, double r_cyl) {
 }
 
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
-                                                  int bins, double tpf_density_coupling, double eps) {
+                                                  int bins, double tpf_density_coupling, double eps,
+                                                  double galaxy_radius) {
   TpfRadialGravityProfile p;
   p.bins = std::max(1, bins);
   p.max_radius = std::max(max_radius, 1e-30);
@@ -85,6 +86,8 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
   p.density_coupling = tpf_density_coupling;
   p.r_outer.resize(static_cast<size_t>(p.bins));
   p.M_eff_enc.resize(static_cast<size_t>(p.bins));
+
+  const double softening_radius = 0.05 * std::max(galaxy_radius, 1e-30);
 
   double cum = 0.0;
   for (int b = 0; b < p.bins; ++b) {
@@ -94,7 +97,9 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     double pz = 0.0;
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I = derived_invariant_I_contracted(theta_tot);
-    double rho_eff = tpf_density_coupling * I;
+    double rho_eff = 0.0;
+    if (R_b >= softening_radius)
+      rho_eff = tpf_density_coupling * I;
     double dM = rho_eff * (4.0 * kPi * R_b * R_b * p.delta_r);
     cum += dM;
     p.r_outer[static_cast<size_t>(b)] = (static_cast<double>(b) + 1.0) * p.delta_r;

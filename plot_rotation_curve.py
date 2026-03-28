@@ -6,6 +6,7 @@ Primary glob: output_*.csv (highest step inferred from filename). Falls back to 
 (C++ galaxy_sim format) if no output_*.csv is found.
 
 `save_rotation_curve_png` is also used by plot_cpp_run.py so rotation_curve.png is written with other outputs.
+The Newtonian overlay uses fixed NEWTONIAN_REFERENCE_M_BH (1e41 kg), not run_info bh_mass.
 
 Usage:
   python plot_rotation_curve.py
@@ -24,7 +25,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 G_SI = 6.6743e-11
-DEFAULT_M_BH = 1.0e41
+# Fixed Newtonian benchmark for rotation-curve overlay (do not use simulation bh_mass / effective mass).
+NEWTONIAN_REFERENCE_M_BH = 1.0e41
 DEFAULT_X_MAX = 1.2e20
 
 
@@ -139,7 +141,7 @@ def save_rotation_curve_png(
     output_path: Path,
     title_suffix: str,
     *,
-    M_bh: float = DEFAULT_M_BH,
+    M_bh: float = NEWTONIAN_REFERENCE_M_BH,
     x_max: float = DEFAULT_X_MAX,
 ) -> None:
     """
@@ -193,8 +195,8 @@ def main() -> None:
     parser.add_argument(
         "--M-bh",
         type=float,
-        default=DEFAULT_M_BH,
-        help="Black hole mass for Newtonian baseline (kg), default 1e41",
+        default=NEWTONIAN_REFERENCE_M_BH,
+        help="Black hole mass for Newtonian baseline (kg); default fixed benchmark 1e41",
     )
     args = parser.parse_args()
 

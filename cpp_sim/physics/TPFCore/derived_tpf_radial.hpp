@@ -21,7 +21,7 @@ constexpr double TPF_G_SI = 6.6743e-11;
 
 /** Config for derived radial Poisson profile (passed from simulator Config via TPFCorePackage). */
 struct DerivedTpfPoissonConfig {
-  double density_coupling = 1.0e20;
+  double density_coupling = 1.0e30;
   int bins = 100;
   /** If <= 0, use galaxy_radius. */
   double max_radius = 0.0;
@@ -59,13 +59,18 @@ struct TpfRadialGravityProfile {
   double M_eff_at_cylindrical_r(double r_cyl) const;
 };
 
+/**
+ * galaxy_radius: inner Poisson bins with R_bin_center < 0.05 * galaxy_radius get rho_eff = 0
+ * (center stays Newtonian; TPF ledger accumulates in the disk).
+ */
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
-                                                  int bins, double tpf_density_coupling, double eps);
+                                                  int bins, double tpf_density_coupling, double eps,
+                                                  double galaxy_radius);
 
 inline TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass,
                                                          const DerivedTpfPoissonConfig& cfg, double eps) {
   return build_tpf_gravity_profile(state, bh_mass, cfg.max_radius_resolved(), cfg.bins, cfg.density_coupling,
-                                   eps);
+                                   eps, cfg.galaxy_radius);
 }
 
 /** Stellar mass with sqrt(x^2+y^2) <= r_cyl. */

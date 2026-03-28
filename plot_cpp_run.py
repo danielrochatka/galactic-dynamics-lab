@@ -5,7 +5,7 @@ Post-process C++ galaxy simulation outputs and generate visualizations.
 Reads snapshot CSV files and run_info.txt from a cpp_sim run directory,
 then produces the same kinds of plots as the Python pipeline:
   - initial and final scatter plots (galaxy view)
-  - rotation_curve.png (final snapshot vs Newtonian baseline; uses bh_mass from run_info when present)
+  - rotation_curve.png (final snapshot vs fixed Newtonian baseline M_bh = 1e41 kg)
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
@@ -33,7 +33,7 @@ import pandas as pd
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
 from diagnostics import compute_diagnostics, plot_and_save_all
-from plot_rotation_curve import DEFAULT_M_BH, rv_from_plane_arrays, save_rotation_curve_png
+from plot_rotation_curve import NEWTONIAN_REFERENCE_M_BH, rv_from_plane_arrays, save_rotation_curve_png
 
 
 # -----------------------------------------------------------------------------
@@ -222,17 +222,6 @@ def get_masses_from_snapshots(snapshots: list[Snapshot], run_dir: Path) -> np.nd
     return np.array(masses) if masses else np.array([])
 
 
-def rotation_curve_m_bh_kg(run_info: dict[str, str | int | float]) -> float:
-    """Newtonian baseline mass: run_info bh_mass if parseable, else script default (1e41)."""
-    raw = run_info.get("bh_mass")
-    if raw is None:
-        return DEFAULT_M_BH
-    try:
-        return float(raw)
-    except (TypeError, ValueError):
-        return DEFAULT_M_BH
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Plot C++ galaxy simulation outputs (initial/final, animation, diagnostics)."
@@ -308,11 +297,17 @@ def main() -> None:
     try:
         r_rc, v_rc = rv_from_plane_arrays(final.positions, final.velocities)
         title_rc = f"snapshot_{final.step:05d}.csv (step {final.step}, t={final.time:g})"
-        m_bh = rotation_curve_m_bh_kg(run_info)
         save_rotation_curve_png(
-            r_rc, v_rc, run_dir / "rotation_curve.png", title_rc, M_bh=m_bh
+            r_rc,
+            v_rc,
+            run_dir / "rotation_curve.png",
+            title_rc,
+            M_bh=NEWTONIAN_REFERENCE_M_BH,
         )
-        print(f"Saved: {run_dir / 'rotation_curve.png'} (Newtonian baseline M_bh={m_bh:g} kg)")
+        print(
+            f"Saved: {run_dir / 'rotation_curve.png'} "
+            f"(Newtonian baseline M_bh={NEWTONIAN_REFERENCE_M_BH:g} kg, fixed benchmark)"
+        )
     except Exception as exc:
         print(f"Warning: could not write rotation_curve.png: {exc}")
 
