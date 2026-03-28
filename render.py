@@ -5,11 +5,22 @@ Top-down 2D view of the galaxy.
 
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Union
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
+
+
+RenderRadius = Union[float, Callable[[np.ndarray], float]]
+
+
+def _resolve_render_radius(render_radius: RenderRadius, positions: np.ndarray) -> float:
+    if callable(render_radius):
+        return float(render_radius(positions))
+    return float(render_radius)
 
 
 def _setup_axes(ax: plt.Axes, render_radius: float) -> None:
@@ -25,13 +36,14 @@ def scatter_frame(
     ax: plt.Axes,
     positions: np.ndarray,
     bh_position: tuple[float, float] = (0.0, 0.0),
-    render_radius: float = 150.0,
+    render_radius: RenderRadius = 150.0,
     star_size: float = 2.0,
     bh_size: float = 80.0,
 ) -> None:
     """Draw one frame: black hole + stars."""
     ax.clear()
-    _setup_axes(ax, render_radius)
+    r = _resolve_render_radius(render_radius, positions)
+    _setup_axes(ax, r)
 
     # Stars
     ax.scatter(
@@ -114,7 +126,7 @@ def save_static_plot(
     positions: np.ndarray,
     output_path: Path,
     title: str = "Galaxy",
-    render_radius: float = 150.0,
+    render_radius: RenderRadius = 150.0,
 ) -> None:
     """Save a single static scatter plot."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
@@ -136,7 +148,7 @@ def save_static_plot(
 def create_animation(
     snapshots: list,
     output_path: Path,
-    render_radius: float = 150.0,
+    render_radius: RenderRadius = 150.0,
     interval: int = 50,
     progress_interval: int = 50,
 ) -> bool:

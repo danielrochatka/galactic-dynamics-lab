@@ -126,6 +126,27 @@ def load_all_snapshots(run_dir: Path) -> list[Snapshot]:
     return snapshots
 
 
+def galaxy_axis_half_extent(
+    positions: np.ndarray, fallback: float = 1e20
+) -> float:
+    """
+    Symmetric half-axis range for galaxy plots: 90th percentile of r times 1.5,
+    so ejected outliers are ignored; floor at 1e15 m.
+    """
+    if positions.size == 0 or len(positions) == 0:
+        return fallback
+    df = pd.DataFrame({"x": positions[:, 0], "y": positions[:, 1]})
+    distances = np.sqrt(df["x"] ** 2 + df["y"] ** 2)
+    if len(distances) > 0:
+        limit = float(np.percentile(distances, 90) * 1.5)
+        limit = max(limit, 1e15)
+    else:
+        limit = 1e20
+    if not np.isfinite(limit):
+        return fallback
+    return limit
+
+
 def get_masses_from_snapshots(snapshots: list[Snapshot], run_dir: Path) -> np.ndarray:
     """Read masses from the first snapshot CSV (mass column)."""
     if not snapshots:
@@ -188,32 +209,25 @@ def main() -> None:
     if run_info:
         print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
 
-    # Dynamic axis half-range from all x,y over the run (matches render.py symmetric limits).
-    xs = np.concatenate([s.positions[:, 0] for s in snapshots])
-    ys = np.concatenate([s.positions[:, 1] for s in snapshots])
-    df = pd.DataFrame({"x": xs, "y": ys})
-    max_range = np.max(
-        np.abs([df["x"].max(), df["x"].min(), df["y"].max(), df["y"].min()])
-    )
-    render_radius = float(max_range * 1.1)
-    if not np.isfinite(render_radius) or render_radius <= 0:
-        render_radius = float(args.render_radius)
-
-    # Initial and final scatter plots
+    fallback_radius = float(args.render_radius)
     initial = snapshots[0]
     final = snapshots[-1]
+    render_radius_initial = galaxy_axis_half_extent(initial.positions, fallback=fallback_radius)
+    render_radius_final = galaxy_axis_half_extent(final.positions, fallback=fallback_radius)
+
+    # Initial and final scatter plots
     save_static_plot(
         initial.positions,
         run_dir / "galaxy_initial.png",
         title="Galaxy – Initial (C++ run)",
-        render_radius=render_radius,
+        render_radius=render_radius_initial,
     )
     print(f"Saved: {run_dir / 'galaxy_initial.png'}")
     save_static_plot(
         final.positions,
         run_dir / "galaxy_final.png",
         title="Galaxy – Final (C++ run)",
-        render_radius=render_radius,
+        render_radius=render_radius_final,
     )
     print(f"Saved: {run_dir / 'galaxy_final.png'}")
 
@@ -227,7 +241,7 @@ def main() -> None:
         ok = create_animation(
             snapshots,
             run_dir / "galaxy",
-            render_radius=render_radius,
+            render_radius=lambda pos: galaxy_axis_half_extent(pos, fallback=fallback_radius),
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
         )
