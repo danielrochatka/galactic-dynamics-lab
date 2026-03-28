@@ -5,20 +5,29 @@ Top-down 2D view of the galaxy.
 
 import subprocess
 import time
-from collections.abc import Callable
 from pathlib import Path
-from typing import Union
+from typing import Callable, Optional, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
 
 
-RenderRadius = Union[float, Callable[[np.ndarray], float]]
+RenderRadius = Union[float, Callable[..., float]]
 
 
-def _resolve_render_radius(render_radius: RenderRadius, positions: np.ndarray) -> float:
+def _resolve_render_radius(
+    render_radius: RenderRadius,
+    positions: np.ndarray,
+    velocities: Optional[np.ndarray] = None,
+) -> float:
     if callable(render_radius):
+        if (
+            velocities is not None
+            and velocities.size > 0
+            and len(velocities) == len(positions)
+        ):
+            return float(render_radius(positions, velocities))
         return float(render_radius(positions))
     return float(render_radius)
 
@@ -37,12 +46,13 @@ def scatter_frame(
     positions: np.ndarray,
     bh_position: tuple[float, float] = (0.0, 0.0),
     render_radius: RenderRadius = 150.0,
+    velocities: Optional[np.ndarray] = None,
     star_size: float = 2.0,
     bh_size: float = 80.0,
 ) -> None:
     """Draw one frame: black hole + stars."""
     ax.clear()
-    r = _resolve_render_radius(render_radius, positions)
+    r = _resolve_render_radius(render_radius, positions, velocities)
     _setup_axes(ax, r)
 
     # Stars
@@ -127,6 +137,7 @@ def save_static_plot(
     output_path: Path,
     title: str = "Galaxy",
     render_radius: RenderRadius = 150.0,
+    velocities: Optional[np.ndarray] = None,
 ) -> None:
     """Save a single static scatter plot."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
@@ -137,7 +148,7 @@ def save_static_plot(
     ax.spines["left"].set_color("gray")
     ax.spines["right"].set_color("gray")
 
-    scatter_frame(ax, positions, render_radius=render_radius)
+    scatter_frame(ax, positions, render_radius=render_radius, velocities=velocities)
     ax.set_title(title, color="white", fontsize=14)
 
     fig.tight_layout()
@@ -172,7 +183,10 @@ def create_animation(
 
     def animate(frame_idx: int) -> list:
         snap = snapshots[frame_idx]
-        scatter_frame(ax, snap.positions, render_radius=render_radius)
+        vel = getattr(snap, "velocities", None)
+        scatter_frame(
+            ax, snap.positions, render_radius=render_radius, velocities=vel
+        )
         ax.set_title(f"Step {snap.step}  |  t = {snap.time:.1f}", color="white")
         if progress_interval and (frame_idx % progress_interval == 0 or frame_idx == n_frames - 1):
             pct = 100 * (frame_idx + 1) / n_frames

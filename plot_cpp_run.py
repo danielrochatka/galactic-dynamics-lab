@@ -127,36 +127,75 @@ def load_all_snapshots(run_dir: Path) -> list[Snapshot]:
     return snapshots
 
 
-def galaxy_zoom_target_limit(positions: np.ndarray, fallback: float = 1e20) -> float:
+def resolve_galaxy_radius_meters(
+    run_info: dict[str, str | int | float],
+    snapshots: list[Snapshot],
+    render_radius_arg: float,
+) -> float:
+    """Prefer run_info galaxy_radius; else max r on the initial snapshot; else CLI fallback."""
+    raw = run_info.get("galaxy_radius")
+    if isinstance(raw, (int, float)) and np.isfinite(raw) and float(raw) > 0:
+        return float(raw)
+    if snapshots and len(snapshots[0].positions) > 0:
+        p0 = snapshots[0].positions
+        r0 = np.sqrt(p0[:, 0] ** 2 + p0[:, 1] ** 2)
+        if len(r0) > 0:
+            return float(np.max(r0))
+    return max(float(render_radius_arg), 1.0)
+
+
+def galaxy_velocity_gated_target_limit(
+    positions: np.ndarray,
+    velocities: np.ndarray,
+    galaxy_radius_m: float,
+    degenerate_fallback: float,
+) -> float:
     """
-    Half-axis range from the active disk: 90th-percentile outer radius, then mean r
-    of stars inside that shell, times 1.10 cushion; floor 1e18. (Static plots: no smoothing.)
+    Velocity-gated viewport: mean r of 'stable' stars (mostly tangential motion) + 10% cushion;
+    if too few stable stars, use 1.2 * galaxy_radius_m. Static plots use this directly.
     """
     if positions.size == 0 or len(positions) == 0:
-        return fallback
-    df = pd.DataFrame({"x": positions[:, 0], "y": positions[:, 1]})
-    r = np.sqrt(df["x"] ** 2 + df["y"] ** 2)
-    if len(r) > 0:
-        active_radius_limit = np.percentile(r, 90)
-        inner_stars = r[r <= active_radius_limit]
-        trimmed_mean = float(np.mean(inner_stars)) if len(inner_stars) > 0 else 1e20
-        target_limit = trimmed_mean * 1.10
-        target_limit = max(float(target_limit), 1e18)
+        return degenerate_fallback
+    if velocities is None or len(velocities) != len(positions):
+        return float(max(1.2 * galaxy_radius_m, degenerate_fallback))
+    df = pd.DataFrame(
+        {
+            "x": positions[:, 0],
+            "y": positions[:, 1],
+            "vx": velocities[:, 0],
+            "vy": velocities[:, 1],
+        }
+    )
+    r = np.sqrt(df["x"] ** 2 + df["y"] ** 2).to_numpy()
+    if len(r) == 0:
+        return degenerate_fallback
+    r_safe = np.maximum(r, 1e-30)
+    v_rad = (df["x"] * df["vx"] + df["y"] * df["vy"]).to_numpy() / r_safe
+    v_total = np.sqrt(df["vx"] ** 2 + df["vy"] ** 2).to_numpy()
+    stable_mask = np.abs(v_rad) < (0.3 * v_total)
+    stable_stars = r[stable_mask]
+    n = len(r)
+    if len(stable_stars) > (0.1 * n):
+        target_limit = float(np.mean(stable_stars) * 1.10)
     else:
-        target_limit = 1e20
-    if not np.isfinite(target_limit):
-        return fallback
+        target_limit = float(1.2 * galaxy_radius_m)
+    if not np.isfinite(target_limit) or target_limit <= 0:
+        return degenerate_fallback
     return float(target_limit)
 
 
-def galaxy_zoom_smoothed_limit(positions: np.ndarray, fallback: float = 1e20) -> float:
-    """
-    Same target as galaxy_zoom_target_limit, then exponential smoothing on plt.current_zoom_limit
-    (alpha=0.1) for fluid camera motion between animation frames.
-    """
+def galaxy_velocity_gated_smoothed_limit(
+    positions: np.ndarray,
+    velocities: np.ndarray,
+    galaxy_radius_m: float,
+    degenerate_fallback: float,
+) -> float:
+    """Same target as galaxy_velocity_gated_target_limit, smoothed on plt.current_zoom_limit (alpha=0.1)."""
     if not hasattr(plt, "current_zoom_limit"):
         plt.current_zoom_limit = 1e20
-    target_limit = galaxy_zoom_target_limit(positions, fallback=fallback)
+    target_limit = galaxy_velocity_gated_target_limit(
+        positions, velocities, galaxy_radius_m, degenerate_fallback
+    )
     alpha = 0.1
     plt.current_zoom_limit = (1.0 - alpha) * plt.current_zoom_limit + alpha * target_limit
     return float(plt.current_zoom_limit)
@@ -225,10 +264,15 @@ def main() -> None:
         print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
 
     fallback_radius = float(args.render_radius)
+    galaxy_radius_m = resolve_galaxy_radius_meters(run_info, snapshots, fallback_radius)
     initial = snapshots[0]
     final = snapshots[-1]
-    render_radius_initial = galaxy_zoom_target_limit(initial.positions, fallback=fallback_radius)
-    render_radius_final = galaxy_zoom_target_limit(final.positions, fallback=fallback_radius)
+    render_radius_initial = galaxy_velocity_gated_target_limit(
+        initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
+    )
+    render_radius_final = galaxy_velocity_gated_target_limit(
+        final.positions, final.velocities, galaxy_radius_m, fallback_radius
+    )
 
     # Initial and final scatter plots
     save_static_plot(
@@ -236,6 +280,7 @@ def main() -> None:
         run_dir / "galaxy_initial.png",
         title="Galaxy – Initial (C++ run)",
         render_radius=render_radius_initial,
+        velocities=initial.velocities,
     )
     print(f"Saved: {run_dir / 'galaxy_initial.png'}")
     save_static_plot(
@@ -243,6 +288,7 @@ def main() -> None:
         run_dir / "galaxy_final.png",
         title="Galaxy – Final (C++ run)",
         render_radius=render_radius_final,
+        velocities=final.velocities,
     )
     print(f"Saved: {run_dir / 'galaxy_final.png'}")
 
@@ -257,7 +303,9 @@ def main() -> None:
         ok = create_animation(
             snapshots,
             run_dir / "galaxy",
-            render_radius=lambda pos: galaxy_zoom_smoothed_limit(pos, fallback=fallback_radius),
+            render_radius=lambda pos, vel: galaxy_velocity_gated_smoothed_limit(
+                pos, vel, galaxy_radius_m, fallback_radius
+            ),
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
         )
