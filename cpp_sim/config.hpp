@@ -5,6 +5,9 @@
 
 namespace galaxy {
 
+/** SI speed of light (m/s). TPF bounce closure (Sec. IX, Eq. 31). */
+constexpr double c = 299792458.0;
+
 // Simulation mode: matches Python VALIDATION_MODES + "galaxy" + TPFCore inspection modes
 enum class SimulationMode {
   galaxy,
@@ -77,9 +80,7 @@ struct Config {
   double tpfcore_theta_tt_scale = 1.0;
   /** TPFCore tr_coherence_readout: Theta_tr mixed coupling scale. Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
-  /** TPFCore derived radial Poisson: rho_eff = tpf_density_coupling * I (SI ledger). Default 1e30. */
-  double tpf_density_coupling = 1.0e30;
-  /** TPFCore derived radial profile: number of spherical shells. Default 100. */
+  /** TPFCore derived radial profile: number of radial bins (grid for diagnostics / interpolation). Default 100. */
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */
   double tpf_poisson_max_radius = 0.0;

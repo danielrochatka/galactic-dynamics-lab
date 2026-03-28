@@ -17,7 +17,6 @@
 
 #include "../../types.hpp"
 #include "../physics_package.hpp"
-#include "derived_tpf_radial.hpp"
 #include "source_ansatz.hpp"
 #include <string>
 #include <vector>
@@ -112,7 +111,6 @@ class TPFCorePackage : public PhysicsPackage {
   double theta_tt_scale_;
   double theta_tr_scale_;
   double source_softening_;
-  tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 };
 
 }  // namespace galaxy

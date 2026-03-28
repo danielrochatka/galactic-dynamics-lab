@@ -1,8 +1,9 @@
 /**
- * Derived TPF radial Poisson profile and acceleration (TPFCore-local).
+ * Derived TPF radial: bounce closure (Sec. IX) and Hessian diagnostics.
  */
 
 #include "derived_tpf_radial.hpp"
+#include "../../config.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -10,8 +11,6 @@ namespace galaxy {
 namespace tpfcore {
 
 namespace {
-
-constexpr double kPi = 3.14159265358979323846;
 
 Theta3D add_theta(const Theta3D& a, const Theta3D& b) {
   Theta3D o;
@@ -76,34 +75,33 @@ double enclosed_stellar_mass_cyl(const State& state, double r_cyl) {
   return M;
 }
 
+double get_tpf_mass_at_r(double M_total, double r) {
+  if (M_total <= 0.0) return 0.0;
+  double rr = std::abs(r);
+  if (rr <= 0.0) return 0.0;
+
+  double r_s = (2.0 * TPF_G_SI * M_total) / (c * c);
+  double r3 = rr * rr * rr;
+  double rs3 = r_s * r_s * r_s;
+
+  return M_total * (r3 / (r3 + rs3));
+}
+
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
-                                                  int bins, double tpf_density_coupling, double eps,
-                                                  double galaxy_radius) {
+                                                  int bins, double eps) {
+  (void)state;
+  (void)bh_mass;
+  (void)eps;
   TpfRadialGravityProfile p;
   p.bins = std::max(1, bins);
   p.max_radius = std::max(max_radius, 1e-30);
   p.delta_r = p.max_radius / static_cast<double>(p.bins);
-  p.density_coupling = tpf_density_coupling;
   p.r_outer.resize(static_cast<size_t>(p.bins));
   p.M_eff_enc.resize(static_cast<size_t>(p.bins));
 
-  const double softening_radius = 0.05 * std::max(galaxy_radius, 1e-30);
-
-  double cum = 0.0;
   for (int b = 0; b < p.bins; ++b) {
-    double R_b = (static_cast<double>(b) + 0.5) * p.delta_r;
-    double px = R_b;
-    double py = 0.0;
-    double pz = 0.0;
-    Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
-    double I = derived_invariant_I_contracted(theta_tot);
-    double rho_eff = 0.0;
-    if (R_b >= softening_radius)
-      rho_eff = tpf_density_coupling * I;
-    double dM = rho_eff * (4.0 * kPi * R_b * R_b * p.delta_r);
-    cum += dM;
     p.r_outer[static_cast<size_t>(b)] = (static_cast<double>(b) + 1.0) * p.delta_r;
-    p.M_eff_enc[static_cast<size_t>(b)] = cum;
+    p.M_eff_enc[static_cast<size_t>(b)] = 0.0;
   }
   return p;
 }
@@ -111,7 +109,6 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
 double TpfRadialGravityProfile::M_eff_at_cylindrical_r(double r_cyl) const {
   if (r_cyl <= 0.0 || bins <= 0 || r_outer.empty()) return 0.0;
   if (r_cyl >= r_outer.back()) return M_eff_enc.back();
-  /* Piecewise linear cumulative between shell outer radii (continuous, not a gravity-law switch). */
   for (size_t k = 0; k < r_outer.size(); ++k) {
     if (r_cyl <= r_outer[k]) {
       double r_lo = (k == 0) ? 0.0 : r_outer[k - 1];
@@ -125,14 +122,12 @@ double TpfRadialGravityProfile::M_eff_at_cylindrical_r(double r_cyl) const {
   return M_eff_enc.back();
 }
 
-double radial_acceleration_scalar_derived(const State& state, double bh_mass,
-                                          const TpfRadialGravityProfile& profile, double r_cyl,
-                                          double eps) {
+double radial_acceleration_scalar_derived(const State& state, double bh_mass, double r_cyl, double eps) {
   double r_soft_sq = r_cyl * r_cyl + eps * eps;
   if (r_soft_sq < 1e-60) r_soft_sq = 1e-60;
-  double Mstars = enclosed_stellar_mass_cyl(state, r_cyl);
-  double Meff = profile.M_eff_at_cylindrical_r(r_cyl);
-  return -TPF_G_SI * (bh_mass + Mstars + Meff) / r_soft_sq;
+  double M_enc = bh_mass + enclosed_stellar_mass_cyl(state, r_cyl);
+  double m_bounce = get_tpf_mass_at_r(M_enc, r_cyl);
+  return -TPF_G_SI * m_bounce / r_soft_sq;
 }
 
 }  // namespace tpfcore

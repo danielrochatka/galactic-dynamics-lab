@@ -61,17 +61,10 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
   if (use_derived_tpf_init) {
     const double eps =
         (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-    tpfcore::DerivedTpfPoissonConfig dcfg;
-    dcfg.density_coupling = config.tpf_density_coupling;
-    dcfg.bins = config.tpf_poisson_bins;
-    dcfg.max_radius = config.tpf_poisson_max_radius;
-    dcfg.galaxy_radius = config.galaxy_radius;
-    tpfcore::TpfRadialGravityProfile profile =
-        tpfcore::build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
     for (int i = 0; i < n; ++i) {
       double th = theta[i];
       double r_cyl = std::hypot(state.x[i], state.y[i]);
-      double a_s = tpfcore::radial_acceleration_scalar_derived(state, bh_mass, profile, r_cyl, eps);
+      double a_s = tpfcore::radial_acceleration_scalar_derived(state, bh_mass, r_cyl, eps);
       double v_circ = std::sqrt(std::max(0.0, std::abs(a_s) * r_cyl));
       double vx = -std::sin(th) * v_circ;
       double vy = std::cos(th) * v_circ;

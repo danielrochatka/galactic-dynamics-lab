@@ -372,26 +372,13 @@ void run_tpf_diagnostic_consistency_audit(const Config& config, const std::strin
 
     tpfcore::ReadoutDiagnostics diag;
     double ax_d = 0.0, ay_d = 0.0;
-    double eps_audit =
-        (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : softening;
-    tpfcore::DerivedTpfPoissonConfig dcfg;
-    dcfg.density_coupling = config.tpf_density_coupling;
-    dcfg.bins = config.tpf_poisson_bins;
-    dcfg.max_radius = config.tpf_poisson_max_radius;
-    dcfg.galaxy_radius = config.galaxy_radius;
-    tpfcore::TpfRadialGravityProfile audit_prof;
-    const tpfcore::TpfRadialGravityProfile* audit_prof_ptr = nullptr;
-    if (tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode)) {
-      audit_prof = tpfcore::build_tpf_gravity_profile(state, bh_mass, dcfg, eps_audit);
-      audit_prof_ptr = &audit_prof;
-    }
     tpfcore::compute_provisional_readout_with_diagnostics(
         state, 0, bh_mass, star_star, softening, config.tpfcore_source_softening,
         config.tpfcore_readout_mode,
         config.tpfcore_readout_scale, config.tpfcore_theta_tt_scale, config.tpfcore_theta_tr_scale,
-        ax_d, ay_d, diag,
-        tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode) ? &dcfg : nullptr,
-        audit_prof_ptr);
+        ax_d, ay_d, diag);
+    (void)ax_d;
+    (void)ay_d;
 
     double r_sq = r * r + eps_sq;
     double a_newton_cal = bh_mass / (r_sq * std::sqrt(r_sq));

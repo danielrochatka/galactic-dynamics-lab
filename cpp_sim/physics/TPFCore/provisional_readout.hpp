@@ -12,12 +12,11 @@
  * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
  * - Closures are downstream of the ansatz; see readout_closure.hpp for the boundary.
  * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- *   tr_coherence_readout / derived_tpf_radial_readout (manuscript Hessian + 1D radial Poisson profile),
+ *   tr_coherence_readout / derived_tpf_radial_readout (manuscript Hessian + TPF bounce mass m(r)),
  *   experimental_radial_r_scaling (experimental; provisional ansatz Theta, radial-only with r-scaling).
  */
 
 #include "../../types.hpp"
-#include "derived_tpf_radial.hpp"
 #include <string>
 #include <vector>
 
@@ -30,11 +29,8 @@ namespace tpfcore {
  * EXPLORATORY: not the full TPF dynamics. Tensor-driven, no Phi gradient.
  *
  * Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- * tr_coherence_readout / derived_tpf_radial_readout (1D radial Poisson + invariant I; uses derived_poisson),
+ * tr_coherence_readout / derived_tpf_radial_readout (bounce m(r) + invariant I for diagnostics),
  * experimental_radial_r_scaling (experimental radial-only closure with r-scaling).
- *
- * For derived radial modes: pass derived_poisson; optional derived_profile avoids rebuilding the radial profile
- * (required for efficient N-body timesteps when nullptr, profile is built each call — use batch API from TPFCorePackage).
  */
 void compute_provisional_readout_acceleration(const State& state,
                                                int i,
@@ -47,9 +43,7 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double theta_tt_scale,
                                                double theta_tr_scale,
                                                double& ax,
-                                               double& ay,
-                                               const DerivedTpfPoissonConfig* derived_poisson = nullptr,
-                                               const TpfRadialGravityProfile* derived_profile = nullptr);
+                                               double& ay);
 
 /** Per-particle readout diagnostics: a, Theta, I, and derived quantities. */
 struct ReadoutDiagnostics {
@@ -84,9 +78,7 @@ void compute_provisional_readout_with_diagnostics(const State& state,
                                                    double theta_tr_scale,
                                                    double& ax,
                                                    double& ay,
-                                                   ReadoutDiagnostics& diag,
-                                                   const DerivedTpfPoissonConfig* derived_poisson = nullptr,
-                                                   const TpfRadialGravityProfile* derived_profile = nullptr);
+                                                   ReadoutDiagnostics& diag);
 
 /**
  * Write tpf_readout_debug.csv for dynamical runs.
@@ -102,8 +94,7 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
                              const std::string& readout_mode,
                              double readout_scale,
                              double theta_tt_scale,
-                             double theta_tr_scale,
-                             const DerivedTpfPoissonConfig& derived_poisson = DerivedTpfPoissonConfig());
+                             double theta_tr_scale);
 
 }  // namespace tpfcore
 }  // namespace galaxy
