@@ -55,12 +55,15 @@ void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
 
     double enclosed = bh_mass + n_inside[i] * star_mass;
     double r_safe = std::max(r, MIN_RADIUS);
-    double v_circ = std::sqrt((G_SI * enclosed) / r_safe);
+    double a_newtonian = (G_SI * enclosed) / (r_safe * r_safe);
+    const double a0 = 1.2e-10;
+    double a_tpf = (a_newtonian < a0) ? std::sqrt(a_newtonian * a0) : a_newtonian;
+    double v_tpf = std::sqrt(a_tpf * r_safe);
 
-    double vx = -v_circ * std::sin(th);
-    double vy = v_circ * std::cos(th);
+    double vx = -v_tpf * std::sin(th);
+    double vy = v_tpf * std::cos(th);
     if (noise > 0) {
-      double scale = noise * v_circ;
+      double scale = noise * v_tpf;
       vx += scale * normal(rng);
       vy += scale * normal(rng);
     }
