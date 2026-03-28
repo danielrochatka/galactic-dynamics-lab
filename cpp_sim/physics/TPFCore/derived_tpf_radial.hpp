@@ -1,0 +1,89 @@
+#ifndef GALAXY_PHYSICS_TPFCORE_DERIVED_TPF_RADIAL_HPP
+#define GALAXY_PHYSICS_TPFCORE_DERIVED_TPF_RADIAL_HPP
+
+/**
+ * Derived TPF radial gravity from configuration tensor invariant + 1D radial Poisson shells.
+ * Manuscript-aligned: Hessian of Phi = -GM/r, linear superposition, I = Theta_ab Theta^ab,
+ * rho_eff = C_TPF * I, enclosed M_eff from spherical shells, then Newtonian-like a_r.
+ * All TPF-specific physics for this closure lives in TPFCore.
+ */
+
+#include "source_ansatz.hpp"
+#include "../../types.hpp"
+#include <string>
+#include <vector>
+
+namespace galaxy {
+namespace tpfcore {
+
+/** SI Newton constant (matches manuscript numerical value). */
+constexpr double TPF_G_SI = 6.6743e-11;
+
+/** Config for derived radial Poisson profile (passed from simulator Config via TPFCorePackage). */
+struct DerivedTpfPoissonConfig {
+  double density_coupling = 1.0e20;
+  int bins = 100;
+  /** If <= 0, use galaxy_radius. */
+  double max_radius = 0.0;
+  double galaxy_radius = 50.0;
+
+  double max_radius_resolved() const {
+    return max_radius > 0.0 ? max_radius : galaxy_radius;
+  }
+};
+
+/**
+ * Hessian Theta_ab = G M (3 d_a d_b - delta_ab d^2) / d^5 with d = displacement from source to field point.
+ * Softening: d^2 = dx^2+dy^2+dz^2 + eps^2 (isotropic on distance magnitude only).
+ */
+Theta3D evaluate_derived_theta(double mass_kg, double dx, double dy, double dz, double eps);
+
+/** Full contraction I = Theta_ab Theta^ab (Euclidean Frobenius squared). */
+double derived_invariant_I_contracted(const Theta3D& theta);
+
+/** Linear superposition of derived Theta at field point (px, py, pz) from BH + all disk stars (z=0). */
+Theta3D sum_derived_theta_at_point(const State& state, double bh_mass, double px, double py, double pz,
+                                   double eps);
+
+/** 1D radial profile: cumulative effective mass from rho_eff shells on x-axis test points. */
+struct TpfRadialGravityProfile {
+  int bins = 0;
+  double max_radius = 0.0;
+  double delta_r = 0.0;
+  double density_coupling = 0.0;
+  /** Outer radius of shell k is (k+1) * delta_r. */
+  std::vector<double> r_outer;
+  /** Cumulative M_eff enclosed within r_outer[k]. */
+  std::vector<double> M_eff_enc;
+
+  double M_eff_at_cylindrical_r(double r_cyl) const;
+};
+
+TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
+                                                  int bins, double tpf_density_coupling, double eps);
+
+inline TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass,
+                                                         const DerivedTpfPoissonConfig& cfg, double eps) {
+  return build_tpf_gravity_profile(state, bh_mass, cfg.max_radius_resolved(), cfg.bins, cfg.density_coupling,
+                                   eps);
+}
+
+/** Stellar mass with sqrt(x^2+y^2) <= r_cyl. */
+double enclosed_stellar_mass_cyl(const State& state, double r_cyl);
+
+/**
+ * a_r (outward radial scalar) = -G * (M_BH + M_stars_enc + M_eff_enc) / r_soft^2,
+ * r_soft^2 = r_cyl^2 + eps^2.
+ */
+double radial_acceleration_scalar_derived(const State& state, double bh_mass,
+                                          const TpfRadialGravityProfile& profile, double r_cyl,
+                                          double eps);
+
+inline bool is_derived_tpf_radial_readout_mode(const std::string& mode) {
+  return mode == "tr_coherence_readout" || mode == "derived_tpf_radial_readout";
+}
+
+}  // namespace tpfcore
+}  // namespace galaxy
+
+#endif
