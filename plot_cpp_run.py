@@ -25,6 +25,7 @@ import re
 from pathlib import Path
 from dataclasses import dataclass
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -126,25 +127,39 @@ def load_all_snapshots(run_dir: Path) -> list[Snapshot]:
     return snapshots
 
 
-def galaxy_axis_half_extent(
-    positions: np.ndarray, fallback: float = 1e20
-) -> float:
+def galaxy_zoom_target_limit(positions: np.ndarray, fallback: float = 1e20) -> float:
     """
-    Symmetric half-axis range for galaxy plots: 90th percentile of r times 1.5,
-    so ejected outliers are ignored; floor at 1e15 m.
+    Half-axis range from the active disk: 90th-percentile outer radius, then mean r
+    of stars inside that shell, times 1.10 cushion; floor 1e18. (Static plots: no smoothing.)
     """
     if positions.size == 0 or len(positions) == 0:
         return fallback
     df = pd.DataFrame({"x": positions[:, 0], "y": positions[:, 1]})
-    distances = np.sqrt(df["x"] ** 2 + df["y"] ** 2)
-    if len(distances) > 0:
-        limit = float(np.percentile(distances, 90) * 1.5)
-        limit = max(limit, 1e15)
+    r = np.sqrt(df["x"] ** 2 + df["y"] ** 2)
+    if len(r) > 0:
+        active_radius_limit = np.percentile(r, 90)
+        inner_stars = r[r <= active_radius_limit]
+        trimmed_mean = float(np.mean(inner_stars)) if len(inner_stars) > 0 else 1e20
+        target_limit = trimmed_mean * 1.10
+        target_limit = max(float(target_limit), 1e18)
     else:
-        limit = 1e20
-    if not np.isfinite(limit):
+        target_limit = 1e20
+    if not np.isfinite(target_limit):
         return fallback
-    return limit
+    return float(target_limit)
+
+
+def galaxy_zoom_smoothed_limit(positions: np.ndarray, fallback: float = 1e20) -> float:
+    """
+    Same target as galaxy_zoom_target_limit, then exponential smoothing on plt.current_zoom_limit
+    (alpha=0.1) for fluid camera motion between animation frames.
+    """
+    if not hasattr(plt, "current_zoom_limit"):
+        plt.current_zoom_limit = 1e20
+    target_limit = galaxy_zoom_target_limit(positions, fallback=fallback)
+    alpha = 0.1
+    plt.current_zoom_limit = (1.0 - alpha) * plt.current_zoom_limit + alpha * target_limit
+    return float(plt.current_zoom_limit)
 
 
 def get_masses_from_snapshots(snapshots: list[Snapshot], run_dir: Path) -> np.ndarray:
@@ -212,8 +227,8 @@ def main() -> None:
     fallback_radius = float(args.render_radius)
     initial = snapshots[0]
     final = snapshots[-1]
-    render_radius_initial = galaxy_axis_half_extent(initial.positions, fallback=fallback_radius)
-    render_radius_final = galaxy_axis_half_extent(final.positions, fallback=fallback_radius)
+    render_radius_initial = galaxy_zoom_target_limit(initial.positions, fallback=fallback_radius)
+    render_radius_final = galaxy_zoom_target_limit(final.positions, fallback=fallback_radius)
 
     # Initial and final scatter plots
     save_static_plot(
@@ -234,6 +249,7 @@ def main() -> None:
     # Optional animation
     if not args.no_animation:
         print("Creating animation...")
+        plt.current_zoom_limit = 1e20
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
         else:
@@ -241,7 +257,7 @@ def main() -> None:
         ok = create_animation(
             snapshots,
             run_dir / "galaxy",
-            render_radius=lambda pos: galaxy_axis_half_extent(pos, fallback=fallback_radius),
+            render_radius=lambda pos: galaxy_zoom_smoothed_limit(pos, fallback=fallback_radius),
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
         )
