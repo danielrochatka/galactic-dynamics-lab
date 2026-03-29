@@ -62,6 +62,33 @@ void TPFCorePackage::init_from_config(const Config& config) {
   derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
 }
 
+namespace {
+
+/** TPFCore-only: Gravitational Doppler Drag — star–star velocity synchronization (G = 1 units). */
+void apply_gravitational_doppler_drag(const State& state, double softening,
+                                      std::vector<double>& ax, std::vector<double>& ay) {
+  const int n = state.n();
+  const double eps2 = softening * softening;
+  const double GDD_COUPLING = 1.0e-5;
+
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      if (i == j) continue;
+      double dx = state.x[j] - state.x[i];
+      double dy = state.y[j] - state.y[i];
+      double r_sq = dx * dx + dy * dy + eps2;
+      double dvx = state.vx[j] - state.vx[i];
+      double dvy = state.vy[j] - state.vy[i];
+      double base_gravity_intensity = state.mass[j] / r_sq;
+      double gdd_factor = GDD_COUPLING * base_gravity_intensity;
+      ax[i] += gdd_factor * dvx;
+      ay[i] += gdd_factor * dvy;
+    }
+  }
+}
+
+}  // namespace
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
@@ -90,6 +117,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
           theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
           &derived_poisson_cfg_, &profile);
     }
+    if (star_star) apply_gravitational_doppler_drag(state, softening, ax, ay);
     return;
   }
 
@@ -100,6 +128,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
         theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
         nullptr, nullptr);
   }
+  if (star_star) apply_gravitational_doppler_drag(state, softening, ax, ay);
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,

@@ -126,26 +126,8 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
 
-    // --- HIGHER-ORDER SPATIAL MEMORY TERM (SELF-SCALING 1/r^2 HALO) ---
-
-    // 1. Base Core Invariant (1/r^6 drop-off)
-    double core_invariant = std::abs(I_total);
-
-    // 2. Transition Radius
-    // This is the radius where the 1/r^2 dark matter halo equals the 1/r^6 core.
-    // Setting this to 1e19 meters (approx 1,000 light years) balances the galaxy.
-    const double R_TRANS = 1.0e19;
-
-    // 3. Mathematical Stretch
-    // By multiplying the local 1/r^6 invariant by (r/R_TRANS)^4, we mathematically
-    // create a perfect 1/r^2 macroscopic profile. This natively inherits all mass
-    // scaling directly from the black hole and config kappa.
-    double r_ratio = r / R_TRANS;
-    double spatial_memory_invariant = core_invariant * (r_ratio * r_ratio * r_ratio * r_ratio);
-
-    // 4. Inject into Ledger
-    I_total = core_invariant + spatial_memory_invariant;
-    // ------------------------------------------------------------------
+    /* Baseline radial ledger: contracted invariant only (no macroscopic spatial memory). */
+    I_total = std::abs(I_total);
 
     double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
     if (!std::isfinite(rho_raw) || rho_raw > 1e300) {
