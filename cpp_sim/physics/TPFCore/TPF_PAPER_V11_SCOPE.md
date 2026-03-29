@@ -30,7 +30,7 @@ The paper writes **C_μν** with an explicit **∆C_μν** term: contributions f
 |------|---------------|--------|
 | Higher-order / non-Newtonian readout | `apply_tensor_radial_closure`, `apply_experimental_radial_r_scaling_closure` | Map **Θ → a** without the hybrid **M_eff** shell model. |
 | **κ · I → ρ → M_eff** shell Poisson | `build_tpf_gravity_profile`, `radial_acceleration_scalar_derived` | **Closure**, not derived from expanded **∆C_μν**. Uses **manuscript I** (via **`compute_invariant_I`**) for **ρ_raw**. |
-| Velocity-dependent rescaling | `accumulate_velocity_deformed_centripetal_gravity` in `tpf_core_package.cpp` | When **`tpf_gdd_coupling ≠ 0`**, **tensor readout is skipped**; SI Newtonian-style **G M / r²** with **doppler_scale** and **|a| shunt**. |
+| Velocity-dependent rescaling | `accumulate_velocity_deformed_centripetal_gravity` in `tpf_core_package.cpp` | When **`tpf_vdsg_coupling ≠ 0`**, **tensor readout is skipped**; SI Newtonian-style **G M / r²** with **doppler_scale** and **|a| shunt**. |
 | Numerical stabilization | ρ shunts, `apply_global_accel_magnitude_shunt` | Engineering, not theory. |
 
 ---
@@ -53,7 +53,7 @@ The paper writes **C_μν** with an explicit **∆C_μν** term: contributions f
 | `tensor_radial_projection` (+ `_negated`) | `apply_tensor_radial_closure` | **Θ·r̂**-style superposed contribution. |
 | `experimental_radial_r_scaling` | `apply_experimental_radial_r_scaling_closure` | Radial closure from **−θ_rr × r** scaling. |
 
-When **`tpf_gdd_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** uses **only** the GDD centripetal path (stderr notice once).
+When **`tpf_vdsg_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** uses **only** the VDSG centripetal path (stderr notice once).
 
 ---
 
@@ -76,7 +76,7 @@ When **`tpf_gdd_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** u
 ## Units
 
 - **NewtonianPackage**: **G ≡ 1** (simulation mass–length–time convention).
-- **TPF hybrid / GDD / derived θ**: **SI** via **`TPF_G_SI`** and **`c`** from `config.hpp`.
+- **TPF hybrid / VDSG / derived θ**: **SI** via **`TPF_G_SI`** and **`c`** from `config.hpp`.
 
 ---
 
@@ -89,5 +89,5 @@ When **`tpf_gdd_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** u
 ## Overclaiming (avoid)
 
 - That **`tr_coherence_readout`** applies **tangential coherence acceleration** (it does **not** in the shared derived closure).
-- That **GDD-on** runs are “tensor TPF readout” dynamics (readout is **bypassed**).
+- That **VDSG-on** runs are “tensor TPF readout” dynamics (readout is **bypassed**).
 - That galaxy rotation results are **claimed v11 results** (paper scopes dynamics / DM as **future work**).

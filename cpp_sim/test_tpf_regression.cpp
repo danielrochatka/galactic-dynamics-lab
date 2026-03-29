@@ -1,5 +1,5 @@
 /**
- * Regression checks: manuscript I vs legacy Frobenius scalar, GDD circular BH limit, κ-ledger smoke.
+ * Regression checks: manuscript I vs legacy Frobenius scalar, VDSG circular BH limit, κ-ledger smoke.
  * Run: make test_tpf_regression && ./test_tpf_regression
  */
 
@@ -38,9 +38,9 @@ int main() {
   check(std::abs(I_frob - 3.0) < 1e-12, "derived_invariant_I_contracted on diagonal Theta");
 
   constexpr double c_light = 299792458.0;
-  double gdd = 1e-4;
-  double doppler = 1.0 + gdd * (0.0 / c_light);
-  check(std::abs(doppler - 1.0) < 1e-15, "GDD BH doppler = 1 when v·r̂ = 0 (circular)");
+  double vdsg_coupling = 1e-4;
+  double doppler = 1.0 + vdsg_coupling * (0.0 / c_light);
+  check(std::abs(doppler - 1.0) < 1e-15, "VDSG BH doppler = 1 when v·r̂ = 0 (circular)");
 
   State st;
   st.resize(0);

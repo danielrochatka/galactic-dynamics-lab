@@ -152,7 +152,7 @@ Used to diagnose runaway vs bound behavior. For bound orbits, a_inward should be
 
 **run_info.txt** includes `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_theta_tt_scale`, `tpfcore_theta_tr_scale` (when applicable), `tpfcore_dump_readout_debug`.
 
-## GDD path (`tpf_gdd_coupling` ≠ 0)
+## VDSG path (`tpf_vdsg_coupling` ≠ 0)
 
 **`TPFCorePackage::compute_accelerations`** uses **`accumulate_velocity_deformed_centripetal_gravity`** only: SI **G M / r²**-style centripetal terms with **doppler_scale = 1 + coupling (v·r̂)/c** and a global **|a|** cap. **Provisional tensor / derived radial readout is not used** for accelerations (see stderr notice once).
 

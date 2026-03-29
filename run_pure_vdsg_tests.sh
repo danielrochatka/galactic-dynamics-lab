@@ -66,7 +66,7 @@ run_one "RUN 1: Newtonian control (no TDSG, no cooling; no TPF branch ledger on 
   --n_stars="${N_STARS}" \
   --n_steps="${N_STEPS}" \
   --snapshot_every="${SNAPSHOT_EVERY}" \
-  --tpf_gdd_coupling=0 \
+  --tpf_vdsg_coupling=0 \
   --tpf_cooling_fraction=0
 
 S1="$(last_snapshot "$R1")"
@@ -76,14 +76,14 @@ P1="${R1}/coherence_diagnostic.png"
 # --- Run 2: TPFCore + VDSG, no cooling ---
 R2="${OUT_BASE}/run2_pure_vdsg_no_cooling"
 mkdir -p "$R2"
-run_one "RUN 2: Pure VDSG (tpf_gdd_coupling=18497.1, tpf_cooling_fraction=0) — expect ACTIVE PHYSICS LEDGER on stderr" \
+run_one "RUN 2: Pure VDSG (tpf_vdsg_coupling=18497.1, tpf_cooling_fraction=0) — expect ACTIVE PHYSICS LEDGER on stderr" \
   --output_dir="${R2}" \
   --physics_package=TPFCore \
   --tpfcore_enable_provisional_readout=true \
   --n_stars="${N_STARS}" \
   --n_steps="${N_STEPS}" \
   --snapshot_every="${SNAPSHOT_EVERY}" \
-  --tpf_gdd_coupling=18497.1 \
+  --tpf_vdsg_coupling=18497.1 \
   --tpf_cooling_fraction=0
 
 S2="$(last_snapshot "$R2")"
@@ -100,7 +100,7 @@ run_one "RUN 3: VDSG + cooling (reference-style; tpf_cooling_fraction=0.2) — e
   --n_stars="${N_STARS}" \
   --n_steps="${N_STEPS}" \
   --snapshot_every="${SNAPSHOT_EVERY}" \
-  --tpf_gdd_coupling=18497.1 \
+  --tpf_vdsg_coupling=18497.1 \
   --tpf_cooling_fraction=0.2
 
 S3="$(last_snapshot "$R3")"

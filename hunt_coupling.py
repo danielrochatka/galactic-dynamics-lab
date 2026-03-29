@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Binary search for the largest stable tpf_gdd_coupling in a bounded interval.
+Binary search for the largest stable tpf_vdsg_coupling in a bounded interval.
 
 Stable = 100%% of stars have r <= 2e20 m in snapshot at n_steps (default 5000).
 
@@ -119,7 +119,7 @@ def run_once(
     cmd = [
         str(exe),
         "galaxy",
-        f"--tpf_gdd_coupling={coupling}",
+        f"--tpf_vdsg_coupling={coupling}",
         f"--n_steps={n_steps}",
         f"--snapshot_every={snapshot_every}",
     ]
@@ -143,7 +143,7 @@ def run_once(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Binary search stable tpf_gdd_coupling")
+    parser = argparse.ArgumentParser(description="Binary search stable tpf_vdsg_coupling")
     parser.add_argument("--cpp-sim", type=Path, default=repo_root() / "cpp_sim", help="Path to cpp_sim directory")
     parser.add_argument("--low", type=float, default=17000.0)
     parser.add_argument("--high", type=float, default=18500.0)

@@ -143,8 +143,8 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_kappa = std::stod(val);
     return true;
   }
-  if (key == "tpf_gdd_coupling") {
-    config.tpf_gdd_coupling = std::stod(val);
+  if (key == "tpf_vdsg_coupling") {
+    config.tpf_vdsg_coupling = std::stod(val);
     return true;
   }
   if (key == "tpf_poisson_bins") {
