@@ -6,9 +6,7 @@
 #include "../../config.hpp"
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <iostream>
 
 namespace galaxy {
 namespace tpfcore {
@@ -137,12 +135,21 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     profile.M_eff_enc[i] = cumulative_M_eff;
   }
 
-  /* Optional stderr diagnostic: export GALAXY_TPF_LEDGER_DIAG=1 */
-  if (const char* diag = std::getenv("GALAXY_TPF_LEDGER_DIAG")) {
-    if (diag[0] != '\0' && std::strcmp(diag, "0") != 0)
-      std::fprintf(stderr, "[TPF ledger] M_eff_enc(r_max)=%.6g kg (bins=%d)\n", cumulative_M_eff,
-                   profile.bins);
+  /* Print once per process: κ and M_BH are arguments tpf_kappa, bh_mass (not Config). */
+  static bool diagnostics_printed = false;
+  if (!diagnostics_printed) {
+    std::cout << "\n--- TPF MACROSCOPIC LEDGER (INITIAL CALIBRATION) ---" << std::endl;
+    std::cout << "Coupling Constant (kappa): " << tpf_kappa << std::endl;
+    std::cout << "Baryonic Black Hole Mass:  " << bh_mass << " kg" << std::endl;
+    std::cout << "Total TPF Effective Mass:  " << cumulative_M_eff << " kg" << std::endl;
+    if (bh_mass > 0.0)
+      std::cout << "Ratio (TPF / BH):          " << (cumulative_M_eff / bh_mass) << std::endl;
+    else
+      std::cout << "Ratio (TPF / BH):          (undefined, bh_mass=0)" << std::endl;
+    std::cout << "----------------------------------------------------\n" << std::endl;
+    diagnostics_printed = true;
   }
+
   return profile;
 }
 
