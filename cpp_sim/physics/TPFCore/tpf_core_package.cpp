@@ -69,42 +69,86 @@ void TPFCorePackage::init_from_config(const Config& config) {
 
 namespace {
 
-/** TPFCore-only: GDD with SI G; sum raw neighbor kicks, then clamp total |a| per axis to 0.1% |v|/dt. */
-void apply_gravitational_doppler_drag(const State& state, double softening, double gdd_coupling,
-                                      double dt, std::vector<double>& ax, std::vector<double>& ay) {
-  if (gdd_coupling == 0.0) return;
+const double C_SI_LIGHT = 299792458.0;
+
+/** Cap total |a| to 0.1% |v|/dt per star (velocity-magnitude safety). */
+void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vector<double>& ax,
+                                        std::vector<double>& ay) {
   if (!(dt > 0.0) || !std::isfinite(dt)) return;
-
   const int n = state.n();
-  const double eps_sq = softening * softening;
-  const double G = tpfcore::TPF_G_SI;
-  const double C_SI = 299792458.0;
-
   for (int i = 0; i < n; ++i) {
-    double total_gdd_ax = 0.0;
-    double total_gdd_ay = 0.0;
-
-    for (int j = 0; j < n; ++j) {
-      if (i == j) continue;
-      double dx = state.x[j] - state.x[i];
-      double dy = state.y[j] - state.y[i];
-      double r_sq = dx * dx + dy * dy;
-      double dvx = state.vx[j] - state.vx[i];
-      double dvy = state.vy[j] - state.vy[i];
-      double base_gravity_intensity = (G * state.mass[j]) / (r_sq + eps_sq);
-      /* Accel_GDD = coupling * Accel_Grav * (Delta_V / C); gdd_factor is coupling * Accel_Grav / C (1/s). */
-      double gdd_factor = gdd_coupling * base_gravity_intensity * (1.0 / C_SI);
-      total_gdd_ax += gdd_factor * dvx;
-      total_gdd_ay += gdd_factor * dvy;
+    double vx = state.vx[i];
+    double vy = state.vy[i];
+    double v_mag = std::sqrt(vx * vx + vy * vy + 1e-30);
+    double a_cap = (0.001 * v_mag) / dt;
+    double a_mag = std::sqrt(ax[i] * ax[i] + ay[i] * ay[i]);
+    if (a_mag > a_cap && a_mag > 0.0 && std::isfinite(a_cap)) {
+      double s = a_cap / a_mag;
+      ax[i] *= s;
+      ay[i] *= s;
     }
-
-    double current_v =
-        std::sqrt(state.vx[i] * state.vx[i] + state.vy[i] * state.vy[i] + 1e-9);
-    double max_total_accel = (0.001 * current_v) / dt;
-    if (!std::isfinite(max_total_accel)) max_total_accel = 0.0;
-    ax[i] += std::max(-max_total_accel, std::min(max_total_accel, total_gdd_ax));
-    ay[i] += std::max(-max_total_accel, std::min(max_total_accel, total_gdd_ay));
   }
+}
+
+/**
+ * Velocity-deformed SI gravity: each interaction is strictly centripetal along the i–source line.
+ * doppler_scale = 1 + coupling * (v_rel · r_hat) / c; accel_mag = (G M / (r^2 + eps^2)) * doppler_scale.
+ * When tpf_gdd_coupling != 0 this replaces tensor readout for accelerations (no separate energy-injecting kick).
+ */
+void accumulate_velocity_deformed_centripetal_gravity(const State& state, double bh_mass, double softening,
+                                                      bool star_star, double gdd_coupling, double dt,
+                                                      std::vector<double>& ax, std::vector<double>& ay) {
+  const int n = state.n();
+  const double G = tpfcore::TPF_G_SI;
+  const double eps_sq = softening * softening;
+
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+
+  /* Star–black hole: r_hat from BH toward star; v_rel = v_star (BH at rest). */
+  if (bh_mass > 0.0) {
+    for (int i = 0; i < n; ++i) {
+      double xi = state.x[i];
+      double yi = state.y[i];
+      double r_sq = xi * xi + yi * yi;
+      double denom = r_sq + eps_sq;
+      double r_mag = std::sqrt(denom);
+      if (r_mag < 1e-300) continue;
+      double ux = xi / r_mag;
+      double uy = yi / r_mag;
+      double v_dot_r = state.vx[i] * ux + state.vy[i] * uy;
+      double doppler_scale = 1.0 + gdd_coupling * (v_dot_r / C_SI_LIGHT);
+      double accel_mag = (G * bh_mass / denom) * doppler_scale;
+      ax[i] -= ux * accel_mag;
+      ay[i] -= uy * accel_mag;
+    }
+  }
+
+  /* Star–star: ordered pairs; reaction on j from (j,i). Acceleration along line i → j. */
+  if (star_star) {
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        if (i == j) continue;
+        double dx = state.x[j] - state.x[i];
+        double dy = state.y[j] - state.y[i];
+        double r_sq = dx * dx + dy * dy;
+        double denom = r_sq + eps_sq;
+        double r_mag = std::sqrt(denom);
+        if (r_mag < 1e-300) continue;
+        double ux = dx / r_mag;
+        double uy = dy / r_mag;
+        double dvx = state.vx[j] - state.vx[i];
+        double dvy = state.vy[j] - state.vy[i];
+        double v_dot_r = dvx * ux + dvy * uy;
+        double doppler_scale = 1.0 + gdd_coupling * (v_dot_r / C_SI_LIGHT);
+        double accel_mag = (G * state.mass[j] / denom) * doppler_scale;
+        ax[i] += ux * accel_mag;
+        ay[i] += uy * accel_mag;
+      }
+    }
+  }
+
+  apply_global_accel_magnitude_shunt(state, dt, ax, ay);
 }
 
 }  // namespace
@@ -126,6 +170,19 @@ void TPFCorePackage::compute_accelerations(const State& state,
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
 
+  /* Non-zero GDD: velocity-deformed centripetal SI gravity (no tangential kick; tensor readout skipped). */
+  if (gdd_coupling_ != 0.0) {
+    static bool gdd_path_notice = false;
+    if (!gdd_path_notice) {
+      std::cerr << "TPFCore: tpf_gdd_coupling != 0 — using velocity-deformed centripetal SI gravity "
+                   "(BH + star–star); provisional tensor readout is not used for accelerations.\n";
+      gdd_path_notice = true;
+    }
+    accumulate_velocity_deformed_centripetal_gravity(state, bh_mass, softening, star_star, gdd_coupling_,
+                                                       simulation_dt_, ax, ay);
+    return;
+  }
+
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
   if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
     tpfcore::TpfRadialGravityProfile profile =
@@ -137,8 +194,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
           theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
           &derived_poisson_cfg_, &profile);
     }
-    if (star_star)
-      apply_gravitational_doppler_drag(state, softening, gdd_coupling_, simulation_dt_, ax, ay);
     return;
   }
 
@@ -149,8 +204,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
         theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
         nullptr, nullptr);
   }
-  if (star_star)
-    apply_gravitational_doppler_drag(state, softening, gdd_coupling_, simulation_dt_, ax, ay);
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
