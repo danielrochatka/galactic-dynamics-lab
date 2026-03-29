@@ -126,23 +126,23 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
 
-    // --- HIGHER-ORDER SPATIAL MEMORY TERM (1/r^2 HALO CORRECTION) ---
-    // To achieve a flat rotation curve, the macroscopic constraint must fall off as 1/r^2.
-    // Since the local invariant I_total falls off as 1/r^6, we mathematically stretch
-    // the curve by amplifying the outer region by (r / L_MACRO)^4.
-
-    // Define the macroscopic scale where the halo transition becomes dominant
+    // --- HIGHER-ORDER SPATIAL MEMORY TERM (DECOUPLED HALO) ---
     const double L_MACRO = 1.0e20;
-
-    // Calculate the radial ratio to the 4th power
     double r_ratio = r / L_MACRO;
     double r_ratio_4 = r_ratio * r_ratio * r_ratio * r_ratio;
 
-    // Transform the steep 1/r^6 core constraint into a macroscopic 1/r^2 constraint
-    double spatial_memory_invariant = std::abs(I_total) * r_ratio_4;
+    // 1. The Core: We leave the bare 1/r^6 invariant untouched to maintain inner stability.
+    // It will only be multiplied by the safe global kappa later.
+    double core_invariant = std::abs(I_total);
 
-    // Inject the macroscopic halo inertia into the total invariant
-    I_total += spatial_memory_invariant;
+    // 2. The Halo: We project the constraint outward (1/r^2) and apply a macroscopic
+    // structural amplifier specifically to the delta-Gamma memory term.
+    // This gives the halo its required mass without touching the core.
+    const double MACRO_AMPLIFIER = 1.0e38;
+    double spatial_memory_invariant = core_invariant * r_ratio_4 * MACRO_AMPLIFIER;
+
+    // 3. The Ledger: Inject the amplified halo into the total invariant
+    I_total = core_invariant + spatial_memory_invariant;
     // ----------------------------------------------------------------
 
     double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
