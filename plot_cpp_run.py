@@ -9,8 +9,9 @@ then produces the same kinds of plots as the Python pipeline:
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
-Animation viewport: by default uses temporally smoothed limits (dynamic zoom). Disable via
-  run_info key plot_animation_dynamic_zoom (from cpp_sim config) or CLI flag --no-dynamic-zoom.
+Animation viewport: default uses temporally smoothed limits (dynamic zoom). When disabled
+  (run_info plot_animation_dynamic_zoom=0 or --no-dynamic-zoom), the axis half-range is held
+  constant at the max velocity-gated limit over all snapshots (no per-frame zoom pumping).
 
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
@@ -25,9 +26,7 @@ Requires: numpy, pandas, matplotlib. Optional: ffmpeg or Pillow for animation.
 from __future__ import annotations
 
 import argparse
-import json
 import re
-import time as time_module
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -38,28 +37,6 @@ import pandas as pd
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
 from diagnostics import compute_diagnostics, plot_and_save_all
-# region agent log
-_AGENT_LOG_PATH = Path("/home/daniel-rochatka/Documents/galaxy/.cursor/debug-fb7c79.log")
-
-
-def _agent_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    payload = {
-        "sessionId": "fb7c79",
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time_module.time() * 1000),
-    }
-    try:
-        with open(_AGENT_LOG_PATH, "a", encoding="utf-8") as lf:
-            lf.write(json.dumps(payload, default=str) + "\n")
-    except OSError:
-        pass
-
-
-# endregion
-
 from plot_rotation_curve import (
     load_run_info,
     newtonian_m_bh_from_run_info,
@@ -282,8 +259,8 @@ def main() -> None:
     zoom_group.add_argument(
         "--no-dynamic-zoom",
         action="store_true",
-        help="Animation: use per-frame velocity-gated limit only (no temporal smoothing). "
-        "Overrides run_info plot_animation_dynamic_zoom.",
+        help="Animation: constant axis half-range = max velocity-gated limit over all snapshots "
+        "(no temporal smoothing, no per-frame zoom). Overrides run_info plot_animation_dynamic_zoom.",
     )
     zoom_group.add_argument(
         "--dynamic-zoom",
@@ -401,9 +378,15 @@ def main() -> None:
                 pos, vel, galaxy_radius_m, fallback_radius
             )
         else:
-            render_radius_cb = lambda pos, vel: galaxy_velocity_gated_target_limit(
-                pos, vel, galaxy_radius_m, fallback_radius
+            # Constant axis limits for the whole clip: per-frame velocity-gated limits still change
+            # with each snapshot (H1); max over frames avoids false "zoom" when dynamic zoom is off.
+            _fixed_anim_r = max(
+                galaxy_velocity_gated_target_limit(
+                    s.positions, s.velocities, galaxy_radius_m, fallback_radius
+                )
+                for s in snapshots
             )
+            render_radius_cb = lambda pos, vel, rfix=_fixed_anim_r: rfix
 
         # region agent log
         _anim_cb_calls = [0]
@@ -434,7 +417,7 @@ def main() -> None:
         # endregion
 
         print(
-            f"  Animation viewport: {'dynamic zoom (smoothed)' if use_animation_dynamic_zoom else 'fixed per frame (no smoothing)'}"
+            f"  Animation viewport: {'dynamic zoom (smoothed)' if use_animation_dynamic_zoom else 'constant (max half-axis over snapshots; no per-frame zoom)'}"
         )
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
