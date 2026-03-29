@@ -1,0 +1,29 @@
+Galaxy initial conditions (cpp_sim, galaxy mode only)
+=====================================================
+
+Implementation: galaxy_init.cpp / galaxy_init.hpp
+Entry point: init_galaxy_disk() -> initialize_galaxy_disk()
+
+Templates (galaxy_init_template):
+  symmetric_disk, symmetric_disk_noisy — uniform annulus [0.05 R, R]; no structured modes.
+    symmetric_disk_noisy is the same code path; use the name to tag noisy experiments in run_info.
+  clumpy_disk — mixture: probability galaxy_init_clumpiness → Gaussian clump around seeded centers;
+    otherwise uniform disk.
+  weak_m2, weak_m3 — acceptance-weighted sampling with (1 + A*cos(m θ)).
+  weak_bar — bar-like weight (cos 2θ + mild inner concentration) + optional axis_ratio stretch.
+  preformed_spiral — (1 + A*cos(2θ + winding*log(r/r_min) + phase)).
+
+Noise vs structure:
+  galaxy_init_master_chaos multiplies ONLY position_noise, velocity_angle_noise, velocity_magnitude_noise.
+  It does NOT scale clumpiness, m2/m3, bar, or spiral amplitudes.
+
+Legacy:
+  If all three structured noises are zero after master_chaos, velocity_noise applies as before
+  (isotropic Cartesian perturbation to vx, vy in fractions of v_circ).
+
+Outputs:
+  run_info.txt — resolved galaxy_init_* in banner + "=== Galaxy initialization (resolved; audit) ==="
+  galaxy_init_diagnostics.txt — radial |v| Lz summaries + audit flags
+  galaxy_init_snapshot.csv — written only if save_snapshots = false (else use snapshot_00000.csv)
+
+Presets: ../../configs/galaxy_init_presets.cfg
