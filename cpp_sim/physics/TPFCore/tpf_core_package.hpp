@@ -113,6 +113,8 @@ class TPFCorePackage : public PhysicsPackage {
   double theta_tr_scale_;
   double source_softening_;
   double vdsg_coupling_;
+  /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
+  double vdsg_mass_baseline_resolved_kg_;
   double simulation_dt_;
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 };

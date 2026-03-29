@@ -147,6 +147,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_vdsg_coupling = std::stod(val);
     return true;
   }
+  if (key == "tpf_vdsg_mass_baseline_kg") {
+    config.tpf_vdsg_mass_baseline_kg = std::stod(val);
+    return true;
+  }
   if (key == "tpf_poisson_bins") {
     config.tpf_poisson_bins = std::stoi(val);
     return true;

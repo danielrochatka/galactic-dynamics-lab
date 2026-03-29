@@ -50,6 +50,7 @@ TPFCorePackage::TPFCorePackage()
       theta_tr_scale_(1.0),
       source_softening_(0.0),
       vdsg_coupling_(1.0e-20),
+      vdsg_mass_baseline_resolved_kg_(0.0),
       simulation_dt_(0.01) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
@@ -64,6 +65,8 @@ void TPFCorePackage::init_from_config(const Config& config) {
   derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
   derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
   vdsg_coupling_ = config.tpf_vdsg_coupling;
+  vdsg_mass_baseline_resolved_kg_ =
+      (config.tpf_vdsg_mass_baseline_kg > 0.0) ? config.tpf_vdsg_mass_baseline_kg : config.star_mass;
   simulation_dt_ = config.dt;
 }
 
@@ -91,12 +94,33 @@ void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vect
 }
 
 /**
+ * PROVISIONAL closure (flag for theory audit): mass-normalized VDSG strength per gravitational source.
+ * λ_eff = λ · log10(max(M_ref,ε)) / log10(max(M_src,ε)). Heavier M_src → smaller λ_eff (attenuation).
+ * Not derived from TPF manuscript v11; single global λ = tpf_vdsg_coupling only (no separate BH coupling).
+ * If M_ref <= 0, returns λ unscaled (identity).
+ */
+inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, double baseline_mass_kg) {
+  if (!(lambda0 != 0.0) || !std::isfinite(lambda0)) return lambda0;
+  if (source_mass_kg <= 0.0 || baseline_mass_kg <= 0.0) return lambda0;
+  constexpr double kFloorKg = 1e-99;
+  const double m_src = std::max(source_mass_kg, kFloorKg);
+  const double m_base = std::max(baseline_mass_kg, kFloorKg);
+  const double log_s = std::log10(m_src);
+  const double log_b = std::log10(m_base);
+  if (!std::isfinite(log_s) || !std::isfinite(log_b)) return lambda0;
+  if (std::abs(log_s) < 1e-300) return lambda0;
+  const double g = lambda0 * (log_b / log_s);
+  return std::isfinite(g) ? g : lambda0;
+}
+
+/**
  * Velocity-deformed SI gravity: each interaction is strictly centripetal along the i–source line.
- * doppler_scale = 1 + coupling * (v_rel · r_hat) / c; accel_mag = (G M / (r^2 + eps^2)) * doppler_scale.
+ * doppler_scale = 1 + λ_eff (v_rel · r_hat) / c with λ_eff from vdsg_effective_coupling per source mass.
  * When tpf_vdsg_coupling != 0 this replaces tensor readout for accelerations (no separate energy-injecting kick).
  */
 void accumulate_velocity_deformed_centripetal_gravity(const State& state, double bh_mass, double softening,
-                                                      bool star_star, double vdsg_coupling, double dt,
+                                                      bool star_star, double vdsg_coupling,
+                                                      double vdsg_mass_baseline_kg, double dt,
                                                       std::vector<double>& ax, std::vector<double>& ay) {
   const int n = state.n();
   const double G = tpfcore::TPF_G_SI;
@@ -117,7 +141,9 @@ void accumulate_velocity_deformed_centripetal_gravity(const State& state, double
       double ux = xi / r_mag;
       double uy = yi / r_mag;
       double v_dot_r = state.vx[i] * ux + state.vy[i] * uy;
-      double doppler_scale = 1.0 + vdsg_coupling * (v_dot_r / C_SI_LIGHT);
+      const double lambda_eff =
+          vdsg_effective_coupling(vdsg_coupling, bh_mass, vdsg_mass_baseline_kg);
+      double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
       double accel_mag = (G * bh_mass / denom) * doppler_scale;
       ax[i] -= ux * accel_mag;
       ay[i] -= uy * accel_mag;
@@ -140,7 +166,9 @@ void accumulate_velocity_deformed_centripetal_gravity(const State& state, double
         double dvx = state.vx[j] - state.vx[i];
         double dvy = state.vy[j] - state.vy[i];
         double v_dot_r = dvx * ux + dvy * uy;
-        double doppler_scale = 1.0 + vdsg_coupling * (v_dot_r / C_SI_LIGHT);
+        const double lambda_eff =
+            vdsg_effective_coupling(vdsg_coupling, state.mass[j], vdsg_mass_baseline_kg);
+        double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
         double accel_mag = (G * state.mass[j] / denom) * doppler_scale;
         ax[i] += ux * accel_mag;
         ay[i] += uy * accel_mag;
@@ -192,6 +220,25 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
     std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
     std::cerr << "tpfcore_readout_mode = " << readout_mode_ << "\n";
+    std::cerr << "VDSG mass normalization (PROVISIONAL / heuristic — not manuscript v11): "
+                 "lambda_eff = lambda * log10(max(M_ref,eps_kg)) / log10(max(M_src,eps_kg)); "
+                 "M_ref = tpf_vdsg_mass_baseline_kg if >0 else star_mass; "
+                 "if M_ref<=0 => lambda_eff=lambda (identity). Single tpf_vdsg_coupling only.\n";
+    std::cerr << "tpf_vdsg_mass_baseline_resolved_kg (runtime M_ref) = " << vdsg_mass_baseline_resolved_kg_
+              << "\n";
+    if (vdsg_active && vdsg_mass_baseline_resolved_kg_ > 0.0) {
+      const double le_bh =
+          vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
+      const int idx_star = (n > 1) ? 1 : 0;
+      const double m_st = state.mass[idx_star];
+      const double le_st =
+          vdsg_effective_coupling(vdsg_coupling_, m_st, vdsg_mass_baseline_resolved_kg_);
+      std::cerr << "lambda_eff sample (gravitational source = BH, M_src = M_BH) = " << le_bh << "\n";
+      std::cerr << "lambda_eff sample (gravitational source = star, M_src = mass[" << idx_star << "]) = " << le_st
+                << "\n";
+    } else if (vdsg_active) {
+      std::cerr << "lambda_eff mass scaling: OFF (M_ref <= 0; set tpf_vdsg_mass_baseline_kg or star_mass > 0).\n";
+    }
 
     const double eps_soft = (source_softening_ > 0.0) ? source_softening_ : softening;
     const double G_si = tpfcore::TPF_G_SI;
@@ -206,14 +253,21 @@ void TPFCorePackage::compute_accelerations(const State& state,
       if (r_mag > 1e-300) {
         const double ux = xi / r_mag;
         const double v_dot_r = state.vx[0] * ux + state.vy[0] * (yi / r_mag);
-        const double doppler_scale = 1.0 + vdsg_coupling_ * (v_dot_r / C_SI_LIGHT);
+        const double lambda_eff_bh =
+            vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
+        const double doppler_scale =
+            vdsg_active ? (1.0 + lambda_eff_bh * (v_dot_r / C_SI_LIGHT))
+                        : (1.0 + vdsg_coupling_ * (v_dot_r / C_SI_LIGHT));
         const double a_newtonian = G_si * bh_mass / denom;
         const double a_VDSG_modifier = a_newtonian * (doppler_scale - 1.0);
 
         std::cerr << "--- Sample: Star 0 vs BH (SI magnitudes) ---\n";
         std::cerr << "a_newtonian = " << a_newtonian << "  (G*M_BH/(r^2+eps^2))\n";
         std::cerr << "a_VDSG_modifier = " << a_VDSG_modifier
-                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = " << doppler_scale << ")\n";
+                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = " << doppler_scale;
+        if (vdsg_active)
+          std::cerr << "; lambda_eff(BH source) = " << lambda_eff_bh;
+        std::cerr << ")\n";
 
         if (tensor_readout_drives_accel) {
           double ax_r = 0.0;
@@ -246,7 +300,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
   /* Non-zero VDSG: velocity-deformed centripetal SI gravity (no tangential kick; tensor readout skipped). */
   if (vdsg_coupling_ != 0.0) {
     accumulate_velocity_deformed_centripetal_gravity(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                                     simulation_dt_, ax, ay);
+                                                     vdsg_mass_baseline_resolved_kg_, simulation_dt_, ax, ay);
     return;
   }
 

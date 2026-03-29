@@ -89,10 +89,16 @@ struct Config {
    */
   double tpf_kappa = 1.0e32;
   /**
-   * TPFCore VDSG: multiplies SI scale (G * m_j / (r^2 + eps^2)) * (v_j - v_i); total VDSG accel per star is
-   * clamped to 0.1% |v|/dt per axis after summing neighbors. Default tuned with TPF_G_SI.
+   * TPFCore VDSG: global strength λ in doppler_scale = 1 + λ_eff (v·r̂)/c per interaction.
+   * λ_eff is mass-normalized (see tpf_vdsg_mass_baseline_kg). Total acceleration still passes the
+   * 0.1% |v|/dt shunt after summing neighbors. Default tuned with TPF_G_SI.
    */
   double tpf_vdsg_coupling = 1.0e-20;
+  /**
+   * VDSG mass baseline M_ref (kg) for log normalization: λ_eff = λ · log10(M_ref) / log10(M_source).
+   * If <= 0, uses star_mass at runtime (same units as simulation). Heuristic / provisional closure.
+   */
+  double tpf_vdsg_mass_baseline_kg = 0.0;
   /** TPFCore derived radial profile: number of radial bins (grid for diagnostics / interpolation). Default 100. */
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */

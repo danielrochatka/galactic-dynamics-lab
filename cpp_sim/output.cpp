@@ -36,6 +36,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
     f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
+    f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
     f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
     f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
     f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
@@ -81,6 +82,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
     f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
+    f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
     f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
     f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
     f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
