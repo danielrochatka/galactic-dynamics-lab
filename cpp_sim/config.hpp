@@ -127,6 +127,55 @@ struct Config {
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
 
+  /**
+   * Galaxy mode: named IC template (see galaxy_init.hpp). Recipes select structured density seeds only;
+   * random “chaos” uses galaxy_init_* noise keys and galaxy_init_master_chaos (noise-only scaler).
+   */
+  std::string galaxy_init_template = "symmetric_disk";
+  /** mt19937 seed for galaxy placement and velocity perturbations (reproducible). Default 12345 matches legacy hardcoded seed. */
+  unsigned galaxy_init_seed = 12345u;
+  /**
+   * Position jitter (Gaussian): delta_r ~ N(0, noise * (R - r_min)), delta_theta ~ N(0, noise * pi).
+   * Scaled by galaxy_init_master_chaos only (not clump/mode amplitudes).
+   */
+  double galaxy_init_position_noise = 0.0;
+  /** RMS rotation (rad) from pure tangential: mix tangent/radial directions by delta ~ N(0, noise^2). Scaled by master_chaos. */
+  double galaxy_init_velocity_angle_noise = 0.0;
+  /**
+   * Fractional speed spread: v *= (1 + noise * N(0,1)) after direction set; floor 0.05 on scale to avoid sign flip.
+   * Scaled by master_chaos.
+   */
+  double galaxy_init_velocity_magnitude_noise = 0.0;
+  /** Probability [0,1] a star is drawn as a clump member (clumpy_disk). Not scaled by master_chaos. */
+  double galaxy_init_clumpiness = 0.0;
+  /** Number of clump centers (deterministic positions from RNG stream). */
+  int galaxy_init_num_clumps = 8;
+  /** Clump Gaussian sigma as fraction of galaxy_radius. */
+  double galaxy_init_clump_radius_fraction = 0.08;
+  /** Mode-2 azimuthal density weight ~ (1 + amp * cos(2 theta)). Weak seed only. Not scaled by master_chaos. */
+  double galaxy_init_m2_amplitude = 0.0;
+  /** Mode-3: (1 + amp * cos(3 theta)). */
+  double galaxy_init_m3_amplitude = 0.0;
+  /** Bar-like weight ~ (1 + amp * cos(2 theta)) * inner concentration; plus optional axis stretch. */
+  double galaxy_init_bar_amplitude = 0.0;
+  /** Bar stretch: x *= sqrt(ratio), y /= sqrt(ratio), then clipped to annulus; 1.0 = no stretch. */
+  double galaxy_init_bar_axis_ratio = 1.0;
+  /** Two-arm spiral envelope: weight ~ (1 + amp * cos(2*theta + winding*log(r/r_min) + phase)). */
+  double galaxy_init_spiral_amplitude = 0.0;
+  /** Dimensionless winding on log(r/r_min) in spiral phase. */
+  double galaxy_init_spiral_winding = 1.0;
+  /** Added to spiral phase (rad). */
+  double galaxy_init_spiral_phase = 0.0;
+  /**
+   * Multiplies only galaxy_init_position_noise, galaxy_init_velocity_angle_noise,
+   * galaxy_init_velocity_magnitude_noise. Does not scale clumpiness, m2/m3, bar, or spiral amplitudes.
+   */
+  double galaxy_init_master_chaos = 1.0;
+
+  /**
+   * Legacy isotropic Cartesian velocity noise (fraction of v_circ per component) when all new galaxy_init_* noises are zero.
+   * If any of position/angle/magnitude noise (after master_chaos) is > 0, new pipeline is used instead for velocities.
+   */
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
 

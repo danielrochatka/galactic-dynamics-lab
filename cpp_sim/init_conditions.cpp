@@ -1,107 +1,17 @@
 #include "init_conditions.hpp"
-#include "physics/TPFCore/derived_tpf_radial.hpp"
+#include "galaxy_init.hpp"
 #include <cmath>
 #include <random>
-#include <algorithm>
-#include <numeric>
+#include <vector>
 
 namespace galaxy {
 
 namespace {
+constexpr double PI = 3.14159265358979323846;
+}
 
-const double PI = 3.14159265358979323846;
-
-}  // namespace
-
-void init_galaxy_disk(const Config& config, State& state, unsigned seed) {
-  const int n = config.n_stars;
-  state.resize(n);
-
-  std::mt19937 rng(seed);
-  std::uniform_real_distribution<double> u01(0, 1);
-  std::uniform_real_distribution<double> u02pi(0, 2 * PI);
-  std::normal_distribution<double> normal(0, 1);
-
-  const double R = config.galaxy_radius;
-  const double r_min = 0.05 * R;
-  const double bh_mass = config.bh_mass;
-  const double star_mass = config.star_mass;
-  const double noise = config.velocity_noise;
-
-  std::vector<double> radii(n), theta(n);
-  for (int i = 0; i < n; ++i) {
-    double u = u01(rng);
-    /* Uniform in area: r^2 uniform between r_min^2 and R^2 */
-    double r_sq = r_min * r_min + u * (R * R - r_min * r_min);
-    radii[i] = std::sqrt(r_sq);
-    theta[i] = u02pi(rng);
-  }
-
-  // Sort by radius to compute n_inside (enclosed stellar count)
-  std::vector<int> order(n);
-  std::iota(order.begin(), order.end(), 0);
-  std::sort(order.begin(), order.end(), [&radii](int i, int j) { return radii[i] < radii[j]; });
-
-  std::vector<int> n_inside(n);
-  for (int k = 0; k < n; ++k)
-    n_inside[order[k]] = k;
-
-  for (int i = 0; i < n; ++i) {
-    double r = radii[i];
-    double th = theta[i];
-    state.x[i] = r * std::cos(th);
-    state.y[i] = r * std::sin(th);
-    state.mass[i] = star_mass;
-  }
-
-  const bool use_derived_tpf_init =
-      (config.physics_package == "TPFCore" && config.tpfcore_enable_provisional_readout &&
-       tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode));
-
-  if (use_derived_tpf_init) {
-    const double eps =
-        (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-    tpfcore::DerivedTpfPoissonConfig dcfg;
-    dcfg.kappa = config.tpf_kappa;
-    dcfg.bins = config.tpf_poisson_bins;
-    dcfg.max_radius = config.tpf_poisson_max_radius;
-    dcfg.galaxy_radius = config.galaxy_radius;
-    tpfcore::TpfRadialGravityProfile profile =
-        tpfcore::build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
-    for (int i = 0; i < n; ++i) {
-      double th = theta[i];
-      double r_cyl = std::hypot(state.x[i], state.y[i]);
-      double a_s =
-          tpfcore::radial_acceleration_scalar_derived(state, bh_mass, profile, r_cyl, eps);
-      double v_circ = std::sqrt(std::max(0.0, std::abs(a_s) * r_cyl));
-      double vx = -std::sin(th) * v_circ;
-      double vy = std::cos(th) * v_circ;
-      if (noise > 0) {
-        double scale = noise * v_circ;
-        vx += scale * normal(rng);
-        vy += scale * normal(rng);
-      }
-      state.vx[i] = config.initial_velocity_scale * vx;
-      state.vy[i] = config.initial_velocity_scale * vy;
-    }
-  } else {
-    constexpr double G_SI = 6.6743e-11;
-    for (int i = 0; i < n; ++i) {
-      double r = radii[i];
-      double th = theta[i];
-      double enclosed_mass = bh_mass + n_inside[i] * star_mass;
-      double v_circ = std::sqrt((G_SI * enclosed_mass) / r);
-      double vx = -std::sin(th) * v_circ;
-      double vy = std::cos(th) * v_circ;
-      if (noise > 0) {
-        double scale = noise * v_circ;
-        vx += scale * normal(rng);
-        vy += scale * normal(rng);
-      }
-      state.vx[i] = config.initial_velocity_scale * vx;
-      state.vy[i] = config.initial_velocity_scale * vy;
-    }
-  }
+void init_galaxy_disk(const Config& config, State& state) {
+  initialize_galaxy_disk(config, state, nullptr);
 }
 
 void init_two_body(const Config& config, State& state) {

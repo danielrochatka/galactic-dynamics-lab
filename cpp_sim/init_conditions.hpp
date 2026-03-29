@@ -6,8 +6,8 @@
 
 namespace galaxy {
 
-// Galaxy: uniform area in annulus [0.05 * galaxy_radius, galaxy_radius]; v_circ = sqrt(G * M_enc / r).
-void init_galaxy_disk(const Config& config, State& state, unsigned seed = 12345);
+// Galaxy: annulus disk, template-driven ICs (see galaxy_init.hpp); v_circ from enclosed mass or TPF derived radial.
+void init_galaxy_disk(const Config& config, State& state);
 
 // Earth–Moon SI benchmark for two_body_orbit: n=2, clears and resizes state arrays.
 void init_two_body(const Config& config, State& state);

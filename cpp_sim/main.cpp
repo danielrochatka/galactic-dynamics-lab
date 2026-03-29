@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "force_compare.hpp"
+#include "galaxy_init.hpp"
 #include "init_conditions.hpp"
 #include "output.hpp"
 #include "physics/physics_package.hpp"
@@ -572,6 +573,20 @@ int main(int argc, char** argv) {
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
+      galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
+                                            galaxy::last_galaxy_init_audit());
+      std::cout << "Galaxy IC: template=" << galaxy::last_galaxy_init_audit().template_name
+                << ", seed=" << galaxy::last_galaxy_init_audit().seed;
+      if (galaxy::last_galaxy_init_audit().used_new_state_noise)
+        std::cout << ", noise=new (pos/angle/mag)";
+      else if (galaxy::last_galaxy_init_audit().used_legacy_velocity_noise)
+        std::cout << ", noise=legacy velocity_noise";
+      else
+        std::cout << ", noise=none";
+      std::cout << "\n";
+      std::cout << "Wrote " << config.output_dir << "/galaxy_init_diagnostics.txt\n";
+      if (!config.save_snapshots)
+        std::cout << "Wrote " << config.output_dir << "/galaxy_init_snapshot.csv (snapshots disabled)\n";
       std::cout << "Running galaxy: n_stars=" << config.n_stars
                 << ", n_steps=" << n_steps
                 << ", dt=" << config.dt
@@ -694,7 +709,10 @@ int main(int argc, char** argv) {
   {
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
-                             run_config_path, package_defaults_path);
+                             run_config_path, package_defaults_path,
+                             config.simulation_mode == galaxy::SimulationMode::galaxy
+                                 ? &galaxy::last_galaxy_init_audit()
+                                 : nullptr);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_snapshots) {

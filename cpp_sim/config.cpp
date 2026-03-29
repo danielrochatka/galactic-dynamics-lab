@@ -199,6 +199,70 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_live_orbit_force_audit = parse_bool(val);
     return true;
   }
+  if (key == "galaxy_init_template") {
+    config.galaxy_init_template = trim(val);
+    return true;
+  }
+  if (key == "galaxy_init_seed") {
+    config.galaxy_init_seed = static_cast<unsigned>(std::stoul(val));
+    return true;
+  }
+  if (key == "galaxy_init_position_noise") {
+    config.galaxy_init_position_noise = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_velocity_angle_noise") {
+    config.galaxy_init_velocity_angle_noise = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_velocity_magnitude_noise") {
+    config.galaxy_init_velocity_magnitude_noise = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_clumpiness") {
+    config.galaxy_init_clumpiness = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_num_clumps") {
+    config.galaxy_init_num_clumps = std::stoi(val);
+    return true;
+  }
+  if (key == "galaxy_init_clump_radius_fraction") {
+    config.galaxy_init_clump_radius_fraction = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_m2_amplitude") {
+    config.galaxy_init_m2_amplitude = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_m3_amplitude") {
+    config.galaxy_init_m3_amplitude = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_bar_amplitude") {
+    config.galaxy_init_bar_amplitude = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_bar_axis_ratio") {
+    config.galaxy_init_bar_axis_ratio = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_spiral_amplitude") {
+    config.galaxy_init_spiral_amplitude = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_spiral_winding") {
+    config.galaxy_init_spiral_winding = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_spiral_phase") {
+    config.galaxy_init_spiral_phase = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_init_master_chaos") {
+    config.galaxy_init_master_chaos = std::stod(val);
+    return true;
+  }
   if (key == "velocity_noise") {
     config.velocity_noise = std::stod(val);
     return true;
