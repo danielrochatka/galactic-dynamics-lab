@@ -85,6 +85,11 @@ struct Config {
    * Default 1e32.
    */
   double tpf_kappa = 1.0e32;
+  /**
+   * TPFCore GDD: multiplies SI scale (G * m_j / (r^2 + eps^2)) * (v_j - v_i); total GDD accel per star is
+   * clamped to 0.1% |v|/dt per axis after summing neighbors. Default tuned with TPF_G_SI.
+   */
+  double tpf_gdd_coupling = 1.0e-20;
   /** TPFCore derived radial profile: number of radial bins (grid for diagnostics / interpolation). Default 100. */
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */

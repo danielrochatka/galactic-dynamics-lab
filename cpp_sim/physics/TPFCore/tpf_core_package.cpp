@@ -12,6 +12,7 @@
 #include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -47,7 +48,9 @@ TPFCorePackage::TPFCorePackage()
       readout_scale_(1.0),
       theta_tt_scale_(1.0),
       theta_tr_scale_(1.0),
-      source_softening_(0.0) {}
+      source_softening_(0.0),
+      gdd_coupling_(1.0e-20),
+      simulation_dt_(0.01) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
@@ -60,30 +63,45 @@ void TPFCorePackage::init_from_config(const Config& config) {
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
   derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
   derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
+  gdd_coupling_ = config.tpf_gdd_coupling;
+  simulation_dt_ = config.dt;
 }
 
 namespace {
 
-/** TPFCore-only: Gravitational Doppler Drag — star–star velocity synchronization (G = 1 units). */
-void apply_gravitational_doppler_drag(const State& state, double softening,
-                                      std::vector<double>& ax, std::vector<double>& ay) {
+/** TPFCore-only: GDD with SI G; sum raw neighbor kicks, then clamp total |a| per axis to 0.1% |v|/dt. */
+void apply_gravitational_doppler_drag(const State& state, double softening, double gdd_coupling,
+                                      double dt, std::vector<double>& ax, std::vector<double>& ay) {
+  if (gdd_coupling == 0.0) return;
+  if (!(dt > 0.0) || !std::isfinite(dt)) return;
+
   const int n = state.n();
-  const double eps2 = softening * softening;
-  const double GDD_COUPLING = 1.0e-5;
+  const double eps_sq = softening * softening;
+  const double G = tpfcore::TPF_G_SI;
 
   for (int i = 0; i < n; ++i) {
+    double total_gdd_ax = 0.0;
+    double total_gdd_ay = 0.0;
+
     for (int j = 0; j < n; ++j) {
       if (i == j) continue;
       double dx = state.x[j] - state.x[i];
       double dy = state.y[j] - state.y[i];
-      double r_sq = dx * dx + dy * dy + eps2;
+      double r_sq = dx * dx + dy * dy;
       double dvx = state.vx[j] - state.vx[i];
       double dvy = state.vy[j] - state.vy[i];
-      double base_gravity_intensity = state.mass[j] / r_sq;
-      double gdd_factor = GDD_COUPLING * base_gravity_intensity;
-      ax[i] += gdd_factor * dvx;
-      ay[i] += gdd_factor * dvy;
+      double base_gravity_intensity = (G * state.mass[j]) / (r_sq + eps_sq);
+      double gdd_factor = gdd_coupling * base_gravity_intensity;
+      total_gdd_ax += gdd_factor * dvx;
+      total_gdd_ay += gdd_factor * dvy;
     }
+
+    double current_v =
+        std::sqrt(state.vx[i] * state.vx[i] + state.vy[i] * state.vy[i] + 1e-9);
+    double max_total_accel = (0.001 * current_v) / dt;
+    if (!std::isfinite(max_total_accel)) max_total_accel = 0.0;
+    ax[i] += std::max(-max_total_accel, std::min(max_total_accel, total_gdd_ax));
+    ay[i] += std::max(-max_total_accel, std::min(max_total_accel, total_gdd_ay));
   }
 }
 
@@ -117,7 +135,8 @@ void TPFCorePackage::compute_accelerations(const State& state,
           theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
           &derived_poisson_cfg_, &profile);
     }
-    if (star_star) apply_gravitational_doppler_drag(state, softening, ax, ay);
+    if (star_star)
+      apply_gravitational_doppler_drag(state, softening, gdd_coupling_, simulation_dt_, ax, ay);
     return;
   }
 
@@ -128,7 +147,8 @@ void TPFCorePackage::compute_accelerations(const State& state,
         theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
         nullptr, nullptr);
   }
-  if (star_star) apply_gravitational_doppler_drag(state, softening, ax, ay);
+  if (star_star)
+    apply_gravitational_doppler_drag(state, softening, gdd_coupling_, simulation_dt_, ax, ay);
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,

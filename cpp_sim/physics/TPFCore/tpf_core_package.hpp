@@ -112,6 +112,8 @@ class TPFCorePackage : public PhysicsPackage {
   double theta_tt_scale_;
   double theta_tr_scale_;
   double source_softening_;
+  double gdd_coupling_;
+  double simulation_dt_;
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 };
 
