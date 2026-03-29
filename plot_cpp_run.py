@@ -294,31 +294,6 @@ def main() -> None:
     else:
         use_animation_dynamic_zoom = plot_animation_dynamic_zoom_from_run_info(run_info)
 
-    # region agent log
-    _pdz_raw = run_info.get("plot_animation_dynamic_zoom")
-    _rip = run_dir / "run_info.txt"
-    _zoom_line_count = 0
-    if _rip.exists():
-        _zoom_line_count = sum(
-            1
-            for ln in _rip.read_text().splitlines()
-            if ln.strip().startswith("plot_animation_dynamic_zoom")
-        )
-    _agent_log(
-        "H2",
-        "plot_cpp_run.py:zoom_resolve",
-        "resolved use_animation_dynamic_zoom and run_info",
-        {
-            "raw_key_value": repr(_pdz_raw),
-            "raw_key_type": type(_pdz_raw).__name__,
-            "use_animation_dynamic_zoom": use_animation_dynamic_zoom,
-            "cli_dynamic_zoom": bool(args.dynamic_zoom),
-            "cli_no_dynamic_zoom": bool(args.no_dynamic_zoom),
-            "run_info_plot_zoom_line_count": _zoom_line_count,
-        },
-    )
-    # endregion
-
     initial = snapshots[0]
     final = snapshots[-1]
     render_radius_initial = galaxy_velocity_gated_target_limit(
@@ -378,8 +353,8 @@ def main() -> None:
                 pos, vel, galaxy_radius_m, fallback_radius
             )
         else:
-            # Constant axis limits for the whole clip: per-frame velocity-gated limits still change
-            # with each snapshot (H1); max over frames avoids false "zoom" when dynamic zoom is off.
+            # Constant axis limits: per-frame velocity-gated limits vary by snapshot; take max so
+            # the viewport does not pump when temporal smoothing is off.
             _fixed_anim_r = max(
                 galaxy_velocity_gated_target_limit(
                     s.positions, s.velocities, galaxy_radius_m, fallback_radius
@@ -387,34 +362,6 @@ def main() -> None:
                 for s in snapshots
             )
             render_radius_cb = lambda pos, vel, rfix=_fixed_anim_r: rfix
-
-        # region agent log
-        _anim_cb_calls = [0]
-
-        def _wrap_anim_render_radius(inner):
-            def _wrapped(pos, vel):
-                lim = inner(pos, vel)
-                i = _anim_cb_calls[0]
-                ntot = len(snapshots)
-                if i in (0, ntot // 2, max(0, ntot - 1)):
-                    _agent_log(
-                        "H1",
-                        "plot_cpp_run.py:anim_render_cb",
-                        "per-frame axis half-range from callback",
-                        {
-                            "callback_invocation": i,
-                            "n_snapshots": ntot,
-                            "render_radius_half_axis": float(lim),
-                            "use_smoothed_dynamic_zoom": use_animation_dynamic_zoom,
-                        },
-                    )
-                _anim_cb_calls[0] += 1
-                return lim
-
-            return _wrapped
-
-        render_radius_cb = _wrap_anim_render_radius(render_radius_cb)
-        # endregion
 
         print(
             f"  Animation viewport: {'dynamic zoom (smoothed)' if use_animation_dynamic_zoom else 'constant (max half-axis over snapshots; no per-frame zoom)'}"
