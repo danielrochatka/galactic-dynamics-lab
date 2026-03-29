@@ -243,6 +243,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.validation_snapshot_every = std::stoi(val);
     return true;
   }
+  if (key == "output_dir") {
+    config.output_dir = trim(val);
+    return true;
+  }
   return false;
 }
 
