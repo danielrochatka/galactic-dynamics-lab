@@ -38,7 +38,7 @@ double derived_invariant_I_contracted(const Theta3D& theta);
 Theta3D sum_derived_theta_at_point(const State& state, double bh_mass, double px, double py, double pz,
                                    double eps);
 
-/** Bounce enclosed mass (Eq. 31, SI): m(r) = M_total * r^3 / (r^3 + r_s^3), r_s = 2 G M_total / c^2. */
+/** R6 bounce enclosed mass (SI): m(r) = M_total * r^6 / (r^6 + r_s^6), r_s = 2 G M_total / c^2. */
 double get_tpf_mass_at_r(double M_total, double r);
 
 struct TpfRadialGravityProfile {

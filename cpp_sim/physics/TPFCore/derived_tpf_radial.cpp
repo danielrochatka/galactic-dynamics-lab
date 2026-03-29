@@ -84,19 +84,25 @@ double get_tpf_mass_at_r(double M_total, double r) {
   if (rr <= 0.0) return 0.0;
 
   double r_s = (2.0 * TPF_G_SI * M_total) / (c * c);
-  double r3 = rr * rr * rr;
-  double rs3 = r_s * r_s * r_s;
+  double r2 = rr * rr;
+  double r6 = r2 * r2 * r2;
+  double rs2 = r_s * r_s;
+  double rs6 = rs2 * rs2 * rs2;
 
-  return M_total * (r3 / (r3 + rs3));
+  return M_total * (r6 / (r6 + rs6));
 }
 
 /**
  * Data pipeline (enforced):
- * 1. Here: cumulative_M_eff += |shell_mass|; profile.M_eff_enc[i] = cumulative_M_eff each bin.
+ * 1. Here: R6 bounce on ρ ledger; cumulative_M_eff += shell_mass only if finite; profile.M_eff_enc[i] set each bin.
  * 2. radial_acceleration_scalar_derived: M_eff = profile.get_effective_mass_at(r_cyl) (interpolates M_eff_enc).
  */
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
                                                   int bins, double tpf_kappa, double eps) {
+  static int warning_count = 0;
+  static int stability_alert_prints = 0;
+  const int MAX_WARNINGS = 5;
+
   TpfRadialGravityProfile profile;
   profile.bins = std::max(1, bins);
   profile.max_radius = std::max(max_radius, 1e-30);
@@ -107,29 +113,39 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
 
   double r_s_bh = 0.0;
   if (bh_mass > 0.0) r_s_bh = (2.0 * TPF_G_SI * bh_mass) / (c * c);
-  double rs3_bh = r_s_bh * r_s_bh * r_s_bh;
 
   const double dr = profile.delta_r;
   double cumulative_M_eff = 0.0;
 
   for (size_t i = 0; i < num_bins; ++i) {
     double R_b = (static_cast<double>(i) + 0.5) * dr;
+    double r = R_b;
     double px = R_b;
     double py = 0.0;
     double pz = 0.0;
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
-    double I_val = std::abs(I_total);
-    double rho_raw = I_val * std::abs(tpf_kappa);
+    double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
+    if (!std::isfinite(rho_raw) || rho_raw > 1e300) {
+      ++warning_count;
+      if (stability_alert_prints < MAX_WARNINGS) {
+        std::cerr << "![STABILITY ALERT]: Numerical singularity at r=" << r << std::endl;
+        ++stability_alert_prints;
+      }
+      rho_raw = 0.0;
+    }
 
-    double r = R_b;
-    double r3 = r * r * r;
-    double bounce_ratio = r3 / (r3 + rs3_bh);
+    double r2 = r * r;
+    double r6 = r2 * r2 * r2;
+    double rs2 = r_s_bh * r_s_bh;
+    double rs6 = rs2 * rs2 * rs2;
+    double bounce_ratio = r6 / (r6 + rs6);
+
     double rho_eff = rho_raw * bounce_ratio;
     if (rho_eff < 0.0) rho_eff = 0.0;
 
     double shell_mass = 4.0 * kPi * r * r * rho_eff * dr;
-    cumulative_M_eff += std::abs(shell_mass);
+    if (std::isfinite(shell_mass)) cumulative_M_eff += shell_mass;
 
     profile.r_outer[i] = (static_cast<double>(i) + 1.0) * dr;
     profile.M_eff_enc[i] = cumulative_M_eff;
@@ -146,7 +162,13 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
       std::cout << "Ratio (TPF / BH):          " << (cumulative_M_eff / bh_mass) << std::endl;
     else
       std::cout << "Ratio (TPF / BH):          (undefined, bh_mass=0)" << std::endl;
+    std::cout << "Numerical Stability Shunts triggered: " << warning_count << " bins." << std::endl;
+    if (warning_count > MAX_WARNINGS) {
+      std::cout << "![WARNING]: Core gravity may be under-resolved (singularity shunts exceeded "
+                << MAX_WARNINGS << ")." << std::endl;
+    }
     std::cout << "----------------------------------------------------\n" << std::endl;
+    std::cout << std::flush;
     diagnostics_printed = true;
   }
 
