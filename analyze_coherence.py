@@ -4,7 +4,8 @@ TPF stellar coherence / phase diagnostics from a snapshot CSV (SI: m, m/s).
 
 Example:
   python analyze_coherence.py
-  python analyze_coherence.py --snapshot cpp_sim/outputs/20260329_025714/snapshot_20000.csv
+  python analyze_coherence.py --snapshot cpp_sim/outputs/run1/snapshot_20000.csv
+  # Default plot: <snapshot_dir>/coherence_plot.png unless --plot is given
 """
 
 from __future__ import annotations
@@ -91,14 +92,19 @@ def main() -> int:
     parser.add_argument(
         "--plot",
         type=Path,
-        default=Path("coherence_plot.png"),
-        help="Output figure path",
+        default=None,
+        help="Output figure path (default: same directory as --snapshot, file coherence_plot.png)",
     )
     args = parser.parse_args()
 
     snap_path = args.snapshot.resolve()
     if not snap_path.is_file():
         raise SystemExit(f"Snapshot not found: {snap_path}")
+
+    if args.plot is None:
+        plot_out = snap_path.parent / "coherence_plot.png"
+    else:
+        plot_out = Path(args.plot).expanduser().resolve()
 
     df = load_snapshot_csv(snap_path)
     x = df["x"].to_numpy(dtype=float)
@@ -173,6 +179,7 @@ def main() -> int:
     # --- Text summary ---
     print("=== TPF coherence analysis (SI) ===")
     print(f"Snapshot: {snap_path}")
+    print(f"Plot output: {plot_out}")
     print(f"Stars: {len(r)}")
     print(f"Ring radius (peak annular density): {ring_r:.6g} m")
     print(f"  bin index {peak_bin}/{args.n_bins - 1}, Δr ~ {widths[peak_bin]:.6g} m")
@@ -200,12 +207,11 @@ def main() -> int:
     ax.legend(loc="best")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    out = args.plot.resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=150)
+    plot_out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(plot_out, dpi=150)
     plt.close(fig)
     print()
-    print(f"Saved coherence plot: {out}")
+    print(f"Saved coherence plot: {plot_out}")
 
     return 0
 

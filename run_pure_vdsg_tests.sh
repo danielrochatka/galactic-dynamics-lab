@@ -45,11 +45,13 @@ run_one() {
   (cd "${ROOT}/cpp_sim" && ./galaxy_sim galaxy "$@") 2>&1 | tee -a "$LOG"
 }
 
+# Writes coherence_diagnostic.png inside the run directory (data containment).
 coherence_plot() {
-  local snap="$1"
-  local png="$2"
+  local run_dir="$1"
+  local snap="$2"
+  local png="${run_dir}/coherence_diagnostic.png"
   python3 "${ROOT}/analyze_coherence.py" --snapshot "$snap" --plot "$png"
-  echo "Wrote $png"
+  echo "Coherence diagnostic plot: ${png}" | tee -a "$LOG"
 }
 
 echo "Logging to $LOG"
@@ -68,7 +70,8 @@ run_one "RUN 1: Newtonian control (no TDSG, no cooling; no TPF branch ledger on 
   --tpf_cooling_fraction=0
 
 S1="$(last_snapshot "$R1")"
-coherence_plot "$S1" "${ROOT}/coherence_pure_newtonian.png"
+coherence_plot "$R1" "$S1"
+P1="${R1}/coherence_diagnostic.png"
 
 # --- Run 2: TPFCore + VDSG, no cooling ---
 R2="${OUT_BASE}/run2_pure_vdsg_no_cooling"
@@ -84,7 +87,8 @@ run_one "RUN 2: Pure VDSG (tpf_gdd_coupling=18497.1, tpf_cooling_fraction=0) —
   --tpf_cooling_fraction=0
 
 S2="$(last_snapshot "$R2")"
-coherence_plot "$S2" "${ROOT}/coherence_pure_vdsg.png"
+coherence_plot "$R2" "$S2"
+P2="${R2}/coherence_diagnostic.png"
 
 # --- Run 3: TPFCore + VDSG + cooling ---
 R3="${OUT_BASE}/run3_vdsg_with_cooling"
@@ -100,16 +104,17 @@ run_one "RUN 3: VDSG + cooling (reference-style; tpf_cooling_fraction=0.2) — e
   --tpf_cooling_fraction=0.2
 
 S3="$(last_snapshot "$R3")"
-coherence_plot "$S3" "${ROOT}/coherence_vdsg_cooled.png"
+coherence_plot "$R3" "$S3"
+P3="${R3}/coherence_diagnostic.png"
 
-echo ""
-echo "Done."
-echo "  Snapshots: $S1"
-echo "             $S2"
-echo "             $S3"
-echo "  Plots:     ${ROOT}/coherence_pure_newtonian.png"
-echo "             ${ROOT}/coherence_pure_vdsg.png"
-echo "             ${ROOT}/coherence_vdsg_cooled.png"
-echo "  Full log:  $LOG"
+echo "" | tee -a "$LOG"
+echo "Done (all artifacts under ${OUT_BASE}/)." | tee -a "$LOG"
+echo "  Run 1 snapshot: $S1" | tee -a "$LOG"
+echo "  Run 1 plot:     $P1" | tee -a "$LOG"
+echo "  Run 2 snapshot: $S2" | tee -a "$LOG"
+echo "  Run 2 plot:     $P2" | tee -a "$LOG"
+echo "  Run 3 snapshot: $S3" | tee -a "$LOG"
+echo "  Run 3 plot:     $P3" | tee -a "$LOG"
+echo "  Full log:       $LOG" | tee -a "$LOG"
 echo ""
 echo "Tip: grep 'ACTIVE PHYSICS LEDGER' $LOG  # runs 2–3 only (TPFCore)"
