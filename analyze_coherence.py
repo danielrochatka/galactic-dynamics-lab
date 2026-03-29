@@ -2,6 +2,9 @@
 """
 TPF stellar coherence / phase diagnostics from a snapshot CSV (SI: m, m/s).
 
+Ring selection: the radial bin with maximum coherence C = 1 - σ_v/⟨|v|⟩ among bins
+with at least 10 stars (not peak surface density).
+
 Example:
   python analyze_coherence.py
   python analyze_coherence.py --snapshot cpp_sim/outputs/run1/snapshot_20000.csv
@@ -128,26 +131,29 @@ def main() -> int:
     widths = np.diff(edges)
     bin_id = bin_index(r, edges)
 
-    # Annular surface area (2D "ring" area) for density
-    areas = np.pi * (edges[1:] ** 2 - edges[:-1] ** 2)
-    areas = np.maximum(areas, 1e-300)
+    # Most coherent ring: maximize C = 1 - σ_v/⟨|v|⟩ per bin (not peak density)
+    coherence_per_bin = np.full(args.n_bins, np.nan)
+    for b in range(args.n_bins):
+        m = bin_id == b
+        if np.sum(m) < 10:  # statistical threshold to avoid noise in sparse bins
+            continue
+        v_bin = v_mag[m]
+        std_v = np.std(v_bin, ddof=1)
+        mean_v_bin = np.mean(v_bin)
+        if mean_v_bin > 1e-10:
+            coherence_per_bin[b] = 1.0 - (std_v / mean_v_bin)
 
-    counts = np.bincount(bin_id, minlength=args.n_bins)[: args.n_bins]
-    rho = counts.astype(float) / areas
-    peak_bin = int(np.argmax(rho))
+    if not np.any(np.isfinite(coherence_per_bin)):
+        raise SystemExit("No bins meet the statistical threshold for coherence analysis.")
+
+    peak_bin = int(np.nanargmax(coherence_per_bin))
     ring_r = float(centers[peak_bin])
+    coherence_c = float(coherence_per_bin[peak_bin])
 
     in_ring = bin_id == peak_bin
-    if np.sum(in_ring) < 2:
-        raise SystemExit("Too few stars in peak-density bin for dispersion.")
-
     v_ring = v_mag[in_ring]
     sigma_v = float(np.std(v_ring, ddof=1))
     mean_v = float(np.mean(v_ring))
-    if mean_v < 1e-30:
-        coherence_c = float("nan")
-    else:
-        coherence_c = 1.0 - (sigma_v / mean_v)
 
     ratio_rt = np.abs(v_r[in_ring]) / np.maximum(np.abs(v_theta[in_ring]), 1e-30)
     mean_ratio_rt = float(np.median(ratio_rt))  # robust to outliers
@@ -181,8 +187,8 @@ def main() -> int:
     print(f"Snapshot: {snap_path}")
     print(f"Plot output: {plot_out}")
     print(f"Stars: {len(r)}")
-    print(f"Ring radius (peak annular density): {ring_r:.6g} m")
-    print(f"  bin index {peak_bin}/{args.n_bins - 1}, Δr ~ {widths[peak_bin]:.6g} m")
+    print(f"Ring radius (peak coherence C = 1 - σ_v/⟨|v|⟩): {ring_r:.6g} m")
+    print(f"  bin index {peak_bin}/{args.n_bins - 1}, Δr ~ {widths[peak_bin]:.6g} m (≥10 stars/bin for C)")
     print(f"At ring: mean |v| = {mean_v:.6g} m/s, σ_v = {sigma_v:.6g} m/s")
     print(f"Coherence factor C = 1 - σ_v/⟨|v|⟩ = {coherence_c:.6f}")
     print(f"  (C → 1 solid-body-like; C → 0 disordered)")
@@ -200,10 +206,10 @@ def main() -> int:
     fig, ax = plt.subplots(figsize=(9, 5))
     valid = np.isfinite(sigma_per_bin)
     ax.plot(centers[valid], sigma_per_bin[valid], "b.-", lw=1.2, markersize=4, label=r"$\sigma_v(|v|)$ per bin")
-    ax.axvline(ring_r, color="crimson", ls="--", lw=1.0, label=f"Ring R = {ring_r:.3g} m")
+    ax.axvline(ring_r, color="crimson", ls="--", lw=1.0, label=f"Peak-coherence ring R = {ring_r:.3g} m")
     ax.set_xlabel("Radius r (m)")
     ax.set_ylabel(r"Velocity dispersion $\sigma_v$ (m/s)")
-    ax.set_title("Coherence diagnostic: velocity dispersion vs. radius")
+    ax.set_title(r"Coherence diagnostic: $\sigma_v(|v|)$ vs $r$; ring = argmax bin coherence ($\geq$10 stars/bin)")
     ax.legend(loc="best")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
