@@ -78,6 +78,7 @@ void apply_gravitational_doppler_drag(const State& state, double softening, doub
   const int n = state.n();
   const double eps_sq = softening * softening;
   const double G = tpfcore::TPF_G_SI;
+  const double C_SI = 299792458.0;
 
   for (int i = 0; i < n; ++i) {
     double total_gdd_ax = 0.0;
@@ -91,7 +92,8 @@ void apply_gravitational_doppler_drag(const State& state, double softening, doub
       double dvx = state.vx[j] - state.vx[i];
       double dvy = state.vy[j] - state.vy[i];
       double base_gravity_intensity = (G * state.mass[j]) / (r_sq + eps_sq);
-      double gdd_factor = gdd_coupling * base_gravity_intensity;
+      /* Accel_GDD = coupling * Accel_Grav * (Delta_V / C); gdd_factor is coupling * Accel_Grav / C (1/s). */
+      double gdd_factor = gdd_coupling * base_gravity_intensity * (1.0 / C_SI);
       total_gdd_ax += gdd_factor * dvx;
       total_gdd_ay += gdd_factor * dvy;
     }
