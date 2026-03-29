@@ -35,6 +35,9 @@ struct Config;
 // Throws on malformed values (invalid number, etc.). Unknown keys are skipped.
 bool load_config_file(const std::string& path, Config& config);
 
+/** Apply one key=value (same rules as .cfg lines). Returns true if key was recognized. Throws on bad value. */
+bool apply_config_kv(const std::string& key, const std::string& val, Config& config);
+
 // Probe a config file for a single key. Returns value if found, else empty string.
 // Returns empty if file does not exist or key not found.
 std::string probe_config_key(const std::string& path, const std::string& key);

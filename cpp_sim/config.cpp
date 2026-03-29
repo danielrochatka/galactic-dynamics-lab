@@ -66,6 +66,186 @@ std::string mode_to_string(SimulationMode m) {
   return "unknown";
 }
 
+bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
+  if (key == "simulation_mode") {
+    config.simulation_mode = parse_mode(val);
+    return true;
+  }
+  if (key == "n_stars") {
+    config.n_stars = std::stoi(val);
+    return true;
+  }
+  if (key == "star_mass") {
+    config.star_mass = std::stod(val);
+    return true;
+  }
+  if (key == "bh_mass") {
+    config.bh_mass = std::stod(val);
+    return true;
+  }
+  if (key == "inner_radius") {
+    config.inner_radius = std::stod(val);
+    return true;
+  }
+  if (key == "outer_radius") {
+    config.outer_radius = std::stod(val);
+    return true;
+  }
+  if (key == "galaxy_radius") {
+    config.galaxy_radius = std::stod(val);
+    return true;
+  }
+  if (key == "dt") {
+    config.dt = std::stod(val);
+    return true;
+  }
+  if (key == "n_steps") {
+    config.n_steps = std::stoi(val);
+    return true;
+  }
+  if (key == "snapshot_every") {
+    config.snapshot_every = std::stoi(val);
+    return true;
+  }
+  if (key == "softening") {
+    config.softening = std::stod(val);
+    return true;
+  }
+  if (key == "enable_star_star_gravity") {
+    config.enable_star_star_gravity = parse_bool(val);
+    return true;
+  }
+  if (key == "physics_package") {
+    config.physics_package = val;
+    return true;
+  }
+  if (key == "tpfcore_enable_provisional_readout") {
+    config.tpfcore_enable_provisional_readout = parse_bool(val);
+    return true;
+  }
+  if (key == "tpfcore_readout_mode") {
+    config.tpfcore_readout_mode = trim(val);
+    return true;
+  }
+  if (key == "tpfcore_readout_scale") {
+    config.tpfcore_readout_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_theta_tt_scale") {
+    config.tpfcore_theta_tt_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_theta_tr_scale") {
+    config.tpfcore_theta_tr_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_kappa") {
+    config.tpf_kappa = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_gdd_coupling") {
+    config.tpf_gdd_coupling = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_poisson_bins") {
+    config.tpf_poisson_bins = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_poisson_max_radius") {
+    config.tpf_poisson_max_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_cooling_fraction") {
+    config.tpf_cooling_fraction = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_dump_readout_debug") {
+    config.tpfcore_dump_readout_debug = parse_bool(val);
+    return true;
+  }
+  if (key == "tpfcore_probe_radius_min") {
+    config.tpfcore_probe_radius_min = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_probe_radius_max") {
+    config.tpfcore_probe_radius_max = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_probe_samples") {
+    config.tpfcore_probe_samples = std::stoi(val);
+    return true;
+  }
+  if (key == "tpfcore_dump_invariant_profile") {
+    config.tpfcore_dump_invariant_profile = parse_bool(val);
+    return true;
+  }
+  if (key == "tpfcore_dump_theta_profile") {
+    config.tpfcore_dump_theta_profile = parse_bool(val);
+    return true;
+  }
+  if (key == "tpfcore_source_softening") {
+    config.tpfcore_source_softening = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_residual_step") {
+    config.tpfcore_residual_step = std::stod(val);
+    return true;
+  }
+  if (key == "tpfcore_live_orbit_force_audit") {
+    config.tpfcore_live_orbit_force_audit = parse_bool(val);
+    return true;
+  }
+  if (key == "velocity_noise") {
+    config.velocity_noise = std::stod(val);
+    return true;
+  }
+  if (key == "initial_velocity_scale") {
+    config.initial_velocity_scale = std::stod(val);
+    return true;
+  }
+  if (key == "save_snapshots") {
+    config.save_snapshots = parse_bool(val);
+    return true;
+  }
+  if (key == "save_run_info") {
+    config.save_run_info = parse_bool(val);
+    return true;
+  }
+  if (key == "validation_two_body_radius") {
+    config.validation_two_body_radius = std::stod(val);
+    return true;
+  }
+  if (key == "validation_two_body_speed_ratio") {
+    config.validation_two_body_speed_ratio = std::stod(val);
+    return true;
+  }
+  if (key == "validation_symmetric_include_bh") {
+    config.validation_symmetric_include_bh = parse_bool(val);
+    return true;
+  }
+  if (key == "validation_symmetric_separation") {
+    config.validation_symmetric_separation = std::stod(val);
+    return true;
+  }
+  if (key == "validation_symmetric_speed") {
+    config.validation_symmetric_speed = std::stod(val);
+    return true;
+  }
+  if (key == "validation_small_n") {
+    config.validation_small_n = std::stoi(val);
+    return true;
+  }
+  if (key == "validation_n_steps") {
+    config.validation_n_steps = std::stoi(val);
+    return true;
+  }
+  if (key == "validation_snapshot_every") {
+    config.validation_snapshot_every = std::stoi(val);
+    return true;
+  }
+  return false;
+}
+
 bool load_config_file(const std::string& path, Config& config) {
   std::ifstream f(path);
   if (!f) return false;
@@ -83,50 +263,9 @@ bool load_config_file(const std::string& path, Config& config) {
     if (key.empty()) continue;
 
     try {
-      if (key == "simulation_mode") { config.simulation_mode = parse_mode(val); continue; }
-      if (key == "n_stars") { config.n_stars = std::stoi(val); continue; }
-      if (key == "star_mass") { config.star_mass = std::stod(val); continue; }
-      if (key == "bh_mass") { config.bh_mass = std::stod(val); continue; }
-      if (key == "inner_radius") { config.inner_radius = std::stod(val); continue; }
-      if (key == "outer_radius") { config.outer_radius = std::stod(val); continue; }
-      if (key == "galaxy_radius") { config.galaxy_radius = std::stod(val); continue; }
-      if (key == "dt") { config.dt = std::stod(val); continue; }
-      if (key == "n_steps") { config.n_steps = std::stoi(val); continue; }
-      if (key == "snapshot_every") { config.snapshot_every = std::stoi(val); continue; }
-      if (key == "softening") { config.softening = std::stod(val); continue; }
-      if (key == "enable_star_star_gravity") { config.enable_star_star_gravity = parse_bool(val); continue; }
-      if (key == "physics_package") { config.physics_package = val; continue; }
-      if (key == "tpfcore_enable_provisional_readout") { config.tpfcore_enable_provisional_readout = parse_bool(val); continue; }
-      if (key == "tpfcore_readout_mode") { config.tpfcore_readout_mode = trim(val); continue; }
-      if (key == "tpfcore_readout_scale") { config.tpfcore_readout_scale = std::stod(val); continue; }
-      if (key == "tpfcore_theta_tt_scale") { config.tpfcore_theta_tt_scale = std::stod(val); continue; }
-      if (key == "tpfcore_theta_tr_scale") { config.tpfcore_theta_tr_scale = std::stod(val); continue; }
-      if (key == "tpf_kappa") { config.tpf_kappa = std::stod(val); continue; }
-      if (key == "tpf_gdd_coupling") { config.tpf_gdd_coupling = std::stod(val); continue; }
-      if (key == "tpf_poisson_bins") { config.tpf_poisson_bins = std::stoi(val); continue; }
-      if (key == "tpf_poisson_max_radius") { config.tpf_poisson_max_radius = std::stod(val); continue; }
-      if (key == "tpf_cooling_fraction") { config.tpf_cooling_fraction = std::stod(val); continue; }
-      if (key == "tpfcore_dump_readout_debug") { config.tpfcore_dump_readout_debug = parse_bool(val); continue; }
-      if (key == "tpfcore_probe_radius_min") { config.tpfcore_probe_radius_min = std::stod(val); continue; }
-      if (key == "tpfcore_probe_radius_max") { config.tpfcore_probe_radius_max = std::stod(val); continue; }
-      if (key == "tpfcore_probe_samples") { config.tpfcore_probe_samples = std::stoi(val); continue; }
-      if (key == "tpfcore_dump_invariant_profile") { config.tpfcore_dump_invariant_profile = parse_bool(val); continue; }
-      if (key == "tpfcore_dump_theta_profile") { config.tpfcore_dump_theta_profile = parse_bool(val); continue; }
-      if (key == "tpfcore_source_softening") { config.tpfcore_source_softening = std::stod(val); continue; }
-      if (key == "tpfcore_residual_step") { config.tpfcore_residual_step = std::stod(val); continue; }
-      if (key == "tpfcore_live_orbit_force_audit") { config.tpfcore_live_orbit_force_audit = parse_bool(val); continue; }
-      if (key == "velocity_noise") { config.velocity_noise = std::stod(val); continue; }
-      if (key == "initial_velocity_scale") { config.initial_velocity_scale = std::stod(val); continue; }
-      if (key == "save_snapshots") { config.save_snapshots = parse_bool(val); continue; }
-      if (key == "save_run_info") { config.save_run_info = parse_bool(val); continue; }
-      if (key == "validation_two_body_radius") { config.validation_two_body_radius = std::stod(val); continue; }
-      if (key == "validation_two_body_speed_ratio") { config.validation_two_body_speed_ratio = std::stod(val); continue; }
-      if (key == "validation_symmetric_include_bh") { config.validation_symmetric_include_bh = parse_bool(val); continue; }
-      if (key == "validation_symmetric_separation") { config.validation_symmetric_separation = std::stod(val); continue; }
-      if (key == "validation_symmetric_speed") { config.validation_symmetric_speed = std::stod(val); continue; }
-      if (key == "validation_small_n") { config.validation_small_n = std::stoi(val); continue; }
-      if (key == "validation_n_steps") { config.validation_n_steps = std::stoi(val); continue; }
-      if (key == "validation_snapshot_every") { config.validation_snapshot_every = std::stoi(val); continue; }
+      if (!apply_config_kv(key, val, config)) {
+        /* unknown key: ignore (same as before) */
+      }
     } catch (const std::exception& e) {
       throw std::runtime_error("Config error in " + path + " line " + std::to_string(line_num) +
           " (key=" + key + "): " + e.what());

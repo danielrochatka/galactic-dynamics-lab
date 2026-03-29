@@ -121,6 +121,28 @@ int main(int argc, char** argv) {
     }
   }
 
+  for (int i = 2; i < argc; ++i) {
+    std::string a = argv[i];
+    if (a == "--plot") continue;
+    if (a.size() < 4 || a.substr(0, 2) != "--") continue;
+    std::size_t eq = a.find('=');
+    if (eq == std::string::npos) {
+      std::cerr << "CLI config: expected --key=value, got: " << a << "\n";
+      return 1;
+    }
+    std::string key = a.substr(2, eq - 2);
+    std::string val = a.substr(eq + 1);
+    try {
+      if (!galaxy::apply_config_kv(key, val, config)) {
+        std::cerr << "Unknown CLI config key: " << key << "\n";
+        return 1;
+      }
+    } catch (const std::exception& e) {
+      std::cerr << "CLI config error (" << key << "): " << e.what() << "\n";
+      return 1;
+    }
+  }
+
   /* Probe run config for consistency check (what did the file say?) */
   std::string run_cfg_physics = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "physics_package");
   std::string run_cfg_mode_str = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "simulation_mode");
