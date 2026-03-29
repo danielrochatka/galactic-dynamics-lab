@@ -183,6 +183,12 @@ struct Config {
   bool save_run_info = true;
   /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
   bool plot_animation_dynamic_zoom = true;
+  /**
+   * plot_cpp_run.py: text overlay on galaxy_initial/final PNG and animation frames.
+   * none | minimal | audit_full. Default none keeps PNG/MP4 pixel-identical to pre-overlay behavior;
+   * set minimal or audit_full in run config for audit labels.
+   */
+  std::string render_overlay_mode = "none";
 
   // Validation-only
   double validation_two_body_radius = 20.0;

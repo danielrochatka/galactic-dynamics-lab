@@ -2,6 +2,7 @@
 #include "force_compare.hpp"
 #include "galaxy_init.hpp"
 #include "init_conditions.hpp"
+#include "render_audit.hpp"
 #include "output.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
@@ -714,6 +715,11 @@ int main(int argc, char** argv) {
                                  ? &galaxy::last_galaxy_init_audit()
                                  : nullptr);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {
+      galaxy::write_render_manifest(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()),
+                                  state.n(), &galaxy::last_galaxy_init_audit());
+      std::cout << "Wrote " << config.output_dir << "/render_manifest.json, render_manifest.txt\n";
     }
     if (config.save_snapshots) {
       galaxy::write_snapshots(config.output_dir, snapshots);

@@ -21,6 +21,10 @@ Outputs are written into the same run_dir (or run_dir/plots if you prefer;
   currently we write into run_dir to match "same run folder").
 
 Requires: numpy, pandas, matplotlib. Optional: ffmpeg or Pillow for animation.
+
+Galaxy runs: cpp_sim writes render_manifest.json and render_manifest.txt (with active_dynamics_branch,
+active_metrics_branch, acceleration_code_path). plot_cpp_run draws optional text overlay on galaxy_*.png
+and animation frames (run_info render_overlay_mode or --render-overlay-mode).
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ import pandas as pd
 
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
+from render_overlay import build_overlay_spec, resolve_overlay_mode
 from diagnostics import compute_diagnostics, plot_and_save_all
 from plot_rotation_curve import (
     load_run_info,
@@ -267,6 +272,14 @@ def main() -> None:
         action="store_true",
         help="Animation: force smoothed viewport (overrides run_info).",
     )
+    parser.add_argument(
+        "--render-overlay-mode",
+        type=str,
+        choices=("none", "minimal", "audit_full"),
+        default=None,
+        help="On-frame audit overlay for galaxy PNG/animation (default: from run_info render_overlay_mode; "
+        "if missing, none for backward compatibility).",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
@@ -294,6 +307,16 @@ def main() -> None:
     else:
         use_animation_dynamic_zoom = plot_animation_dynamic_zoom_from_run_info(run_info)
 
+    overlay_mode = resolve_overlay_mode(run_info, args.render_overlay_mode)
+    overlay_spec = build_overlay_spec(run_dir, run_info)
+    overlay_kw = {}
+    if overlay_mode != "none":
+        overlay_kw = {
+            "overlay_mode": overlay_mode,
+            "overlay_spec": overlay_spec,
+            "run_info": run_info,
+        }
+
     initial = snapshots[0]
     final = snapshots[-1]
     render_radius_initial = galaxy_velocity_gated_target_limit(
@@ -310,6 +333,9 @@ def main() -> None:
         title="Galaxy – Initial (C++ run)",
         render_radius=render_radius_initial,
         velocities=initial.velocities,
+        overlay_step=initial.step,
+        overlay_time=float(initial.time),
+        **overlay_kw,
     )
     print(f"Saved: {run_dir / 'galaxy_initial.png'}")
     save_static_plot(
@@ -318,6 +344,9 @@ def main() -> None:
         title="Galaxy – Final (C++ run)",
         render_radius=render_radius_final,
         velocities=final.velocities,
+        overlay_step=final.step,
+        overlay_time=float(final.time),
+        **overlay_kw,
     )
     print(f"Saved: {run_dir / 'galaxy_final.png'}")
 
@@ -376,6 +405,7 @@ def main() -> None:
             render_radius=render_radius_cb,
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
+            **overlay_kw,
         )
         if ok:
             if (run_dir / "galaxy.mp4").exists():

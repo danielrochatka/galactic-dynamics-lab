@@ -1,5 +1,6 @@
 #include "output.hpp"
 #include "galaxy_init.hpp"
+#include "render_audit.hpp"
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -27,6 +28,10 @@ void write_run_info(const std::string& output_dir,
   f << "package_defaults\t" << (package_defaults_path.empty() ? "(none)" : package_defaults_path) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
   f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
+  f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
+  f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
+  f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
+  f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
   f << "output_dir\t" << output_dir << "\n";
   f << "n_stars\t" << n_star << "\n";
   f << "bh_mass\t" << config.bh_mass << "\n";
@@ -82,6 +87,10 @@ void write_run_info(const std::string& output_dir,
   f << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
   f << "galaxy_radius\t" << config.galaxy_radius << "\n";
   f << "plot_animation_dynamic_zoom\t" << (config.plot_animation_dynamic_zoom ? 1 : 0) << "\n";
+  f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
+  f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
+  f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
+  f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
   f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
   f << "number_of_snapshots\t" << n_snapshots << "\n";
   f << "n_stars\t" << n_star << "\n";

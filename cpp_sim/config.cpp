@@ -283,6 +283,22 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.plot_animation_dynamic_zoom = parse_bool(val);
     return true;
   }
+  if (key == "render_overlay_mode") {
+    std::string m = trim(val);
+    std::string lo = m;
+    for (char& c : lo) {
+      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    if (lo == "none" || lo == "minimal" || lo == "audit_full") {
+      config.render_overlay_mode = lo;
+      return true;
+    }
+    throw std::runtime_error("render_overlay_mode must be none, minimal, or audit_full");
+  }
+  if (key == "tpf_gdd_coupling") {
+    config.tpf_vdsg_coupling = std::stod(val);
+    return true;
+  }
   if (key == "validation_two_body_radius") {
     config.validation_two_body_radius = std::stod(val);
     return true;

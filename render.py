@@ -6,7 +6,7 @@ Top-down 2D view of the galaxy.
 import subprocess
 import time
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -138,6 +138,12 @@ def save_static_plot(
     title: str = "Galaxy",
     render_radius: RenderRadius = 150.0,
     velocities: Optional[np.ndarray] = None,
+    *,
+    overlay_mode: str = "none",
+    overlay_spec: Optional[dict[str, Any]] = None,
+    run_info: Optional[dict[str, Any]] = None,
+    overlay_step: int = 0,
+    overlay_time: float = 0.0,
 ) -> None:
     """Save a single static scatter plot."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
@@ -150,6 +156,21 @@ def save_static_plot(
 
     scatter_frame(ax, positions, render_radius=render_radius, velocities=velocities)
     ax.set_title(title, color="white", fontsize=14)
+    if (
+        overlay_mode != "none"
+        and overlay_spec is not None
+        and run_info is not None
+    ):
+        from render_overlay import draw_galaxy_render_overlay
+
+        draw_galaxy_render_overlay(
+            ax,
+            overlay_mode,
+            overlay_spec,
+            run_info=run_info,
+            step=overlay_step,
+            time_s=overlay_time,
+        )
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150, facecolor="black", edgecolor="none")
@@ -162,6 +183,10 @@ def create_animation(
     render_radius: RenderRadius = 150.0,
     interval: int = 50,
     progress_interval: int = 50,
+    *,
+    overlay_mode: str = "none",
+    overlay_spec: Optional[dict[str, Any]] = None,
+    run_info: Optional[dict[str, Any]] = None,
 ) -> bool:
     """
     Create animation (MP4 or GIF) from snapshots.
@@ -188,6 +213,21 @@ def create_animation(
             ax, snap.positions, render_radius=render_radius, velocities=vel
         )
         ax.set_title(f"Step {snap.step}  |  t = {snap.time:.1f}", color="white")
+        if (
+            overlay_mode != "none"
+            and overlay_spec is not None
+            and run_info is not None
+        ):
+            from render_overlay import draw_galaxy_render_overlay
+
+            draw_galaxy_render_overlay(
+                ax,
+                overlay_mode,
+                overlay_spec,
+                run_info=run_info,
+                step=int(snap.step),
+                time_s=float(snap.time),
+            )
         if progress_interval and (frame_idx % progress_interval == 0 or frame_idx == n_frames - 1):
             pct = 100 * (frame_idx + 1) / n_frames
             print(f"    Frame {frame_idx + 1}/{n_frames} ({pct:.0f}%)")
