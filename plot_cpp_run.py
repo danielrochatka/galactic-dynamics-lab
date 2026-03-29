@@ -9,6 +9,9 @@ then produces the same kinds of plots as the Python pipeline:
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
+Animation viewport: by default uses temporally smoothed limits (dynamic zoom). Disable via
+  run_info key plot_animation_dynamic_zoom (from cpp_sim config) or CLI flag --no-dynamic-zoom.
+
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
   python plot_cpp_run.py cpp_sim/outputs/20260308_175421
@@ -169,6 +172,27 @@ def galaxy_velocity_gated_target_limit(
     return float(target_limit)
 
 
+def plot_animation_dynamic_zoom_from_run_info(
+    run_info: dict[str, str | int | float],
+) -> bool:
+    """
+    Read plot_animation_dynamic_zoom from run_info (written by cpp_sim).
+    Default True if missing (preserve legacy animation smoothing).
+    """
+    raw = run_info.get("plot_animation_dynamic_zoom")
+    if raw is None:
+        return True
+    if isinstance(raw, (int, float)):
+        return int(raw) != 0
+    if isinstance(raw, str):
+        s = raw.strip().lower()
+        if s in ("0", "false", "no"):
+            return False
+        if s in ("1", "true", "yes"):
+            return True
+    return True
+
+
 def galaxy_velocity_gated_smoothed_limit(
     positions: np.ndarray,
     velocities: np.ndarray,
@@ -230,6 +254,18 @@ def main() -> None:
         default=150.0,
         help="Fallback half-axis range if snapshot extents are degenerate (default 150)",
     )
+    zoom_group = parser.add_mutually_exclusive_group()
+    zoom_group.add_argument(
+        "--no-dynamic-zoom",
+        action="store_true",
+        help="Animation: use per-frame velocity-gated limit only (no temporal smoothing). "
+        "Overrides run_info plot_animation_dynamic_zoom.",
+    )
+    zoom_group.add_argument(
+        "--dynamic-zoom",
+        action="store_true",
+        help="Animation: force smoothed viewport (overrides run_info).",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
@@ -250,6 +286,12 @@ def main() -> None:
 
     fallback_radius = float(args.render_radius)
     galaxy_radius_m = resolve_galaxy_radius_meters(run_info, snapshots, fallback_radius)
+    if args.dynamic_zoom:
+        use_animation_dynamic_zoom = True
+    elif args.no_dynamic_zoom:
+        use_animation_dynamic_zoom = False
+    else:
+        use_animation_dynamic_zoom = plot_animation_dynamic_zoom_from_run_info(run_info)
     initial = snapshots[0]
     final = snapshots[-1]
     render_radius_initial = galaxy_velocity_gated_target_limit(
@@ -303,7 +345,18 @@ def main() -> None:
     # Optional animation
     if not args.no_animation:
         print("Creating animation...")
-        plt.current_zoom_limit = 1e20
+        if use_animation_dynamic_zoom:
+            plt.current_zoom_limit = 1e20
+            render_radius_cb = lambda pos, vel: galaxy_velocity_gated_smoothed_limit(
+                pos, vel, galaxy_radius_m, fallback_radius
+            )
+        else:
+            render_radius_cb = lambda pos, vel: galaxy_velocity_gated_target_limit(
+                pos, vel, galaxy_radius_m, fallback_radius
+            )
+        print(
+            f"  Animation viewport: {'dynamic zoom (smoothed)' if use_animation_dynamic_zoom else 'fixed per frame (no smoothing)'}"
+        )
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
         else:
@@ -311,9 +364,7 @@ def main() -> None:
         ok = create_animation(
             snapshots,
             run_dir / "galaxy",
-            render_radius=lambda pos, vel: galaxy_velocity_gated_smoothed_limit(
-                pos, vel, galaxy_radius_m, fallback_radius
-            ),
+            render_radius=render_radius_cb,
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
         )

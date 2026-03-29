@@ -132,6 +132,8 @@ struct Config {
 
   bool save_snapshots = true;
   bool save_run_info = true;
+  /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
+  bool plot_animation_dynamic_zoom = true;
 
   // Validation-only
   double validation_two_body_radius = 20.0;

@@ -215,6 +215,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.save_run_info = parse_bool(val);
     return true;
   }
+  if (key == "plot_animation_dynamic_zoom") {
+    config.plot_animation_dynamic_zoom = parse_bool(val);
+    return true;
+  }
   if (key == "validation_two_body_radius") {
     config.validation_two_body_radius = std::stod(val);
     return true;

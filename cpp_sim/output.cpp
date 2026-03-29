@@ -60,6 +60,7 @@ void write_run_info(const std::string& output_dir,
   f << "bh_mass\t" << config.bh_mass << "\n";
   f << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
   f << "galaxy_radius\t" << config.galaxy_radius << "\n";
+  f << "plot_animation_dynamic_zoom\t" << (config.plot_animation_dynamic_zoom ? 1 : 0) << "\n";
   f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
   f << "number_of_snapshots\t" << n_snapshots << "\n";
   f << "n_stars\t" << n_star << "\n";
