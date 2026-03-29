@@ -170,16 +170,83 @@ void TPFCorePackage::compute_accelerations(const State& state,
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
 
+  static bool has_branch_audited = false;
+  if (!has_branch_audited && n > 0) {
+    has_branch_audited = true;
+    const bool vdsg_active = (gdd_coupling_ != 0.0);
+    const bool readout_enabled = provisional_readout_;
+    const bool hybrid_config = readout_enabled && vdsg_active;
+    const bool tensor_readout_drives_accel = readout_enabled && !vdsg_active;
+
+    std::cerr << "\n========== ACTIVE PHYSICS LEDGER (one-time branch audit) ==========\n";
+    std::cerr << "VDSG/GDD BRANCH: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
+              << "  (tpf_gdd_coupling " << (vdsg_active ? "!=" : "==") << " 0)\n";
+    std::cerr << "TPF READOUT BRANCH: " << (readout_enabled ? "ACTIVE" : "INACTIVE")
+              << "  (tpfcore_enable_provisional_readout)\n";
+    std::cerr << "HYBRID MODE: " << (hybrid_config ? "YES" : "NO")
+              << "  (readout enabled AND GDD coupling nonzero; GDD supersedes accelerations)\n";
+    std::cerr << "Acceleration path: "
+              << (vdsg_active ? "VDSG centripetal SI (tensor readout not used for ax, ay)\n"
+                              : "TPF provisional readout (tensor / derived radial / experimental)\n");
+    std::cerr << std::scientific << std::setprecision(16);
+    std::cerr << "tpf_gdd_coupling = " << gdd_coupling_ << "\n";
+    std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
+    std::cerr << "tpfcore_readout_mode = " << readout_mode_ << "\n";
+
+    const double eps_soft = (source_softening_ > 0.0) ? source_softening_ : softening;
+    const double G_si = tpfcore::TPF_G_SI;
+
+    if (bh_mass > 0.0) {
+      const double xi = state.x[0];
+      const double yi = state.y[0];
+      const double r_sq = xi * xi + yi * yi;
+      const double eps_sq = softening * softening;
+      const double denom = r_sq + eps_sq;
+      const double r_mag = std::sqrt(denom);
+      if (r_mag > 1e-300) {
+        const double ux = xi / r_mag;
+        const double v_dot_r = state.vx[0] * ux + state.vy[0] * (yi / r_mag);
+        const double doppler_scale = 1.0 + gdd_coupling_ * (v_dot_r / C_SI_LIGHT);
+        const double a_newtonian = G_si * bh_mass / denom;
+        const double a_VDSG_modifier = a_newtonian * (doppler_scale - 1.0);
+
+        std::cerr << "--- Sample: Star 0 vs BH (SI magnitudes) ---\n";
+        std::cerr << "a_newtonian = " << a_newtonian << "  (G*M_BH/(r^2+eps^2))\n";
+        std::cerr << "a_VDSG_modifier = " << a_VDSG_modifier
+                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = " << doppler_scale << ")\n";
+
+        if (tensor_readout_drives_accel) {
+          double ax_r = 0.0;
+          double ay_r = 0.0;
+          if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+            tpfcore::TpfRadialGravityProfile profile =
+                tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps_soft);
+            tpfcore::compute_provisional_readout_acceleration(
+                state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
+                theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, &derived_poisson_cfg_, &profile);
+          } else {
+            tpfcore::compute_provisional_readout_acceleration(
+                state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
+                theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, nullptr, nullptr);
+          }
+          const double a_tpf_readout = std::hypot(ax_r, ay_r);
+          std::cerr << "a_tpf_readout = " << a_tpf_readout << "  (|a| from compute_provisional_readout_acceleration)\n";
+        } else {
+          std::cerr << "a_tpf_readout = N/A  (VDSG active: tensor readout bypassed for accelerations)\n";
+        }
+      } else {
+        std::cerr << "--- Sample: Star 0 vs BH skipped (r_mag too small) ---\n";
+      }
+    } else {
+      std::cerr << "--- Sample: Star 0 vs BH skipped (bh_mass <= 0) ---\n";
+    }
+    std::cerr << "===================================================================\n\n" << std::flush;
+  }
+
   /* Non-zero GDD: velocity-deformed centripetal SI gravity (no tangential kick; tensor readout skipped). */
   if (gdd_coupling_ != 0.0) {
-    static bool gdd_path_notice = false;
-    if (!gdd_path_notice) {
-      std::cerr << "TPFCore: tpf_gdd_coupling != 0 — using velocity-deformed centripetal SI gravity "
-                   "(BH + star–star); provisional tensor readout is not used for accelerations.\n";
-      gdd_path_notice = true;
-    }
     accumulate_velocity_deformed_centripetal_gravity(state, bh_mass, softening, star_star, gdd_coupling_,
-                                                       simulation_dt_, ax, ay);
+                                                     simulation_dt_, ax, ay);
     return;
   }
 

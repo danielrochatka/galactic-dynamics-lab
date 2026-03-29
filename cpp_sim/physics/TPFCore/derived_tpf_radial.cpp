@@ -3,6 +3,7 @@
  */
 
 #include "derived_tpf_radial.hpp"
+#include "source_ansatz.hpp"
 #include "../../config.hpp"
 #include <algorithm>
 #include <cmath>
@@ -45,6 +46,7 @@ Theta3D evaluate_derived_theta(double mass_kg, double dx, double dy, double dz, 
 }
 
 double derived_invariant_I_contracted(const Theta3D& theta) {
+  /* Frobenius Θ_ij Θ_ij only — not manuscript I = Θ_μν Θ^μν − λ Θ² (Eq. 3, v11). */
   return theta.xx * theta.xx + theta.yy * theta.yy + theta.zz * theta.zz +
          2.0 * (theta.xy * theta.xy + theta.xz * theta.xz + theta.yz * theta.yz);
 }
@@ -124,12 +126,12 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     double py = 0.0;
     double pz = 0.0;
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
-    double I_total = derived_invariant_I_contracted(theta_tot);
+    /* Manuscript I (Eq. 3); |·| for ρ_raw so sign of I does not flip density. */
+    double I_total = std::abs(compute_invariant_I(theta_tot));
 
-    /* Baseline radial ledger: contracted invariant only (no macroscopic spatial memory). */
-    I_total = std::abs(I_total);
+    /* Baseline radial ledger (no macroscopic spatial memory beyond this shell model). */
 
-    double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
+    double rho_raw = I_total * std::abs(tpf_kappa);
     if (!std::isfinite(rho_raw) || rho_raw > 1e300) {
       ++warning_count;
       if (stability_alert_prints < MAX_WARNINGS) {

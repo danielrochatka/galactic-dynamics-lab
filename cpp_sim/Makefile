@@ -8,7 +8,9 @@ SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newto
 OBJS = $(SRCS:.cpp=.o)
 TARGET = galaxy_sim
 
-.PHONY: all clean
+TEST_TPF_OBJS = test_tpf_regression.o physics/TPFCore/source_ansatz.o physics/TPFCore/derived_tpf_radial.o
+
+.PHONY: all clean test_tpf_regression check
 
 all: $(TARGET)
 
@@ -18,5 +20,11 @@ $(TARGET): $(OBJS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+test_tpf_regression: $(TEST_TPF_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(TEST_TPF_OBJS)
+
+check: test_tpf_regression
+	./test_tpf_regression
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) test_tpf_regression $(TEST_TPF_OBJS)

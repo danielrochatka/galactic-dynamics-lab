@@ -33,6 +33,7 @@ struct DerivedTpfPoissonConfig {
 
 Theta3D evaluate_derived_theta(double mass_kg, double dx, double dy, double dz, double eps);
 
+/** Frobenius sum Θ_ij Θ_ij only; not manuscript I = Θ_μν Θ^μν − λ Θ². κ-ledger uses compute_invariant_I. */
 double derived_invariant_I_contracted(const Theta3D& theta);
 
 Theta3D sum_derived_theta_at_point(const State& state, double bh_mass, double px, double py, double pz,

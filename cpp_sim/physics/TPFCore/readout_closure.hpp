@@ -10,8 +10,12 @@
  *
  * Implementations (in provisional_readout.cpp):
  * - tensor_radial: per-source Theta·r_hat, superposed (with optional negated).
- * - tr_coherence: superposed Theta at particle, then Theta_rr/Theta_tt/Theta_tr formula.
- * - experimental_radial_r_scaling: same Theta as tr_coherence; radial-only a = readout_scale*(-theta_rr)*r*r_hat.
+ * - derived_tpf_radial_readout and tr_coherence_readout: same path — hybrid radial a_s r̂ from
+ *   bounced baryons + κ–I ledger (see derived_tpf_radial.*). Theta_rr/Theta_tt/Theta_tr are diagnostics;
+ *   tangential readout is not added to ax, ay.
+ * - experimental_radial_r_scaling: superposed Theta; radial-only a = readout_scale*(-theta_rr)*r*r_hat.
+ *
+ * Full scope / tiers: TPF_PAPER_V11_SCOPE.md in this directory.
  *
  * The public API is in provisional_readout.hpp (compute_provisional_readout_*).
  * This header documents the closure boundary only; no new symbols required by callers.

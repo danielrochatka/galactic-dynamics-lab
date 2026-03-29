@@ -162,7 +162,7 @@ static void apply_derived_tpf_radial_readout_closure(const State& state,
     diag->theta_xy = theta_sum.xy;
     diag->theta_yy = theta_sum.yy;
     diag->theta_trace = theta_sum.trace();
-    diag->invariant_I = derived_invariant_I_contracted(theta_sum);
+    diag->invariant_I = compute_invariant_I(theta_sum);
     diag->theta_norm = theta_frobenius_norm(theta_sum);
     diag->regime = "derived-tpf-radial";
   }

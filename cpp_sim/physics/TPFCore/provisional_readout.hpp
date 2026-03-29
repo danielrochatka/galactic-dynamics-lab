@@ -14,6 +14,8 @@
  * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
  *   tr_coherence_readout / derived_tpf_radial_readout (hybrid bounce + κ ledger),
  *   experimental_radial_r_scaling (experimental; provisional ansatz Theta, radial-only with r-scaling).
+ *
+ * Manuscript v11 vs code tiers: TPF_PAPER_V11_SCOPE.md in this directory.
  */
 
 #include "../../types.hpp"

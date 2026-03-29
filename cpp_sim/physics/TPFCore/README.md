@@ -2,6 +2,8 @@
 
 **This is NOT the removed weak-field Newtonian-like TPF package.** TPFCore implements the bare primitive structure from the paper. The source uses the **3D** Hessian of a softened Coulomb potential evaluated on the **z = 0** simulation plane (source and field point at z = 0).
 
+**Manuscript v11 vs simulator scope (tiers, readout routing, ∆C placeholder):** see **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
+
 ## Source ansatz (provisional weak-field)
 
 - **Phi** = -M / R with **R²** = dx² + dy² + eps² — same as 3D distance with z = z_s = 0 and isotropic softening eps² in the radical
@@ -77,7 +79,7 @@ For **symmetric pair** at (±d, 0):
 ## Config (defaults.cfg)
 
 - `tpfcore_enable_provisional_readout` — false. Set true to enable tensor-driven motion (exploratory).
-- `tpfcore_readout_mode` — `tensor_radial_projection`, `tensor_radial_projection_negated`, or `tr_coherence_readout` (see below).
+- `tpfcore_readout_mode` — `tensor_radial_projection`, `tensor_radial_projection_negated`, `derived_tpf_radial_readout`, `tr_coherence_readout`, or `experimental_radial_r_scaling` (see below).
 - `tpfcore_readout_scale` — scale factor for readout magnitude (default 1.0)
 - `tpfcore_theta_tt_scale` — (tr_coherence_readout only) Theta_tt balancing companion scale (default 1.0)
 - `tpfcore_theta_tr_scale` — (tr_coherence_readout only) Theta_tr mixed coupling scale (default 1.0)
@@ -120,18 +122,18 @@ A **provisional**, **exploratory** motion/readout layer maps the local tensor fi
 
 **tensor_radial_projection_negated**: Same projection, opposite sign. For debugging sign errors only. Not a final theory result.
 
-### Readout mode: `tr_coherence_readout` (paper-aligned t–r structure)
+### Readout modes: `derived_tpf_radial_readout` and `tr_coherence_readout` (same dynamics path)
 
-**Exploratory** readout inspired by the paper’s weak-field t–r orbit/coherence discussion (Theta_tt, Theta_rr, Theta_tr). It is **not** the final derived TPF motion law; it moves the provisional motion layer closer to the paper than the spatial projection.
+Both strings satisfy `is_derived_tpf_radial_readout_mode()` and call **`apply_derived_tpf_radial_readout_closure`** (`provisional_readout.cpp`):
 
-- **Theta_rr**: spatial tensor projected onto local radial: r_hat^T Theta r_hat (from superposed Theta at particle).
-- **Theta_tt**: configurable balancing companion term: `tpfcore_theta_tt_scale × (−Theta_rr)` so that Theta_rr + Theta_tt can be tuned (e.g. toward balance).
-- **Theta_tr**: provisional mixed time–radial coupling: t_hat^T Theta r_hat (tangential unit t_hat ⊥ r_hat).
-- **Provisional radial readout**: `readout_scale × (Theta_rr + Theta_tt)` along r_hat.
-- **Provisional tangential readout**: `readout_scale × tpfcore_theta_tr_scale × Theta_tr` along t_hat.
-- **Acceleration**: radial component + tangential component (no Phi gradient).
+- **Particle acceleration** is **purely radial**: **a = a_s r̂** with **a_s** from **`radial_acceleration_scalar_derived`** (bounced enclosed baryons + **M_eff(r)** from the κ–**I** shell ledger in **`build_tpf_gravity_profile`**). **Manuscript I** (Eq. 3) enters the ledger via **`compute_invariant_I`** on the superposed SI **Θ** at each shell radius.
+- **Theta_rr**, **Theta_tt** (`theta_tt_scale × (−theta_rr)`), **Theta_tr**, and **provisional_tangential_readout** are computed for **CSV / diagnostics only**; they are **not** added to **a_x, a_y**.
 
-**Config:** `tpfcore_readout_mode = tr_coherence_readout`, `tpfcore_theta_tt_scale` (default 1.0), `tpfcore_theta_tr_scale` (default 1.0).
+**Config:** `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_theta_tt_scale`, `tpfcore_theta_tr_scale` (latter two affect diagnostics and recorded tangential readout, not the integrator for this path).
+
+### Readout mode: `tr_coherence_readout` (naming note)
+
+The name suggests a distinct t–r coherence **force**; **in code** it is **the same hybrid radial closure** as `derived_tpf_radial_readout`. For paper claims, prefer **`TPF_PAPER_V11_SCOPE.md`** wording.
 
 **Supported simulation modes** (with any readout enabled):
 - `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `galaxy`
@@ -150,10 +152,15 @@ Used to diagnose runaway vs bound behavior. For bound orbits, a_inward should be
 
 **run_info.txt** includes `tpfcore_readout_mode`, `tpfcore_readout_scale`, `tpfcore_theta_tt_scale`, `tpfcore_theta_tr_scale` (when applicable), `tpfcore_dump_readout_debug`.
 
+## GDD path (`tpf_gdd_coupling` ≠ 0)
+
+**`TPFCorePackage::compute_accelerations`** uses **`accumulate_velocity_deformed_centripetal_gravity`** only: SI **G M / r²**-style centripetal terms with **doppler_scale = 1 + coupling (v·r̂)/c** and a global **|a|** cap. **Provisional tensor / derived radial readout is not used** for accelerations (see stderr notice once).
+
 ## What is NOT implemented
 
-- Full nonlinear/dynamic TPF field equations (the readout is exploratory, not derived)
-- Newtonian-style substitution (−grad(Phi) acceleration)
+- Full **C_μν** / metric evolution from the manuscript; **∆C_μν** is not expanded in v11 and not implemented here.
+- Full nonlinear/dynamic TPF field equations for **Ξ** (the readout and ledger layers are exploratory closures, not derived from Eq. (10) as a coupled PDE solve).
+- Newtonian-style **default** acceleration when readout is off (readout must be enabled for TPFCore dynamics, or use inspection modes).
 
 ## Warning
 
