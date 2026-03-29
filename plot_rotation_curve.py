@@ -10,8 +10,9 @@ Primary glob: output_*.csv (highest step inferred from filename). Falls back to 
 The red curve is **pure** Newtonian v = sqrt(G*M_bh/r): it does **not** use tpf_kappa or any TPF ledger.
 Only the **blue scatter** comes from the snapshot (so κ changes star speeds for TPFCore runs, not the red line).
 
-By default, when run_info.txt sits next to the CSV, M_bh and x-axis extent are taken from the run
-(bh_mass, galaxy_radius). Legacy default M_bh = 1e41 applies if no run_info / no bh_mass.
+By default, when run_info.txt sits next to the CSV, M_bh is taken from the run; the x-axis is capped
+to 2× galaxy_radius (escapers omitted from scatter by default) so the disk stays readable. If
+galaxy_radius is missing, x_max falls back to 2e20 m.
 
 Usage:
   python plot_rotation_curve.py
@@ -32,8 +33,10 @@ import numpy as np
 G_SI = 6.6743e-11
 # Fallback M_bh when run_info has no positive bh_mass (legacy astronomical benchmark only).
 NEWTONIAN_REFERENCE_M_BH = 1.0e41
-# Legacy x-axis cap (m); prefer auto scale from data + galaxy_radius.
-DEFAULT_X_MAX = 1.2e20
+# X-axis fallback when run_info has no galaxy_radius (legacy / huge-r plots).
+ROTATION_CURVE_X_FALLBACK_MAX = 2.0e20
+# Kept for backward compatibility in auto branches inside save_rotation_curve_png.
+DEFAULT_X_MAX = ROTATION_CURVE_X_FALLBACK_MAX
 
 
 def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
@@ -74,12 +77,15 @@ def rotation_curve_x_max(
     run_info: dict[str, str | int | float],
     r_data: np.ndarray,
 ) -> float:
-    """Horizontal plot limit (m): ~galaxy_radius or data extent so the curve is not crushed to r≈0."""
-    rmax = float(np.max(r_data)) if len(r_data) else 1.0
+    """
+    Horizontal plot limit (m): twice configured galaxy_radius so escaped outliers do not stretch the disk.
+    Falls back to ROTATION_CURVE_X_FALLBACK_MAX (2e20 m) when galaxy_radius is missing.
+    """
+    _ = r_data  # kept for API compatibility with callers; x extent comes from run_info only
     gr = run_info.get("galaxy_radius") if run_info else None
     if isinstance(gr, (int, float)) and float(gr) > 0:
-        return max(float(gr) * 1.25, rmax * 1.12, 1.0)
-    return max(rmax * 1.2, 1.0)
+        return 2.0 * float(gr)
+    return float(ROTATION_CURVE_X_FALLBACK_MAX)
 
 
 def scatter_label_from_run_info(run_info: dict[str, str | int | float]) -> str:
@@ -206,11 +212,13 @@ def save_rotation_curve_png(
     x_max: float | None = None,
     scatter_label: str = "Simulated stars",
     newtonian_label: str | None = None,
+    filter_scatter_by_xmax: bool = True,
 ) -> None:
     """
     Scatter r vs v and overlay Newtonian v = sqrt(G*M_bh/r). Arrays need not be pre-sorted.
 
-    The overlay uses only G and M_bh (no κ, no TPF profile). x_max=None picks a scale from the data.
+    The overlay uses only G and M_bh (no κ, no TPF profile). x_max=None picks a capped scale from data.
+    When filter_scatter_by_xmax is True, only points with r <= x_max are scattered (keeps v-scale disk-like).
     """
     order = np.argsort(r)
     r_s = r[order]
@@ -225,9 +233,18 @@ def save_rotation_curve_png(
         if r_hi > 1e15:
             x_max = max(x_max, min(DEFAULT_X_MAX, r_hi * 1.2))
 
-    r_lo = float(np.min(r_s))
-    r_hi = float(np.max(r_s))
-    r_line_lo = max(r_lo * 0.9, r_hi * 1e-9, 1e-12)
+    x_max = float(x_max)
+    if filter_scatter_by_xmax:
+        in_disk = r_s <= x_max
+        r_plot = r_s[in_disk]
+        v_plot = v_s[in_disk]
+    else:
+        r_plot = r_s
+        v_plot = v_s
+
+    r_lo = float(np.min(r_plot)) if len(r_plot) else float(np.min(r_s))
+    r_hi_plot = float(np.max(r_plot)) if len(r_plot) else float(np.max(r_s))
+    r_line_lo = max(r_lo * 0.9, r_hi_plot * 1e-9, 1e-12)
     if r_line_lo >= x_max:
         r_line_lo = max(x_max * 1e-6, 1e-12)
     r_line = np.linspace(r_line_lo, x_max, 2000)
@@ -237,7 +254,15 @@ def save_rotation_curve_png(
         newtonian_label = f"Newtonian √(GM_bh/r), M_bh={M_bh:.6g} kg (κ-independent)"
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(r_s, v_s, s=5, alpha=0.6, c="blue", edgecolors="none", label=scatter_label)
+    ax.scatter(
+        r_plot,
+        v_plot,
+        s=5,
+        alpha=0.6,
+        c="blue",
+        edgecolors="none",
+        label=scatter_label,
+    )
     ax.plot(
         r_line,
         v_newton,
@@ -245,7 +270,7 @@ def save_rotation_curve_png(
         linewidth=2,
         label=newtonian_label,
     )
-    ax.set_xlim(0.0, x_max)
+    ax.set_xlim(0.0, x_max)  # disk-focused cap from rotation_curve_x_max (e.g. 2× galaxy_radius)
     ax.set_xlabel("Distance from Galactic Center (m)")
     ax.set_ylabel("Orbital Velocity (m/s)")
     ax.set_title(f"Rotation curve — {title_suffix}")
@@ -280,6 +305,11 @@ def main() -> None:
         default=None,
         help="Black hole mass for Newtonian baseline (kg). Default: bh_mass from run_info.txt if present, else 1e41",
     )
+    parser.add_argument(
+        "--no-filter-scatter",
+        action="store_true",
+        help="Plot all stars in scatter even if r > x_max (y-axis may stretch from escapers)",
+    )
     args = parser.parse_args()
 
     csv_path = find_latest_csv(args.search_dir)
@@ -297,6 +327,7 @@ def main() -> None:
         M_bh=M_bh,
         x_max=x_lim,
         scatter_label=lbl,
+        filter_scatter_by_xmax=not args.no_filter_scatter,
     )
     print(f"Loaded: {csv_path}")
     print(f"Saved: {args.output.resolve()}")
