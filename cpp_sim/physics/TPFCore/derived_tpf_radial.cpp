@@ -6,6 +6,9 @@
 #include "../../config.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace galaxy {
 namespace tpfcore {
@@ -89,41 +92,58 @@ double get_tpf_mass_at_r(double M_total, double r) {
   return M_total * (r3 / (r3 + rs3));
 }
 
+/**
+ * Data pipeline (enforced):
+ * 1. Here: cumulative_M_eff += |shell_mass|; profile.M_eff_enc[i] = cumulative_M_eff each bin.
+ * 2. radial_acceleration_scalar_derived: M_eff = profile.get_effective_mass_at(r_cyl) (interpolates M_eff_enc).
+ */
 TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_mass, double max_radius,
                                                   int bins, double tpf_kappa, double eps) {
-  TpfRadialGravityProfile p;
-  p.bins = std::max(1, bins);
-  p.max_radius = std::max(max_radius, 1e-30);
-  p.delta_r = p.max_radius / static_cast<double>(p.bins);
-  p.r_outer.resize(static_cast<size_t>(p.bins));
-  p.M_eff_enc.resize(static_cast<size_t>(p.bins));
+  TpfRadialGravityProfile profile;
+  profile.bins = std::max(1, bins);
+  profile.max_radius = std::max(max_radius, 1e-30);
+  profile.delta_r = profile.max_radius / static_cast<double>(profile.bins);
+  const size_t num_bins = static_cast<size_t>(profile.bins);
+  profile.r_outer.resize(num_bins);
+  profile.M_eff_enc.resize(num_bins);
 
   double r_s_bh = 0.0;
   if (bh_mass > 0.0) r_s_bh = (2.0 * TPF_G_SI * bh_mass) / (c * c);
   double rs3_bh = r_s_bh * r_s_bh * r_s_bh;
 
-  double cum = 0.0;
-  for (int b = 0; b < p.bins; ++b) {
-    double R_b = (static_cast<double>(b) + 0.5) * p.delta_r;
+  const double dr = profile.delta_r;
+  double cumulative_M_eff = 0.0;
+
+  for (size_t i = 0; i < num_bins; ++i) {
+    double R_b = (static_cast<double>(i) + 0.5) * dr;
     double px = R_b;
     double py = 0.0;
     double pz = 0.0;
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
-    /* |I|: geometric invariant can be negative under metric signature; density must be positive. */
-    double rho_raw = std::abs(I_total) * tpf_kappa;
+    double I_val = std::abs(I_total);
+    double rho_raw = I_val * std::abs(tpf_kappa);
 
     double r = R_b;
     double r3 = r * r * r;
     double bounce_ratio = r3 / (r3 + rs3_bh);
     double rho_eff = rho_raw * bounce_ratio;
+    if (rho_eff < 0.0) rho_eff = 0.0;
 
-    double dM = rho_eff * (4.0 * kPi * R_b * R_b * p.delta_r);
-    cum += dM;
-    p.r_outer[static_cast<size_t>(b)] = (static_cast<double>(b) + 1.0) * p.delta_r;
-    p.M_eff_enc[static_cast<size_t>(b)] = cum;
+    double shell_mass = 4.0 * kPi * r * r * rho_eff * dr;
+    cumulative_M_eff += std::abs(shell_mass);
+
+    profile.r_outer[i] = (static_cast<double>(i) + 1.0) * dr;
+    profile.M_eff_enc[i] = cumulative_M_eff;
   }
-  return p;
+
+  /* Optional stderr diagnostic: export GALAXY_TPF_LEDGER_DIAG=1 */
+  if (const char* diag = std::getenv("GALAXY_TPF_LEDGER_DIAG")) {
+    if (diag[0] != '\0' && std::strcmp(diag, "0") != 0)
+      std::fprintf(stderr, "[TPF ledger] M_eff_enc(r_max)=%.6g kg (bins=%d)\n", cumulative_M_eff,
+                   profile.bins);
+  }
+  return profile;
 }
 
 double TpfRadialGravityProfile::M_eff_at_cylindrical_r(double r_cyl) const {
@@ -142,6 +162,7 @@ double TpfRadialGravityProfile::M_eff_at_cylindrical_r(double r_cyl) const {
   return M_eff_enc.back();
 }
 
+/** Uses profile built by build_tpf_gravity_profile; M_eff is never ignored when this overload is used. */
 double radial_acceleration_scalar_derived(const State& state, double bh_mass,
                                           const TpfRadialGravityProfile& profile, double r_cyl,
                                           double eps) {

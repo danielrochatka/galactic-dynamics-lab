@@ -390,11 +390,36 @@ void write_readout_debug_csv(const std::vector<Snapshot>& snapshots,
       double radial_unit_x = (r > 1e-30) ? (x / r) : 1.0;
       double radial_unit_y = (r > 1e-30) ? (y / r) : 0.0;
 
-      double a_radial = ax * radial_unit_x + ay * radial_unit_y;
-      double a_inward = -a_radial;
+      double a_radial;
+      double a_inward;
       double tangential_unit_x = -radial_unit_y;
       double tangential_unit_y = radial_unit_x;
-      double a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
+      double a_tangential;
+
+      /* Hybrid ledger: CSV must match radial_acceleration_scalar_derived (M_baryon_bounced + M_eff). */
+      if (tr_style && derived_prof_ptr != nullptr) {
+        const double r_cyl = std::hypot(x, y);
+        double r_soft_sq = r_cyl * r_cyl + eps * eps;
+        if (r_soft_sq < 1e-60) r_soft_sq = 1e-60;
+        const double M_stars_enc = enclosed_stellar_mass_cyl(s, r_cyl);
+        const double M_baryon_bounced = get_tpf_mass_at_r(bh_mass + M_stars_enc, r_cyl);
+        const double M_eff = std::abs(derived_prof.get_effective_mass_at(r_cyl));
+        const double a_s = -TPF_G_SI * (M_baryon_bounced + M_eff) / r_soft_sq;
+        if (r < 1e-30) {
+          ax = ay = 0.0;
+        } else {
+          ax = a_s * (x / r);
+          ay = a_s * (y / r);
+        }
+        a_radial = ax * radial_unit_x + ay * radial_unit_y;
+        a_inward = -a_radial;
+        a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
+        diag.provisional_radial_readout = a_s;
+      } else {
+        a_radial = ax * radial_unit_x + ay * radial_unit_y;
+        a_inward = -a_radial;
+        a_tangential = ax * tangential_unit_x + ay * tangential_unit_y;
+      }
 
       const std::string regime_out =
           (tr_style && !diag.regime.empty()) ? diag.regime
