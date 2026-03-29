@@ -5,7 +5,7 @@ Post-process C++ galaxy simulation outputs and generate visualizations.
 Reads snapshot CSV files and run_info.txt from a cpp_sim run directory,
 then produces the same kinds of plots as the Python pipeline:
   - initial and final scatter plots (galaxy view)
-  - rotation_curve.png (final snapshot vs fixed Newtonian baseline M_bh = 1e41 kg)
+  - rotation_curve.png (final snapshot vs Keplerian √(GM/r); M_bh from run_info when present)
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
@@ -33,7 +33,14 @@ import pandas as pd
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
 from diagnostics import compute_diagnostics, plot_and_save_all
-from plot_rotation_curve import NEWTONIAN_REFERENCE_M_BH, rv_from_plane_arrays, save_rotation_curve_png
+from plot_rotation_curve import (
+    load_run_info,
+    newtonian_m_bh_from_run_info,
+    rotation_curve_x_max,
+    rv_from_plane_arrays,
+    save_rotation_curve_png,
+    scatter_label_from_run_info,
+)
 
 
 # -----------------------------------------------------------------------------
@@ -50,30 +57,6 @@ class Snapshot:
     time: float
     positions: np.ndarray
     velocities: np.ndarray
-
-
-def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
-    """Parse run_info.txt into a dict of config values."""
-    path = run_dir / "run_info.txt"
-    if not path.exists():
-        return {}
-    info = {}
-    for line in path.read_text().strip().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split("\t", 1)
-        if len(parts) != 2:
-            continue
-        key, val = parts[0].strip(), parts[1].strip()
-        try:
-            if "." in val:
-                info[key] = float(val)
-            else:
-                info[key] = int(val)
-        except ValueError:
-            info[key] = val
-    return info
 
 
 def load_snapshot_csv(path: Path) -> Snapshot | None:
@@ -297,16 +280,22 @@ def main() -> None:
     try:
         r_rc, v_rc = rv_from_plane_arrays(final.positions, final.velocities)
         title_rc = f"snapshot_{final.step:05d}.csv (step {final.step}, t={final.time:g})"
+        M_bh_rc = newtonian_m_bh_from_run_info(run_info)
+        x_max_rc = rotation_curve_x_max(run_info, r_rc)
+        scatter_lbl = scatter_label_from_run_info(run_info)
         save_rotation_curve_png(
             r_rc,
             v_rc,
             run_dir / "rotation_curve.png",
             title_rc,
-            M_bh=NEWTONIAN_REFERENCE_M_BH,
+            M_bh=M_bh_rc,
+            x_max=x_max_rc,
+            scatter_label=scatter_lbl,
         )
         print(
             f"Saved: {run_dir / 'rotation_curve.png'} "
-            f"(Newtonian baseline M_bh={NEWTONIAN_REFERENCE_M_BH:g} kg, fixed benchmark)"
+            f"(Keplerian overlay M_bh={M_bh_rc:g} kg; x_max={x_max_rc:g} m; "
+            "red curve is κ-independent — only blue scatter changes with TPF)"
         )
     except Exception as exc:
         print(f"Warning: could not write rotation_curve.png: {exc}")

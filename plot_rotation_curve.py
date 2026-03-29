@@ -5,8 +5,13 @@ Rotation curve from N-body snapshot CSV: compare simulated speeds to a Newtonian
 Primary glob: output_*.csv (highest step inferred from filename). Falls back to snapshot_*.csv
 (C++ galaxy_sim format) if no output_*.csv is found.
 
-`save_rotation_curve_png` is also used by plot_cpp_run.py so rotation_curve.png is written with other outputs.
-The Newtonian overlay uses fixed NEWTONIAN_REFERENCE_M_BH (1e41 kg), not run_info bh_mass.
+`save_rotation_curve_png` is also used by plot_cpp_run.py.
+
+The red curve is **pure** Newtonian v = sqrt(G*M_bh/r): it does **not** use tpf_kappa or any TPF ledger.
+Only the **blue scatter** comes from the snapshot (so κ changes star speeds for TPFCore runs, not the red line).
+
+By default, when run_info.txt sits next to the CSV, M_bh and x-axis extent are taken from the run
+(bh_mass, galaxy_radius). Legacy default M_bh = 1e41 applies if no run_info / no bh_mass.
 
 Usage:
   python plot_rotation_curve.py
@@ -25,9 +30,65 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 G_SI = 6.6743e-11
-# Fixed Newtonian benchmark for rotation-curve overlay (do not use simulation bh_mass / effective mass).
+# Fallback M_bh when run_info has no positive bh_mass (legacy astronomical benchmark only).
 NEWTONIAN_REFERENCE_M_BH = 1.0e41
+# Legacy x-axis cap (m); prefer auto scale from data + galaxy_radius.
 DEFAULT_X_MAX = 1.2e20
+
+
+def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
+    """Parse run_info.txt (tab-separated key, value) into a dict."""
+    path = Path(run_dir) / "run_info.txt"
+    if not path.exists():
+        return {}
+    info: dict[str, str | int | float] = {}
+    for line in path.read_text().strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        key, val = parts[0].strip(), parts[1].strip()
+        try:
+            if "." in val or "e" in val.lower():
+                info[key] = float(val)
+            else:
+                info[key] = int(val)
+        except ValueError:
+            info[key] = val
+    return info
+
+
+def newtonian_m_bh_from_run_info(run_info: dict[str, str | int | float]) -> float:
+    """Central mass for Keplerian overlay; matches simulation bh_mass when available."""
+    if not run_info:
+        return float(NEWTONIAN_REFERENCE_M_BH)
+    m = run_info.get("bh_mass")
+    if isinstance(m, (int, float)) and float(m) > 0:
+        return float(m)
+    return float(NEWTONIAN_REFERENCE_M_BH)
+
+
+def rotation_curve_x_max(
+    run_info: dict[str, str | int | float],
+    r_data: np.ndarray,
+) -> float:
+    """Horizontal plot limit (m): ~galaxy_radius or data extent so the curve is not crushed to r≈0."""
+    rmax = float(np.max(r_data)) if len(r_data) else 1.0
+    gr = run_info.get("galaxy_radius") if run_info else None
+    if isinstance(gr, (int, float)) and float(gr) > 0:
+        return max(float(gr) * 1.25, rmax * 1.12, 1.0)
+    return max(rmax * 1.2, 1.0)
+
+
+def scatter_label_from_run_info(run_info: dict[str, str | int | float]) -> str:
+    pkg = run_info.get("physics_package", "")
+    if isinstance(pkg, str) and pkg == "TPFCore":
+        return "Simulated stars (TPFCore)"
+    if isinstance(pkg, str) and pkg:
+        return f"Simulated stars ({pkg})"
+    return "Simulated stars"
 
 
 def _step_from_stem(stem: str) -> int:
@@ -142,26 +203,47 @@ def save_rotation_curve_png(
     title_suffix: str,
     *,
     M_bh: float = NEWTONIAN_REFERENCE_M_BH,
-    x_max: float = DEFAULT_X_MAX,
+    x_max: float | None = None,
+    scatter_label: str = "Simulated stars",
+    newtonian_label: str | None = None,
 ) -> None:
     """
     Scatter r vs v and overlay Newtonian v = sqrt(G*M_bh/r). Arrays need not be pre-sorted.
+
+    The overlay uses only G and M_bh (no κ, no TPF profile). x_max=None picks a scale from the data.
     """
     order = np.argsort(r)
     r_s = r[order]
     v_s = v[order]
 
-    r_line = np.linspace(max(float(r_s.min()), 1.0), x_max, 2000)
+    if len(r_s) == 0:
+        raise ValueError("No radius data for rotation curve")
+
+    if x_max is None:
+        r_hi = float(np.max(r_s))
+        x_max = max(r_hi * 1.2, 1.0)
+        if r_hi > 1e15:
+            x_max = max(x_max, min(DEFAULT_X_MAX, r_hi * 1.2))
+
+    r_lo = float(np.min(r_s))
+    r_hi = float(np.max(r_s))
+    r_line_lo = max(r_lo * 0.9, r_hi * 1e-9, 1e-12)
+    if r_line_lo >= x_max:
+        r_line_lo = max(x_max * 1e-6, 1e-12)
+    r_line = np.linspace(r_line_lo, x_max, 2000)
     v_newton = np.sqrt(np.maximum(0.0, (G_SI * M_bh) / r_line))
 
+    if newtonian_label is None:
+        newtonian_label = f"Newtonian √(GM_bh/r), M_bh={M_bh:.6g} kg (κ-independent)"
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(r_s, v_s, s=5, alpha=0.6, c="blue", edgecolors="none", label="TPF Simulated Stars")
+    ax.scatter(r_s, v_s, s=5, alpha=0.6, c="blue", edgecolors="none", label=scatter_label)
     ax.plot(
         r_line,
         v_newton,
         "r--",
         linewidth=2,
-        label="Newtonian Prediction (1/sqrt(r))",
+        label=newtonian_label,
     )
     ax.set_xlim(0.0, x_max)
     ax.set_xlabel("Distance from Galactic Center (m)")
@@ -195,14 +277,27 @@ def main() -> None:
     parser.add_argument(
         "--M-bh",
         type=float,
-        default=NEWTONIAN_REFERENCE_M_BH,
-        help="Black hole mass for Newtonian baseline (kg); default fixed benchmark 1e41",
+        default=None,
+        help="Black hole mass for Newtonian baseline (kg). Default: bh_mass from run_info.txt if present, else 1e41",
     )
     args = parser.parse_args()
 
     csv_path = find_latest_csv(args.search_dir)
+    run_dir = csv_path.parent
+    run_info = load_run_info(run_dir)
     r, v, title_suffix = load_particle_kinematics(csv_path)
-    save_rotation_curve_png(r, v, args.output, title_suffix, M_bh=args.M_bh)
+    M_bh = float(args.M_bh) if args.M_bh is not None else newtonian_m_bh_from_run_info(run_info)
+    x_lim = rotation_curve_x_max(run_info, r)
+    lbl = scatter_label_from_run_info(run_info)
+    save_rotation_curve_png(
+        r,
+        v,
+        args.output,
+        title_suffix,
+        M_bh=M_bh,
+        x_max=x_lim,
+        scatter_label=lbl,
+    )
     print(f"Loaded: {csv_path}")
     print(f"Saved: {args.output.resolve()}")
 
