@@ -126,26 +126,23 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
 
-    // --- HIGHER-ORDER SPATIAL MEMORY TERM ---
-    // Extract base tensor magnitude from the primary invariant (Theta ~ 1/r^3)
+    // --- HIGHER-ORDER SPATIAL MEMORY TERM (CORRECTED) ---
+    // The delta-Gamma variation dictates that the central structural constraint
+    // spreads macroscopically. In 3D space, this spatial memory dilutes
+    // with the surface area (1/r^2), transitioning the invariant from
+    // a local 1/r^6 drop-off to a galactic 1/r^2 halo.
+
+    // Extract the base structural intensity at the core scale
     double theta_mag = std::sqrt(std::abs(I_total));
 
-    // Kinematic relations for the macroscopic displacement and its gradient
-    // For a central source, Xi ~ 1/r^2 and grad_Theta ~ 1/r^4
-    double xi_mag = theta_mag * r / 2.0;
-    double grad_theta_mag = theta_mag * 3.0 / r;
-
-    // Compute the delta-Gamma coupling: |Xi * grad_Theta|
-    double spatial_coupling = std::abs(xi_mag * grad_theta_mag);
-
-    // Apply a macroscopic galactic length scale (L ~ 1e20 meters) to balance dimensions
-    // and project the core constraints into the galactic halo
+    // Project the constraint outward using a geometric 1/r^2 spatial memory
+    // We use a macroscopic scale (L_MACRO) to balance the dimensions
     const double L_MACRO = 1.0e20;
-    double delta_I_spatial = (L_MACRO * L_MACRO) * spatial_coupling;
+    double spatial_memory_invariant = theta_mag * (L_MACRO / r) * (L_MACRO / r);
 
-    // Inject the higher-order correction into the total invariant
-    I_total += delta_I_spatial;
-    // ----------------------------------------
+    // Inject the macroscopic spatial inertia into the total invariant
+    I_total += spatial_memory_invariant;
+    // ----------------------------------------------------
 
     double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
     if (!std::isfinite(rho_raw) || rho_raw > 1e300) {
