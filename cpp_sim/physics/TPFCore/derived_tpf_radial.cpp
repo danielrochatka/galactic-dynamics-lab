@@ -125,6 +125,28 @@ TpfRadialGravityProfile build_tpf_gravity_profile(const State& state, double bh_
     double pz = 0.0;
     Theta3D theta_tot = sum_derived_theta_at_point(state, bh_mass, px, py, pz, eps);
     double I_total = derived_invariant_I_contracted(theta_tot);
+
+    // --- HIGHER-ORDER SPATIAL MEMORY TERM ---
+    // Extract base tensor magnitude from the primary invariant (Theta ~ 1/r^3)
+    double theta_mag = std::sqrt(std::abs(I_total));
+
+    // Kinematic relations for the macroscopic displacement and its gradient
+    // For a central source, Xi ~ 1/r^2 and grad_Theta ~ 1/r^4
+    double xi_mag = theta_mag * r / 2.0;
+    double grad_theta_mag = theta_mag * 3.0 / r;
+
+    // Compute the delta-Gamma coupling: |Xi * grad_Theta|
+    double spatial_coupling = std::abs(xi_mag * grad_theta_mag);
+
+    // Apply a macroscopic galactic length scale (L ~ 1e20 meters) to balance dimensions
+    // and project the core constraints into the galactic halo
+    const double L_MACRO = 1.0e20;
+    double delta_I_spatial = (L_MACRO * L_MACRO) * spatial_coupling;
+
+    // Inject the higher-order correction into the total invariant
+    I_total += delta_I_spatial;
+    // ----------------------------------------
+
     double rho_raw = std::abs(I_total) * std::abs(tpf_kappa);
     if (!std::isfinite(rho_raw) || rho_raw > 1e300) {
       ++warning_count;
