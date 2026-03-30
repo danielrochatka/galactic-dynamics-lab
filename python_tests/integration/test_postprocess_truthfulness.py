@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -102,6 +104,87 @@ class TestPostprocessTruthfulness(unittest.TestCase):
             txt = buf.getvalue()
             self.assertIn("source=fallback_benchmark", txt)
             self.assertIn("using fallback benchmark mass", txt)
+
+    def test_cooled_run_title_label_helper(self) -> None:
+        import plot_cpp_run as pcr
+
+        self.assertEqual(
+            pcr.initial_snapshot_plot_title(True, 100),
+            "Galaxy – First saved snapshot after cooling (C++ run)",
+        )
+        self.assertEqual(
+            pcr.initial_snapshot_plot_title(True, 0),
+            "Galaxy – Initial (C++ run)",
+        )
+
+    def test_plot_cpp_run_warns_on_cooling_active(self) -> None:
+        import plot_cpp_run as pcr
+
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            _write_snapshot(d / "snapshot_00000.csv", step=100)
+            (d / "run_info.txt").write_text(
+                "\n".join(
+                    [
+                        "cooling_active\t1",
+                        "cooling_steps\t50",
+                        "first_saved_snapshot_step\t100",
+                        "first_saved_snapshot_time\t1.0",
+                        "bh_mass\t1.0e6",
+                        "galaxy_radius\t50.0",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            argv_old = sys.argv[:]
+            buf = io.StringIO()
+            try:
+                sys.argv = ["plot_cpp_run.py", str(d), "--no-animation", "--no-diagnostics"]
+                with contextlib.redirect_stdout(buf):
+                    pcr.main()
+            finally:
+                sys.argv = argv_old
+            out = buf.getvalue()
+            self.assertIn("WARNING: cooling phase was active", out)
+            self.assertIn("first_saved_snapshot_step=100", out)
+
+    def test_run_info_contains_explicit_cooling_fields(self) -> None:
+        cpp_dir = REPO_ROOT / "cpp_sim"
+        bin_path = cpp_dir / "galaxy_sim"
+        if not bin_path.exists():
+            self.skipTest("requires built cpp_sim/galaxy_sim")
+
+        run_id = "test_cooling_meta_py"
+        out_dir = f"outputs/{run_id}"
+        cmd = [
+            str(bin_path),
+            "galaxy",
+            "--physics_package=TPFCore",
+            "--n_stars=8",
+            "--n_steps=20",
+            "--snapshot_every=10",
+            "--tpf_cooling_fraction=0.5",
+            "--save_snapshots=false",
+            "--save_run_info=true",
+            f"--output_dir={out_dir}",
+        ]
+        subprocess.run(
+            cmd,
+            cwd=str(cpp_dir),
+            check=True,
+            env={**os.environ, "GALAXY_RUN_CONFIG": ""},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        run_info_path = cpp_dir / out_dir / "run_info.txt"
+        txt = run_info_path.read_text(encoding="utf-8")
+        self.assertIn("cooling_active\t1", txt)
+        self.assertIn("cooling_steps\t10", txt)
+        self.assertIn("cooling_end_step\t9", txt)
+        self.assertIn("first_saved_snapshot_step\t10", txt)
+        self.assertIn("first_saved_snapshot_time\t", txt)
 
 
 if __name__ == "__main__":

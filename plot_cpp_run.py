@@ -209,6 +209,50 @@ def resolve_diagnostic_cutoff_radius(
     )
 
 
+def resolve_cooling_audit_flags(
+    run_info: dict[str, str | int | float],
+    snapshots: list[Snapshot],
+) -> tuple[bool, int, int, float]:
+    """
+    Cooling audit metadata from run_info (with fallback to loaded snapshot list).
+    Returns (cooling_active, cooling_steps, first_saved_step, first_saved_time).
+    """
+
+    def ri_int(key: str, default: int) -> int:
+        raw = run_info.get(key)
+        if isinstance(raw, (int, float)):
+            return int(raw)
+        try:
+            return int(str(raw)) if raw is not None else default
+        except Exception:
+            return default
+
+    def ri_float(key: str, default: float) -> float:
+        raw = run_info.get(key)
+        if isinstance(raw, (int, float)):
+            return float(raw)
+        try:
+            return float(str(raw)) if raw is not None else default
+        except Exception:
+            return default
+
+    cooling_active = ri_int("cooling_active", 0) != 0
+    cooling_steps = ri_int("cooling_steps", 0)
+    fs_step = ri_int("first_saved_snapshot_step", snapshots[0].step if snapshots else 0)
+    fs_time = ri_float("first_saved_snapshot_time", snapshots[0].time if snapshots else 0.0)
+    return cooling_active, cooling_steps, fs_step, fs_time
+
+
+def initial_snapshot_plot_title(
+    cooling_active: bool,
+    initial_step: int,
+) -> str:
+    """Truthful initial-frame title for cooled vs non-cooled runs."""
+    if cooling_active and initial_step > 0:
+        return "Galaxy – First saved snapshot after cooling (C++ run)"
+    return "Galaxy – Initial (C++ run)"
+
+
 def resolve_galaxy_radius_meters(
     run_info: dict[str, str | int | float],
     snapshots: list[Snapshot],
@@ -476,6 +520,19 @@ def main() -> None:
     )
     if run_info:
         print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
+    cooling_active, cooling_steps, first_saved_step, first_saved_time = resolve_cooling_audit_flags(
+        run_info, snapshots
+    )
+    if cooling_active:
+        print(
+            "WARNING: cooling phase was active; early intermediate snapshots were suppressed "
+            "during cooling for audit/performance."
+        )
+        print(
+            "  cooling_audit: "
+            f"cooling_steps={cooling_steps}, first_saved_snapshot_step={first_saved_step}, "
+            f"first_saved_snapshot_time={first_saved_time:g}"
+        )
 
     fallback_radius = float(args.render_radius)
     galaxy_radius_m = resolve_galaxy_radius_meters(run_info, snapshots, fallback_radius)
@@ -506,10 +563,11 @@ def main() -> None:
     )
 
     # Initial and final scatter plots
+    initial_title = initial_snapshot_plot_title(cooling_active, initial.step)
     save_static_plot(
         initial.positions,
         run_dir / "galaxy_initial.png",
-        title="Galaxy – Initial (C++ run)",
+        title=initial_title,
         render_radius=render_radius_initial,
         velocities=initial.velocities,
         overlay_step=initial.step,

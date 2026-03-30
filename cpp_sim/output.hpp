@@ -9,6 +9,13 @@
 namespace galaxy {
 
 struct GalaxyInitAudit;
+struct CoolingAuditInfo {
+  bool cooling_active = false;
+  int cooling_steps = 0;
+  int cooling_end_step = 0;
+  int first_saved_snapshot_step = 0;
+  double first_saved_snapshot_time = 0.0;
+};
 
 // Write run_info.txt with key config (dt, n_steps, softening, etc.) and run summary.
 // n_particles: actual particle count (if < 0, use config.n_stars).
@@ -21,7 +28,8 @@ void write_run_info(const std::string& output_dir,
                     int n_particles = -1,
                     const std::string& run_config_path = "",
                     const std::string& package_defaults_path = "",
-                    const GalaxyInitAudit* galaxy_init_audit = nullptr);
+                    const GalaxyInitAudit* galaxy_init_audit = nullptr,
+                    const CoolingAuditInfo* cooling_audit = nullptr);
 
 // Write each snapshot to output_dir/snapshot_<step>.csv (columns: i,x,y,vx,vy,mass).
 void write_snapshots(const std::string& output_dir,

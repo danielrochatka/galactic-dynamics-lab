@@ -724,12 +724,35 @@ int main(int argc, char** argv) {
   }
 
   {
+    const bool cooling_active =
+        (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
+    const int cooling_steps = cooling_active
+        ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
+        : 0;
+    galaxy::CoolingAuditInfo cooling_audit;
+    cooling_audit.cooling_active = cooling_active;
+    cooling_audit.cooling_steps = cooling_steps;
+    cooling_audit.cooling_end_step = std::max(0, cooling_steps - 1);
+    if (!snapshots.empty()) {
+      const galaxy::Snapshot* first_saved = nullptr;
+      for (const auto& snap : snapshots) {
+        if (snap.step > 0) {
+          first_saved = &snap;
+          break;
+        }
+      }
+      if (!first_saved) first_saved = &snapshots.front();
+      cooling_audit.first_saved_snapshot_step = first_saved->step;
+      cooling_audit.first_saved_snapshot_time = first_saved->time;
+    }
+
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
                              run_config_path, package_defaults_path,
                              config.simulation_mode == galaxy::SimulationMode::galaxy
                                  ? &galaxy::last_galaxy_init_audit()
-                                 : nullptr);
+                                 : nullptr,
+                             &cooling_audit);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {

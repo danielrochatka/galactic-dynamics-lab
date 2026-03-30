@@ -14,7 +14,8 @@ void write_run_info(const std::string& output_dir,
                     int n_particles,
                     const std::string& run_config_path,
                     const std::string& package_defaults_path,
-                    const GalaxyInitAudit* galaxy_init_audit) {
+                    const GalaxyInitAudit* galaxy_init_audit,
+                    const CoolingAuditInfo* cooling_audit) {
   std::ostringstream path;
   path << output_dir << "/run_info.txt";
   std::ofstream f(path.str());
@@ -96,6 +97,13 @@ void write_run_info(const std::string& output_dir,
   f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
   f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
   f << "number_of_snapshots\t" << n_snapshots << "\n";
+  if (cooling_audit) {
+    f << "cooling_active\t" << (cooling_audit->cooling_active ? 1 : 0) << "\n";
+    f << "cooling_steps\t" << cooling_audit->cooling_steps << "\n";
+    f << "cooling_end_step\t" << cooling_audit->cooling_end_step << "\n";
+    f << "first_saved_snapshot_step\t" << cooling_audit->first_saved_snapshot_step << "\n";
+    f << "first_saved_snapshot_time\t" << cooling_audit->first_saved_snapshot_time << "\n";
+  }
   f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
