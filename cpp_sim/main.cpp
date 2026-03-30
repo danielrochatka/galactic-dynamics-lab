@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "force_compare.hpp"
 #include "galaxy_init.hpp"
+#include "git_provenance.hpp"
 #include "init_conditions.hpp"
 #include "render_audit.hpp"
 #include "output.hpp"
@@ -20,6 +21,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cstdint>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -69,6 +71,43 @@ std::string format_elapsed(double sec) {
     os << std::setw(2) << h << ":" << std::setw(2) << m << ":" << std::setw(2) << s;
   else
     os << std::setw(2) << m << ":" << std::setw(2) << s;
+  return os.str();
+}
+
+std::string sanitize_label(const std::string& in) {
+  std::string out;
+  out.reserve(in.size());
+  for (char c : in) {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+      out.push_back(c);
+    else
+      out.push_back('_');
+  }
+  return out;
+}
+
+std::uint64_t fnv1a_u64_append(std::uint64_t h, const void* p, std::size_t n) {
+  const unsigned char* b = static_cast<const unsigned char*>(p);
+  for (std::size_t i = 0; i < n; ++i) {
+    h ^= static_cast<std::uint64_t>(b[i]);
+    h *= 1099511628211ull;
+  }
+  return h;
+}
+
+std::string state_fingerprint_hex(const galaxy::State& s) {
+  std::uint64_t h = 1469598103934665603ull;
+  const int n = s.n();
+  h = fnv1a_u64_append(h, &n, sizeof(n));
+  for (int i = 0; i < n; ++i) {
+    h = fnv1a_u64_append(h, &s.x[i], sizeof(double));
+    h = fnv1a_u64_append(h, &s.y[i], sizeof(double));
+    h = fnv1a_u64_append(h, &s.vx[i], sizeof(double));
+    h = fnv1a_u64_append(h, &s.vy[i], sizeof(double));
+    h = fnv1a_u64_append(h, &s.mass[i], sizeof(double));
+  }
+  std::ostringstream os;
+  os << std::hex << std::setfill('0') << std::setw(16) << h;
   return os.str();
 }
 
@@ -676,6 +715,166 @@ int main(int argc, char** argv) {
       std::cout << "Output directory: " << config.output_dir << "\n";
       return 0;
     }
+  }
+
+  const bool compare_mode_requested =
+      (config.simulation_mode == galaxy::SimulationMode::galaxy &&
+       !config.physics_package_compare.empty());
+  const bool compare_same_package =
+      (compare_mode_requested && config.physics_package_compare == config.physics_package);
+  if (compare_same_package) {
+    std::cout << "Warning: physics_package_compare equals physics_package ("
+              << config.physics_package << "); falling back to single-package run.\n";
+  }
+
+  if (compare_mode_requested && !compare_same_package) {
+    const std::string compare_parent_dir = config.output_dir;
+    const std::string left_dir = compare_parent_dir + "/left_" + sanitize_label(config.physics_package);
+    const std::string right_dir = compare_parent_dir + "/right_" + sanitize_label(config.physics_package_compare);
+    if (!ensure_dir("outputs") || !ensure_dir(compare_parent_dir) ||
+        !ensure_dir(left_dir) || !ensure_dir(right_dir)) {
+      std::cerr << "Failed to create compare output directories under " << compare_parent_dir << "\n";
+      return 1;
+    }
+
+    galaxy::Config left_cfg = config;
+    left_cfg.output_dir = left_dir;
+    left_cfg.run_id = config.run_id + "_left";
+    left_cfg.physics_package = config.physics_package;
+
+    galaxy::Config right_cfg = config;
+    right_cfg.output_dir = right_dir;
+    right_cfg.run_id = config.run_id + "_right";
+    right_cfg.physics_package = config.physics_package_compare;
+    right_cfg.physics_package_compare.clear();
+
+    galaxy::PhysicsPackage* left_physics = galaxy::get_physics_package(left_cfg.physics_package);
+    galaxy::PhysicsPackage* right_physics = galaxy::get_physics_package(right_cfg.physics_package);
+    if (!left_physics || !right_physics) {
+      std::cerr << "Compare mode failed: unknown package(s): left=" << left_cfg.physics_package
+                << ", right=" << right_cfg.physics_package << "\n";
+      return 1;
+    }
+    left_physics->init_from_config(left_cfg);
+    right_physics->init_from_config(right_cfg);
+
+    galaxy::State left_state = state;
+    galaxy::State right_state = state;
+    const std::string ic_hash = state_fingerprint_hex(state);
+
+    std::cout << "Compare mode: left=" << left_cfg.physics_package
+              << "  right=" << right_cfg.physics_package << "\n";
+    std::cout << "Shared IC fingerprint (fnv1a64): " << ic_hash << "\n";
+
+    auto left_snapshots =
+        galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, nullptr, 0);
+    auto right_snapshots =
+        galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, nullptr, 0);
+
+    auto write_side_outputs =
+        [&](const galaxy::Config& side_cfg,
+            galaxy::PhysicsPackage* side_physics,
+            const std::vector<galaxy::Snapshot>& side_snaps,
+            const std::string& side_defaults_path) {
+          const bool cooling_active =
+              (side_cfg.physics_package == "TPFCore" && side_cfg.tpf_cooling_fraction > 0.0);
+          const int cooling_steps = cooling_active
+              ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * side_cfg.tpf_cooling_fraction)))
+              : 0;
+          galaxy::CoolingAuditInfo cooling_audit;
+          cooling_audit.cooling_active = cooling_active;
+          cooling_audit.cooling_steps = cooling_steps;
+          cooling_audit.cooling_end_step = std::max(0, cooling_steps - 1);
+          if (!side_snaps.empty()) {
+            const galaxy::Snapshot* first_saved = nullptr;
+            for (const auto& snap : side_snaps) {
+              if (snap.step > 0) {
+                first_saved = &snap;
+                break;
+              }
+            }
+            if (!first_saved) first_saved = &side_snaps.front();
+            cooling_audit.first_saved_snapshot_step = first_saved->step;
+            cooling_audit.first_saved_snapshot_time = first_saved->time;
+          }
+
+          const galaxy::AccelPipelineStats* tpf_pipeline_stats = nullptr;
+          if (side_cfg.physics_package == "TPFCore") {
+            if (auto* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(side_physics)) {
+              if (tpf_pkg->provisional_readout_enabled() && tpf_pkg->last_accel_pipeline_stats().valid)
+                tpf_pipeline_stats = &tpf_pkg->last_accel_pipeline_stats();
+            }
+          }
+
+          if (side_cfg.save_run_info) {
+            galaxy::write_run_info(side_cfg.output_dir, side_cfg, n_steps, static_cast<int>(side_snaps.size()),
+                                   state.n(), run_config_path, side_defaults_path,
+                                   &galaxy::last_galaxy_init_audit(), &cooling_audit, tpf_pipeline_stats);
+            galaxy::write_render_manifest(side_cfg.output_dir, side_cfg, n_steps,
+                                          static_cast<int>(side_snaps.size()), state.n(),
+                                          &galaxy::last_galaxy_init_audit());
+          }
+          if (side_cfg.save_snapshots)
+            galaxy::write_snapshots(side_cfg.output_dir, side_snaps);
+          galaxy::write_galaxy_init_diagnostics(side_cfg.output_dir, state, side_cfg,
+                                                galaxy::last_galaxy_init_audit());
+        };
+
+    write_side_outputs(left_cfg, left_physics, left_snapshots,
+                       galaxy::find_package_defaults_path(left_cfg.physics_package));
+    write_side_outputs(right_cfg, right_physics, right_snapshots,
+                       galaxy::find_package_defaults_path(right_cfg.physics_package));
+
+    const galaxy::GitProvenance gp = galaxy::resolve_git_provenance();
+    {
+      std::ofstream jf(compare_parent_dir + "/compare_manifest.json");
+      if (jf) {
+        jf << "{\n"
+           << "  \"schema\": \"galaxy_compare_manifest_v1\",\n"
+           << "  \"compare_run_id\": \"" << config.run_id << "\",\n"
+           << "  \"primary_package\": \"" << left_cfg.physics_package << "\",\n"
+           << "  \"compare_package\": \"" << right_cfg.physics_package << "\",\n"
+           << "  \"left_dir\": \"" << left_dir << "\",\n"
+           << "  \"right_dir\": \"" << right_dir << "\",\n"
+           << "  \"ic_seed\": " << left_cfg.galaxy_init_seed << ",\n"
+           << "  \"ic_fingerprint_fnv1a64\": \"" << ic_hash << "\",\n"
+           << "  \"git_commit_full\": \"" << gp.git_commit_full << "\",\n"
+           << "  \"git_commit_short\": \"" << gp.git_commit_short << "\",\n"
+           << "  \"git_branch\": \"" << gp.git_branch << "\",\n"
+           << "  \"git_tag\": \"" << gp.git_tag << "\",\n"
+           << "  \"git_dirty\": " << (gp.git_dirty ? "true" : "false") << ",\n"
+           << "  \"code_version_label\": \"" << gp.code_version_label << "\"\n"
+           << "}\n";
+      }
+      std::ofstream tf(compare_parent_dir + "/compare_manifest.txt");
+      if (tf) {
+        tf << "compare_run_id\t" << config.run_id << "\n";
+        tf << "primary_package\t" << left_cfg.physics_package << "\n";
+        tf << "compare_package\t" << right_cfg.physics_package << "\n";
+        tf << "left_dir\t" << left_dir << "\n";
+        tf << "right_dir\t" << right_dir << "\n";
+        tf << "ic_seed\t" << left_cfg.galaxy_init_seed << "\n";
+        tf << "ic_fingerprint_fnv1a64\t" << ic_hash << "\n";
+        tf << "git_commit_full\t" << gp.git_commit_full << "\n";
+        tf << "git_commit_short\t" << gp.git_commit_short << "\n";
+        tf << "git_branch\t" << gp.git_branch << "\n";
+        tf << "git_tag\t" << gp.git_tag << "\n";
+        tf << "git_dirty\t" << (gp.git_dirty ? 1 : 0) << "\n";
+        tf << "code_version_label\t" << gp.code_version_label << "\n";
+      }
+    }
+
+    std::cout << "Wrote compare manifests in " << compare_parent_dir << "\n";
+    std::cout << "Left output: " << left_dir << "\n";
+    std::cout << "Right output: " << right_dir << "\n";
+
+    if (auto_plot) {
+      std::string cmd = "cd .. && ./dev/bin/python plot_cpp_compare.py cpp_sim/" + compare_parent_dir;
+      int ret = std::system(cmd.c_str());
+      if (ret != 0)
+        std::cerr << "Warning: compare renderer returned non-zero exit code.\n";
+    }
+    return 0;
   }
 
   // Progress reporting: only for galaxy (long runs); in-place line when stdout is a terminal

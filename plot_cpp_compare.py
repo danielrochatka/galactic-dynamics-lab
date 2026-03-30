@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""
+Render declared side-by-side compare outputs from a compare parent directory.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+from render_overlay import build_overlay_spec, draw_galaxy_render_overlay, resolve_overlay_mode
+
+
+@dataclass
+class SideData:
+    label: str
+    run_dir: Path
+    run_info: dict
+    overlay_mode: str
+    overlay_spec: dict
+    snapshots_by_step: dict[int, object]
+
+
+def _load_compare_manifest(parent: Path) -> dict:
+    p = parent / "compare_manifest.json"
+    if not p.exists():
+        raise SystemExit(f"Missing compare_manifest.json in {parent}")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def _load_side_data(run_dir: Path, label: str, overlay_mode_override: str | None) -> SideData:
+    from plot_cpp_run import load_all_snapshot_records, load_run_info
+
+    if not run_dir.is_dir():
+        raise SystemExit(f"Missing compare child directory: {run_dir}")
+    run_info = load_run_info(run_dir)
+    overlay_mode = resolve_overlay_mode(run_info, overlay_mode_override)
+    overlay_spec = build_overlay_spec(run_dir, run_info)
+    records = load_all_snapshot_records(run_dir)
+    if not records:
+        raise SystemExit(f"No snapshots found in {run_dir}")
+    by_step = {snap.step: snap for _, snap in records}
+    return SideData(
+        label=label,
+        run_dir=run_dir,
+        run_info=run_info,
+        overlay_mode=overlay_mode,
+        overlay_spec=overlay_spec,
+        snapshots_by_step=by_step,
+    )
+
+
+def matched_steps_strict(left_steps: set[int], right_steps: set[int]) -> list[int]:
+    if left_steps != right_steps:
+        missing_left = sorted(right_steps - left_steps)
+        missing_right = sorted(left_steps - right_steps)
+        raise ValueError(
+            "Strict step matching failed: "
+            f"missing in left={missing_left[:10]}, missing in right={missing_right[:10]}"
+        )
+    return sorted(left_steps)
+
+
+def _common_radius(left_snapshots: list, right_snapshots: list) -> float:
+    import math
+
+    max_r = 0.0
+    for snap in left_snapshots + right_snapshots:
+        p = snap.positions
+        if len(p) == 0:
+            continue
+        for i in range(len(p)):
+            ri = math.hypot(float(p[i, 0]), float(p[i, 1]))
+            if ri > max_r:
+                max_r = ri
+    return max(1.0, 1.2 * max_r)
+
+
+def _draw_panel(ax, side: SideData, snap, radius: float) -> None:
+    from render import scatter_frame
+
+    scatter_frame(ax, snap.positions, velocities=getattr(snap, "velocities", None), render_radius=radius)
+    ax.set_title(f"{side.label} ({side.run_info.get('physics_package', '?')})", color="white", fontsize=11)
+    if side.overlay_mode != "none":
+        draw_galaxy_render_overlay(
+            ax,
+            side.overlay_mode,
+            side.overlay_spec,
+            run_info=side.run_info,
+            step=int(snap.step),
+            time_s=float(snap.time),
+        )
+
+
+def render_compare(parent_dir: Path, no_animation: bool = False, overlay_mode: str | None = None) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    mf = _load_compare_manifest(parent_dir)
+    left_dir = Path(mf["left_dir"])
+    right_dir = Path(mf["right_dir"])
+    compare_run_id = str(mf.get("compare_run_id", parent_dir.name))
+
+    left = _load_side_data(left_dir, "left", overlay_mode)
+    right = _load_side_data(right_dir, "right", overlay_mode)
+    steps = matched_steps_strict(set(left.snapshots_by_step.keys()), set(right.snapshots_by_step.keys()))
+    left_snaps = [left.snapshots_by_step[s] for s in steps]
+    right_snaps = [right.snapshots_by_step[s] for s in steps]
+    radius = _common_radius(left_snaps, right_snaps)
+
+    def save_static(step_idx: int, out_name: str) -> None:
+        ls = left_snaps[step_idx]
+        rs = right_snaps[step_idx]
+        fig, axes = plt.subplots(1, 2, figsize=(16, 8), facecolor="black")
+        for ax in axes:
+            ax.set_facecolor("black")
+            ax.tick_params(colors="gray")
+            for s in ax.spines.values():
+                s.set_color("gray")
+        _draw_panel(axes[0], left, ls, radius)
+        _draw_panel(axes[1], right, rs, radius)
+        fig.suptitle(
+            f"Compare {compare_run_id} | left={left.run_info.get('physics_package', '?')} "
+            f"| right={right.run_info.get('physics_package', '?')} "
+            f"| rev={left.run_info.get('code_version_label', 'unknown')}",
+            color="white",
+            fontsize=11,
+        )
+        fig.tight_layout()
+        fig.savefig(parent_dir / out_name, dpi=150, facecolor="black", edgecolor="none")
+        plt.close(fig)
+
+    save_static(0, "galaxy_initial_compare.png")
+    save_static(len(steps) - 1, "galaxy_final_compare.png")
+
+    if no_animation:
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8), facecolor="black")
+    for ax in axes:
+        ax.set_facecolor("black")
+        ax.tick_params(colors="gray")
+        for s in ax.spines.values():
+            s.set_color("gray")
+
+    def animate(i: int):
+        _draw_panel(axes[0], left, left_snaps[i], radius)
+        _draw_panel(axes[1], right, right_snaps[i], radius)
+        t = float(left_snaps[i].time)
+        fig.suptitle(
+            f"Compare {compare_run_id} | step={steps[i]} | t={t:.6g} "
+            f"| left={left.run_info.get('physics_package', '?')} "
+            f"| right={right.run_info.get('physics_package', '?')}",
+            color="white",
+            fontsize=11,
+        )
+        return []
+
+    anim = animation.FuncAnimation(fig, animate, frames=len(steps), interval=50, blit=False)
+    out_mp4 = parent_dir / "galaxy_compare.mp4"
+    out_gif = parent_dir / "galaxy_compare.gif"
+    try:
+        anim.save(str(out_mp4), writer="ffmpeg", fps=20, dpi=100)
+    except Exception:
+        anim.save(str(out_gif), writer="pillow", fps=15, dpi=100)
+    plt.close(fig)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Render side-by-side compare outputs for cpp_sim compare runs.")
+    ap.add_argument("compare_parent_dir", type=Path)
+    ap.add_argument("--no-animation", action="store_true")
+    ap.add_argument(
+        "--render-overlay-mode",
+        choices=("none", "minimal", "audit_full"),
+        default=None,
+        help="Override per-side run_info overlay mode.",
+    )
+    args = ap.parse_args()
+    render_compare(args.compare_parent_dir.resolve(), args.no_animation, args.render_overlay_mode)
+
+
+if __name__ == "__main__":
+    main()
+

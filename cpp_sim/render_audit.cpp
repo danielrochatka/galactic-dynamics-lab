@@ -127,6 +127,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "run_id", run_id);
     json_kv(jf, first, "output_dir", output_dir);
     json_kv(jf, first, "physics_package", config.physics_package);
+    json_kv(jf, first, "physics_package_compare", config.physics_package_compare);
     json_kv(jf, first, "simulation_mode", mode_to_string(config.simulation_mode));
     json_kv_int(jf, first, "n_stars", n_star);
     json_kv_int(jf, first, "n_steps", n_steps_done);
@@ -192,6 +193,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "active_metrics_branch\t" << met << "\n";
     tf << "acceleration_code_path\t" << acc << "\n";
     tf << "physics_package\t" << config.physics_package << "\n";
+    tf << "physics_package_compare\t" << config.physics_package_compare << "\n";
     tf << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
     tf << "n_stars\t" << n_star << "\n";
     tf << "n_steps\t" << n_steps_done << "\n";

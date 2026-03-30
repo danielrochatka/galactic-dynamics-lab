@@ -120,6 +120,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.physics_package = val;
     return true;
   }
+  if (key == "physics_package_compare") {
+    config.physics_package_compare = trim(val);
+    return true;
+  }
   if (key == "tpfcore_enable_provisional_readout") {
     config.tpfcore_enable_provisional_readout = parse_bool(val);
     return true;

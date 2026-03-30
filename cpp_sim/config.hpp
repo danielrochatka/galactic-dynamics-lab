@@ -72,6 +72,11 @@ struct Config {
 
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
   std::string physics_package = "Newtonian";
+  /**
+   * Optional secondary package for declared side-by-side compare workflow.
+   * Empty => single-package run (default). Non-empty + different from physics_package => compare mode.
+   */
+  std::string physics_package_compare = "";
 
   /** TPFCore only: gate for compute_accelerations (required; else TPFCore throws). Not “readout drives” alone — VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
   bool tpfcore_enable_provisional_readout = false;

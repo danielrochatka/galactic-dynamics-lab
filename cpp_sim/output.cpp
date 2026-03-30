@@ -33,6 +33,7 @@ void write_run_info(const std::string& output_dir,
   f << "run_config\t" << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   f << "package_defaults\t" << (package_defaults_path.empty() ? "(none)" : package_defaults_path) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
+  f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
@@ -137,6 +138,7 @@ void write_run_info(const std::string& output_dir,
   f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
+  f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   if (config.physics_package == "TPFCore") {
     double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
     f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
