@@ -9,9 +9,11 @@ then produces the same kinds of plots as the Python pipeline:
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
-Animation viewport: default uses temporally smoothed limits (dynamic zoom). When disabled
-  (run_info plot_animation_dynamic_zoom=0 or --no-dynamic-zoom), the axis half-range is held
-  constant at the max velocity-gated limit over all snapshots (no per-frame zoom pumping).
+Animation viewport: default uses **smart framing** — one fixed axis half-range from the 95th
+  percentile of all star radii across all snapshots, times 1.2 (see `calculate_smart_bounds`).
+  Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
+  command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
+  forces smart framing even if run_info requests dynamic zoom.
 
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
@@ -178,16 +180,48 @@ def galaxy_velocity_gated_target_limit(
     return float(target_limit)
 
 
+def calculate_smart_bounds(output_dir: Path, fallback: float = 150.0) -> float:
+    """
+    Global animation axis half-range: 95th percentile of r = sqrt(x^2 + y^2) over every star in
+    every snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
+    """
+    paths = sorted(output_dir.glob("snapshot_*.csv"), key=lambda p: p.stem)
+    if not paths:
+        return float(max(fallback, 1.0))
+    radii_chunks: list[np.ndarray] = []
+    for path in paths:
+        try:
+            df = pd.read_csv(path, skiprows=1, usecols=["x", "y"])
+        except (ValueError, KeyError):
+            try:
+                df = pd.read_csv(path, skiprows=2, header=None, usecols=[1, 2], names=["x", "y"])
+            except Exception:
+                continue
+        x = df["x"].to_numpy(dtype=np.float64, copy=False)
+        y = df["y"].to_numpy(dtype=np.float64, copy=False)
+        radii_chunks.append(np.sqrt(x * x + y * y))
+    if not radii_chunks:
+        return float(max(fallback, 1.0))
+    r_all = np.concatenate(radii_chunks)
+    if r_all.size == 0:
+        return float(max(fallback, 1.0))
+    p95 = float(np.percentile(r_all, 95))
+    static_bound = p95 * 1.20
+    if not np.isfinite(static_bound) or static_bound <= 0:
+        return float(max(fallback, 1.0))
+    return float(static_bound)
+
+
 def plot_animation_dynamic_zoom_from_run_info(
     run_info: dict[str, str | int | float],
 ) -> bool:
     """
     Read plot_animation_dynamic_zoom from run_info (written by cpp_sim).
-    Default True if missing (preserve legacy animation smoothing).
+    Default False if missing: smart framing (fixed bounds from calculate_smart_bounds).
     """
     raw = run_info.get("plot_animation_dynamic_zoom")
     if raw is None:
-        return True
+        return False
     if isinstance(raw, (int, float)):
         return int(raw) != 0
     if isinstance(raw, str):
@@ -196,7 +230,7 @@ def plot_animation_dynamic_zoom_from_run_info(
             return False
         if s in ("1", "true", "yes"):
             return True
-    return True
+    return False
 
 
 def galaxy_velocity_gated_smoothed_limit(
@@ -264,13 +298,13 @@ def main() -> None:
     zoom_group.add_argument(
         "--no-dynamic-zoom",
         action="store_true",
-        help="Animation: constant axis half-range = max velocity-gated limit over all snapshots "
-        "(no temporal smoothing, no per-frame zoom). Overrides run_info plot_animation_dynamic_zoom.",
+        help="Animation: smart framing (95th percentile r × 1.2 over all snapshots). "
+        "Overrides run_info plot_animation_dynamic_zoom.",
     )
     zoom_group.add_argument(
         "--dynamic-zoom",
         action="store_true",
-        help="Animation: force smoothed viewport (overrides run_info).",
+        help="Animation: legacy per-frame velocity-gated smoothed zoom (overrides run_info).",
     )
     parser.add_argument(
         "--render-overlay-mode",
@@ -382,19 +416,16 @@ def main() -> None:
                 pos, vel, galaxy_radius_m, fallback_radius
             )
         else:
-            # Constant axis limits: per-frame velocity-gated limits vary by snapshot; take max so
-            # the viewport does not pump when temporal smoothing is off.
-            _fixed_anim_r = max(
-                galaxy_velocity_gated_target_limit(
-                    s.positions, s.velocities, galaxy_radius_m, fallback_radius
-                )
-                for s in snapshots
-            )
-            render_radius_cb = lambda pos, vel, rfix=_fixed_anim_r: rfix
+            static_bound = calculate_smart_bounds(run_dir, fallback=fallback_radius)
+            render_radius_cb = static_bound
 
-        print(
-            f"  Animation viewport: {'dynamic zoom (smoothed)' if use_animation_dynamic_zoom else 'constant (max half-axis over snapshots; no per-frame zoom)'}"
-        )
+        if use_animation_dynamic_zoom:
+            print("  Animation viewport: dynamic zoom (velocity-gated, smoothed per frame)")
+        else:
+            print(
+                f"  Animation viewport: smart framing (fixed half-axis = {float(render_radius_cb):.6g} m, "
+                "95th percentile r × 1.2 over all snapshots)"
+            )
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
         else:
