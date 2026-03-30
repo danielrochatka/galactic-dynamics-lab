@@ -798,27 +798,27 @@ int main(int argc, char** argv) {
     std::cout << "Shared IC fingerprint (fnv1a64): " << ic_hash << "\n";
 
     int compare_progress_interval = 0;
-    bool compare_progress_tty = false;
     auto compare_start_wall = std::chrono::steady_clock::now();
     if (n_steps > 0) {
       compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
-      compare_progress_tty = IS_STDOUT_TERMINAL();
-      std::cout << "Running compare simulations (" << n_steps << " steps each; progress shows left then right)...\n"
-                << std::flush;
+      std::cout << "Running compare simulations (" << n_steps << " steps each).\n" << std::flush;
     }
+    // Compare: always line-based progress (second arg false). In-place \r works for the first leg on many
+    // terminals, but the second leg often fails to redraw after the newline following the first leg.
     galaxy::ProgressCallback left_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_tty, "left");
+        make_galaxy_step_progress_callback(compare_start_wall, false, "left");
+    std::cout << "Left simulation (" << left_cfg.physics_package << ")...\n" << std::flush;
     auto left_snapshots =
         galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, left_progress,
                                compare_progress_interval);
-    if (compare_progress_tty && n_steps > 0) std::cout << "\n";
 
     galaxy::ProgressCallback right_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_tty, "right");
+        make_galaxy_step_progress_callback(compare_start_wall, false, "right");
+    std::cout << "Right simulation (" << right_cfg.physics_package << ")...\n" << std::flush;
     auto right_snapshots =
         galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, right_progress,
                                compare_progress_interval);
-    if (compare_progress_tty && n_steps > 0) std::cout << "\n";
+    if (n_steps > 0) std::cout << "\n";
 
     auto write_side_outputs =
         [&](const galaxy::Config& side_cfg,
