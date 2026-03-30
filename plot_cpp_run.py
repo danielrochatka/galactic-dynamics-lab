@@ -15,7 +15,9 @@ Animation viewport: default uses **smart framing** — one fixed axis half-range
   command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
   forces smart framing even if run_info requests dynamic zoom.
 Burn-in filter (plotting only): `--skip-initial-steps` and/or `--skip-initial-snapshots` ignore
-early snapshots for plotting products; raw snapshot files are unchanged on disk.
+early snapshots for plotting products (animation/PNGs/diagnostics). You can also set
+`plot_skip_initial_steps` / `plot_skip_initial_snapshots` in the run config (written to
+`run_info.txt`). CLI flags override run_info; raw snapshot files are unchanged on disk.
 
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
@@ -146,6 +148,34 @@ def filter_snapshots_for_plotting(
     if skip_initial_snapshots > 0:
         filtered = filtered[skip_initial_snapshots:]
     return filtered
+
+
+def resolve_burnin_skip_settings(
+    run_info: dict[str, str | int | float],
+    cli_skip_initial_steps: int | None,
+    cli_skip_initial_snapshots: int | None,
+) -> tuple[int, int]:
+    """Resolve burn-in skip settings with precedence: CLI overrides run_info; defaults to 0."""
+
+    def ri_int(key: str, default: int) -> int:
+        if not run_info or key not in run_info:
+            return default
+        try:
+            return int(run_info[key])
+        except Exception:
+            return default
+
+    effective_steps = (
+        cli_skip_initial_steps
+        if cli_skip_initial_steps is not None
+        else ri_int("plot_skip_initial_steps", 0)
+    )
+    effective_snaps = (
+        cli_skip_initial_snapshots
+        if cli_skip_initial_snapshots is not None
+        else ri_int("plot_skip_initial_snapshots", 0)
+    )
+    return effective_steps, effective_snaps
 
 
 def resolve_galaxy_radius_meters(
@@ -348,14 +378,16 @@ def main() -> None:
     parser.add_argument(
         "--skip-initial-steps",
         type=int,
-        default=0,
-        help="Burn-in filter (plotting only): ignore snapshots with step < this value.",
+        default=None,
+        help="Burn-in filter (plotting only): ignore snapshots with step < this value. "
+        "Overrides run_info plot_skip_initial_steps when set.",
     )
     parser.add_argument(
         "--skip-initial-snapshots",
         type=int,
-        default=0,
-        help="Burn-in filter (plotting only): after step filtering, drop first N snapshots.",
+        default=None,
+        help="Burn-in filter (plotting only): after step filtering, drop first N snapshots. "
+        "Overrides run_info plot_skip_initial_snapshots when set.",
     )
     args = parser.parse_args()
 
@@ -363,26 +395,30 @@ def main() -> None:
     if not run_dir.is_dir():
         raise SystemExit(f"Not a directory: {run_dir}")
 
-    if args.skip_initial_steps < 0:
-        raise SystemExit("--skip-initial-steps must be >= 0")
-    if args.skip_initial_snapshots < 0:
-        raise SystemExit("--skip-initial-snapshots must be >= 0")
-
     # Load run info and snapshots
     run_info = load_run_info(run_dir)
+    skip_initial_steps, skip_initial_snapshots = resolve_burnin_skip_settings(
+        run_info,
+        cli_skip_initial_steps=args.skip_initial_steps,
+        cli_skip_initial_snapshots=args.skip_initial_snapshots,
+    )
+    if skip_initial_steps < 0:
+        raise SystemExit("--skip-initial-steps must be >= 0 (effective)")
+    if skip_initial_snapshots < 0:
+        raise SystemExit("--skip-initial-snapshots must be >= 0 (effective)")
     snapshot_records = load_all_snapshot_records(run_dir)
     if not snapshot_records:
         raise SystemExit(f"No snapshots found in {run_dir} (look for snapshot_*.csv)")
     filtered_records = filter_snapshots_for_plotting(
         snapshot_records,
-        skip_initial_steps=args.skip_initial_steps,
-        skip_initial_snapshots=args.skip_initial_snapshots,
+        skip_initial_steps=skip_initial_steps,
+        skip_initial_snapshots=skip_initial_snapshots,
     )
     if not filtered_records:
         raise SystemExit(
             "Burn-in filter removed all snapshots. "
-            f"Found={len(snapshot_records)}, skip_initial_steps={args.skip_initial_steps}, "
-            f"skip_initial_snapshots={args.skip_initial_snapshots}."
+            f"Found={len(snapshot_records)}, skip_initial_steps={skip_initial_steps}, "
+            f"skip_initial_snapshots={skip_initial_snapshots}."
         )
     snapshots = [s for _, s in filtered_records]
     filtered_paths = [p for p, _ in filtered_records]
@@ -392,8 +428,8 @@ def main() -> None:
     print(f"Snapshots found (raw): {len(snapshot_records)}")
     print(
         "Burn-in filter: "
-        f"skip_initial_steps={args.skip_initial_steps}, "
-        f"skip_initial_snapshots={args.skip_initial_snapshots}"
+        f"skip_initial_steps={skip_initial_steps}, "
+        f"skip_initial_snapshots={skip_initial_snapshots}"
     )
     print(f"Snapshots used for plotting: {len(snapshots)}, particles: {n_stars}")
     print(

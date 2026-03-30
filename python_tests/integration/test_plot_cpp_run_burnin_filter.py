@@ -94,6 +94,28 @@ class TestPlotCppRunBurninFilter(unittest.TestCase):
             self.assertAlmostEqual(b_all, 60.6, places=6)  # median([1,1,100,100]) * 1.2
             self.assertAlmostEqual(b_filtered, 120.0, places=6)
 
+    def test_resolve_skip_settings_cli_overrides_run_info(self) -> None:
+        import plot_cpp_run as pcr
+
+        run_info = {
+            "plot_skip_initial_steps": 10,
+            "plot_skip_initial_snapshots": 3,
+        }
+        steps, snaps = pcr.resolve_burnin_skip_settings(
+            run_info,
+            cli_skip_initial_steps=5,
+            cli_skip_initial_snapshots=None,
+        )
+        self.assertEqual(steps, 5)
+        self.assertEqual(snaps, 3)
+
+    def test_resolve_skip_settings_missing_defaults_to_zero(self) -> None:
+        import plot_cpp_run as pcr
+
+        steps, snaps = pcr.resolve_burnin_skip_settings({}, None, None)
+        self.assertEqual(steps, 0)
+        self.assertEqual(snaps, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -187,6 +187,10 @@ struct Config {
   bool save_run_info = true;
   /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
   bool plot_animation_dynamic_zoom = false;
+  /** plot_cpp_run.py: plotting-only burn-in filter: ignore snapshots with step < this value. Default 0 (no filtering). */
+  int plot_skip_initial_steps = 0;
+  /** plot_cpp_run.py: plotting-only burn-in filter: after step filtering, drop first N remaining snapshots. Default 0 (no filtering). */
+  int plot_skip_initial_snapshots = 0;
   /**
    * plot_cpp_run.py: text overlay on galaxy_initial/final PNG and animation frames.
    * none | minimal | audit_full. Default none keeps PNG/MP4 pixel-identical to pre-overlay behavior;

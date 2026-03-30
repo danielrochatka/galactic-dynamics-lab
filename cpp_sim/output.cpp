@@ -87,6 +87,8 @@ void write_run_info(const std::string& output_dir,
   f << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
   f << "galaxy_radius\t" << config.galaxy_radius << "\n";
   f << "plot_animation_dynamic_zoom\t" << (config.plot_animation_dynamic_zoom ? 1 : 0) << "\n";
+  f << "plot_skip_initial_steps\t" << config.plot_skip_initial_steps << "\n";
+  f << "plot_skip_initial_snapshots\t" << config.plot_skip_initial_snapshots << "\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";

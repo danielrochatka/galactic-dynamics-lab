@@ -284,6 +284,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.plot_animation_dynamic_zoom = parse_bool(val);
     return true;
   }
+  if (key == "plot_skip_initial_steps") {
+    config.plot_skip_initial_steps = std::stoi(val);
+    return true;
+  }
+  if (key == "plot_skip_initial_snapshots") {
+    config.plot_skip_initial_snapshots = std::stoi(val);
+    return true;
+  }
   if (key == "render_overlay_mode") {
     std::string m = trim(val);
     std::string lo = m;
