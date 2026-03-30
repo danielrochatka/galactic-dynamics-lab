@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from plot_cpp_compare import matched_steps_strict, render_compare
+from plot_cpp_compare import _resolve_side_run_dir, matched_steps_strict, render_compare
 
 
 def _write_snapshot(path: Path, step: int, t: float, x: float) -> None:
@@ -45,6 +45,16 @@ def _write_run_info(run_dir: Path, pkg: str) -> None:
 
 
 class TestPlotCppCompare(unittest.TestCase):
+    def test_resolve_side_run_dir_cpp_sim_relative_manifest(self) -> None:
+        """Manifest stores paths relative to cpp_sim; compare_parent is .../outputs/RUN."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run = root / "cpp_sim" / "outputs" / "RUN1"
+            (run / "left_X").mkdir(parents=True)
+            m = "outputs/RUN1/left_X"
+            got = _resolve_side_run_dir(m, run.resolve())
+            self.assertEqual(got, (run / "left_X").resolve())
+
     def test_matched_steps_strict_pass(self) -> None:
         self.assertEqual(matched_steps_strict({0, 5}, {0, 5}), [0, 5])
 

@@ -30,6 +30,30 @@ def _load_compare_manifest(parent: Path) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _resolve_side_run_dir(manifest_path_str: str, compare_parent: Path) -> Path:
+    """
+    C++ writes left_dir/right_dir relative to cpp_sim cwd (e.g. outputs/RUN/left_TPFCore).
+    compare_parent is the resolved compare folder (.../cpp_sim/outputs/RUN).
+    Resolving Path(manifest) against repo-root cwd breaks; prefer compare_parent / basename,
+    then cpp_sim / manifest path.
+    """
+    p = Path(manifest_path_str)
+    if p.is_absolute():
+        return p
+    direct = compare_parent / p.name
+    if direct.is_dir():
+        return direct.resolve()
+    # Manifest path is relative to cpp_sim: outputs/RUN/left_*
+    cpp_sim = compare_parent.parent.parent
+    under_cpp = (cpp_sim / p).resolve()
+    if under_cpp.is_dir():
+        return under_cpp
+    cwd_rel = (Path.cwd() / p).resolve()
+    if cwd_rel.is_dir():
+        return cwd_rel
+    return direct
+
+
 def _load_side_data(run_dir: Path, label: str, overlay_mode_override: str | None) -> SideData:
     from plot_cpp_run import load_all_snapshot_records, load_run_info
 
@@ -99,8 +123,8 @@ def render_compare(parent_dir: Path, no_animation: bool = False, overlay_mode: s
     import matplotlib.pyplot as plt
 
     mf = _load_compare_manifest(parent_dir)
-    left_dir = Path(mf["left_dir"])
-    right_dir = Path(mf["right_dir"])
+    left_dir = _resolve_side_run_dir(str(mf["left_dir"]), parent_dir)
+    right_dir = _resolve_side_run_dir(str(mf["right_dir"]), parent_dir)
     compare_run_id = str(mf.get("compare_run_id", parent_dir.name))
 
     left = _load_side_data(left_dir, "left", overlay_mode)

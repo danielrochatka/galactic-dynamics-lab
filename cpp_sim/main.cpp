@@ -918,10 +918,22 @@ int main(int argc, char** argv) {
     std::cout << "Right output: " << right_dir << "\n";
 
     if (auto_plot) {
-      std::string cmd = "cd .. && ./dev/bin/python plot_cpp_compare.py cpp_sim/" + compare_parent_dir;
+      std::cout << "Rendering compare figures (plot_cpp_compare.py)...\n" << std::flush;
+      // Run from cpp_sim cwd: script lives at repo_root/plot_cpp_compare.py
+      std::string cmd = "python3 ../plot_cpp_compare.py " + compare_parent_dir;
       int ret = std::system(cmd.c_str());
-      if (ret != 0)
-        std::cerr << "Warning: compare renderer returned non-zero exit code.\n";
+      if (ret != 0) {
+        std::cerr << "Warning: compare renderer returned non-zero exit code. Command was:\n  " << cmd << "\n";
+      } else {
+        std::cout << "Compare render finished (see galaxy_initial_compare.png, galaxy_final_compare.png in "
+                  << compare_parent_dir << ").\n";
+      }
+    } else {
+      std::cout
+          << "\nCompare side-by-side PNGs/animation were not generated (run without --plot).\n"
+          << "From the cpp_sim directory:\n  python3 ../plot_cpp_compare.py " << compare_parent_dir << "\n"
+          << "From the repository root:\n  python3 plot_cpp_compare.py cpp_sim/" << compare_parent_dir << "\n"
+          << "Or re-run with --plot to render automatically.\n";
     }
     return 0;
   }
