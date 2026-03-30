@@ -1,7 +1,7 @@
 /**
  * TPFCore package implementation.
  * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
- * Integrator accelerations: VDSG (when coupling nonzero) vs provisional readout — see compute_accelerations.
+ * Integrator accelerations: readout baseline + optional VDSG modifier + global |a| shunt — see compute_accelerations.
  */
 
 #include "tpf_core_package.hpp"
@@ -20,6 +20,9 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+
+/* File-local: test hook counts per-particle applications of global |a| cap in apply_global_accel_magnitude_shunt. */
+static unsigned g_tpf_shunt_events = 0;
 
 namespace galaxy {
 
@@ -90,6 +93,7 @@ void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vect
       double s = a_cap / a_mag;
       ax[i] *= s;
       ay[i] *= s;
+      ++g_tpf_shunt_events;
     }
   }
 }
@@ -115,10 +119,19 @@ inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, dou
 }
 
 /**
- * VDSG velocity modifier (SI): additive on top of TPF readout baseline.
- * Per interaction, Newtonian magnitude a_N = G M / r_soft^2; doppler_scale = 1 + λ_eff (v·r̂)/c.
- * This accumulates only the excess over Newtonian: a_N * (doppler_scale - 1) along the same line as a_N.
- * Full SI replacement path would be a_N * doppler_scale; we add (a_N * doppler_scale - a_N) to baseline.
+ * VDSG velocity modifier (SI), additive on TPF readout baseline.
+ *
+ * Design (replaces radial Doppler (v_rel·r̂)/c):
+ * 1) Why (v_rel·r̂)/c failed: for nearly circular orbits about the BH, v is mostly tangential, so v·r̂ ≈ 0 and
+ *    the BH–star modifier vanished — no gradual coupling between orbital motion and the modifier, and no
+ *    “moving mass” signal aligned with wake-like intuition (flow past the source, not only radial approach).
+ * 2) New scalar: beta = |v_rel| / c (relative speed in the interaction, BH frame or pairwise). This is
+ *    nonzero for circular motion (|v| > 0) and goes to 0 smoothly as speeds → 0, so λ_eff*beta → 0 as
+ *    coupling or speeds → 0 (continuous Newtonian/baseline limit).
+ * 3) Direction: excess remains along the Newtonian line (centripetal toward the source). The modifier is
+ *    a_speed-dependent rescaling of that radial magnitude: doppler_scale = 1 + λ_eff * beta, contribution
+ *    a_N * (doppler_scale - 1) = a_N * λ_eff * beta for small λ_eff*beta — interpretable as wake-like
+ *    amplification tied to how fast matter moves in the interaction, not to radial vs tangential split alone.
  */
 void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, double softening,
                                          bool star_star, double vdsg_coupling,
@@ -131,6 +144,8 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
 
+  if (!(vdsg_coupling != 0.0) || !std::isfinite(vdsg_coupling)) return;
+
   /* Star–black hole: r_hat from BH toward star; v_rel = v_star (BH at rest). */
   if (bh_mass > 0.0) {
     for (int i = 0; i < n; ++i) {
@@ -142,12 +157,14 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
       if (r_mag < 1e-300) continue;
       double ux = xi / r_mag;
       double uy = yi / r_mag;
-      double v_dot_r = state.vx[i] * ux + state.vy[i] * uy;
+      const double vrel_mag =
+          std::sqrt(state.vx[i] * state.vx[i] + state.vy[i] * state.vy[i] + 1e-300);
+      const double beta = vrel_mag / C_SI_LIGHT;
       const double lambda_eff =
           vdsg_effective_coupling(vdsg_coupling, bh_mass, vdsg_mass_baseline_kg);
-      double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
+      const double doppler_scale = 1.0 + lambda_eff * beta;
       const double a_newt = G * bh_mass / denom;
-      double accel_mag = a_newt * (doppler_scale - 1.0);
+      const double accel_mag = a_newt * (doppler_scale - 1.0);
       ax[i] -= ux * accel_mag;
       ay[i] -= uy * accel_mag;
     }
@@ -168,12 +185,13 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
         double uy = dy / r_mag;
         double dvx = state.vx[j] - state.vx[i];
         double dvy = state.vy[j] - state.vy[i];
-        double v_dot_r = dvx * ux + dvy * uy;
+        const double vrel_mag = std::sqrt(dvx * dvx + dvy * dvy + 1e-300);
+        const double beta = vrel_mag / C_SI_LIGHT;
         const double lambda_eff =
             vdsg_effective_coupling(vdsg_coupling, state.mass[j], vdsg_mass_baseline_kg);
-        double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
+        const double doppler_scale = 1.0 + lambda_eff * beta;
         const double a_newt = G * state.mass[j] / denom;
-        double accel_mag = a_newt * (doppler_scale - 1.0);
+        const double accel_mag = a_newt * (doppler_scale - 1.0);
         ax[i] += ux * accel_mag;
         ay[i] += uy * accel_mag;
       }
@@ -210,11 +228,12 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "TPF readout baseline: provisional readout closures per tpfcore_readout_mode "
                  "(tensor / derived radial / experimental)\n";
     std::cerr << "VDSG velocity modifier: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
-              << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0; additive SI excess "
-                 "a_N*(doppler_scale-1) on top of baseline)\n";
+              << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0; additive excess "
+                 "a_N*(doppler_scale-1), doppler_scale=1+lambda_eff*|v_rel|/c)\n";
     std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
               << "  (tpfcore_enable_provisional_readout; required to call TPFCore accelerations)\n";
-    std::cerr << "Integrator ax, ay = readout_baseline + vdsg_modifier (modifier zero if coupling == 0)\n";
+    std::cerr << "Integrator ax, ay = readout_baseline + vdsg_modifier; then apply_global_accel_magnitude_shunt "
+                 "(always; same for coupling 0 and nonzero)\n";
     std::cerr << std::scientific << std::setprecision(16);
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
     std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
@@ -250,20 +269,20 @@ void TPFCorePackage::compute_accelerations(const State& state,
       const double denom = r_sq + eps_sq;
       const double r_mag = std::sqrt(denom);
       if (r_mag > 1e-300) {
-        const double ux = xi / r_mag;
-        const double v_dot_r = state.vx[0] * ux + state.vy[0] * (yi / r_mag);
+        const double v_mag =
+            std::sqrt(state.vx[0] * state.vx[0] + state.vy[0] * state.vy[0] + 1e-300);
+        const double beta_sample = v_mag / C_SI_LIGHT;
         const double lambda_eff_bh =
             vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
-        const double doppler_scale =
-            vdsg_active ? (1.0 + lambda_eff_bh * (v_dot_r / C_SI_LIGHT))
-                        : (1.0 + vdsg_coupling_ * (v_dot_r / C_SI_LIGHT));
+        const double doppler_scale = 1.0 + lambda_eff_bh * beta_sample;
         const double a_newtonian = G_si * bh_mass / denom;
         const double a_VDSG_modifier = a_newtonian * (doppler_scale - 1.0);
 
         std::cerr << "--- Sample: Star 0 vs BH (SI magnitudes) ---\n";
         std::cerr << "a_newtonian = " << a_newtonian << "  (G*M_BH/(r^2+eps^2))\n";
         std::cerr << "a_VDSG_modifier = " << a_VDSG_modifier
-                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = " << doppler_scale;
+                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = 1 + lambda_eff*|v|/c = "
+                  << doppler_scale;
         if (vdsg_active)
           std::cerr << "; lambda_eff(BH source) = " << lambda_eff_bh;
         std::cerr << ")\n";
@@ -313,16 +332,15 @@ void TPFCorePackage::compute_accelerations(const State& state,
     }
   }
 
-  if (vdsg_coupling_ != 0.0) {
-    std::vector<double> dax, day;
-    accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                        vdsg_mass_baseline_resolved_kg_, dax, day);
-    for (int i = 0; i < n; ++i) {
-      ax[i] += dax[i];
-      ay[i] += day[i];
-    }
-    apply_global_accel_magnitude_shunt(state, simulation_dt_, ax, ay);
+  std::vector<double> dax, day;
+  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                      vdsg_mass_baseline_resolved_kg_, dax, day);
+  for (int i = 0; i < n; ++i) {
+    ax[i] += dax[i];
+    ay[i] += day[i];
   }
+  /* Same cap for all tpf_vdsg_coupling (including 0): no nonzero-only shunt regime. */
+  apply_global_accel_magnitude_shunt(state, simulation_dt_, ax, ay);
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
@@ -1399,5 +1417,9 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   else
     txt << "This initial state is outside the calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
 }
+
+void tpf_test_reset_global_accel_shunt_events() { g_tpf_shunt_events = 0; }
+
+unsigned tpf_test_global_accel_shunt_events() { return g_tpf_shunt_events; }
 
 }  // namespace galaxy

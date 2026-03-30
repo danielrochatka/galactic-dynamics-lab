@@ -98,10 +98,7 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
         base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
     else:
         base = f"TPFCorePackage::compute_provisional_readout_acceleration ({rmode})"
-    if vdsg != 0.0:
-        acc = base + " + accumulate_vdsg_velocity_modifier"
-    else:
-        acc = base
+    acc = base + " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt"
     return dyn, met, acc
 
 

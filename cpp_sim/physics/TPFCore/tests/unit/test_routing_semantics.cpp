@@ -23,6 +23,69 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 
 }  // namespace
 
+TEST_CASE("Task A: coupling 0 vs tiny nonzero — same shunt event count, near-identical ax when v=0") {
+  galaxy::Config c0;
+  c0.tpfcore_enable_provisional_readout = true;
+  c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.dt = 0.01;
+  c0.star_mass = 2.0;
+  c0.tpf_kappa = 1.0e10;
+  c0.tpf_poisson_bins = 32;
+  c0.galaxy_radius = 100.0;
+
+  galaxy::Config c1 = c0;
+  c1.tpf_vdsg_coupling = 1e-8;
+
+  galaxy::TPFCorePackage p0, p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
+
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 2.0);
+  std::vector<double> ax0, ay0, ax1, ay1;
+
+  galaxy::tpf_test_reset_global_accel_shunt_events();
+  p0.compute_accelerations(s, 100.0, 1.0, false, ax0, ay0);
+  const unsigned n0 = galaxy::tpf_test_global_accel_shunt_events();
+
+  galaxy::tpf_test_reset_global_accel_shunt_events();
+  p1.compute_accelerations(s, 100.0, 1.0, false, ax1, ay1);
+  const unsigned n1 = galaxy::tpf_test_global_accel_shunt_events();
+
+  CHECK(n0 == n1);
+  CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
+  CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
+}
+
+TEST_CASE("Task B: tangential motion — VDSG modifier scales with |v|/c (nonzero for circular-like flow)") {
+  galaxy::Config c0;
+  c0.tpfcore_enable_provisional_readout = true;
+  c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.dt = 0.01;
+  c0.star_mass = 2.0;
+  c0.tpf_kappa = 1.0e10;
+  c0.tpf_poisson_bins = 32;
+  c0.galaxy_radius = 100.0;
+
+  galaxy::Config c1 = c0;
+  /* Large enough λ with |v|/c so Δax is above double noise (old (v·r̂)/c gave 0 here). */
+  c1.tpf_vdsg_coupling = 0.02;
+
+  galaxy::TPFCorePackage p0, p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
+
+  /* On +x axis from BH; velocity purely tangential (+y) => old (v·r̂) would give zero excess. */
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 8000.0, 2.0);
+  std::vector<double> ax0, ay0, ax1, ay1;
+  p0.compute_accelerations(s, 100.0, 1.0, false, ax0, ay0);
+  p1.compute_accelerations(s, 100.0, 1.0, false, ax1, ay1);
+
+  REQUIRE(ax0.size() == 1);
+  CHECK(std::fabs(ax1[0] - ax0[0]) > 1e-20);
+}
+
 TEST_CASE("VDSG coupling is additive: tiny coupling gives accelerations near baseline-only") {
   galaxy::Config c0;
   c0.tpfcore_enable_provisional_readout = true;

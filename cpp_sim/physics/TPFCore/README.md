@@ -22,7 +22,7 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code:** `TPFCorePackage::compute_accelerations` always builds **TPF readout baseline** **`ax, ay`** from **`compute_provisional_readout_acceleration`** when provisional readout is on. If **`tpf_vdsg_coupling ≠ 0`**, it **adds** the SI velocity modifier from **`accumulate_vdsg_velocity_modifier`** (Newtonian magnitude × (**doppler_scale − 1**) per interaction). Paths are **exploratory** unless stated otherwise. |
+| **Closure (acceleration)** | **Current code:** readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then **`apply_global_accel_magnitude_shunt`** (always). Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
 | **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). **VDSG** contributes an additive SI excess on top of that baseline, not a replacement readout. |
 
 ---
@@ -34,13 +34,13 @@ The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_m
 - **`active_dynamics_branch`** — **Readout identity** for dynamics: **`TPF_readout_acceleration:<mode>`** when **`tpfcore_enable_provisional_readout`** is on (independent of **`tpf_vdsg_coupling`**). If provisional readout is off, dynamics are disabled for TPFCore acceleration.
 - **`active_metrics_branch`** — Identity of the **configured readout** label (e.g. `tpfcore_readout:derived_tpf_radial_readout`).
 
-**Integrator accelerations** are **baseline readout + optional VDSG modifier** when coupling is nonzero. **`acceleration_code_path`** appends **`+ accumulate_vdsg_velocity_modifier`** when **`tpf_vdsg_coupling ≠ 0`**.
+**Integrator accelerations** are **baseline readout + VDSG modifier (zero if λ = 0) + global shunt**. **`acceleration_code_path`** lists the full pipeline including **`apply_global_accel_magnitude_shunt`**.
 
 ---
 
 ## VDSG (Velocity-Deformed Spacetime Gradient)
 
-**VDSG** (**Velocity-Deformed Spacetime Gradient**) is an **exploratory**, **velocity-dependent** **additive** correction: per interaction, Newtonian magnitude **a_N = G M / r²** is scaled by **doppler_scale = 1 + λ_eff (v·r̂)/c**; the code adds only the **excess** **a_N (doppler_scale − 1)** on top of the **TPF readout baseline** (see **`accumulate_vdsg_velocity_modifier`** in `tpf_core_package.cpp`). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; manifests record the modifier via **`acceleration_code_path`**.
+**VDSG** (**Velocity-Deformed Spacetime Gradient**) is an **exploratory**, **velocity-dependent** **additive** correction: per interaction, **doppler_scale = 1 + λ_eff |v_rel| / c** (relative speed of the interaction, not **v·r̂** — so tangential / circular motion still couples); excess **a_N (doppler_scale − 1)** is added along the Newtonian line on top of the **TPF readout baseline** (see **`accumulate_vdsg_velocity_modifier`** in `tpf_core_package.cpp`). **`apply_global_accel_magnitude_shunt`** runs **after** every TPFCore acceleration evaluation (**same for λ = 0 and λ ≠ 0**). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; **`acceleration_code_path`** lists the full pipeline.
 
 **Legacy alias (once):** the parser accepts **`tpf_gdd_coupling`** as an alias for **`tpf_vdsg_coupling`** (historical name). **Canonical key:** **`tpf_vdsg_coupling`**. Manifests note the rename for audit.
 
@@ -54,7 +54,7 @@ Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SC
 - **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
 - **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-When **`tpf_vdsg_coupling ≠ 0`**, **`compute_accelerations`** adds the VDSG velocity modifier **after** the readout baseline; **`apply_global_accel_magnitude_shunt`** applies to the **sum** when the modifier is active.
+**`compute_accelerations`** always adds the modifier vector (zeros if λ = 0), then applies **`apply_global_accel_magnitude_shunt`** to the **final** **`ax, ay`**.
 
 ---
 

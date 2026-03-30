@@ -124,6 +124,10 @@ class TPFCorePackage : public PhysicsPackage {
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 };
 
+/** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */
+void tpf_test_reset_global_accel_shunt_events();
+unsigned tpf_test_global_accel_shunt_events();
+
 }  // namespace galaxy
 
 #endif

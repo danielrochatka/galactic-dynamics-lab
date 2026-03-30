@@ -92,8 +92,7 @@ std::string compute_acceleration_code_path(const Config& config) {
     base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
   else
     base = "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
-  if (config.tpf_vdsg_coupling != 0.0) return base + " + accumulate_vdsg_velocity_modifier";
-  return base;
+  return base + " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt";
 }
 
 void write_render_manifest(const std::string& output_dir,

@@ -22,5 +22,9 @@ d0=$(grep -m1 '^active_dynamics_branch' "$OUT0/run_info.txt" | cut -f2)
 d1=$(grep -m1 '^active_dynamics_branch' "$OUT1/run_info.txt" | cut -f2)
 test "$d0" = "$d1"
 echo "$d0" | grep -q '^TPF_readout_acceleration:derived_tpf_radial_readout$'
+grep -q 'accumulate_vdsg_velocity_modifier' "$OUT0/run_info.txt"
+grep -q 'apply_global_accel_magnitude_shunt' "$OUT0/run_info.txt"
 grep -q 'accumulate_vdsg_velocity_modifier' "$OUT1/run_info.txt"
-test ! "$(grep -m1 '^acceleration_code_path' "$OUT0/run_info.txt" | cut -f2)" = "$(grep -m1 '^acceleration_code_path' "$OUT1/run_info.txt" | cut -f2)"
+a0=$(grep -m1 '^acceleration_code_path' "$OUT0/run_info.txt" | cut -f2)
+a1=$(grep -m1 '^acceleration_code_path' "$OUT1/run_info.txt" | cut -f2)
+test "$a0" = "$a1"
