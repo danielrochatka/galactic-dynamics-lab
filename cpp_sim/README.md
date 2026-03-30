@@ -112,6 +112,7 @@ python3 plot_cpp_run.py cpp_sim/outputs/<run_id>
 This produces e.g. **`galaxy_initial.png`**, **`galaxy_final.png`**, optional **`galaxy.mp4`**, **`rotation_curve.png`**, and may honor **`render_overlay_mode`** from **`run_info`** (or **`--render-overlay-mode`**): **`none`** | **`minimal`** | **`audit_full`**. Overlays read **`run_info`** and **`render_manifest.json`** so plots show **dynamics vs metrics** and coupling without opening source.
 
 **`plot_animation_dynamic_zoom`**: default **off** — `plot_cpp_run.py` uses **smart framing** (fixed axis from median radius over all stars and snapshots, × 1.2). Set **`true`** for legacy per-frame velocity-gated smoothed zoom (see `plot_cpp_run.py`).
+Burn-in plotting filter (does not modify raw snapshots): `plot_cpp_run.py --skip-initial-steps <step>` and/or `--skip-initial-snapshots <N>` to ignore early cold-start frames for PNG/animation/diagnostics and smart framing.
 
 ---
 

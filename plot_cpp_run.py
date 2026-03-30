@@ -14,6 +14,8 @@ Animation viewport: default uses **smart framing** — one fixed axis half-range
   Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
   command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
   forces smart framing even if run_info requests dynamic zoom.
+Burn-in filter (plotting only): `--skip-initial-steps` and/or `--skip-initial-snapshots` ignore
+early snapshots for plotting products; raw snapshot files are unchanged on disk.
 
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
@@ -113,14 +115,37 @@ def load_snapshot_csv(path: Path) -> Snapshot | None:
 
 def load_all_snapshots(run_dir: Path) -> list[Snapshot]:
     """Find all snapshot_*.csv in run_dir, sort by step, load and return."""
+    records = load_all_snapshot_records(run_dir)
+    return [snap for _, snap in records]
+
+
+def load_all_snapshot_records(run_dir: Path) -> list[tuple[Path, Snapshot]]:
+    """Find all snapshot_*.csv in run_dir, sort by step, load and return (path, snapshot)."""
     pattern = "snapshot_*.csv"
     files = sorted(run_dir.glob(pattern), key=lambda p: p.stem)
-    snapshots = []
+    records: list[tuple[Path, Snapshot]] = []
     for p in files:
         snap = load_snapshot_csv(p)
         if snap is not None:
-            snapshots.append(snap)
-    return snapshots
+            records.append((p, snap))
+    return records
+
+
+def filter_snapshots_for_plotting(
+    records: list[tuple[Path, Snapshot]],
+    skip_initial_steps: int = 0,
+    skip_initial_snapshots: int = 0,
+) -> list[tuple[Path, Snapshot]]:
+    """
+    Burn-in filter for plotting products only.
+    Applies both filters conservatively: (step >= skip_initial_steps) then drop first N remaining.
+    """
+    filtered = records
+    if skip_initial_steps > 0:
+        filtered = [(p, s) for (p, s) in filtered if s.step >= skip_initial_steps]
+    if skip_initial_snapshots > 0:
+        filtered = filtered[skip_initial_snapshots:]
+    return filtered
 
 
 def resolve_galaxy_radius_meters(
@@ -180,12 +205,18 @@ def galaxy_velocity_gated_target_limit(
     return float(target_limit)
 
 
-def calculate_smart_bounds(output_dir: Path, fallback: float = 150.0) -> float:
+def calculate_smart_bounds(
+    output_dir: Path,
+    fallback: float = 150.0,
+    snapshot_paths: list[Path] | None = None,
+) -> float:
     """
     Global animation axis half-range: median of r = sqrt(x^2 + y^2) over every star in every
     snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
     """
-    paths = sorted(output_dir.glob("snapshot_*.csv"), key=lambda p: p.stem)
+    paths = snapshot_paths if snapshot_paths is not None else sorted(
+        output_dir.glob("snapshot_*.csv"), key=lambda p: p.stem
+    )
     if not paths:
         return float(max(fallback, 1.0))
     radii_chunks: list[np.ndarray] = []
@@ -314,21 +345,61 @@ def main() -> None:
         help="On-frame audit overlay for galaxy PNG/animation (default: from run_info render_overlay_mode; "
         "if missing, none for backward compatibility).",
     )
+    parser.add_argument(
+        "--skip-initial-steps",
+        type=int,
+        default=0,
+        help="Burn-in filter (plotting only): ignore snapshots with step < this value.",
+    )
+    parser.add_argument(
+        "--skip-initial-snapshots",
+        type=int,
+        default=0,
+        help="Burn-in filter (plotting only): after step filtering, drop first N snapshots.",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
     if not run_dir.is_dir():
         raise SystemExit(f"Not a directory: {run_dir}")
 
+    if args.skip_initial_steps < 0:
+        raise SystemExit("--skip-initial-steps must be >= 0")
+    if args.skip_initial_snapshots < 0:
+        raise SystemExit("--skip-initial-snapshots must be >= 0")
+
     # Load run info and snapshots
     run_info = load_run_info(run_dir)
-    snapshots = load_all_snapshots(run_dir)
-    if not snapshots:
+    snapshot_records = load_all_snapshot_records(run_dir)
+    if not snapshot_records:
         raise SystemExit(f"No snapshots found in {run_dir} (look for snapshot_*.csv)")
+    filtered_records = filter_snapshots_for_plotting(
+        snapshot_records,
+        skip_initial_steps=args.skip_initial_steps,
+        skip_initial_snapshots=args.skip_initial_snapshots,
+    )
+    if not filtered_records:
+        raise SystemExit(
+            "Burn-in filter removed all snapshots. "
+            f"Found={len(snapshot_records)}, skip_initial_steps={args.skip_initial_steps}, "
+            f"skip_initial_snapshots={args.skip_initial_snapshots}."
+        )
+    snapshots = [s for _, s in filtered_records]
+    filtered_paths = [p for p, _ in filtered_records]
 
     n_stars = len(snapshots[0].positions)
     print(f"Run dir: {run_dir}")
-    print(f"Snapshots: {len(snapshots)}, particles: {n_stars}")
+    print(f"Snapshots found (raw): {len(snapshot_records)}")
+    print(
+        "Burn-in filter: "
+        f"skip_initial_steps={args.skip_initial_steps}, "
+        f"skip_initial_snapshots={args.skip_initial_snapshots}"
+    )
+    print(f"Snapshots used for plotting: {len(snapshots)}, particles: {n_stars}")
+    print(
+        f"Plotted range: first step/time={snapshots[0].step}/{float(snapshots[0].time):g}, "
+        f"last step/time={snapshots[-1].step}/{float(snapshots[-1].time):g}"
+    )
     if run_info:
         print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
 
@@ -416,7 +487,11 @@ def main() -> None:
                 pos, vel, galaxy_radius_m, fallback_radius
             )
         else:
-            static_bound = calculate_smart_bounds(run_dir, fallback=fallback_radius)
+            static_bound = calculate_smart_bounds(
+                run_dir,
+                fallback=fallback_radius,
+                snapshot_paths=filtered_paths,
+            )
             render_radius_cb = static_bound
 
         if use_animation_dynamic_zoom:
