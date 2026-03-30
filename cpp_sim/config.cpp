@@ -152,6 +152,18 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_vdsg_mass_baseline_kg = std::stod(val);
     return true;
   }
+  if (key == "tpf_global_accel_shunt_enable") {
+    config.tpf_global_accel_shunt_enable = parse_bool(val);
+    return true;
+  }
+  if (key == "tpf_global_accel_shunt_fraction") {
+    config.tpf_global_accel_shunt_fraction = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_accel_pipeline_diagnostics_csv") {
+    config.tpf_accel_pipeline_diagnostics_csv = parse_bool(val);
+    return true;
+  }
   if (key == "tpf_poisson_bins") {
     config.tpf_poisson_bins = std::stoi(val);
     return true;

@@ -116,7 +116,17 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
         base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
     else:
         base = f"TPFCorePackage::compute_provisional_readout_acceleration ({rmode})"
-    acc = base + " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt"
+    shunt_on = bool(_pick_boolish({}, ri, "tpf_global_accel_shunt_enable", False))
+    if shunt_on:
+        acc = (
+            base
+            + " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)"
+        )
+    else:
+        acc = (
+            base
+            + " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)"
+        )
     return dyn, met, acc
 
 

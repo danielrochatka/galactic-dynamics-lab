@@ -9,6 +9,9 @@ TEST_CASE("config defaults") {
   CHECK(c.simulation_mode == galaxy::SimulationMode::galaxy);
   CHECK(c.physics_package == "Newtonian");
   CHECK(c.tpf_vdsg_coupling == doctest::Approx(1.0e-20));
+  CHECK(c.tpf_global_accel_shunt_enable == false);
+  CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
+  CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
   CHECK(c.render_overlay_mode == "none");
 }
 

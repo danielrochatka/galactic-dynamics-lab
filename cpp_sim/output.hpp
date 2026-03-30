@@ -8,6 +8,8 @@
 
 namespace galaxy {
 
+struct AccelPipelineStats;
+
 struct GalaxyInitAudit;
 struct CoolingAuditInfo {
   bool cooling_active = false;
@@ -21,6 +23,7 @@ struct CoolingAuditInfo {
 // n_particles: actual particle count (if < 0, use config.n_stars).
 // run_config_path, package_defaults_path: if non-empty, written for reproducibility.
 // galaxy_init_audit: if non-null and valid, writes resolved galaxy IC block (galaxy mode).
+// tpf_pipeline: optional last-step TPFCore accel pipeline stats (readout / VDSG / shunt instrumentation).
 void write_run_info(const std::string& output_dir,
                     const Config& config,
                     int n_steps_done,
@@ -29,7 +32,8 @@ void write_run_info(const std::string& output_dir,
                     const std::string& run_config_path = "",
                     const std::string& package_defaults_path = "",
                     const GalaxyInitAudit* galaxy_init_audit = nullptr,
-                    const CoolingAuditInfo* cooling_audit = nullptr);
+                    const CoolingAuditInfo* cooling_audit = nullptr,
+                    const AccelPipelineStats* tpf_pipeline = nullptr);
 
 // Write each snapshot to output_dir/snapshot_<step>.csv (columns: i,x,y,vx,vy,mass).
 void write_snapshots(const std::string& output_dir,

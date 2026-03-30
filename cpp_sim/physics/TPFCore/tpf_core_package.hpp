@@ -16,6 +16,7 @@
  * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
  */
 
+#include "../../accel_pipeline_stats.hpp"
 #include "../../types.hpp"
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
@@ -80,6 +81,14 @@ class TPFCorePackage : public PhysicsPackage {
                                  const Config& config,
                                  const std::string& output_dir) const;
 
+  /** Per-snapshot pipeline metrics CSV (readout baseline, VDSG modifier, shunt); optional end-of-run pass. */
+  void write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
+                                          const Config& config,
+                                          const std::string& output_dir) const;
+
+  /** Last integrator-step pipeline stats (updated every compute_accelerations). */
+  const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
+
   /** Live two_body_orbit force audit (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
                                     const Config& config,
@@ -121,7 +130,19 @@ class TPFCorePackage : public PhysicsPackage {
   /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
   double vdsg_mass_baseline_resolved_kg_;
   double simulation_dt_;
+  bool shunt_enable_;
+  double shunt_fraction_;
+  bool pipeline_diagnostics_csv_;
+  mutable AccelPipelineStats last_pipeline_;
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
+
+  void eval_accel_pipeline(const State& state,
+                           double bh_mass,
+                           double softening,
+                           bool star_star,
+                           std::vector<double>& ax,
+                           std::vector<double>& ay,
+                           AccelPipelineStats* stats_out) const;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

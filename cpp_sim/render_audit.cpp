@@ -93,7 +93,12 @@ std::string compute_acceleration_code_path(const Config& config) {
     base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
   else
     base = "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
-  return base + " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt";
+  std::string tail = " + accumulate_vdsg_velocity_modifier";
+  if (config.tpf_global_accel_shunt_enable)
+    tail += " + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)";
+  else
+    tail += " (global |a| shunt OFF — clean readout+VDSG path without velocity cap)";
+  return base + tail;
 }
 
 void write_render_manifest(const std::string& output_dir,
@@ -159,6 +164,9 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "galaxy_init_spiral_phase", config.galaxy_init_spiral_phase);
     json_kv_bool(jf, first, "enable_star_star_gravity", config.enable_star_star_gravity);
     json_kv_num(jf, first, "tpf_vdsg_mass_baseline_kg", config.tpf_vdsg_mass_baseline_kg);
+    json_kv_bool(jf, first, "tpf_global_accel_shunt_enable", config.tpf_global_accel_shunt_enable);
+    json_kv_num(jf, first, "tpf_global_accel_shunt_fraction", config.tpf_global_accel_shunt_fraction);
+    json_kv_bool(jf, first, "tpf_accel_pipeline_diagnostics_csv", config.tpf_accel_pipeline_diagnostics_csv);
     json_kv(jf, first, "git_commit_full", gp.git_commit_full);
     json_kv(jf, first, "git_commit_short", gp.git_commit_short);
     json_kv(jf, first, "git_branch", gp.git_branch);
@@ -217,6 +225,9 @@ void write_render_manifest(const std::string& output_dir,
     tf << "galaxy_init_spiral_amplitude\t" << config.galaxy_init_spiral_amplitude << "\n";
     tf << "galaxy_init_spiral_winding\t" << config.galaxy_init_spiral_winding << "\n";
     tf << "galaxy_init_spiral_phase\t" << config.galaxy_init_spiral_phase << "\n";
+    tf << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
+    tf << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
+    tf << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
     tf << "git_commit_full\t" << gp.git_commit_full << "\n";
     tf << "git_commit_short\t" << gp.git_commit_short << "\n";
     tf << "git_branch\t" << gp.git_branch << "\n";

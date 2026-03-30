@@ -5,6 +5,7 @@
  */
 
 #include "tpf_core_package.hpp"
+#include "../../accel_pipeline_stats.hpp"
 #include "../../config.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
@@ -55,7 +56,10 @@ TPFCorePackage::TPFCorePackage()
       source_softening_(0.0),
       vdsg_coupling_(1.0e-20),
       vdsg_mass_baseline_resolved_kg_(0.0),
-      simulation_dt_(0.01) {}
+      simulation_dt_(0.01),
+      shunt_enable_(false),
+      shunt_fraction_(0.001),
+      pipeline_diagnostics_csv_(true) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
@@ -72,22 +76,28 @@ void TPFCorePackage::init_from_config(const Config& config) {
   vdsg_mass_baseline_resolved_kg_ =
       (config.tpf_vdsg_mass_baseline_kg > 0.0) ? config.tpf_vdsg_mass_baseline_kg : config.star_mass;
   simulation_dt_ = config.dt;
+  shunt_enable_ = config.tpf_global_accel_shunt_enable;
+  shunt_fraction_ = (config.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(config.tpf_global_accel_shunt_fraction))
+                        ? config.tpf_global_accel_shunt_fraction
+                        : 0.001;
+  pipeline_diagnostics_csv_ = config.tpf_accel_pipeline_diagnostics_csv;
 }
 
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
 
-/** Cap total |a| to 0.1% |v|/dt per star (velocity-magnitude safety). */
-void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vector<double>& ax,
-                                        std::vector<double>& ay) {
-  if (!(dt > 0.0) || !std::isfinite(dt)) return;
+/** Cap total |a| to fraction * |v|/dt per star when enabled. Returns per-particle cap count. */
+unsigned apply_global_accel_magnitude_shunt(const State& state, double dt, bool enable, double fraction,
+                                              std::vector<double>& ax, std::vector<double>& ay) {
+  g_tpf_shunt_events = 0;
+  if (!enable || !(dt > 0.0) || !std::isfinite(dt) || !(fraction > 0.0)) return 0;
   const int n = state.n();
   for (int i = 0; i < n; ++i) {
     double vx = state.vx[i];
     double vy = state.vy[i];
     double v_mag = std::sqrt(vx * vx + vy * vy + 1e-30);
-    double a_cap = (0.001 * v_mag) / dt;
+    double a_cap = (fraction * v_mag) / dt;
     double a_mag = std::sqrt(ax[i] * ax[i] + ay[i] * ay[i]);
     if (a_mag > a_cap && a_mag > 0.0 && std::isfinite(a_cap)) {
       double s = a_cap / a_mag;
@@ -96,6 +106,7 @@ void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vect
       ++g_tpf_shunt_events;
     }
   }
+  return g_tpf_shunt_events;
 }
 
 /**
@@ -201,6 +212,74 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
 
 }  // namespace
 
+void TPFCorePackage::eval_accel_pipeline(const State& state,
+                                         double bh_mass,
+                                         double softening,
+                                         bool star_star,
+                                         std::vector<double>& ax,
+                                         std::vector<double>& ay,
+                                         AccelPipelineStats* stats_out) const {
+  const int n = state.n();
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+    tpfcore::TpfRadialGravityProfile profile =
+        tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
+    for (int i = 0; i < n; ++i) {
+      tpfcore::compute_provisional_readout_acceleration(
+          state, i, bh_mass, star_star, softening, source_softening_,
+          readout_mode_, readout_scale_,
+          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
+          &derived_poisson_cfg_, &profile);
+    }
+  } else {
+    for (int i = 0; i < n; ++i) {
+      tpfcore::compute_provisional_readout_acceleration(
+          state, i, bh_mass, star_star, softening, source_softening_,
+          readout_mode_, readout_scale_,
+          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
+          nullptr, nullptr);
+    }
+  }
+
+  double sum_b = 0.0;
+  for (int i = 0; i < n; ++i) {
+    sum_b += std::hypot(ax[i], ay[i]);
+  }
+  const double mean_b = (n > 0) ? (sum_b / static_cast<double>(n)) : 0.0;
+
+  std::vector<double> dax, day;
+  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                    vdsg_mass_baseline_resolved_kg_, dax, day);
+  double sum_v = 0.0;
+  for (int i = 0; i < n; ++i) {
+    sum_v += std::hypot(dax[i], day[i]);
+  }
+  const double mean_v = (n > 0) ? (sum_v / static_cast<double>(n)) : 0.0;
+
+  for (int i = 0; i < n; ++i) {
+    ax[i] += dax[i];
+    ay[i] += day[i];
+  }
+
+  const unsigned shunt_n =
+      apply_global_accel_magnitude_shunt(state, simulation_dt_, shunt_enable_, shunt_fraction_, ax, ay);
+
+  if (stats_out) {
+    stats_out->valid = true;
+    stats_out->mean_baseline_mag = mean_b;
+    stats_out->mean_vdsg_mag = mean_v;
+    stats_out->vdsg_over_baseline_ratio = (mean_b > 1e-300) ? (mean_v / mean_b) : 0.0;
+    stats_out->shunt_events_last_step = shunt_n;
+    stats_out->frac_capped_last_step =
+        (n > 0) ? (static_cast<double>(shunt_n) / static_cast<double>(n)) : 0.0;
+    stats_out->shunt_enabled = shunt_enable_;
+    stats_out->shunt_fraction = shunt_fraction_;
+  }
+}
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
@@ -215,8 +294,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
   }
 
   const int n = state.n();
-  ax.assign(n, 0.0);
-  ay.assign(n, 0.0);
 
   static bool has_branch_audited = false;
   if (!has_branch_audited && n > 0) {
@@ -232,8 +309,13 @@ void TPFCorePackage::compute_accelerations(const State& state,
                  "a_N*(doppler_scale-1), doppler_scale=1+lambda_eff*|v_rel|/c)\n";
     std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
               << "  (tpfcore_enable_provisional_readout; required to call TPFCore accelerations)\n";
-    std::cerr << "Integrator ax, ay = readout_baseline + vdsg_modifier; then apply_global_accel_magnitude_shunt "
-                 "(always; same for coupling 0 and nonzero)\n";
+    std::cerr << "Global |a| shunt (velocity cap): "
+              << (shunt_enable_ ? "ENABLED" : "OFF")
+              << "  (tpf_global_accel_shunt_enable; independent of tpf_vdsg_coupling; clean λ=0 baseline when off)\n";
+    if (shunt_enable_) {
+      std::cerr << "  shunt cap = tpf_global_accel_shunt_fraction * |v|/dt  (fraction=" << shunt_fraction_
+                << ")\n";
+    }
     std::cerr << std::scientific << std::setprecision(16);
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
     std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
@@ -311,36 +393,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "===================================================================\n\n" << std::flush;
   }
 
-  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-    tpfcore::TpfRadialGravityProfile profile =
-        tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          &derived_poisson_cfg_, &profile);
-    }
-  } else {
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          nullptr, nullptr);
-    }
-  }
-
-  std::vector<double> dax, day;
-  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                      vdsg_mass_baseline_resolved_kg_, dax, day);
-  for (int i = 0; i < n; ++i) {
-    ax[i] += dax[i];
-    ay[i] += day[i];
-  }
-  /* Same cap for all tpf_vdsg_coupling (including 0): no nonzero-only shunt regime. */
-  apply_global_accel_magnitude_shunt(state, simulation_dt_, ax, ay);
+  eval_accel_pipeline(state, bh_mass, softening, star_star, ax, ay, &last_pipeline_);
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
@@ -1416,6 +1469,26 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
     txt << "This initial state is within the calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
   else
     txt << "This initial state is outside the calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
+}
+
+void TPFCorePackage::write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
+                                                      const Config& config,
+                                                      const std::string& output_dir) const {
+  if (!pipeline_diagnostics_csv_ || !provisional_readout_) return;
+  std::ostringstream path;
+  path << output_dir << "/tpf_accel_pipeline_diagnostics.csv";
+  std::ofstream f(path.str());
+  if (!f) return;
+  f << "step,time,mean_baseline_accel_mag,mean_vdsg_accel_mag,vdsg_over_baseline_ratio,shunt_events,frac_capped,tpf_global_accel_shunt_enabled\n";
+  f << std::scientific << std::setprecision(17);
+  for (const auto& sn : snapshots) {
+    std::vector<double> ax, ay;
+    AccelPipelineStats st;
+    eval_accel_pipeline(sn.state, config.bh_mass, config.softening, config.enable_star_star_gravity, ax, ay, &st);
+    f << sn.step << ',' << sn.time << ',' << st.mean_baseline_mag << ',' << st.mean_vdsg_mag << ','
+      << st.vdsg_over_baseline_ratio << ',' << st.shunt_events_last_step << ',' << st.frac_capped_last_step << ','
+      << (shunt_enable_ ? 1 : 0) << '\n';
+  }
 }
 
 void tpf_test_reset_global_accel_shunt_events() { g_tpf_shunt_events = 0; }

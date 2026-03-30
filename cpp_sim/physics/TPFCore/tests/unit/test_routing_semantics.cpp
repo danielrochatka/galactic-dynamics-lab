@@ -21,9 +21,14 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
   return s;
 }
 
+/** Clean audit default: global |a| shunt off (independent of λ). */
+void apply_clean_tpf_defaults(galaxy::Config& c) {
+  c.tpf_global_accel_shunt_enable = false;
+}
+
 }  // namespace
 
-TEST_CASE("Task A: coupling 0 vs tiny nonzero — same shunt event count, near-identical ax when v=0") {
+TEST_CASE("Task A: coupling 0 vs tiny nonzero — shunt off, zero shunt events, near-identical ax when v=0") {
   galaxy::Config c0;
   c0.tpfcore_enable_provisional_readout = true;
   c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
@@ -33,6 +38,74 @@ TEST_CASE("Task A: coupling 0 vs tiny nonzero — same shunt event count, near-i
   c0.tpf_kappa = 1.0e10;
   c0.tpf_poisson_bins = 32;
   c0.galaxy_radius = 100.0;
+  apply_clean_tpf_defaults(c0);
+
+  galaxy::Config c1 = c0;
+  c1.tpf_vdsg_coupling = 1e-8;
+
+  galaxy::TPFCorePackage p0, p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
+
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 2.0);
+  std::vector<double> ax0, ay0, ax1, ay1;
+
+  galaxy::tpf_test_reset_global_accel_shunt_events();
+  p0.compute_accelerations(s, 100.0, 1.0, false, ax0, ay0);
+  const unsigned n0 = galaxy::tpf_test_global_accel_shunt_events();
+
+  galaxy::tpf_test_reset_global_accel_shunt_events();
+  p1.compute_accelerations(s, 100.0, 1.0, false, ax1, ay1);
+  const unsigned n1 = galaxy::tpf_test_global_accel_shunt_events();
+
+  CHECK(n0 == 0u);
+  CHECK(n1 == 0u);
+  CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
+  CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
+}
+
+TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt disabled — differences at float noise (VDSG term negligible at v=0)") {
+  galaxy::Config c0;
+  apply_clean_tpf_defaults(c0);
+  c0.tpfcore_enable_provisional_readout = true;
+  c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.dt = 0.01;
+  c0.star_mass = 2.0;
+  c0.tpf_kappa = 1.0e10;
+  c0.tpf_poisson_bins = 32;
+  c0.galaxy_radius = 100.0;
+
+  galaxy::Config c1 = c0;
+  c1.tpf_vdsg_coupling = 1e-8;
+
+  galaxy::TPFCorePackage p0, p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
+
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 2.0);
+  std::vector<double> ax0, ay0, ax1, ay1;
+  p0.compute_accelerations(s, 100.0, 1.0, false, ax0, ay0);
+  p1.compute_accelerations(s, 100.0, 1.0, false, ax1, ay1);
+
+  CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
+  CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
+  CHECK(p0.last_accel_pipeline_stats().shunt_events_last_step == 0u);
+  CHECK(p1.last_accel_pipeline_stats().shunt_events_last_step == 0u);
+}
+
+TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt enabled — same policy; shunt events match at v=0") {
+  galaxy::Config c0;
+  c0.tpfcore_enable_provisional_readout = true;
+  c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.dt = 0.01;
+  c0.star_mass = 2.0;
+  c0.tpf_kappa = 1.0e10;
+  c0.tpf_poisson_bins = 32;
+  c0.galaxy_radius = 100.0;
+  c0.tpf_global_accel_shunt_enable = true;
+  c0.tpf_global_accel_shunt_fraction = 0.001;
 
   galaxy::Config c1 = c0;
   c1.tpf_vdsg_coupling = 1e-8;
@@ -55,10 +128,13 @@ TEST_CASE("Task A: coupling 0 vs tiny nonzero — same shunt event count, near-i
   CHECK(n0 == n1);
   CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
   CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
+  CHECK(p0.last_accel_pipeline_stats().shunt_enabled == true);
+  CHECK(p1.last_accel_pipeline_stats().shunt_enabled == true);
 }
 
 TEST_CASE("Task B: tangential motion — VDSG modifier scales with |v|/c (nonzero for circular-like flow)") {
   galaxy::Config c0;
+  apply_clean_tpf_defaults(c0);
   c0.tpfcore_enable_provisional_readout = true;
   c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c0.tpf_vdsg_coupling = 0.0;
@@ -88,6 +164,7 @@ TEST_CASE("Task B: tangential motion — VDSG modifier scales with |v|/c (nonzer
 
 TEST_CASE("VDSG coupling is additive: tiny coupling gives accelerations near baseline-only") {
   galaxy::Config c0;
+  apply_clean_tpf_defaults(c0);
   c0.tpfcore_enable_provisional_readout = true;
   c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c0.tpf_vdsg_coupling = 0.0;
@@ -122,6 +199,7 @@ TEST_CASE("readout mode affects accelerations when VDSG coupling is shared (addi
   c_tensor.tpf_vdsg_coupling = 1e-20;
   c_tensor.dt = 0.01;
   c_tensor.star_mass = 2.0;
+  apply_clean_tpf_defaults(c_tensor);
 
   galaxy::Config c_derived = c_tensor;
   c_derived.tpfcore_readout_mode = "derived_tpf_radial_readout";
@@ -153,6 +231,7 @@ TEST_CASE("tr_coherence_readout and derived_tpf_radial_readout share acceleratio
   c_tr.tpf_kappa = 123.0;
   c_tr.tpf_poisson_bins = 64;
   c_tr.galaxy_radius = 50.0;
+  apply_clean_tpf_defaults(c_tr);
 
   galaxy::Config c_dr = c_tr;
   c_dr.tpfcore_readout_mode = "derived_tpf_radial_readout";

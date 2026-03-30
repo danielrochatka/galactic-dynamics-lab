@@ -29,8 +29,8 @@ TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
   c.tpf_vdsg_coupling = 1e-15;
   CHECK(galaxy::compute_active_metrics_branch(c) == "tpfcore_readout:derived_tpf_radial_readout");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile + "
-        "accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt");
+        "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
+        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)");
 }
 
 TEST_CASE("compute_acceleration_code_path: same pipeline string when vdsg coupling is zero") {
@@ -40,6 +40,17 @@ TEST_CASE("compute_acceleration_code_path: same pipeline string when vdsg coupli
   c.tpfcore_readout_mode = "tensor_radial_projection";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_provisional_readout_acceleration (tensor_radial_projection) + "
-        "accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt");
+        "TPFCorePackage::compute_provisional_readout_acceleration (tensor_radial_projection)"
+        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)");
+}
+
+TEST_CASE("compute_acceleration_code_path: includes shunt when explicitly enabled") {
+  Config c;
+  c.physics_package = "TPFCore";
+  c.tpfcore_enable_provisional_readout = true;
+  c.tpfcore_readout_mode = "tensor_radial_projection";
+  c.tpf_global_accel_shunt_enable = true;
+  CHECK(galaxy::compute_acceleration_code_path(c) ==
+        "TPFCorePackage::compute_provisional_readout_acceleration (tensor_radial_projection)"
+        " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)");
 }

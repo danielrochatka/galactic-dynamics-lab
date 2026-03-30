@@ -49,7 +49,7 @@ class TestRenderOverlay(unittest.TestCase):
         self.assertEqual(d, "TPF_readout_acceleration:derived_tpf_radial_readout")
         self.assertIn("derived_tpf_radial", m)
         self.assertIn("accumulate_vdsg_velocity_modifier", acc)
-        self.assertIn("apply_global_accel_magnitude_shunt", acc)
+        self.assertIn("shunt OFF", acc)
 
     def test_infer_branches_fills_missing_explicit_keys(self) -> None:
         """Older run_info without active_* keys still yields consistent labels."""

@@ -1,3 +1,4 @@
+#include "accel_pipeline_stats.hpp"
 #include "config.hpp"
 #include "force_compare.hpp"
 #include "galaxy_init.hpp"
@@ -746,13 +747,22 @@ int main(int argc, char** argv) {
       cooling_audit.first_saved_snapshot_time = first_saved->time;
     }
 
+    const galaxy::AccelPipelineStats* tpf_pipeline_stats = nullptr;
+    if (config.physics_package == "TPFCore") {
+      if (auto* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(physics)) {
+        if (tpf_pkg->provisional_readout_enabled() && tpf_pkg->last_accel_pipeline_stats().valid)
+          tpf_pipeline_stats = &tpf_pkg->last_accel_pipeline_stats();
+      }
+    }
+
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
                              run_config_path, package_defaults_path,
                              config.simulation_mode == galaxy::SimulationMode::galaxy
                                  ? &galaxy::last_galaxy_init_audit()
                                  : nullptr,
-                             &cooling_audit);
+                             &cooling_audit,
+                             tpf_pipeline_stats);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {
@@ -786,6 +796,10 @@ int main(int argc, char** argv) {
         if (config.tpfcore_live_orbit_force_audit) {
           tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
           std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
+        }
+        if (config.tpf_accel_pipeline_diagnostics_csv) {
+          tpf->write_accel_pipeline_diagnostics(snapshots, config, config.output_dir);
+          std::cout << "Wrote " << config.output_dir << "/tpf_accel_pipeline_diagnostics.csv\n";
         }
       }
     }

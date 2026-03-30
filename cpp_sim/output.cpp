@@ -1,4 +1,5 @@
 #include "output.hpp"
+#include "accel_pipeline_stats.hpp"
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
 #include "render_audit.hpp"
@@ -16,7 +17,8 @@ void write_run_info(const std::string& output_dir,
                     const std::string& run_config_path,
                     const std::string& package_defaults_path,
                     const GalaxyInitAudit* galaxy_init_audit,
-                    const CoolingAuditInfo* cooling_audit) {
+                    const CoolingAuditInfo* cooling_audit,
+                    const AccelPipelineStats* tpf_pipeline) {
   std::ostringstream path;
   path << output_dir << "/run_info.txt";
   std::ofstream f(path.str());
@@ -70,6 +72,9 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
     f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
     f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
+    f << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
+    f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
+    f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
   }
   f << "=== End resolved config ===\n\n";
 
@@ -118,6 +123,17 @@ void write_run_info(const std::string& output_dir,
     f << "first_saved_snapshot_step\t" << cooling_audit->first_saved_snapshot_step << "\n";
     f << "first_saved_snapshot_time\t" << cooling_audit->first_saved_snapshot_time << "\n";
   }
+  if (config.physics_package == "TPFCore" && tpf_pipeline && tpf_pipeline->valid) {
+    f << "\n=== TPF acceleration pipeline (last integrator step) ===\n";
+    f << "tpf_last_mean_baseline_accel_mag\t" << tpf_pipeline->mean_baseline_mag << "\n";
+    f << "tpf_last_mean_vdsg_accel_mag\t" << tpf_pipeline->mean_vdsg_mag << "\n";
+    f << "tpf_last_vdsg_over_baseline_ratio\t" << tpf_pipeline->vdsg_over_baseline_ratio << "\n";
+    f << "tpf_last_shunt_events\t" << tpf_pipeline->shunt_events_last_step << "\n";
+    f << "tpf_last_frac_capped\t" << tpf_pipeline->frac_capped_last_step << "\n";
+    f << "tpf_last_global_accel_shunt_enabled\t" << (tpf_pipeline->shunt_enabled ? 1 : 0) << "\n";
+    f << "tpf_last_global_accel_shunt_fraction\t" << tpf_pipeline->shunt_fraction << "\n";
+    f << "=== End TPF acceleration pipeline ===\n";
+  }
   f << "n_stars\t" << n_star << "\n";
   f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
   f << "physics_package\t" << config.physics_package << "\n";
@@ -142,6 +158,9 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
     f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
     f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
+    f << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
+    f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
+    f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
     f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
     f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
     f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";

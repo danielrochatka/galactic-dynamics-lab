@@ -99,6 +99,19 @@ struct Config {
    * If <= 0, uses star_mass at runtime (same units as simulation). Heuristic / provisional closure.
    */
   double tpf_vdsg_mass_baseline_kg = 0.0;
+  /**
+   * TPFCore: optional global |a| cap after readout + VDSG (fraction of |v|/dt per particle).
+   * Default **false** so λ=0 runs are a clean readout baseline without this stabilization path.
+   * Enable explicitly when investigating numerical caps; not implied by tpf_vdsg_coupling.
+   */
+  bool tpf_global_accel_shunt_enable = false;
+  /** TPFCore: cap magnitude = tpf_global_accel_shunt_fraction * |v| / dt (when shunt enabled). Default 0.001 (0.1%). */
+  double tpf_global_accel_shunt_fraction = 0.001;
+  /**
+   * TPFCore dynamical runs: write tpf_accel_pipeline_diagnostics.csv (per-snapshot pipeline metrics).
+   * Default true; set false to skip the extra pass over snapshots at end of run.
+   */
+  bool tpf_accel_pipeline_diagnostics_csv = true;
   /** TPFCore derived radial profile: number of radial bins (grid for diagnostics / interpolation). Default 100. */
   int tpf_poisson_bins = 100;
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */

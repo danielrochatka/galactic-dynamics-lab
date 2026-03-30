@@ -54,7 +54,7 @@ Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SC
 - **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
 - **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-**`compute_accelerations`** always adds the modifier vector (zeros if λ = 0), then applies **`apply_global_accel_magnitude_shunt`** to the **final** **`ax, ay`**.
+**`compute_accelerations`** always adds the VDSG modifier vector (zeros if λ = 0). The optional global **`|a|` shunt** (velocity cap) is **off by default** (`tpf_global_accel_shunt_enable = false`) so λ = 0 remains a clean readout baseline; enable it explicitly for stabilization experiments.
 
 ---
 
@@ -66,6 +66,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 - **`tpfcore_readout_mode`**, **`tpfcore_readout_scale`**, **`tpfcore_theta_tt_scale`**, **`tpfcore_theta_tr_scale`**
 - **`tpf_kappa`**, **`tpf_poisson_bins`**, **`tpf_poisson_max_radius`**, **`tpf_cooling_fraction`**
 - **`tpf_vdsg_coupling`**, **`tpf_vdsg_mass_baseline_kg`**
+- **`tpf_global_accel_shunt_enable`**, **`tpf_global_accel_shunt_fraction`**, **`tpf_accel_pipeline_diagnostics_csv`**
 - Inspection: **`tpfcore_probe_radius_*`**, **`tpfcore_dump_*`**, **`tpfcore_source_softening`**
 
 **Simulation-wide** keys (galaxy ICs, softening, `n_stars`, etc.) belong to the **application** config, not this file alone — see **[../../README.md](../../README.md)**.
