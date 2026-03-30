@@ -73,15 +73,15 @@ struct Config {
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
   std::string physics_package = "Newtonian";
 
-  /** TPFCore only: enable provisional acceleration readout for dynamical modes. Default false. */
+  /** TPFCore only: gate for compute_accelerations (required; else TPFCore throws). Not “readout drives” alone — VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
   bool tpfcore_enable_provisional_readout = false;
-  /** TPFCore readout: mode. tensor_radial_projection (spatial) or tr_coherence_readout (paper t-r). */
+  /** TPFCore configured readout mode string (see provisional_readout.cpp). May label metrics while VDSG supersedes ax, ay. */
   std::string tpfcore_readout_mode = "tensor_radial_projection";
   /** TPFCore readout: scale factor for magnitude. Was 0.2046442 (INVALIDATED by benchmark mismatch). Pending recalibration; default 1.0. */
   double tpfcore_readout_scale = 1.0;
-  /** TPFCore tr_coherence_readout: Theta_tt balancing companion scale. Default 1.0. */
+  /** TPFCore derived-radial readout modes: theta_tt scale in diagnostics (derived closure; not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tt_scale = 1.0;
-  /** TPFCore tr_coherence_readout: Theta_tr mixed coupling scale. Default 1.0. */
+  /** TPFCore derived-radial readout modes: theta_tr scale in diagnostics (not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
   /**
    * TPFCore hybrid radial: coupling κ from geometric invariant I to effective mass density ρ_eff = κ I (SI ledger).

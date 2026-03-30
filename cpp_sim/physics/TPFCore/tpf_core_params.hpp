@@ -10,7 +10,7 @@
  * Role classification:
  *   - Fixed theory:     lambda = 1/4 (LAMBDA_4D in source_ansatz.hpp; not tunable).
  *   - Numerical reg.:   source softening (eps) for Phi; not part of the theory.
- *   - Provisional:      readout closure (mode, scale, theta_tt/tr); experimental.
+ *   - Provisional:      readout closure (mode, scale, theta_tt/tr); VDSG params live on Config (separate path).
  *   - Inspection:       probe geometry and dump flags; one-time/calibration use.
  *
  * The simulator passes Config; the package (tpf_core_package.cpp) converts

@@ -1,6 +1,7 @@
 /**
  * TPFCore package implementation.
- * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0. No Newtonian substitution.
+ * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
+ * Integrator accelerations: VDSG (when coupling nonzero) vs provisional readout — see compute_accelerations.
  */
 
 #include "tpf_core_package.hpp"
@@ -94,9 +95,9 @@ void apply_global_accel_magnitude_shunt(const State& state, double dt, std::vect
 }
 
 /**
- * PROVISIONAL closure (flag for theory audit): mass-normalized VDSG strength per gravitational source.
+ * PROVISIONAL: mass-normalized VDSG strength per gravitational source.
  * λ_eff = λ · log10(max(M_ref,ε)) / log10(max(M_src,ε)). Heavier M_src → smaller λ_eff (attenuation).
- * Not derived from TPF manuscript v11; single global λ = tpf_vdsg_coupling only (no separate BH coupling).
+ * Exploratory heuristic; single global λ = tpf_vdsg_coupling only (no separate BH coupling).
  * If M_ref <= 0, returns λ unscaled (identity).
  */
 inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, double baseline_mass_kg) {
@@ -116,7 +117,8 @@ inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, dou
 /**
  * Velocity-deformed SI gravity: each interaction is strictly centripetal along the i–source line.
  * doppler_scale = 1 + λ_eff (v_rel · r_hat) / c with λ_eff from vdsg_effective_coupling per source mass.
- * When tpf_vdsg_coupling != 0 this replaces tensor readout for accelerations (no separate energy-injecting kick).
+ * When selected from compute_accelerations, this path supplies integrator accelerations instead of
+ * compute_provisional_readout_acceleration (no separate energy-injecting kick).
  */
 void accumulate_velocity_deformed_centripetal_gravity(const State& state, double bh_mass, double softening,
                                                       bool star_star, double vdsg_coupling,
@@ -297,7 +299,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "===================================================================\n\n" << std::flush;
   }
 
-  /* Non-zero VDSG: velocity-deformed centripetal SI gravity (no tangential kick; tensor readout skipped). */
+  /* Non-zero VDSG: velocity-deformed centripetal SI gravity (no tangential kick; readout closures skipped for ax, ay). */
   if (vdsg_coupling_ != 0.0) {
     accumulate_velocity_deformed_centripetal_gravity(state, bh_mass, softening, star_star, vdsg_coupling_,
                                                      vdsg_mass_baseline_resolved_kg_, simulation_dt_, ax, ay);

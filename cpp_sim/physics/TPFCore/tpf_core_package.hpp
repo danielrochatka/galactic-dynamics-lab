@@ -8,11 +8,12 @@
  * Lambda = 1/4 in 4D (fixed theory; not tunable).
  *
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
- * provisional experimental (readout mode/scale/theta_tt/theta_tr).
+ * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
  *
- * When tpfcore_enable_provisional_readout=true, a PROVISIONAL motion/readout layer
- * maps Theta into acceleration. EXPLORATORY—not the full derived TPF dynamics.
- * Inspection-first; dynamics require provisional readout to be enabled.
+ * compute_accelerations requires tpfcore_enable_provisional_readout (gate to this API).
+ * When tpf_vdsg_coupling != 0, ax, ay are filled by VDSG (provisional readout closures do not supply them).
+ * When VDSG is off, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
+ * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
  */
 
 #include "../../types.hpp"
@@ -32,7 +33,11 @@ class TPFCorePackage : public PhysicsPackage {
 
   void init_from_config(const Config& config) override;
 
-  /** When provisional readout enabled: tensor-driven acceleration. Otherwise throws. */
+  /**
+   * Particle accelerations. Requires provisional readout enabled (else throws).
+   * If tpf_vdsg_coupling != 0: ax, ay from VDSG SI centripetal path.
+   * Else: ax, ay from compute_provisional_readout_acceleration for configured mode.
+   */
   void compute_accelerations(const State& state,
                             double bh_mass,
                             double softening,

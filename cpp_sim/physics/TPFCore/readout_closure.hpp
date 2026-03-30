@@ -5,8 +5,11 @@
  * Provisional readout closure boundary.
  *
  * Readout closures are DOWNSTREAM of the source ansatz: they take Theta (or
- * per-source Theta) and produce a provisional acceleration. They are NOT the
- * source theory; they are exploratory motion/readout formulas.
+ * per-source Theta) and produce a provisional acceleration for the readout path.
+ * They are NOT the source theory; they are exploratory motion/readout formulas.
+ *
+ * Integrator branch (VDSG vs readout for ax, ay) is chosen in TPFCorePackage::compute_accelerations;
+ * run_info / render_manifest record active_dynamics_branch and acceleration_code_path.
  *
  * Implementations (in provisional_readout.cpp):
  * - tensor_radial: per-source Theta·r_hat, superposed (with optional negated).

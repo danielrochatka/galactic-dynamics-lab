@@ -2,8 +2,8 @@
 #define GALAXY_PHYSICS_TPFCORE_DERIVED_TPF_RADIAL_HPP
 
 /**
- * Hybrid TPF radial: Sec. IX bounce metric on baryons + macroscopic Poisson ledger (κ * I) with bounce
- * regularization on ρ_eff, spherical shells → M_eff_enc(r).
+ * Hybrid radial closure: bounced baryonic mass + κ·I Poisson ledger (ρ_eff), shells → M_eff_enc(r).
+ * Feeds radial_acceleration_scalar_derived and derived radial readout modes.
  */
 
 #include "source_ansatz.hpp"
@@ -14,7 +14,7 @@
 namespace galaxy {
 namespace tpfcore {
 
-/** SI Newton constant (matches manuscript numerical value). */
+/** SI Newton constant (fixed literal in this codebase). */
 constexpr double TPF_G_SI = 6.6743e-11;
 
 /** Config for derived radial Poisson grid (κ, bins, radial extent). */
@@ -33,7 +33,7 @@ struct DerivedTpfPoissonConfig {
 
 Theta3D evaluate_derived_theta(double mass_kg, double dx, double dy, double dz, double eps);
 
-/** Frobenius sum Θ_ij Θ_ij only; not manuscript I = Θ_μν Θ^μν − λ Θ². κ-ledger uses compute_invariant_I. */
+/** Frobenius sum Θ_ij Θ_ij only; not compute_invariant_I. κ-ledger uses compute_invariant_I. */
 double derived_invariant_I_contracted(const Theta3D& theta);
 
 Theta3D sum_derived_theta_at_point(const State& state, double bh_mass, double px, double py, double pz,

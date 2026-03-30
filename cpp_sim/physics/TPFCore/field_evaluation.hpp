@@ -5,8 +5,9 @@
  * Field-evaluation layer for TPFCore.
  *
  * Packages the provisional field at a sample point: Xi, Theta, invariant I,
- * and residual (when available). Built from source_ansatz only; no motion/readout.
- * Downstream (inspection, provisional readout) consume this layer.
+ * and residual (when available). Built from source_ansatz only; no motion/readout here.
+ * Consumed by inspection and provisional readout closures. VDSG integrator path does not
+ * use this layer for ax, ay (separate path in tpf_core_package.cpp).
  */
 
 #include "source_ansatz.hpp"

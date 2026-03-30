@@ -46,7 +46,7 @@ Theta3D evaluate_derived_theta(double mass_kg, double dx, double dy, double dz, 
 }
 
 double derived_invariant_I_contracted(const Theta3D& theta) {
-  /* Frobenius Θ_ij Θ_ij only — not manuscript I = Θ_μν Θ^μν − λ Θ² (Eq. 3, v11). */
+  /* Frobenius Θ_ij Θ_ij only — not compute_invariant_I (κ-ledger uses the latter). */
   return theta.xx * theta.xx + theta.yy * theta.yy + theta.zz * theta.zz +
          2.0 * (theta.xy * theta.xy + theta.xz * theta.xz + theta.yz * theta.yz);
 }

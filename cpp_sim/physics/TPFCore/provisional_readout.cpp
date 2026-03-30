@@ -1,8 +1,8 @@
 /**
  * PROVISIONAL motion/readout layer for TPFCore.
  *
- * EXPLORATORY: This is NOT the full derived TPF dynamics.
- * Closures are downstream of the ansatz (see readout_closure.hpp).
+ * EXPLORATORY closures downstream of the ansatz (see readout_closure.hpp).
+ * VDSG dynamics path bypasses readout for integrator ax, ay — see TPFCorePackage::compute_accelerations.
  */
 
 #include "provisional_readout.hpp"

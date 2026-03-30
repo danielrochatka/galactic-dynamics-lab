@@ -4,18 +4,17 @@
 /**
  * PROVISIONAL motion/readout layer for TPFCore.
  *
- * EXPLORATORY: This is NOT the full derived TPF dynamics. It maps the local
- * tensor field (Theta_ij) into an acceleration-like vector for the simulator,
- * without reverting to Newtonian scalar-potential dynamics.
+ * EXPLORATORY closures downstream of the source ansatz (see readout_closure.hpp).
+ * Not the full derived TPF dynamics.
  *
- * Design:
- * - Motion derived from local TPF tensor structure (Theta), NOT from Phi or -grad(Phi).
- * - Closures are downstream of the ansatz; see readout_closure.hpp for the boundary.
- * - Supported modes: tensor_radial_projection, tensor_radial_projection_negated,
- *   tr_coherence_readout / derived_tpf_radial_readout (hybrid bounce + κ ledger),
- *   experimental_radial_r_scaling (experimental; provisional ansatz Theta, radial-only with r-scaling).
+ * Modes (dispatch in compute_provisional_readout_acceleration):
+ * - tensor_radial_projection / _negated: per-source Theta projected along r_hat, superposed.
+ * - tr_coherence_readout, derived_tpf_radial_readout: same hybrid radial closure (a_s r̂ from
+ *   radial_acceleration_scalar_derived; κ–I ledger). Extra theta_tt/tr terms are diagnostics only.
+ * - experimental_radial_r_scaling: separate radial closure from theta_rr.
  *
- * Manuscript v11 vs code tiers: TPF_PAPER_V11_SCOPE.md in this directory.
+ * Integrator note: TPFCorePackage::compute_accelerations may fill ax, ay from VDSG instead;
+ * when tpf_vdsg_coupling != 0, readout closures here are not used for ax, ay on that path.
  */
 
 #include "../../types.hpp"
@@ -28,7 +27,7 @@ struct Config;
 namespace tpfcore {
 
 /**
- * Compute provisional readout acceleration for one particle from all sources.
+ * Provisional readout acceleration for one particle (readout path only; not used for ax, ay when VDSG active).
  *
  * Derived radial modes: pass derived_poisson; optional derived_profile avoids rebuilding the radial
  * profile each particle (batch from TPFCorePackage).
@@ -54,14 +53,14 @@ struct ReadoutDiagnostics {
   double theta_xx, theta_xy, theta_yy, theta_trace, invariant_I;
   /** Theta Frobenius norm (configuration intensity); for regime diagnostics. */
   double theta_norm = 0.0;
-  /* tr_coherence_readout only (0 otherwise): paper-aligned t-r provisional terms */
+  /* Derived-radial closure: diagnostic theta components (not added to ax, ay on that path). */
   double theta_rr = 0.0;
   double theta_tt = 0.0;
   double theta_tr = 0.0;
   double theta_rr_plus_theta_tt = 0.0;
   double provisional_radial_readout = 0.0;
   double provisional_tangential_readout = 0.0;
-  /** tr_coherence_readout: TPF vs Newtonian regime label (empty for other modes). */
+  /** Optional regime label when populated (often empty for non–derived-radial modes). */
   std::string regime;
 };
 

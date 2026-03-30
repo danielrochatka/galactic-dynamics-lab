@@ -54,7 +54,7 @@ PointSourceField provisional_point_source_field(double xs, double ys, double m,
 Theta3D provisional_point_source_theta(double xs, double ys, double m,
                                          double x, double y, double eps);
 
-/** Lambda = 1/4 in 4D. Fixed by manuscript structure; must not become tunable. */
+/** Lambda = 1/4 in 4D (LAMBDA_4D). Fixed in this codebase; not a tunable knob. */
 constexpr double LAMBDA_4D = 0.25;
 
 /** Residual vector for the x,y components of the configuration equation on the plane. */
