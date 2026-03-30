@@ -1,42 +1,40 @@
-# Galaxy N-body simulator
+# Galaxy — TPF simulation repository
 
-2D N-body galaxy simulation (Newtonian pairwise gravity, velocity Verlet). Python reference implementation with rendering and diagnostics; C++ engine for speed.
+This repository hosts **simulation and tooling** around **Triality Primordial Field (TPF)**–style galaxy dynamics: a 2D N-body engine, Python reference code, and post-processing, with a clear split between **manuscript-aligned structure**, **exploratory closures**, and **experiment workflows**.
 
-## Quick start
+## What this repo is
 
-**Python** (from repo root):
+- **Theory / manuscript** — TPF structural claims and scope boundaries live in project docs (e.g. paper drafts and `cpp_sim/physics/TPFCore/TPF_PAPER_V11_SCOPE.md`). The code does not replace the paper; it implements testable pieces and labeled stand-ins where the theory is deferred.
+- **Simulation** — `cpp_sim/` is the primary **C++** N-body application (Newtonian baseline and pluggable physics packages). A **Python** stack (`main.py`, `config.py`, …) provides a reference implementation, rendering, and validation modes.
+- **Experiments** — Long runs, sweeps, and diagnostics are orchestrated via configs and scripts; outputs are designed to be **auditable** (run metadata, manifests, optional plot overlays).
 
-```bash
-pip install numpy matplotlib
-python main.py
-```
+## cpp_sim in one line
 
-**C++** (faster, no built-in plots):
+`cpp_sim/` is the **simulation application**: build `galaxy_sim`, drive modes from root `configs/`, write `run_info.txt`, snapshots, and optional **`render_manifest.json`** for render-time truth. Details: **[cpp_sim/README.md](cpp_sim/README.md)**.
 
-```bash
-cd cpp_sim && make && ./galaxy_sim galaxy
-```
+## Repo map
 
-Use `plot_cpp_run.py` to generate plots from C++ outputs (see below).
+| Area | Role |
+|------|------|
+| **`cpp_sim/`** | C++ simulator, physics packages, configs precedence, outputs. |
+| **`cpp_sim/physics/TPFCore/`** | TPFCore package: primitive Ξ/Θ/I, readout/VDSG paths. **[cpp_sim/physics/TPFCore/README.md](cpp_sim/physics/TPFCore/README.md)** |
+| **`configs/`** | Run configs (root only; see cpp_sim README). `example.cfg` is a reference list. |
+| **`plot_cpp_run.py`** | Post-process C++ run directories → galaxy PNGs, animation, rotation curve. |
+| **Python (`main.py`, …)** | Reference N-body + plots; not the only path to science results. |
 
-## Configuration
+## Paper vs simulation vs experiments
 
-- **Defaults** — Python: `config.py` (`SimulationConfig`). C++: `cpp_sim/config.hpp` (`Config`).
-- **Example config** — `configs/example.cfg` lists available options and sensible defaults. It is version-controlled as a reference.
-- **Local overrides** — Keep personal or machine-specific settings out of version control:
-  - Put local config files in **`configs/local/`** (entire directory is gitignored), or
-  - Use any **`configs/*.local.cfg`** file (e.g. `configs/dev.local.cfg`).
+- **Paper** — Defines intended ontology, equations where closed, and what is *not* expanded (∆C, full nonlinear field solve, etc.).
+- **Simulation** — Integrates particles with a chosen **physics package**; exposes **resolved** parameters in `run_info` / manifests.
+- **Experiments** — Compare branches (e.g. Newtonian control vs TPFCore), tune closures, and record outcomes without conflating **configured** readout with **actual acceleration branch** (see manifests and TPFCore README).
 
-Copy `configs/example.cfg` to `configs/my.local.cfg` or `configs/local/my.cfg` and edit as needed. **Python** `main.py` automatically loads (in order) `configs/my.local.cfg`, `configs/local/my.local.cfg`, and any `configs/local/*.cfg`; later files override earlier. Keys match option names (e.g. `n_steps`, `simulation_mode`). On startup, a line like `Config loaded from: ['configs/my.local.cfg']` confirms your file was used.
+## Quick start (pointers)
 
-## Project layout
+| Goal | Start here |
+|------|------------|
+| Build & run C++, configs, outputs, overlays | [cpp_sim/README.md](cpp_sim/README.md) |
+| TPFCore: Θ, I, λ, VDSG, readout vs dynamics | [cpp_sim/physics/TPFCore/README.md](cpp_sim/physics/TPFCore/README.md) |
+| Paper vs code scope (v11) | [cpp_sim/physics/TPFCore/TPF_PAPER_V11_SCOPE.md](cpp_sim/physics/TPFCore/TPF_PAPER_V11_SCOPE.md) |
+| Example keys (not exhaustive) | [configs/example.cfg](configs/example.cfg) |
 
-- **Python**: `main.py`, `config.py`, `simulation.py`, `physics.py`, `init_conditions.py`, `render.py`, `diagnostics.py`, `validation.py` — full run, rendering, validation modes.
-- **C++**: `cpp_sim/` — simulation core only; see `cpp_sim/README.md` for build and run.
-- **Post-processing**: `plot_cpp_run.py <run_dir>` — reads C++ snapshot CSVs and produces initial/final plots, optional animation and diagnostics.
-- **Config**: `configs/example.cfg` (tracked), `configs/local/` and `configs/*.local.cfg` (gitignored).
-
-## Outputs
-
-- Python: `outputs/<run_id>/` (run_id = `YYYYMMDD_HHMMSS`).
-- C++: `cpp_sim/outputs/<run_id>/` — `run_info.txt`, `snapshot_*.csv`; then run `python plot_cpp_run.py cpp_sim/outputs/<run_id>` to generate plots.
+For Python-only quick runs, see comments in `configs/example.cfg` and `main.py`; the **authoritative** simulation workflow for this project’s audit trail is documented under **`cpp_sim/README.md`**.
