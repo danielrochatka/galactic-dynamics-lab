@@ -29,7 +29,11 @@
 
 - **Simulation** — Particles are integrated with a chosen **physics package**; the engine exposes **resolved** parameters in `run_info` and manifests.
 - **Experiments** — Long runs, sweeps, and diagnostics use configs and scripts; outputs separate **configured** options from **actual** dynamics branches where the engine records both (see **`cpp_sim/README.md`** and, for TPFCore, **`cpp_sim/physics/TPFCore/README.md`**).
-- **TPF manuscript and package theory** — Detailed TPF scope, paper-vs-code mapping, and Ξ/Θ/I semantics live under **`cpp_sim/physics/TPFCore/`** (e.g. **`TPF_PAPER_V11_SCOPE.md`**). The root README does not duplicate that material; the code implements testable pieces and labeled stand-ins where theory is deferred.
+- **TPF manuscript and package theory** — Detailed TPF scope, paper-vs-code mapping, and Ξ/Θ/I semantics live under **`cpp_sim/physics/TPFCore/`** (e.g. **`TPF_PAPER_V11_SCOPE.md`**). The root README does not duplicate that material; **current code behavior** is the ground truth for what runs, with exploratory layers explicitly labeled.
+
+### Outputs: configured labels vs recorded branches
+
+Finished runs include **`run_info.txt`** and (in galaxy mode when enabled) **`render_manifest.json`**. Treat **`active_dynamics_branch`**, **`active_metrics_branch`**, and **`acceleration_code_path`** as the **audit record** of what the binary actually used for dynamics and metrics. A **configured** readout or coupling string in the same files is **not** automatically the same as the **active acceleration path** (TPFCore: e.g. nonzero **`tpf_vdsg_coupling`** routes **`ax, ay`** through VDSG while **`tpfcore_readout_mode`** may still describe the readout/metrics path). Details: **[cpp_sim/README.md](cpp_sim/README.md)**, **[cpp_sim/physics/TPFCore/README.md](cpp_sim/physics/TPFCore/README.md)**.
 
 ## Quick start (pointers)
 

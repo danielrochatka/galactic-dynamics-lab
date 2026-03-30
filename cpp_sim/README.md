@@ -36,7 +36,7 @@ From **`cpp_sim/`**:
 | `tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`, … | Package-specific **inspection** (require `physics_package = TPFCore`). |
 | `tpf_two_body_sweep`, `tpf_weak_field_calibration`, `tpf_newtonian_force_compare`, `tpf_bound_orbit_sweep`, `tpf_diagnostic_consistency_audit` | TPFCore **sweeps / calibration / diagnostics** (see binary help and `SimulationMode` in `config.hpp`). |
 
-Full mode list and errors for unknown modes are printed by the binary. For **TPFCore**, **dynamical** modes need **`tpfcore_enable_provisional_readout = true`**; inspection and sweep modes have their own requirements — see the TPFCore package README.
+Full mode list and errors for unknown modes are printed by the binary. For **TPFCore**, any mode that integrates particles via **`TPFCorePackage::compute_accelerations`** requires **`tpfcore_enable_provisional_readout = true`** (otherwise the package throws). That flag is the **gate** to the acceleration API; when **`tpf_vdsg_coupling ≠ 0`**, **`ax, ay`** are produced by the **VDSG** path and **tensor readout does not supply** those accelerations (readout mode still labels metrics/diagnostics where applicable). Inspection and sweep modes have their own requirements — see the TPFCore package README.
 
 Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `YYYYMMDD_HHMMSS`).
 
@@ -91,7 +91,7 @@ Typical **`outputs/<run_id>/`** contents:
 
 | File | Content |
 |------|---------|
-| **`run_info.txt`** | Tab-separated resolved config, counters, **`active_dynamics_branch`**, **`active_metrics_branch`**, **`acceleration_code_path`**, TPF/IC keys when applicable. |
+| **`run_info.txt`** | Tab-separated resolved config, counters, **`active_dynamics_branch`**, **`active_metrics_branch`**, **`acceleration_code_path`**, TPF/IC keys when applicable. Use these branch fields together with config keys—do not infer dynamics from **`tpfcore_readout_mode`** alone when TPFCore VDSG may be active. |
 | **`render_manifest.json`** / **`render_manifest.txt`** | Full resolved audit for renders (galaxy mode when `save_run_info`): branches, coupling, cooling, IC parameters, aliases note. |
 | **`snapshot_*.csv`** | State: `# step,…,time,…` then `i,x,y,vx,vy,mass`. |
 | **`galaxy_init_diagnostics.txt`** | Initial radial / speed / L_z summaries (galaxy mode). |
@@ -122,7 +122,7 @@ Diagnostics cutoff for post-processing: set `diagnostic_cutoff_radius` in run co
 | Concern | Lives in |
 |---------|----------|
 | Integrator, snapshots, `run_info`, manifests, IC templates, registry | **This README / `config.hpp` / `main.cpp`** |
-| Ξ, Θ, I, λ, readout closures, VDSG vs tensor path, paper alignment | **`physics/TPFCore/README.md`** |
+| Ξ, Θ, I, λ, readout vs VDSG acceleration routing, paper alignment | **`physics/TPFCore/README.md`** |
 
 ---
 

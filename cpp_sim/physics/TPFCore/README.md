@@ -21,31 +21,28 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 
 | Layer | Role |
 |-------|------|
-| **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the paper leaves the full source unspecified. |
-| **Closure** | Maps **Θ** (and ledgers) into **acceleration** or into **SI-style VDSG** — **exploratory** unless stated otherwise; isolated in `provisional_readout.*` / `tpf_core_package.*`. |
-| **Diagnostics** | CSVs and stderr ledgers that record tensor components, regime labels, etc.; may **not** be the same as the integrator’s **ax, ay** when **VDSG** drives dynamics. |
+| **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
+| **Closure (acceleration)** | **Current code:** `TPFCorePackage::compute_accelerations` either (1) fills **ax, ay** from **VDSG** when **`tpf_vdsg_coupling ≠ 0`**, or (2) else calls **`compute_provisional_readout_acceleration`** for the configured readout mode. Paths are **exploratory** unless stated otherwise; implementation in `provisional_readout.*` / `tpf_core_package.cpp`. |
+| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). When **VDSG** supplies **ax, ay**, readout tensors are **not** the dynamics path regardless of diagnostics. |
 
 ---
 
 ## Dynamics branch vs metrics branch (audit language)
 
-The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`**:
+The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`** (computed in **`render_audit.cpp`**):
 
-- **`active_dynamics_branch`** — What **actually integrates** particle motion (e.g. **VDSG centripetal** when `tpf_vdsg_coupling ≠ 0`, else readout-based acceleration from `tpfcore_readout_mode` when provisional readout is on).
-- **`active_metrics_branch`** — Identity of the **provisional readout / tensor diagnostic** path (e.g. `tpfcore_readout:derived_tpf_radial_readout`), which may still run for profiles and CSVs **even when VDSG supersedes accelerations**.
+- **`active_dynamics_branch`** — What **actually integrates** particle motion: **`VDSG_centripetal_SI`** when **`tpf_vdsg_coupling ≠ 0`** and **`tpfcore_enable_provisional_readout`**, else **`TPF_readout_acceleration:<mode>`** when provisional readout is on and VDSG is off; if provisional readout is off, dynamics are disabled for TPFCore acceleration.
+- **`active_metrics_branch`** — Identity of the **configured readout** label (e.g. `tpfcore_readout:derived_tpf_radial_readout`), which may still describe **profiles and CSVs** when VDSG supersedes **ax, ay**.
 
-Do not equate **configured** `tpfcore_readout_mode` with **actual** acceleration routing: when VDSG is active, tensor readout is **not** used for **ax, ay** (see `TPFCorePackage::compute_accelerations`). **`acceleration_code_path`** in the manifest names the C++ symbol-level path for audit.
+Do not equate **configured** `tpfcore_readout_mode` with **actual** acceleration routing: when **`tpf_vdsg_coupling ≠ 0`**, **`accumulate_velocity_deformed_centripetal_gravity`** supplies **ax, ay**; readout is **not** used for those components (see `TPFCorePackage::compute_accelerations`). **`acceleration_code_path`** names the **C++ symbol-level** path for audit.
 
 ---
 
 ## VDSG (Velocity-Deformed Spacetime Gradient)
 
-**VDSG** stands for **Velocity-Deformed Spacetime Gradient**: the **exploratory** closure path in this package that applies a **velocity-dependent rescaling** (e.g. **`doppler_scale`** tied to **`tpf_vdsg_coupling`**) on top of a **centripetal / SI-style** acceleration route, implemented in **`accumulate_velocity_deformed_centripetal_gravity`**. In manifests and **`run_info`**, labels such as **`VDSG_centripetal_SI`** refer to this dynamics branch.
+**VDSG** (**Velocity-Deformed Spacetime Gradient**) is the **exploratory**, **velocity-dependent** branch in this package: **SI-style** centripetal gravity per source with **doppler_scale** from **`tpf_vdsg_coupling`** (λ; optional mass normalization per source — see **`vdsg_effective_coupling`** in `tpf_core_package.cpp`). Implemented in **`accumulate_velocity_deformed_centripetal_gravity`**. In manifests and **`run_info`**, **`VDSG_centripetal_SI`** refers to this **dynamics** branch.
 
-### Naming and legacy alias
-
-- **Canonical config key:** **`tpf_vdsg_coupling`** (λ in **doppler_scale** for the VDSG SI path; effective λ may be mass-normalized per interaction — see code and run_info).
-- **Legacy alias:** **`tpf_gdd_coupling`** is accepted in the config parser and maps to **`tpf_vdsg_coupling`**. Manifests record the alias for audit.
+**Legacy alias (once):** the parser accepts **`tpf_gdd_coupling`** as an alias for **`tpf_vdsg_coupling`** (historical name). **Canonical key:** **`tpf_vdsg_coupling`**. Manifests note the rename for audit.
 
 ---
 
@@ -53,11 +50,11 @@ Do not equate **configured** `tpfcore_readout_mode` with **actual** acceleration
 
 Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SCOPE.md`**.
 
-- **`tensor_radial_projection`** (and negated variant) — Exploratory spatial projection; not the paper’s preferred t–r coherence story.
-- **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — Share the **hybrid radial** closure where `is_derived_tpf_radial_readout_mode` holds; **particle acceleration** is **radial** from **`radial_acceleration_scalar_derived`** and the κ–**I** ledger. **Theta_tt / Theta_tr** (and similar) can appear in **diagnostics**, not necessarily in **a** for that path.
-- **`experimental_radial_r_scaling`** — Experimental (see code / scope doc).
+- **`tensor_radial_projection`** (and negated variant) — Exploratory **Θ·r̂**-style superposed acceleration from **`apply_tensor_radial_closure`**.
+- **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
+- **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-When **`tpf_vdsg_coupling ≠ 0`**, **`accumulate_velocity_deformed_centripetal_gravity`** defines dynamics; readout remains available for **measurement / CSV**, not for substituting Newtonian −∇Φ in that regime.
+When **`tpf_vdsg_coupling ≠ 0`**, **`compute_accelerations`** uses **only** the VDSG path for **ax, ay**; provisional readout is **not** used for those components (stderr one-time branch audit in `tpf_core_package.cpp`). Readout-related diagnostics may still be produced elsewhere when enabled.
 
 ---
 
