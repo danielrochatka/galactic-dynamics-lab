@@ -589,6 +589,7 @@ int main(int argc, char** argv) {
       return 1;
     case galaxy::SimulationMode::galaxy: {
       galaxy::init_galaxy_disk(config, state);
+      galaxy::sync_config_galaxy_init_from_last_audit(config);
       galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
                                             galaxy::last_galaxy_init_audit());
       std::cout << "Galaxy IC: template=" << galaxy::last_galaxy_init_audit().template_name

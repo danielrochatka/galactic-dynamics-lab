@@ -128,8 +128,12 @@ struct Config {
   double tpfcore_residual_step = 1e-6;
 
   /**
-   * Galaxy mode: named IC template (see galaxy_init.hpp). Recipes select structured density seeds only;
-   * random “chaos” uses galaxy_init_* noise keys and galaxy_init_master_chaos (noise-only scaler).
+   * Galaxy mode: named IC template (see galaxy_init.hpp). Each template selects structured density
+   * seeds (m2/m3/bar/spiral/clumps). When structured or noise parameters are still at their neutral
+   * built-in defaults (0.0, 1.0 axis ratio, etc.), apply_galaxy_init_template_defaults supplies
+   * modest template-specific values so the preset name matches visible structure. Explicit nonzero
+   * user settings are never overwritten. Random “chaos” uses galaxy_init_* noise keys and
+   * galaxy_init_master_chaos (noise-only scaler).
    */
   std::string galaxy_init_template = "symmetric_disk";
   /** mt19937 seed for galaxy placement and velocity perturbations (reproducible). Default 12345 matches legacy hardcoded seed. */

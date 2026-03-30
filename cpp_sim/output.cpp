@@ -135,6 +135,8 @@ void write_run_info(const std::string& output_dir,
       config.simulation_mode == galaxy::SimulationMode::galaxy) {
     f << "\n=== Galaxy initialization (resolved; audit) ===\n";
     f << "galaxy_init_template\t" << galaxy_init_audit->template_name << "\n";
+    f << "galaxy_init_template_defaults_used\t" << (galaxy_init_audit->template_defaults_used ? 1 : 0)
+      << "\n";
     f << "galaxy_init_seed\t" << galaxy_init_audit->seed << "\n";
     f << "galaxy_init_master_chaos\t" << galaxy_init_audit->master_chaos << "\n";
     f << "master_chaos_scales_position_noise\t" << (galaxy_init_audit->master_scales_position_noise ? 1 : 0)
@@ -154,6 +156,18 @@ void write_run_info(const std::string& output_dir,
     f << "used_legacy_velocity_noise\t" << (galaxy_init_audit->used_legacy_velocity_noise ? 1 : 0) << "\n";
     f << "velocity_noise_config\t" << config.velocity_noise
       << "  (legacy Cartesian vx,vy if new noises zero)\n";
+    f << "galaxy_init_m2_amplitude_raw\t" << galaxy_init_audit->galaxy_init_m2_amplitude_raw << "\n";
+    f << "galaxy_init_m3_amplitude_raw\t" << galaxy_init_audit->galaxy_init_m3_amplitude_raw << "\n";
+    f << "galaxy_init_bar_amplitude_raw\t" << galaxy_init_audit->galaxy_init_bar_amplitude_raw << "\n";
+    f << "galaxy_init_bar_axis_ratio_raw\t" << galaxy_init_audit->galaxy_init_bar_axis_ratio_raw << "\n";
+    f << "galaxy_init_spiral_amplitude_raw\t" << galaxy_init_audit->galaxy_init_spiral_amplitude_raw << "\n";
+    f << "galaxy_init_spiral_winding_raw\t" << galaxy_init_audit->galaxy_init_spiral_winding_raw << "\n";
+    f << "galaxy_init_spiral_phase_raw\t" << galaxy_init_audit->galaxy_init_spiral_phase_raw << "\n";
+    f << "galaxy_init_clumpiness_raw\t" << galaxy_init_audit->galaxy_init_clumpiness_raw << "\n";
+    f << "galaxy_init_num_clumps_raw\t" << galaxy_init_audit->galaxy_init_num_clumps_raw << "\n";
+    f << "galaxy_init_clump_radius_fraction_raw\t" << galaxy_init_audit->galaxy_init_clump_radius_fraction_raw
+      << "\n";
+    f << "velocity_noise_raw\t" << galaxy_init_audit->velocity_noise_raw << "\n";
     f << "structured_m2\t" << (galaxy_init_audit->structured_m2 ? 1 : 0) << "\n";
     f << "structured_m3\t" << (galaxy_init_audit->structured_m3 ? 1 : 0) << "\n";
     f << "structured_bar\t" << (galaxy_init_audit->structured_bar ? 1 : 0) << "\n";
@@ -176,6 +190,13 @@ void write_run_info(const std::string& output_dir,
     for (size_t i = 0; i < galaxy_init_audit->clump_centers_xy.size(); ++i) {
       f << "clump_center_" << i << "_x\t" << galaxy_init_audit->clump_centers_xy[i].first << "\n";
       f << "clump_center_" << i << "_y\t" << galaxy_init_audit->clump_centers_xy[i].second << "\n";
+    }
+    for (size_t i = 0; i < galaxy_init_audit->template_defaults_log.applied.size(); ++i) {
+      f << "template_default_applied_" << i << "\t" << galaxy_init_audit->template_defaults_log.applied[i]
+        << "\n";
+    }
+    for (size_t i = 0; i < galaxy_init_audit->template_defaults_log.warnings.size(); ++i) {
+      f << "template_warning_" << i << "\t" << galaxy_init_audit->template_defaults_log.warnings[i] << "\n";
     }
     f << "galaxy_init_diagnostics_file\tgalaxy_init_diagnostics.txt\n";
     f << "=== End galaxy initialization ===\n";

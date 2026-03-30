@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <numeric>
 #include <random>
@@ -32,6 +33,20 @@ struct TemplateFlags {
   bool spiral = false;
   bool clumps = false;
 };
+
+/** Template-specific defaults when structured/noise keys are still at Config neutrals (see config.hpp). */
+constexpr double kTemplateDefaultM2Amp = 0.08;
+constexpr double kTemplateDefaultM3Amp = 0.08;
+constexpr double kTemplateDefaultBarAmp = 0.08;
+constexpr double kTemplateDefaultBarAxisRatio = 1.35;
+constexpr double kTemplateDefaultSpiralAmp = 0.06;
+constexpr double kTemplateDefaultSpiralWinding = 1.2;
+constexpr double kTemplateDefaultClumpiness = 0.28;
+constexpr int kTemplateDefaultNumClumps = 12;
+/** "Warm" noise preset (configs/galaxy_init_presets.cfg). */
+constexpr double kTemplateNoisyPos = 0.01;
+constexpr double kTemplateNoisyAng = 0.08;
+constexpr double kTemplateNoisyMag = 0.05;
 
 TemplateFlags flags_for_template(GalaxyInitTemplate t) {
   TemplateFlags f;
@@ -95,6 +110,131 @@ double structured_w_max(const TemplateFlags& tf, const Config& cfg) {
   }
   if (tf.spiral) w *= 1.0 + std::abs(cfg.galaxy_init_spiral_amplitude);
   return std::max(w, kWeightFloor);
+}
+
+const char* template_debug_name(GalaxyInitTemplate t) {
+  switch (t) {
+    case GalaxyInitTemplate::symmetric_disk:
+      return "symmetric_disk";
+    case GalaxyInitTemplate::symmetric_disk_noisy:
+      return "symmetric_disk_noisy";
+    case GalaxyInitTemplate::clumpy_disk:
+      return "clumpy_disk";
+    case GalaxyInitTemplate::weak_m2:
+      return "weak_m2";
+    case GalaxyInitTemplate::weak_m3:
+      return "weak_m3";
+    case GalaxyInitTemplate::weak_bar:
+      return "weak_bar";
+    case GalaxyInitTemplate::preformed_spiral:
+      return "preformed_spiral";
+  }
+  return "symmetric_disk";
+}
+
+void log_warn_ic(GalaxyInitTemplateDefaultsLog* log_out, const std::string& msg) {
+  if (log_out) log_out->warnings.push_back(msg);
+  std::cerr << "galaxy_init: " << msg << "\n";
+}
+
+void log_applied_ic(GalaxyInitTemplateDefaultsLog* log_out, const std::string& msg) {
+  if (log_out) log_out->applied.push_back(msg);
+}
+
+void validate_structured_amplitudes(GalaxyInitTemplate tmpl, const Config& g, GalaxyInitTemplateDefaultsLog* log_out) {
+  TemplateFlags tf = flags_for_template(tmpl);
+  bool need = tf.m2 || tf.m3 || tf.bar || tf.spiral;
+  if (!need) return;
+  double w = structured_w_max(tf, g);
+  if (w <= 1.0 + 1e-12) {
+    log_warn_ic(log_out, std::string("template '") + template_debug_name(tmpl) +
+                             "' has structured flags but rejection weight cap ~1 (check amplitudes / template defaults).");
+  }
+}
+
+void apply_galaxy_init_template_defaults_impl(GalaxyInitTemplate tmpl, Config& g,
+                                               GalaxyInitTemplateDefaultsLog* log_out) {
+  switch (tmpl) {
+    case GalaxyInitTemplate::symmetric_disk:
+      break;
+    case GalaxyInitTemplate::symmetric_disk_noisy: {
+      bool all_new_zero = (g.galaxy_init_position_noise == 0.0 && g.galaxy_init_velocity_angle_noise == 0.0 &&
+                           g.galaxy_init_velocity_magnitude_noise == 0.0);
+      if (all_new_zero) {
+        if (g.velocity_noise > 0.0) {
+          log_warn_ic(log_out,
+                      "symmetric_disk_noisy: applying default galaxy_init_* noise; setting legacy velocity_noise "
+                      "to 0 (was " +
+                          std::to_string(g.velocity_noise) + ") so the new noise pipeline is used.");
+        }
+        g.galaxy_init_position_noise = kTemplateNoisyPos;
+        g.galaxy_init_velocity_angle_noise = kTemplateNoisyAng;
+        g.galaxy_init_velocity_magnitude_noise = kTemplateNoisyMag;
+        g.velocity_noise = 0.0;
+        log_applied_ic(log_out, "symmetric_disk_noisy: position_noise=" + std::to_string(kTemplateNoisyPos) +
+                                    ", velocity_angle_noise=" + std::to_string(kTemplateNoisyAng) +
+                                    ", velocity_magnitude_noise=" + std::to_string(kTemplateNoisyMag) +
+                                    ", velocity_noise=0");
+      }
+      break;
+    }
+    case GalaxyInitTemplate::clumpy_disk: {
+      bool had_zero_clump = (g.galaxy_init_clumpiness == 0.0);
+      if (had_zero_clump) {
+        g.galaxy_init_clumpiness = kTemplateDefaultClumpiness;
+        log_applied_ic(log_out, "clumpy_disk: galaxy_init_clumpiness=" + std::to_string(kTemplateDefaultClumpiness));
+        if (g.galaxy_init_num_clumps == 8) {
+          g.galaxy_init_num_clumps = kTemplateDefaultNumClumps;
+          log_applied_ic(log_out,
+                         "clumpy_disk: galaxy_init_num_clumps=" + std::to_string(kTemplateDefaultNumClumps));
+        }
+      }
+      break;
+    }
+    case GalaxyInitTemplate::weak_m2:
+      if (g.galaxy_init_m2_amplitude == 0.0) {
+        g.galaxy_init_m2_amplitude = kTemplateDefaultM2Amp;
+        log_applied_ic(log_out, "weak_m2: galaxy_init_m2_amplitude=" + std::to_string(kTemplateDefaultM2Amp));
+      }
+      break;
+    case GalaxyInitTemplate::weak_m3:
+      if (g.galaxy_init_m3_amplitude == 0.0) {
+        g.galaxy_init_m3_amplitude = kTemplateDefaultM3Amp;
+        log_applied_ic(log_out, "weak_m3: galaxy_init_m3_amplitude=" + std::to_string(kTemplateDefaultM3Amp));
+      }
+      break;
+    case GalaxyInitTemplate::weak_bar:
+      if (g.galaxy_init_bar_amplitude == 0.0) {
+        g.galaxy_init_bar_amplitude = kTemplateDefaultBarAmp;
+        log_applied_ic(log_out, "weak_bar: galaxy_init_bar_amplitude=" + std::to_string(kTemplateDefaultBarAmp));
+      }
+      if (g.galaxy_init_bar_axis_ratio == 1.0) {
+        g.galaxy_init_bar_axis_ratio = kTemplateDefaultBarAxisRatio;
+        log_applied_ic(log_out,
+                       "weak_bar: galaxy_init_bar_axis_ratio=" + std::to_string(kTemplateDefaultBarAxisRatio));
+      }
+      break;
+    case GalaxyInitTemplate::preformed_spiral:
+      if (g.galaxy_init_spiral_amplitude == 0.0) {
+        g.galaxy_init_spiral_amplitude = kTemplateDefaultSpiralAmp;
+        log_applied_ic(log_out,
+                       "preformed_spiral: galaxy_init_spiral_amplitude=" + std::to_string(kTemplateDefaultSpiralAmp));
+      }
+      if (g.galaxy_init_spiral_winding == 1.0 && g.galaxy_init_spiral_phase == 0.0) {
+        g.galaxy_init_spiral_winding = kTemplateDefaultSpiralWinding;
+        log_applied_ic(log_out,
+                       "preformed_spiral: galaxy_init_spiral_winding=" + std::to_string(kTemplateDefaultSpiralWinding) +
+                           " (neutral 1.0 + phase 0)");
+      }
+      break;
+    default:
+      break;
+  }
+
+  if (tmpl == GalaxyInitTemplate::clumpy_disk && g.galaxy_init_clumpiness == 0.0) {
+    log_warn_ic(log_out, "clumpy_disk: effective clumpiness is still zero after resolution.");
+  }
+  validate_structured_amplitudes(tmpl, g, log_out);
 }
 
 void apply_bar_axis_stretch(double& x, double& y, double axis_ratio, double r_min, double R) {
@@ -181,32 +321,80 @@ std::string galaxy_init_template_to_string(GalaxyInitTemplate t) {
 
 const GalaxyInitAudit& last_galaxy_init_audit() { return g_last_audit; }
 
+void apply_galaxy_init_template_defaults(GalaxyInitTemplate tmpl, Config& effective,
+                                         GalaxyInitTemplateDefaultsLog* log_out) {
+  apply_galaxy_init_template_defaults_impl(tmpl, effective, log_out);
+}
+
+void sync_config_galaxy_init_from_last_audit(Config& config) {
+  const GalaxyInitAudit& a = g_last_audit;
+  if (!a.valid) return;
+  config.galaxy_init_clumpiness = a.galaxy_init_clumpiness;
+  config.galaxy_init_num_clumps = a.galaxy_init_num_clumps;
+  config.galaxy_init_clump_radius_fraction = a.galaxy_init_clump_radius_fraction;
+  config.galaxy_init_m2_amplitude = a.galaxy_init_m2_amplitude;
+  config.galaxy_init_m3_amplitude = a.galaxy_init_m3_amplitude;
+  config.galaxy_init_bar_amplitude = a.galaxy_init_bar_amplitude;
+  config.galaxy_init_bar_axis_ratio = a.galaxy_init_bar_axis_ratio;
+  config.galaxy_init_spiral_amplitude = a.galaxy_init_spiral_amplitude;
+  config.galaxy_init_spiral_winding = a.galaxy_init_spiral_winding;
+  config.galaxy_init_spiral_phase = a.galaxy_init_spiral_phase;
+  config.galaxy_init_position_noise = a.galaxy_init_position_noise_resolved;
+  config.galaxy_init_velocity_angle_noise = a.galaxy_init_velocity_angle_noise_resolved;
+  config.galaxy_init_velocity_magnitude_noise = a.galaxy_init_velocity_magnitude_noise_resolved;
+  config.velocity_noise = a.velocity_noise_effective;
+}
+
 void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit* audit_out) {
   GalaxyInitAudit audit;
   audit.valid = true;
   GalaxyInitTemplate tmpl = parse_galaxy_init_template(config.galaxy_init_template);
   audit.template_name = galaxy_init_template_to_string(tmpl);
-  audit.seed = config.galaxy_init_seed;
-  audit.master_chaos = config.galaxy_init_master_chaos;
+
+  audit.galaxy_init_m2_amplitude_raw = config.galaxy_init_m2_amplitude;
+  audit.galaxy_init_m3_amplitude_raw = config.galaxy_init_m3_amplitude;
+  audit.galaxy_init_bar_amplitude_raw = config.galaxy_init_bar_amplitude;
+  audit.galaxy_init_bar_axis_ratio_raw = config.galaxy_init_bar_axis_ratio;
+  audit.galaxy_init_spiral_amplitude_raw = config.galaxy_init_spiral_amplitude;
+  audit.galaxy_init_spiral_winding_raw = config.galaxy_init_spiral_winding;
+  audit.galaxy_init_spiral_phase_raw = config.galaxy_init_spiral_phase;
+  audit.galaxy_init_clumpiness_raw = config.galaxy_init_clumpiness;
+  audit.galaxy_init_num_clumps_raw = config.galaxy_init_num_clumps;
+  audit.galaxy_init_clump_radius_fraction_raw = config.galaxy_init_clump_radius_fraction;
+  audit.velocity_noise_raw = config.velocity_noise;
+
+  Config effective = config;
+  GalaxyInitTemplateDefaultsLog tlog;
+  apply_galaxy_init_template_defaults_impl(tmpl, effective, &tlog);
+  audit.template_defaults_used = !tlog.applied.empty();
+  audit.template_defaults_log = std::move(tlog);
+
+  audit.seed = effective.galaxy_init_seed;
+  audit.master_chaos = effective.galaxy_init_master_chaos;
   if (!(audit.master_chaos > 0.0) || !std::isfinite(audit.master_chaos)) audit.master_chaos = 1.0;
 
   audit.raw_position_noise = config.galaxy_init_position_noise;
   audit.raw_velocity_angle_noise = config.galaxy_init_velocity_angle_noise;
   audit.raw_velocity_magnitude_noise = config.galaxy_init_velocity_magnitude_noise;
 
-  audit.eff_position_noise = config.galaxy_init_position_noise * audit.master_chaos;
-  audit.eff_velocity_angle_noise_rad = config.galaxy_init_velocity_angle_noise * audit.master_chaos;
-  audit.eff_velocity_magnitude_noise = config.galaxy_init_velocity_magnitude_noise * audit.master_chaos;
+  audit.galaxy_init_position_noise_resolved = effective.galaxy_init_position_noise;
+  audit.galaxy_init_velocity_angle_noise_resolved = effective.galaxy_init_velocity_angle_noise;
+  audit.galaxy_init_velocity_magnitude_noise_resolved = effective.galaxy_init_velocity_magnitude_noise;
+  audit.velocity_noise_effective = effective.velocity_noise;
 
-  audit.master_scales_position_noise = (config.galaxy_init_position_noise > 0.0);
-  audit.master_scales_velocity_angle_noise = (config.galaxy_init_velocity_angle_noise > 0.0);
-  audit.master_scales_velocity_magnitude_noise = (config.galaxy_init_velocity_magnitude_noise > 0.0);
+  audit.eff_position_noise = effective.galaxy_init_position_noise * audit.master_chaos;
+  audit.eff_velocity_angle_noise_rad = effective.galaxy_init_velocity_angle_noise * audit.master_chaos;
+  audit.eff_velocity_magnitude_noise = effective.galaxy_init_velocity_magnitude_noise * audit.master_chaos;
+
+  audit.master_scales_position_noise = (effective.galaxy_init_position_noise > 0.0);
+  audit.master_scales_velocity_angle_noise = (effective.galaxy_init_velocity_angle_noise > 0.0);
+  audit.master_scales_velocity_magnitude_noise = (effective.galaxy_init_velocity_magnitude_noise > 0.0);
 
   audit.used_new_state_noise =
       (audit.eff_position_noise > 0.0 || audit.eff_velocity_angle_noise_rad > 0.0 ||
        audit.eff_velocity_magnitude_noise > 0.0);
   audit.used_legacy_velocity_noise =
-      !audit.used_new_state_noise && (config.velocity_noise > 0.0);
+      !audit.used_new_state_noise && (effective.velocity_noise > 0.0);
 
   TemplateFlags tf = flags_for_template(tmpl);
   audit.structured_m2 = tf.m2;
@@ -215,37 +403,37 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
   audit.structured_spiral = tf.spiral;
   audit.structured_clumps = tf.clumps;
 
-  audit.galaxy_init_clumpiness = config.galaxy_init_clumpiness;
-  audit.galaxy_init_num_clumps = std::max(1, config.galaxy_init_num_clumps);
-  audit.galaxy_init_clump_radius_fraction = config.galaxy_init_clump_radius_fraction;
-  audit.galaxy_init_m2_amplitude = config.galaxy_init_m2_amplitude;
-  audit.galaxy_init_m3_amplitude = config.galaxy_init_m3_amplitude;
-  audit.galaxy_init_bar_amplitude = config.galaxy_init_bar_amplitude;
-  audit.galaxy_init_bar_axis_ratio = config.galaxy_init_bar_axis_ratio;
-  audit.galaxy_init_spiral_amplitude = config.galaxy_init_spiral_amplitude;
-  audit.galaxy_init_spiral_winding = config.galaxy_init_spiral_winding;
-  audit.galaxy_init_spiral_phase = config.galaxy_init_spiral_phase;
+  audit.galaxy_init_clumpiness = effective.galaxy_init_clumpiness;
+  audit.galaxy_init_num_clumps = std::max(1, effective.galaxy_init_num_clumps);
+  audit.galaxy_init_clump_radius_fraction = effective.galaxy_init_clump_radius_fraction;
+  audit.galaxy_init_m2_amplitude = effective.galaxy_init_m2_amplitude;
+  audit.galaxy_init_m3_amplitude = effective.galaxy_init_m3_amplitude;
+  audit.galaxy_init_bar_amplitude = effective.galaxy_init_bar_amplitude;
+  audit.galaxy_init_bar_axis_ratio = effective.galaxy_init_bar_axis_ratio;
+  audit.galaxy_init_spiral_amplitude = effective.galaxy_init_spiral_amplitude;
+  audit.galaxy_init_spiral_winding = effective.galaxy_init_spiral_winding;
+  audit.galaxy_init_spiral_phase = effective.galaxy_init_spiral_phase;
 
   const int n = config.n_stars;
   state.resize(n);
 
-  std::mt19937 rng(config.galaxy_init_seed);
+  std::mt19937 rng(effective.galaxy_init_seed);
   std::uniform_real_distribution<double> u01(0.0, 1.0);
   std::normal_distribution<double> normal(0.0, 1.0);
 
-  const double R = config.galaxy_radius;
+  const double R = effective.galaxy_radius;
   const double r_min = kDiskInnerFraction * R;
-  const double bh_mass = config.bh_mass;
-  const double star_mass = config.star_mass;
+  const double bh_mass = effective.bh_mass;
+  const double star_mass = effective.star_mass;
 
-  double w_max = structured_w_max(tf, config);
+  double w_max = structured_w_max(tf, effective);
   audit.weight_w_max = w_max;
 
   /* Clump centers (disk annulus, uniform area per clump center draw) */
   audit.clump_centers_xy.clear();
   int n_clumps = tf.clumps ? audit.galaxy_init_num_clumps : 0;
-  double clump_p = tf.clumps ? std::max(0.0, std::min(1.0, config.galaxy_init_clumpiness)) : 0.0;
-  double sigma_clump = std::max(config.galaxy_init_clump_radius_fraction, 1e-6) * R;
+  double clump_p = tf.clumps ? std::max(0.0, std::min(1.0, effective.galaxy_init_clumpiness)) : 0.0;
+  double sigma_clump = std::max(effective.galaxy_init_clump_radius_fraction, 1e-6) * R;
 
   for (int c = 0; c < n_clumps; ++c) {
     double u = u01(rng);
@@ -303,7 +491,7 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
           double r_sq = r_min * r_min + u * (R * R - r_min * r_min);
           double r = std::sqrt(r_sq);
           double th = kTwoPi * u01(rng);
-          double w = structured_weight(tf, r, th, R, r_min, config);
+          double w = structured_weight(tf, r, th, R, r_min, effective);
           if (u01(rng) < w / w_max) {
             x = r * std::cos(th);
             y = r * std::sin(th);
@@ -324,7 +512,7 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
     }
 
     if (tf.bar) {
-      apply_bar_axis_stretch(x, y, clamp_axis_ratio(config.galaxy_init_bar_axis_ratio), r_min, R);
+      apply_bar_axis_stretch(x, y, clamp_axis_ratio(effective.galaxy_init_bar_axis_ratio), r_min, R);
     }
 
     apply_position_jitter_polar(x, y, R, r_min, audit.eff_position_noise, rng, normal);
@@ -343,17 +531,17 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
   for (int k = 0; k < n; ++k) n_inside[order[k]] = k;
 
   const bool use_derived_tpf_init =
-      (config.physics_package == "TPFCore" && config.tpfcore_enable_provisional_readout &&
-       tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode));
+      (effective.physics_package == "TPFCore" && effective.tpfcore_enable_provisional_readout &&
+       tpfcore::is_derived_tpf_radial_readout_mode(effective.tpfcore_readout_mode));
 
   if (use_derived_tpf_init) {
     const double eps =
-        (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+        (effective.tpfcore_source_softening > 0.0) ? effective.tpfcore_source_softening : effective.softening;
     tpfcore::DerivedTpfPoissonConfig dcfg;
-    dcfg.kappa = config.tpf_kappa;
-    dcfg.bins = config.tpf_poisson_bins;
-    dcfg.max_radius = config.tpf_poisson_max_radius;
-    dcfg.galaxy_radius = config.galaxy_radius;
+    dcfg.kappa = effective.tpf_kappa;
+    dcfg.bins = effective.tpf_poisson_bins;
+    dcfg.max_radius = effective.tpf_poisson_max_radius;
+    dcfg.galaxy_radius = effective.galaxy_radius;
     tpfcore::TpfRadialGravityProfile profile =
         tpfcore::build_tpf_gravity_profile(state, bh_mass, dcfg, eps);
     for (int i = 0; i < n; ++i) {
@@ -375,13 +563,13 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
         vx *= mag_scale;
         vy *= mag_scale;
       } else if (audit.used_legacy_velocity_noise) {
-        double scale = config.velocity_noise * v_circ;
+        double scale = effective.velocity_noise * v_circ;
         vx += scale * normal(rng);
         vy += scale * normal(rng);
       }
 
-      state.vx[i] = config.initial_velocity_scale * vx;
-      state.vy[i] = config.initial_velocity_scale * vy;
+      state.vx[i] = effective.initial_velocity_scale * vx;
+      state.vy[i] = effective.initial_velocity_scale * vy;
     }
   } else {
     constexpr double G_SI = 6.6743e-11;
@@ -403,13 +591,13 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
         vx *= mag_scale;
         vy *= mag_scale;
       } else if (audit.used_legacy_velocity_noise) {
-        double scale = config.velocity_noise * v_circ;
+        double scale = effective.velocity_noise * v_circ;
         vx += scale * normal(rng);
         vy += scale * normal(rng);
       }
 
-      state.vx[i] = config.initial_velocity_scale * vx;
-      state.vy[i] = config.initial_velocity_scale * vy;
+      state.vx[i] = effective.initial_velocity_scale * vx;
+      state.vy[i] = effective.initial_velocity_scale * vy;
     }
   }
 
@@ -479,6 +667,41 @@ void write_galaxy_init_diagnostics(const std::string& output_dir,
   txt << "--- Angular momentum (z) ---\n";
   txt << "L_z_total\t" << lz_sum << "  (sum_i m_i (x_i v_y_i - y_i v_x_i))\n";
   txt << "L_z_mean_per_star\t" << (lz_sum / static_cast<double>(n)) << "\n";
+  txt << "--- IC template resolution (raw config vs effective) ---\n";
+  txt << "template_defaults_used\t" << (audit.template_defaults_used ? 1 : 0) << "\n";
+  txt << "galaxy_init_m2_amplitude_raw\t" << audit.galaxy_init_m2_amplitude_raw << "\n";
+  txt << "galaxy_init_m3_amplitude_raw\t" << audit.galaxy_init_m3_amplitude_raw << "\n";
+  txt << "galaxy_init_bar_amplitude_raw\t" << audit.galaxy_init_bar_amplitude_raw << "\n";
+  txt << "galaxy_init_bar_axis_ratio_raw\t" << audit.galaxy_init_bar_axis_ratio_raw << "\n";
+  txt << "galaxy_init_spiral_amplitude_raw\t" << audit.galaxy_init_spiral_amplitude_raw << "\n";
+  txt << "galaxy_init_spiral_winding_raw\t" << audit.galaxy_init_spiral_winding_raw << "\n";
+  txt << "galaxy_init_spiral_phase_raw\t" << audit.galaxy_init_spiral_phase_raw << "\n";
+  txt << "galaxy_init_clumpiness_raw\t" << audit.galaxy_init_clumpiness_raw << "\n";
+  txt << "galaxy_init_num_clumps_raw\t" << audit.galaxy_init_num_clumps_raw << "\n";
+  txt << "galaxy_init_clump_radius_fraction_raw\t" << audit.galaxy_init_clump_radius_fraction_raw << "\n";
+  txt << "velocity_noise_raw\t" << audit.velocity_noise_raw << "\n";
+  txt << "galaxy_init_m2_amplitude_effective\t" << audit.galaxy_init_m2_amplitude << "\n";
+  txt << "galaxy_init_m3_amplitude_effective\t" << audit.galaxy_init_m3_amplitude << "\n";
+  txt << "galaxy_init_bar_amplitude_effective\t" << audit.galaxy_init_bar_amplitude << "\n";
+  txt << "galaxy_init_bar_axis_ratio_effective\t" << audit.galaxy_init_bar_axis_ratio << "\n";
+  txt << "galaxy_init_spiral_amplitude_effective\t" << audit.galaxy_init_spiral_amplitude << "\n";
+  txt << "galaxy_init_spiral_winding_effective\t" << audit.galaxy_init_spiral_winding << "\n";
+  txt << "galaxy_init_spiral_phase_effective\t" << audit.galaxy_init_spiral_phase << "\n";
+  txt << "galaxy_init_clumpiness_effective\t" << audit.galaxy_init_clumpiness << "\n";
+  txt << "galaxy_init_num_clumps_effective\t" << audit.galaxy_init_num_clumps << "\n";
+  txt << "galaxy_init_clump_radius_fraction_effective\t" << audit.galaxy_init_clump_radius_fraction << "\n";
+  txt << "velocity_noise_effective\t" << audit.velocity_noise_effective << "\n";
+  txt << "galaxy_init_position_noise_resolved\t" << audit.galaxy_init_position_noise_resolved << "\n";
+  txt << "galaxy_init_velocity_angle_noise_resolved\t" << audit.galaxy_init_velocity_angle_noise_resolved
+      << "\n";
+  txt << "galaxy_init_velocity_magnitude_noise_resolved\t" << audit.galaxy_init_velocity_magnitude_noise_resolved
+      << "\n";
+  for (size_t i = 0; i < audit.template_defaults_log.applied.size(); ++i) {
+    txt << "template_default_applied_" << i << "\t" << audit.template_defaults_log.applied[i] << "\n";
+  }
+  for (size_t i = 0; i < audit.template_defaults_log.warnings.size(); ++i) {
+    txt << "template_warning_" << i << "\t" << audit.template_defaults_log.warnings[i] << "\n";
+  }
   txt << "--- Audit ---\n";
   txt << "used_new_state_noise\t" << (audit.used_new_state_noise ? 1 : 0) << "\n";
   txt << "used_legacy_velocity_noise\t" << (audit.used_legacy_velocity_noise ? 1 : 0) << "\n";

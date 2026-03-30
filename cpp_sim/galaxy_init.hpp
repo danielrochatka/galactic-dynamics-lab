@@ -11,8 +11,10 @@ namespace galaxy {
 
 /**
  * Named galaxy IC recipes (galaxy mode only). Each enables a subset of structured
- * density seeds; noise is controlled separately via galaxy_init_* noise keys and
- * galaxy_init_master_chaos (noise only — not m2/m3/bar/spiral/clump strengths).
+ * density seeds (m2/m3/bar/spiral/clumps). **Template-specific defaults** are applied
+ * when structured/noise parameters are still at neutral Config defaults so the template
+ * name matches visible structure (see apply_galaxy_init_template_defaults). User-set
+ * nonzero values are never overwritten.
  */
 enum class GalaxyInitTemplate {
   symmetric_disk,
@@ -28,6 +30,12 @@ enum class GalaxyInitTemplate {
 GalaxyInitTemplate parse_galaxy_init_template(const std::string& s);
 
 std::string galaxy_init_template_to_string(GalaxyInitTemplate t);
+
+/** Log lines from apply_galaxy_init_template_defaults (for audit / stderr). */
+struct GalaxyInitTemplateDefaultsLog {
+  std::vector<std::string> applied;
+  std::vector<std::string> warnings;
+};
 
 /** Filled during initialize_galaxy_disk for run_info and diagnostics. */
 struct GalaxyInitAudit {
@@ -55,6 +63,20 @@ struct GalaxyInitAudit {
   bool structured_spiral = false;
   bool structured_clumps = false;
 
+  /** Raw config file values (before template defaults). */
+  double galaxy_init_clumpiness_raw = 0.0;
+  int galaxy_init_num_clumps_raw = 0;
+  double galaxy_init_clump_radius_fraction_raw = 0.0;
+  double galaxy_init_m2_amplitude_raw = 0.0;
+  double galaxy_init_m3_amplitude_raw = 0.0;
+  double galaxy_init_bar_amplitude_raw = 0.0;
+  double galaxy_init_bar_axis_ratio_raw = 1.0;
+  double galaxy_init_spiral_amplitude_raw = 0.0;
+  double galaxy_init_spiral_winding_raw = 0.0;
+  double galaxy_init_spiral_phase_raw = 0.0;
+  double velocity_noise_raw = 0.05;
+
+  /** Effective values used for placement (after template defaults). */
   double galaxy_init_clumpiness = 0.0;
   int galaxy_init_num_clumps = 0;
   double galaxy_init_clump_radius_fraction = 0.0;
@@ -65,6 +87,15 @@ struct GalaxyInitAudit {
   double galaxy_init_spiral_amplitude = 0.0;
   double galaxy_init_spiral_winding = 0.0;
   double galaxy_init_spiral_phase = 0.0;
+  /** Legacy velocity_noise after resolution (often 0 when new-style noise is used). */
+  double velocity_noise_effective = 0.05;
+  /** galaxy_init_* noise after template defaults (for sync to Config / run_info). */
+  double galaxy_init_position_noise_resolved = 0.0;
+  double galaxy_init_velocity_angle_noise_resolved = 0.0;
+  double galaxy_init_velocity_magnitude_noise_resolved = 0.0;
+
+  bool template_defaults_used = false;
+  GalaxyInitTemplateDefaultsLog template_defaults_log;
 
   double weight_w_max = 1.0;
   int rejection_fallbacks = 0;
@@ -74,6 +105,20 @@ struct GalaxyInitAudit {
 
 /** Last galaxy initialization audit (galaxy mode). Invalid until initialize_galaxy_disk runs. */
 const GalaxyInitAudit& last_galaxy_init_audit();
+
+/**
+ * Apply template-specific defaults to `effective` when structured/noise fields are still
+ * at neutral built-in defaults. Does not modify `symmetric_disk`. Logs human-readable lines
+ * to `log_out` and may print warnings to stderr.
+ */
+void apply_galaxy_init_template_defaults(GalaxyInitTemplate tmpl, Config& effective,
+                                         GalaxyInitTemplateDefaultsLog* log_out = nullptr);
+
+/**
+ * After initialize_galaxy_disk, copy effective IC parameters from the last audit into
+ * `config` so run_info / render_manifest match what was used for placement.
+ */
+void sync_config_galaxy_init_from_last_audit(Config& config);
 
 /**
  * Full galaxy disk initialization: templates, structured seeds, reproducible RNG,

@@ -77,7 +77,7 @@ Adding a new package: implement **`physics/physics_package.hpp`**, register in *
 
 ### Galaxy initialization (templates)
 
-**Galaxy mode** uses a **named template** plus optional noise and structured seeds (`galaxy_init_*` keys in `config.hpp`). Valid **`galaxy_init_template`** names match **`galaxy_init.hpp`**: `symmetric_disk`, `symmetric_disk_noisy`, `clumpy_disk`, `weak_m2`, `weak_m3`, `weak_bar`, `preformed_spiral`. Resolved initialization is logged in **`run_info.txt`** (galaxy init audit block) and **`galaxy_init_diagnostics.txt`**.
+**Galaxy mode** uses a **named template** plus optional noise and structured seeds (`galaxy_init_*` keys in `config.hpp`). Valid **`galaxy_init_template`** names match **`galaxy_init.hpp`**: `symmetric_disk`, `symmetric_disk_noisy`, `clumpy_disk`, `weak_m2`, `weak_m3`, `weak_bar`, `preformed_spiral`. Templates act as **presets**: when structured parameters are still at neutral defaults (e.g. zero amplitudes), the engine applies modest template-specific values so the visible IC matches the name; **explicit user values are never overwritten**. Resolved initialization (raw vs effective, template defaults applied, warnings) is logged in **`run_info.txt`** (galaxy init audit block) and **`galaxy_init_diagnostics.txt`**.
 
 **RNG:** `galaxy_init_seed` controls reproducibility.
 
