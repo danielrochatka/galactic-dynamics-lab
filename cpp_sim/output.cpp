@@ -72,9 +72,11 @@ void write_run_info(const std::string& output_dir,
 
   if (config.physics_package == "TPFCore") {
     f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
-    f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; manuscript structure; not tunable)\n";
+    f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
     f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-    f << "provisional_readout\ttpfcore_enable_provisional_readout, readout_mode, readout_scale (weak-field calibrated effective scale), theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental closure)\n";
+    f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to accelerations), readout_mode (configured label; "
+         "may differ from integrator ax,ay path when tpf_vdsg_coupling != 0), readout_scale, theta_tt_scale, "
+         "theta_tr_scale, dump_readout_debug (experimental readout closures; diagnostics)\n";
     f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
     f << "=== End TPFCore parameter roles ===\n\n";
   }

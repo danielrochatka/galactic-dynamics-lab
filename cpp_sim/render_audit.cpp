@@ -157,7 +157,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_bool(jf, first, "enable_star_star_gravity", config.enable_star_star_gravity);
     json_kv_num(jf, first, "tpf_vdsg_mass_baseline_kg", config.tpf_vdsg_mass_baseline_kg);
     json_kv(jf, first, "config_key_aliases_note",
-            "tpf_gdd_coupling renamed to tpf_vdsg_coupling; parser accepts both keys.");
+            "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling).");
     jf << ",\n  \"config_key_aliases\": [\n";
     jf << "    {\"legacy\": \"tpf_gdd_coupling\", \"canonical\": \"tpf_vdsg_coupling\", "
           "\"accepted_in_config_parser\": true}\n  ]";
@@ -213,7 +213,7 @@ void write_render_manifest(const std::string& output_dir,
       tf << "galaxy_init_audit_used_legacy_velocity_noise\t"
          << (galaxy_init_audit->used_legacy_velocity_noise ? 1 : 0) << "\n";
     }
-    tf << "config_key_aliases\ttpf_gdd_coupling -> tpf_vdsg_coupling (historical; parser uses tpf_vdsg_coupling only)\n";
+    tf << "config_key_aliases\ttpf_gdd_coupling -> tpf_vdsg_coupling (legacy alias; canonical tpf_vdsg_coupling)\n";
     tf << "=== end render_manifest.txt ===\n";
   }
 }

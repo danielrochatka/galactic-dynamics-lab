@@ -211,18 +211,20 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "\n========== ACTIVE PHYSICS LEDGER (one-time branch audit) ==========\n";
     std::cerr << "VDSG BRANCH: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
               << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0)\n";
-    std::cerr << "TPF READOUT BRANCH: " << (readout_enabled ? "ACTIVE" : "INACTIVE")
-              << "  (tpfcore_enable_provisional_readout)\n";
-    std::cerr << "HYBRID MODE: " << (hybrid_config ? "YES" : "NO")
-              << "  (readout enabled AND tpf_vdsg_coupling nonzero; VDSG supersedes accelerations)\n";
-    std::cerr << "Acceleration path: "
-              << (vdsg_active ? "VDSG centripetal SI (tensor readout not used for ax, ay)\n"
-                              : "TPF provisional readout (tensor / derived radial / experimental)\n");
+    std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
+              << "  (tpfcore_enable_provisional_readout; required to call TPFCore accelerations)\n";
+    std::cerr << "READOUT_AND_VDSG_BOTH_SET: " << (hybrid_config ? "YES" : "NO")
+              << "  (gate on AND tpf_vdsg_coupling nonzero; VDSG supplies ax, ay; readout closures do not)\n";
+    std::cerr << "Active acceleration path (integrator ax, ay): "
+              << (vdsg_active ? "VDSG centripetal SI — readout closures do not supply ax, ay on this run "
+                              "(see active_dynamics_branch / acceleration_code_path in run_info or manifest)\n"
+                              : "provisional readout closures per tpfcore_readout_mode "
+                                "(tensor / derived radial / experimental)\n");
     std::cerr << std::scientific << std::setprecision(16);
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
     std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
     std::cerr << "tpfcore_readout_mode = " << readout_mode_ << "\n";
-    std::cerr << "VDSG mass normalization (PROVISIONAL / heuristic — not manuscript v11): "
+    std::cerr << "VDSG mass normalization (PROVISIONAL / exploratory heuristic): "
                  "lambda_eff = lambda * log10(max(M_ref,eps_kg)) / log10(max(M_src,eps_kg)); "
                  "M_ref = tpf_vdsg_mass_baseline_kg if >0 else star_mass; "
                  "if M_ref<=0 => lambda_eff=lambda (identity). Single tpf_vdsg_coupling only.\n";
@@ -286,9 +288,11 @@ void TPFCorePackage::compute_accelerations(const State& state,
                 theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, nullptr, nullptr);
           }
           const double a_tpf_readout = std::hypot(ax_r, ay_r);
-          std::cerr << "a_tpf_readout = " << a_tpf_readout << "  (|a| from compute_provisional_readout_acceleration)\n";
+          std::cerr << "a_tpf_readout = " << a_tpf_readout
+                    << "  (|a| from compute_provisional_readout_acceleration; sample only when VDSG off)\n";
         } else {
-          std::cerr << "a_tpf_readout = N/A  (VDSG active: tensor readout bypassed for accelerations)\n";
+          std::cerr << "a_tpf_readout = N/A  (VDSG active: configured readout does not supply integrator ax, ay; "
+                       "VDSG path is active — see active_dynamics_branch)\n";
         }
       } else {
         std::cerr << "--- Sample: Star 0 vs BH skipped (r_mag too small) ---\n";
