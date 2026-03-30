@@ -8,7 +8,9 @@
 #   make test_unit      -> doctest binary only
 
 CXX = g++
-CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor
+# -MMD/-MP: track headers (e.g. config.hpp) so Config layout changes cannot leave stale .o files
+# that disagree across TUs (undefined behavior: crashes in string ops during galaxy init).
+CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor -MMD -MP
 
 # Library objects (everything except main.cpp) — linked into galaxy_tests
 LIB_SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
@@ -39,6 +41,9 @@ TEST_MAIN_OBJ = tests/doctest_main.o
 
 TEST_TARGET = galaxy_tests
 
+# Auto-generated dependency files (same stem as .o)
+DEP_FILES := $(OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(TEST_MAIN_OBJ:.o=.d)
+
 .PHONY: all clean test check test_unit test_integration
 
 all: $(TARGET)
@@ -68,4 +73,7 @@ test: $(TARGET) $(TEST_TARGET)
 check: test
 
 clean:
-	rm -f $(OBJS) $(TARGET) $(TEST_TARGET) $(TEST_OBJS) $(TEST_MAIN_OBJ)
+	rm -f $(OBJS) $(TARGET) $(TEST_TARGET) $(TEST_OBJS) $(TEST_MAIN_OBJ) $(DEP_FILES)
+
+# Must be last: .d files define rules like "config.o: ..." and must not become the default goal.
+-include $(DEP_FILES)
