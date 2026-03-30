@@ -9,8 +9,8 @@ then produces the same kinds of plots as the Python pipeline:
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
 
-Animation viewport: default uses **smart framing** — one fixed axis half-range from the 95th
-  percentile of all star radii across all snapshots, times 1.2 (see `calculate_smart_bounds`).
+Animation viewport: default uses **smart framing** — one fixed axis half-range from the **median**
+  radial distance of all stars across all snapshots, times 1.2 (see `calculate_smart_bounds`).
   Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
   command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
   forces smart framing even if run_info requests dynamic zoom.
@@ -182,8 +182,8 @@ def galaxy_velocity_gated_target_limit(
 
 def calculate_smart_bounds(output_dir: Path, fallback: float = 150.0) -> float:
     """
-    Global animation axis half-range: 95th percentile of r = sqrt(x^2 + y^2) over every star in
-    every snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
+    Global animation axis half-range: median of r = sqrt(x^2 + y^2) over every star in every
+    snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
     """
     paths = sorted(output_dir.glob("snapshot_*.csv"), key=lambda p: p.stem)
     if not paths:
@@ -205,8 +205,8 @@ def calculate_smart_bounds(output_dir: Path, fallback: float = 150.0) -> float:
     r_all = np.concatenate(radii_chunks)
     if r_all.size == 0:
         return float(max(fallback, 1.0))
-    p95 = float(np.percentile(r_all, 95))
-    static_bound = p95 * 1.20
+    med = float(np.median(r_all))
+    static_bound = med * 1.20
     if not np.isfinite(static_bound) or static_bound <= 0:
         return float(max(fallback, 1.0))
     return float(static_bound)
@@ -298,7 +298,7 @@ def main() -> None:
     zoom_group.add_argument(
         "--no-dynamic-zoom",
         action="store_true",
-        help="Animation: smart framing (95th percentile r × 1.2 over all snapshots). "
+        help="Animation: smart framing (median r × 1.2 over all snapshots). "
         "Overrides run_info plot_animation_dynamic_zoom.",
     )
     zoom_group.add_argument(
@@ -424,7 +424,7 @@ def main() -> None:
         else:
             print(
                 f"  Animation viewport: smart framing (fixed half-axis = {float(render_radius_cb):.6g} m, "
-                "95th percentile r × 1.2 over all snapshots)"
+                "median r × 1.2 over all snapshots)"
             )
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
