@@ -8,7 +8,7 @@ namespace galaxy {
 
 struct GalaxyInitAudit;
 
-/** What integrates motion (acceleration source) — mirrors TPFCorePackage::compute_accelerations. */
+/** TPF readout baseline identity (TPF_readout_acceleration:<mode>); not toggled by tpf_vdsg_coupling. */
 std::string compute_active_dynamics_branch(const Config& config);
 
 /** Provisional readout / diagnostic identity (Theta→readout path); not necessarily ax,ay driver when VDSG on. */

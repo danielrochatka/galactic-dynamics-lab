@@ -43,7 +43,7 @@ Re-verify after any edit to `provisional_readout.cpp`, `derived_tpf_radial.*`, o
 |------|---------------|--------|
 | Higher-order / non-Newtonian readout | `apply_tensor_radial_closure`, `apply_experimental_radial_r_scaling_closure` | Map **Θ → a** without the hybrid **M_eff** shell model. |
 | **κ · I → ρ → M_eff** shell Poisson | `build_tpf_gravity_profile`, `radial_acceleration_scalar_derived` | **Closure**, not derived from expanded **∆C_μν**. Uses **manuscript I** (via **`compute_invariant_I`**) for **ρ_raw**. |
-| Velocity-dependent rescaling | `accumulate_velocity_deformed_centripetal_gravity` in `tpf_core_package.cpp` | When **`tpf_vdsg_coupling ≠ 0`**, **tensor readout is skipped**; SI Newtonian-style **G M / r²** with **doppler_scale** and **|a| shunt**. |
+| Velocity-dependent rescaling | `accumulate_vdsg_velocity_modifier` in `tpf_core_package.cpp` | When **`tpf_vdsg_coupling ≠ 0`**, adds SI excess **a_N (doppler_scale − 1)** on top of **TPF readout baseline**; **|a| shunt** on the sum when modifier active. |
 | Numerical stabilization | ρ shunts, `apply_global_accel_magnitude_shunt` | Engineering, not theory. |
 
 ---
@@ -66,7 +66,7 @@ Re-verify after any edit to `provisional_readout.cpp`, `derived_tpf_radial.*`, o
 | `tensor_radial_projection` (+ `_negated`) | `apply_tensor_radial_closure` | **Θ·r̂**-style superposed contribution. |
 | `experimental_radial_r_scaling` | `apply_experimental_radial_r_scaling_closure` | Radial closure from **−θ_rr × r** scaling. |
 
-When **`tpf_vdsg_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** uses **only** the VDSG centripetal path (stderr notice once).
+When **`tpf_vdsg_coupling ≠ 0`**, **`TPFCorePackage::compute_accelerations`** adds **`accumulate_vdsg_velocity_modifier`** after the readout baseline (stderr notice once).
 
 ---
 
@@ -104,7 +104,7 @@ This repo does **not** embed the full manuscript. The following are **not** sett
 
 ## What you can say in a methods section (safe, code-grounded)
 
-- The simulator evaluates **Θ** and **I** from a **stated provisional potential ansatz**, applies **optional readout closures** or **VDSG** per **`TPFCorePackage::compute_accelerations`**, and integrates with **Verlet**.
+- The simulator evaluates **Θ** and **I** from a **stated provisional potential ansatz**, applies **readout closures** for the acceleration baseline, **optionally adds** the **VDSG velocity modifier**, and integrates with **Verlet**.
 - **Invariant I** from **`compute_invariant_I`** (same combination as manuscript **Eq. (3)** in this repo’s implementation) feeds the **κ–ledger** shell model (**Tier 2 closure**). **Verify equation numbers against the PDF** in a paper.
 - **∆C_μν** and full **C_μν** dynamics are **not** implemented as expanded weak-field physics in this codebase.
 
@@ -113,5 +113,5 @@ This repo does **not** embed the full manuscript. The following are **not** sett
 ## Overclaiming (avoid)
 
 - That **`tr_coherence_readout`** applies **tangential coherence acceleration** in **ax, ay** (it does **not**: **current code** uses the same **radial-only** derived closure as **`derived_tpf_radial_readout`**; tangential quantities are **diagnostics-only** on that path).
-- That **VDSG-on** runs use **tensor readout** for **ax, ay** (readout **does not** supply those accelerations when **`tpf_vdsg_coupling ≠ 0`**).
+- That **VDSG-on** runs **replace** the readout baseline (they **do not**: readout baseline is always applied; VDSG adds an SI velocity **modifier**).
 - That **galaxy** or **rotation-curve** results from this simulator are **automatically** “v11 manuscript results” without checking **both** this code and the **v11 PDF** (see **Unresolved** above).

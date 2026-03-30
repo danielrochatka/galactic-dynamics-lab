@@ -23,30 +23,63 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 
 }  // namespace
 
-TEST_CASE("VDSG coupling bypasses readout mode for accelerations") {
-  galaxy::Config c_a;
-  c_a.tpfcore_enable_provisional_readout = true;
-  c_a.tpfcore_readout_mode = "tensor_radial_projection";
-  c_a.tpf_vdsg_coupling = 1.0;  // activate VDSG branch
-  c_a.dt = 0.01;
-  c_a.star_mass = 2.0;
+TEST_CASE("VDSG coupling is additive: tiny coupling gives accelerations near baseline-only") {
+  galaxy::Config c0;
+  c0.tpfcore_enable_provisional_readout = true;
+  c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.dt = 0.01;
+  c0.star_mass = 2.0;
+  c0.tpf_kappa = 1.0e10;
+  c0.tpf_poisson_bins = 32;
+  c0.galaxy_radius = 100.0;
 
-  galaxy::Config c_b = c_a;
-  c_b.tpfcore_readout_mode = "unknown_mode_that_readout_would_ignore";
+  galaxy::Config c1 = c0;
+  c1.tpf_vdsg_coupling = 1e-45;
 
-  galaxy::TPFCorePackage p_a, p_b;
-  p_a.init_from_config(c_a);
-  p_b.init_from_config(c_b);
+  galaxy::TPFCorePackage p0, p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
 
   galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 2.0);
-  std::vector<double> ax_a, ay_a, ax_b, ay_b;
-  p_a.compute_accelerations(s, /*bh_mass=*/100.0, /*softening=*/1.0, /*star_star=*/false, ax_a, ay_a);
-  p_b.compute_accelerations(s, /*bh_mass=*/100.0, /*softening=*/1.0, /*star_star=*/false, ax_b, ay_b);
+  std::vector<double> ax0, ay0, ax1, ay1;
+  p0.compute_accelerations(s, /*bh_mass=*/100.0, /*softening=*/1.0, /*star_star=*/false, ax0, ay0);
+  p1.compute_accelerations(s, /*bh_mass=*/100.0, /*softening=*/1.0, /*star_star=*/false, ax1, ay1);
 
-  REQUIRE(ax_a.size() == 1);
-  REQUIRE(ax_b.size() == 1);
-  CHECK(ax_a[0] == doctest::Approx(ax_b[0]));
-  CHECK(ay_a[0] == doctest::Approx(ay_b[0]));
+  REQUIRE(ax0.size() == 1);
+  REQUIRE(ax1.size() == 1);
+  CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
+  CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
+}
+
+TEST_CASE("readout mode affects accelerations when VDSG coupling is shared (additive)") {
+  galaxy::Config c_tensor;
+  c_tensor.tpfcore_enable_provisional_readout = true;
+  c_tensor.tpfcore_readout_mode = "tensor_radial_projection";
+  c_tensor.tpf_vdsg_coupling = 1e-20;
+  c_tensor.dt = 0.01;
+  c_tensor.star_mass = 2.0;
+
+  galaxy::Config c_derived = c_tensor;
+  c_derived.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c_derived.tpf_kappa = 1.0e10;
+  c_derived.tpf_poisson_bins = 32;
+  c_derived.galaxy_radius = 100.0;
+
+  galaxy::TPFCorePackage p_t, p_d;
+  p_t.init_from_config(c_tensor);
+  p_d.init_from_config(c_derived);
+
+  /* Generic off-axis point so tensor vs derived closures do not coincide. */
+  galaxy::State s = one_body_state(12.0, 5.0, 1.0, -0.2, 5.0);
+  std::vector<double> ax_t, ay_t, ax_d, ay_d;
+  p_t.compute_accelerations(s, 200.0, 0.5, false, ax_t, ay_t);
+  p_d.compute_accelerations(s, 200.0, 0.5, false, ax_d, ay_d);
+
+  REQUIRE(ax_t.size() == 1);
+  REQUIRE(ax_d.size() == 1);
+  const double diff = std::hypot(ax_t[0] - ax_d[0], ay_t[0] - ay_d[0]);
+  CHECK(diff > 1e-20);
 }
 
 TEST_CASE("tr_coherence_readout and derived_tpf_radial_readout share acceleration closure") {

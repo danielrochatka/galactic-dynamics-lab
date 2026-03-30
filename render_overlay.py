@@ -92,18 +92,16 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
             "TPFCore_metrics_n/a (provisional_readout off)",
             "TPFCorePackage::compute_accelerations (throws without provisional readout)",
         )
-    if vdsg != 0.0:
-        return (
-            "VDSG_centripetal_SI",
-            f"tpfcore_readout:{rmode}",
-            "TPFCorePackage::accumulate_velocity_deformed_centripetal_gravity",
-        )
     dyn = f"TPF_readout_acceleration:{rmode}"
     met = f"tpfcore_readout:{rmode}"
     if rmode in _DERIVED_READOUT_MODES:
-        acc = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
+        base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
     else:
-        acc = f"TPFCorePackage::compute_provisional_readout_acceleration ({rmode})"
+        base = f"TPFCorePackage::compute_provisional_readout_acceleration ({rmode})"
+    if vdsg != 0.0:
+        acc = base + " + accumulate_vdsg_velocity_modifier"
+    else:
+        acc = base
     return dyn, met, acc
 
 

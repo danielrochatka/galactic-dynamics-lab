@@ -68,7 +68,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCore_dynamics_DISABLED (provisional_readout off)";
-  if (config.tpf_vdsg_coupling != 0.0) return "VDSG_centripetal_SI";
+  /* Baseline readout + optional additive VDSG modifier; branch label is readout identity (not VDSG-only). */
   return "TPF_readout_acceleration:" + config.tpfcore_readout_mode;
 }
 
@@ -87,11 +87,13 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.physics_package != "TPFCore") return "unknown_package";
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCorePackage::compute_accelerations (throws without provisional readout)";
-  if (config.tpf_vdsg_coupling != 0.0)
-    return "TPFCorePackage::accumulate_velocity_deformed_centripetal_gravity";
+  std::string base;
   if (tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode))
-    return "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
-  return "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
+    base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
+  else
+    base = "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
+  if (config.tpf_vdsg_coupling != 0.0) return base + " + accumulate_vdsg_velocity_modifier";
+  return base;
 }
 
 void write_render_manifest(const std::string& output_dir,

@@ -115,15 +115,15 @@ inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, dou
 }
 
 /**
- * Velocity-deformed SI gravity: each interaction is strictly centripetal along the i–source line.
- * doppler_scale = 1 + λ_eff (v_rel · r_hat) / c with λ_eff from vdsg_effective_coupling per source mass.
- * When selected from compute_accelerations, this path supplies integrator accelerations instead of
- * compute_provisional_readout_acceleration (no separate energy-injecting kick).
+ * VDSG velocity modifier (SI): additive on top of TPF readout baseline.
+ * Per interaction, Newtonian magnitude a_N = G M / r_soft^2; doppler_scale = 1 + λ_eff (v·r̂)/c.
+ * This accumulates only the excess over Newtonian: a_N * (doppler_scale - 1) along the same line as a_N.
+ * Full SI replacement path would be a_N * doppler_scale; we add (a_N * doppler_scale - a_N) to baseline.
  */
-void accumulate_velocity_deformed_centripetal_gravity(const State& state, double bh_mass, double softening,
-                                                      bool star_star, double vdsg_coupling,
-                                                      double vdsg_mass_baseline_kg, double dt,
-                                                      std::vector<double>& ax, std::vector<double>& ay) {
+void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, double softening,
+                                         bool star_star, double vdsg_coupling,
+                                         double vdsg_mass_baseline_kg, std::vector<double>& ax,
+                                         std::vector<double>& ay) {
   const int n = state.n();
   const double G = tpfcore::TPF_G_SI;
   const double eps_sq = softening * softening;
@@ -146,7 +146,8 @@ void accumulate_velocity_deformed_centripetal_gravity(const State& state, double
       const double lambda_eff =
           vdsg_effective_coupling(vdsg_coupling, bh_mass, vdsg_mass_baseline_kg);
       double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
-      double accel_mag = (G * bh_mass / denom) * doppler_scale;
+      const double a_newt = G * bh_mass / denom;
+      double accel_mag = a_newt * (doppler_scale - 1.0);
       ax[i] -= ux * accel_mag;
       ay[i] -= uy * accel_mag;
     }
@@ -171,14 +172,13 @@ void accumulate_velocity_deformed_centripetal_gravity(const State& state, double
         const double lambda_eff =
             vdsg_effective_coupling(vdsg_coupling, state.mass[j], vdsg_mass_baseline_kg);
         double doppler_scale = 1.0 + lambda_eff * (v_dot_r / C_SI_LIGHT);
-        double accel_mag = (G * state.mass[j] / denom) * doppler_scale;
+        const double a_newt = G * state.mass[j] / denom;
+        double accel_mag = a_newt * (doppler_scale - 1.0);
         ax[i] += ux * accel_mag;
         ay[i] += uy * accel_mag;
       }
     }
   }
-
-  apply_global_accel_magnitude_shunt(state, dt, ax, ay);
 }
 
 }  // namespace
@@ -205,21 +205,16 @@ void TPFCorePackage::compute_accelerations(const State& state,
     has_branch_audited = true;
     const bool vdsg_active = (vdsg_coupling_ != 0.0);
     const bool readout_enabled = provisional_readout_;
-    const bool hybrid_config = readout_enabled && vdsg_active;
-    const bool tensor_readout_drives_accel = readout_enabled && !vdsg_active;
 
     std::cerr << "\n========== ACTIVE PHYSICS LEDGER (one-time branch audit) ==========\n";
-    std::cerr << "VDSG BRANCH: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
-              << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0)\n";
+    std::cerr << "TPF readout baseline: provisional readout closures per tpfcore_readout_mode "
+                 "(tensor / derived radial / experimental)\n";
+    std::cerr << "VDSG velocity modifier: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
+              << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0; additive SI excess "
+                 "a_N*(doppler_scale-1) on top of baseline)\n";
     std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
               << "  (tpfcore_enable_provisional_readout; required to call TPFCore accelerations)\n";
-    std::cerr << "READOUT_AND_VDSG_BOTH_SET: " << (hybrid_config ? "YES" : "NO")
-              << "  (gate on AND tpf_vdsg_coupling nonzero; VDSG supplies ax, ay; readout closures do not)\n";
-    std::cerr << "Active acceleration path (integrator ax, ay): "
-              << (vdsg_active ? "VDSG centripetal SI — readout closures do not supply ax, ay on this run "
-                              "(see active_dynamics_branch / acceleration_code_path in run_info or manifest)\n"
-                              : "provisional readout closures per tpfcore_readout_mode "
-                                "(tensor / derived radial / experimental)\n");
+    std::cerr << "Integrator ax, ay = readout_baseline + vdsg_modifier (modifier zero if coupling == 0)\n";
     std::cerr << std::scientific << std::setprecision(16);
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
     std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
@@ -273,27 +268,21 @@ void TPFCorePackage::compute_accelerations(const State& state,
           std::cerr << "; lambda_eff(BH source) = " << lambda_eff_bh;
         std::cerr << ")\n";
 
-        if (tensor_readout_drives_accel) {
-          double ax_r = 0.0;
-          double ay_r = 0.0;
-          if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-            tpfcore::TpfRadialGravityProfile profile =
-                tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps_soft);
-            tpfcore::compute_provisional_readout_acceleration(
-                state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
-                theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, &derived_poisson_cfg_, &profile);
-          } else {
-            tpfcore::compute_provisional_readout_acceleration(
-                state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
-                theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, nullptr, nullptr);
-          }
-          const double a_tpf_readout = std::hypot(ax_r, ay_r);
-          std::cerr << "a_tpf_readout = " << a_tpf_readout
-                    << "  (|a| from compute_provisional_readout_acceleration; sample only when VDSG off)\n";
+        double ax_r = 0.0;
+        double ay_r = 0.0;
+        if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
+          tpfcore::TpfRadialGravityProfile profile =
+              tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps_soft);
+          tpfcore::compute_provisional_readout_acceleration(
+              state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
+              theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, &derived_poisson_cfg_, &profile);
         } else {
-          std::cerr << "a_tpf_readout = N/A  (VDSG active: configured readout does not supply integrator ax, ay; "
-                       "VDSG path is active — see active_dynamics_branch)\n";
+          tpfcore::compute_provisional_readout_acceleration(
+              state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
+              theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, nullptr, nullptr);
         }
+        const double a_tpf_readout = std::hypot(ax_r, ay_r);
+        std::cerr << "a_readout_baseline (sample |a|) = " << a_tpf_readout << "\n";
       } else {
         std::cerr << "--- Sample: Star 0 vs BH skipped (r_mag too small) ---\n";
       }
@@ -301,13 +290,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
       std::cerr << "--- Sample: Star 0 vs BH skipped (bh_mass <= 0) ---\n";
     }
     std::cerr << "===================================================================\n\n" << std::flush;
-  }
-
-  /* Non-zero VDSG: velocity-deformed centripetal SI gravity (no tangential kick; readout closures skipped for ax, ay). */
-  if (vdsg_coupling_ != 0.0) {
-    accumulate_velocity_deformed_centripetal_gravity(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                                     vdsg_mass_baseline_resolved_kg_, simulation_dt_, ax, ay);
-    return;
   }
 
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
@@ -321,15 +303,25 @@ void TPFCorePackage::compute_accelerations(const State& state,
           theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
           &derived_poisson_cfg_, &profile);
     }
-    return;
+  } else {
+    for (int i = 0; i < n; ++i) {
+      tpfcore::compute_provisional_readout_acceleration(
+          state, i, bh_mass, star_star, softening, source_softening_,
+          readout_mode_, readout_scale_,
+          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
+          nullptr, nullptr);
+    }
   }
 
-  for (int i = 0; i < n; ++i) {
-    tpfcore::compute_provisional_readout_acceleration(
-        state, i, bh_mass, star_star, softening, source_softening_,
-        readout_mode_, readout_scale_,
-        theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-        nullptr, nullptr);
+  if (vdsg_coupling_ != 0.0) {
+    std::vector<double> dax, day;
+    accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                        vdsg_mass_baseline_resolved_kg_, dax, day);
+    for (int i = 0; i < n; ++i) {
+      ax[i] += dax[i];
+      ay[i] += day[i];
+    }
+    apply_global_accel_magnitude_shunt(state, simulation_dt_, ax, ay);
   }
 }
 

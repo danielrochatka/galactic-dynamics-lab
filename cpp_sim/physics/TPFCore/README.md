@@ -22,8 +22,8 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code:** `TPFCorePackage::compute_accelerations` either (1) fills **ax, ay** from **VDSG** when **`tpf_vdsg_coupling ≠ 0`**, or (2) else calls **`compute_provisional_readout_acceleration`** for the configured readout mode. Paths are **exploratory** unless stated otherwise; implementation in `provisional_readout.*` / `tpf_core_package.cpp`. |
-| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). When **VDSG** supplies **ax, ay**, readout tensors are **not** the dynamics path regardless of diagnostics. |
+| **Closure (acceleration)** | **Current code:** `TPFCorePackage::compute_accelerations` always builds **TPF readout baseline** **`ax, ay`** from **`compute_provisional_readout_acceleration`** when provisional readout is on. If **`tpf_vdsg_coupling ≠ 0`**, it **adds** the SI velocity modifier from **`accumulate_vdsg_velocity_modifier`** (Newtonian magnitude × (**doppler_scale − 1**) per interaction). Paths are **exploratory** unless stated otherwise. |
+| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). **VDSG** contributes an additive SI excess on top of that baseline, not a replacement readout. |
 
 ---
 
@@ -31,16 +31,16 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 
 The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`** (computed in **`render_audit.cpp`**):
 
-- **`active_dynamics_branch`** — What **actually integrates** particle motion: **`VDSG_centripetal_SI`** when **`tpf_vdsg_coupling ≠ 0`** and **`tpfcore_enable_provisional_readout`**, else **`TPF_readout_acceleration:<mode>`** when provisional readout is on and VDSG is off; if provisional readout is off, dynamics are disabled for TPFCore acceleration.
-- **`active_metrics_branch`** — Identity of the **configured readout** label (e.g. `tpfcore_readout:derived_tpf_radial_readout`), which may still describe **profiles and CSVs** when VDSG supersedes **ax, ay**.
+- **`active_dynamics_branch`** — **Readout identity** for dynamics: **`TPF_readout_acceleration:<mode>`** when **`tpfcore_enable_provisional_readout`** is on (independent of **`tpf_vdsg_coupling`**). If provisional readout is off, dynamics are disabled for TPFCore acceleration.
+- **`active_metrics_branch`** — Identity of the **configured readout** label (e.g. `tpfcore_readout:derived_tpf_radial_readout`).
 
-Do not equate **configured** `tpfcore_readout_mode` with **actual** acceleration routing: when **`tpf_vdsg_coupling ≠ 0`**, **`accumulate_velocity_deformed_centripetal_gravity`** supplies **ax, ay**; readout is **not** used for those components (see `TPFCorePackage::compute_accelerations`). **`acceleration_code_path`** names the **C++ symbol-level** path for audit.
+**Integrator accelerations** are **baseline readout + optional VDSG modifier** when coupling is nonzero. **`acceleration_code_path`** appends **`+ accumulate_vdsg_velocity_modifier`** when **`tpf_vdsg_coupling ≠ 0`**.
 
 ---
 
 ## VDSG (Velocity-Deformed Spacetime Gradient)
 
-**VDSG** (**Velocity-Deformed Spacetime Gradient**) is the **exploratory**, **velocity-dependent** branch in this package: **SI-style** centripetal gravity per source with **doppler_scale** from **`tpf_vdsg_coupling`** (λ; optional mass normalization per source — see **`vdsg_effective_coupling`** in `tpf_core_package.cpp`). Implemented in **`accumulate_velocity_deformed_centripetal_gravity`**. In manifests and **`run_info`**, **`VDSG_centripetal_SI`** refers to this **dynamics** branch.
+**VDSG** (**Velocity-Deformed Spacetime Gradient**) is an **exploratory**, **velocity-dependent** **additive** correction: per interaction, Newtonian magnitude **a_N = G M / r²** is scaled by **doppler_scale = 1 + λ_eff (v·r̂)/c**; the code adds only the **excess** **a_N (doppler_scale − 1)** on top of the **TPF readout baseline** (see **`accumulate_vdsg_velocity_modifier`** in `tpf_core_package.cpp`). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; manifests record the modifier via **`acceleration_code_path`**.
 
 **Legacy alias (once):** the parser accepts **`tpf_gdd_coupling`** as an alias for **`tpf_vdsg_coupling`** (historical name). **Canonical key:** **`tpf_vdsg_coupling`**. Manifests note the rename for audit.
 
@@ -54,7 +54,7 @@ Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SC
 - **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
 - **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-When **`tpf_vdsg_coupling ≠ 0`**, **`compute_accelerations`** uses **only** the VDSG path for **ax, ay**; provisional readout is **not** used for those components (stderr one-time branch audit in `tpf_core_package.cpp`). Readout-related diagnostics may still be produced elsewhere when enabled.
+When **`tpf_vdsg_coupling ≠ 0`**, **`compute_accelerations`** adds the VDSG velocity modifier **after** the readout baseline; **`apply_global_accel_magnitude_shunt`** applies to the **sum** when the modifier is active.
 
 ---
 

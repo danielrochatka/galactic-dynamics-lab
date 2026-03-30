@@ -45,9 +45,9 @@ class TestRenderOverlay(unittest.TestCase):
             "tpfcore_readout_mode": "derived_tpf_radial_readout",
         }
         d, m, acc = infer_branches_from_run_info(ri)
-        self.assertEqual(d, "VDSG_centripetal_SI")
+        self.assertEqual(d, "TPF_readout_acceleration:derived_tpf_radial_readout")
         self.assertIn("derived_tpf_radial", m)
-        self.assertIn("centripetal", acc)
+        self.assertIn("accumulate_vdsg_velocity_modifier", acc)
 
     def test_infer_branches_fills_missing_explicit_keys(self) -> None:
         """Older run_info without active_* keys still yields consistent labels."""
@@ -68,9 +68,10 @@ class TestRenderOverlay(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             mf = {
-                "active_dynamics_branch": "VDSG_centripetal_SI",
+                "active_dynamics_branch": "TPF_readout_acceleration:derived_tpf_radial_readout",
                 "active_metrics_branch": "tpfcore_readout:derived_tpf_radial_readout",
-                "acceleration_code_path": "TPFCorePackage::accumulate_velocity_deformed_centripetal_gravity",
+                "acceleration_code_path": "TPFCorePackage::compute_provisional_readout_acceleration + "
+                "derived_tpf_radial_profile + accumulate_vdsg_velocity_modifier",
                 "run_id": "test_run",
                 "physics_package": "TPFCore",
                 "tpf_vdsg_coupling": 1e-18,
@@ -80,7 +81,7 @@ class TestRenderOverlay(unittest.TestCase):
             )
             ri = {"physics_package": "TPFCore", "simulation_mode": "galaxy"}
             spec = build_overlay_spec(run_dir, ri)
-            self.assertEqual(spec["active_dynamics_branch"], "VDSG_centripetal_SI")
+            self.assertEqual(spec["active_dynamics_branch"], "TPF_readout_acceleration:derived_tpf_radial_readout")
             self.assertEqual(spec["run_id"], "test_run")
 
 
