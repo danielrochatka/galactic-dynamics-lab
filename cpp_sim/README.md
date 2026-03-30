@@ -1,8 +1,8 @@
-# cpp_sim — Galaxy N-body application
+# cpp_sim — N-body simulation engine
 
-C++ **simulation framework**: velocity Verlet, pluggable **physics packages**, layered configuration, and structured outputs. **Rendering** is not built into the binary; use **`plot_cpp_run.py`** from the repo root on a finished run directory.
+This directory is the **C++ simulation application** for **[Galactic Dynamics Lab](../README.md)** (the repository root): velocity Verlet, pluggable **physics packages**, layered configuration, and structured outputs. **Rendering** is not built into the binary; use **`plot_cpp_run.py`** from the repo root on a finished run directory.
 
-This README describes the **application** (build, config, outputs, plotting). **TPFCore-specific theory** (Ξ, Θ, I, readout vs VDSG) lives in **[physics/TPFCore/README.md](physics/TPFCore/README.md)**.
+This README describes the **engine** (build, config, outputs, plotting) and how packages plug in. **TPFCore-specific theory** (Ξ, Θ, I, readout vs VDSG) lives in **[physics/TPFCore/README.md](physics/TPFCore/README.md)**.
 
 ---
 
