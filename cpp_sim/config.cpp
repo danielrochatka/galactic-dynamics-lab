@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 
 namespace galaxy {
 
@@ -386,6 +387,12 @@ std::string probe_config_key(const std::string& path, const std::string& key) {
 // Root configs only: try repo-root configs/ (../configs when run from cpp_sim, configs when run from repo root).
 // We never use cpp_sim/configs/; if it exists we warn or fail (see check_run_config_canonical).
 std::string find_run_config_path() {
+  // Optional explicit path for CI / integration tests (takes precedence over my.local.cfg).
+  const char* env = std::getenv("GALAXY_RUN_CONFIG");
+  if (env && env[0] != '\0') {
+    std::string p = trim(std::string(env));
+    if (file_exists(p)) return p;
+  }
   // 1. Root configs when run from cpp_sim/
   if (file_exists("../configs/my.local.cfg")) return "../configs/my.local.cfg";
   if (file_exists("../configs/local/my.local.cfg")) return "../configs/local/my.local.cfg";

@@ -11,7 +11,8 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-import matplotlib.pyplot as plt
+# matplotlib is imported inside draw_galaxy_render_overlay so tests can import branch helpers
+# without requiring matplotlib at import time.
 
 _DERIVED_READOUT_MODES = frozenset({"tr_coherence_readout", "derived_tpf_radial_readout"})
 
@@ -189,7 +190,7 @@ def _cooling_label(ri: dict[str, Any], spec: dict[str, Any]) -> str:
 
 
 def draw_galaxy_render_overlay(
-    ax: plt.Axes,
+    ax: Any,
     mode: str,
     spec: dict[str, Any],
     *,

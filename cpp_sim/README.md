@@ -130,6 +130,12 @@ The repo includes a **Python** simulator (`main.py`, …) for reference and vali
 
 ---
 
+## Testing
+
+Automated tests (doctest, shell smoke scripts, Python `unittest`) live under `tests/` and `physics/*/tests/`; see **[../docs/TESTING.md](../docs/TESTING.md)**. From repo root: `./run_tests.sh`. From `cpp_sim/`: `make test`.
+
+---
+
 ## Compare C++ vs Python (sanity)
 
 Same `simulation_mode` and aligned parameters: compare final **`snapshot_*.csv`** and **`run_info`** fields. Run C++ from `cpp_sim/`; run Python from repo root per `main.py` / `config.py`.
