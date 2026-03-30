@@ -209,7 +209,7 @@ def resolve_overlay_mode(run_info: dict[str, Any], cli_override: Optional[str]) 
 
 def provenance_overlay_watermark_text(mode: str, spec: dict[str, Any]) -> str:
     """
-    Lower-right watermark for minimal / audit_full (empty for none or missing data).
+    Lower-left watermark for minimal / audit_full (empty for none or missing data).
     Does not duplicate the upper-left audit box; this is rev / branch / tag only.
     """
     if mode == "none":
@@ -345,14 +345,14 @@ def draw_galaxy_render_overlay(
     if wm:
         wm_fs = 5 if mode == "audit_full" else 6
         ax.text(
-            0.99,
+            0.01,
             0.01,
             wm,
             transform=ax.transAxes,
             fontsize=wm_fs,
             family="monospace",
             verticalalignment="bottom",
-            horizontalalignment="right",
+            horizontalalignment="left",
             color="white",
             bbox={
                 "boxstyle": "round,pad=0.28",

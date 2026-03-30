@@ -309,11 +309,11 @@ def save_rotation_curve_png(
     fig.tight_layout()
     if provenance_label:
         fig.text(
-            0.99,
+            0.01,
             0.02,
             provenance_label,
             transform=fig.transFigure,
-            ha="right",
+            ha="left",
             va="bottom",
             fontsize=7,
             color="gray",
