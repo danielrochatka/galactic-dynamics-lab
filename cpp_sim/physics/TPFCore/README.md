@@ -38,7 +38,11 @@ Do not equate **configured** `tpfcore_readout_mode` with **actual** acceleration
 
 ---
 
-## VDSG naming and legacy alias
+## VDSG (Velocity-Deformed Spacetime Gradient)
+
+**VDSG** stands for **Velocity-Deformed Spacetime Gradient**: the **exploratory** closure path in this package that applies a **velocity-dependent rescaling** (e.g. **`doppler_scale`** tied to **`tpf_vdsg_coupling`**) on top of a **centripetal / SI-style** acceleration route, implemented in **`accumulate_velocity_deformed_centripetal_gravity`**. In manifests and **`run_info`**, labels such as **`VDSG_centripetal_SI`** refer to this dynamics branch.
+
+### Naming and legacy alias
 
 - **Canonical config key:** **`tpf_vdsg_coupling`** (λ in **doppler_scale** for the VDSG SI path; effective λ may be mass-normalized per interaction — see code and run_info).
 - **Legacy alias:** **`tpf_gdd_coupling`** is accepted in the config parser and maps to **`tpf_vdsg_coupling`**. Manifests record the alias for audit.
