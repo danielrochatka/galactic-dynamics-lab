@@ -74,6 +74,36 @@ std::string format_elapsed(double sec) {
   return os.str();
 }
 
+/** Galaxy step progress; stage_tag e.g. "left"/"right" in compare mode, empty for single run. */
+galaxy::ProgressCallback make_galaxy_step_progress_callback(
+    std::chrono::steady_clock::time_point start_wall,
+    bool progress_to_terminal,
+    const std::string& stage_tag) {
+  return [start_wall, progress_to_terminal, stage_tag](int step, int n_steps, double sim_time) {
+    auto now = std::chrono::steady_clock::now();
+    double elapsed_sec =
+        1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
+    double eta_sec =
+        (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
+    double pct = 100.0 * step / n_steps;
+    if (progress_to_terminal) {
+      std::cout << "\r[ ";
+      if (!stage_tag.empty()) std::cout << stage_tag << " ";
+      std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
+                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec)
+                << "    " << std::flush;
+    } else {
+      std::cout << "[ ";
+      if (!stage_tag.empty()) std::cout << stage_tag << " ";
+      std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
+                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec) << "\n"
+                << std::flush;
+    }
+  };
+}
+
 std::string sanitize_label(const std::string& in) {
   std::string out;
   out.reserve(in.size());
@@ -736,6 +766,7 @@ int main(int argc, char** argv) {
       std::cerr << "Failed to create compare output directories under " << compare_parent_dir << "\n";
       return 1;
     }
+    std::cout << "Compare run directories (created):\n  " << left_dir << "\n  " << right_dir << "\n";
 
     galaxy::Config left_cfg = config;
     left_cfg.output_dir = left_dir;
@@ -766,10 +797,28 @@ int main(int argc, char** argv) {
               << "  right=" << right_cfg.physics_package << "\n";
     std::cout << "Shared IC fingerprint (fnv1a64): " << ic_hash << "\n";
 
+    int compare_progress_interval = 0;
+    bool compare_progress_tty = false;
+    auto compare_start_wall = std::chrono::steady_clock::now();
+    if (n_steps > 0) {
+      compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
+      compare_progress_tty = IS_STDOUT_TERMINAL();
+      std::cout << "Running compare simulations (" << n_steps << " steps each; progress shows left then right)...\n"
+                << std::flush;
+    }
+    galaxy::ProgressCallback left_progress =
+        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_tty, "left");
     auto left_snapshots =
-        galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, nullptr, 0);
+        galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, left_progress,
+                               compare_progress_interval);
+    if (compare_progress_tty && n_steps > 0) std::cout << "\n";
+
+    galaxy::ProgressCallback right_progress =
+        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_tty, "right");
     auto right_snapshots =
-        galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, nullptr, 0);
+        galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, right_progress,
+                               compare_progress_interval);
+    if (compare_progress_tty && n_steps > 0) std::cout << "\n";
 
     auto write_side_outputs =
         [&](const galaxy::Config& side_cfg,
@@ -885,28 +934,7 @@ int main(int argc, char** argv) {
     progress_interval = std::max(1, std::min(1000, n_steps / 100));
     auto start_wall = std::chrono::steady_clock::now();
     progress_to_terminal = IS_STDOUT_TERMINAL();
-    progress_callback = [start_wall, &config, progress_to_terminal](int step, int n_steps, double sim_time) {
-      auto now = std::chrono::steady_clock::now();
-      double elapsed_sec = 1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
-      double eta_sec = (step > 0 && step < n_steps)
-          ? (elapsed_sec / step) * (n_steps - step)
-          : 0.0;
-      double pct = 100.0 * step / n_steps;
-      if (progress_to_terminal) {
-        std::cout << "\r[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                  << "step " << step << "/" << n_steps
-                  << ", sim t=" << std::setprecision(2) << sim_time
-                  << ", elapsed=" << format_elapsed(elapsed_sec)
-                  << ", eta=" << format_elapsed(eta_sec) << "    " << std::flush;
-      } else {
-        std::cout << "[ " << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                  << "step " << step << "/" << n_steps
-                  << ", sim t=" << std::setprecision(2) << sim_time
-                  << ", elapsed=" << format_elapsed(elapsed_sec)
-                  << ", eta=" << format_elapsed(eta_sec) << "\n"
-                  << std::flush;
-      }
-    };
+    progress_callback = make_galaxy_step_progress_callback(start_wall, progress_to_terminal, "");
   }
 
   auto run_start = std::chrono::steady_clock::now();
