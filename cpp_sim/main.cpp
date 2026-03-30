@@ -398,6 +398,21 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_diagnostic_consistency_audit) {
+    if (!ensure_dir("outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create output dir " << config.output_dir << "\n";
+      return 1;
+    }
+    std::cout << "Diagnostic: tpf_diagnostic_consistency_audit (weak_field vs force_compare intermediates)\n";
+    galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/tpf_diagnostic_consistency_audit.csv, tpf_diagnostic_consistency_audit.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    return 0;
+  }
+
   if (config.simulation_mode == galaxy::SimulationMode::tpf_bound_orbit_sweep) {
     if (!tpfcore) {
       std::cerr << "tpf_bound_orbit_sweep requires physics_package = TPFCore.\n";

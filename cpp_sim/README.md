@@ -34,8 +34,9 @@ From **`cpp_sim/`**:
 | `galaxy` | Disk N-body (production morphology runs). |
 | `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `timestep_convergence` | Validation / checks. |
 | `tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`, … | Package-specific **inspection** (require `physics_package = TPFCore`). |
+| `tpf_two_body_sweep`, `tpf_weak_field_calibration`, `tpf_newtonian_force_compare`, `tpf_bound_orbit_sweep`, `tpf_diagnostic_consistency_audit` | TPFCore **sweeps / calibration / diagnostics** (see binary help and `SimulationMode` in `config.hpp`). |
 
-Full mode list and errors for unknown modes are printed by the binary. **Inspection modes** vs **dynamical modes** for TPFCore are constrained by `tpfcore_enable_provisional_readout`; see the TPFCore package README.
+Full mode list and errors for unknown modes are printed by the binary. For **TPFCore**, **dynamical** modes need **`tpfcore_enable_provisional_readout = true`**; inspection and sweep modes have their own requirements — see the TPFCore package README.
 
 Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `YYYYMMDD_HHMMSS`).
 
@@ -76,7 +77,7 @@ Adding a new package: implement **`physics/physics_package.hpp`**, register in *
 
 ### Galaxy initialization (templates)
 
-**Galaxy mode** uses a **named template** plus optional noise and structured seeds (`galaxy_init_*` keys in `config.hpp`). Templates include e.g. `symmetric_disk`, `clumpy_disk`, `weak_m2`, `preformed_spiral`. Resolved initialization is logged in **`run_info.txt`** (galaxy init audit block) and **`galaxy_init_diagnostics.txt`**.
+**Galaxy mode** uses a **named template** plus optional noise and structured seeds (`galaxy_init_*` keys in `config.hpp`). Valid **`galaxy_init_template`** names match **`galaxy_init.hpp`**: `symmetric_disk`, `symmetric_disk_noisy`, `clumpy_disk`, `weak_m2`, `weak_m3`, `weak_bar`, `preformed_spiral`. Resolved initialization is logged in **`run_info.txt`** (galaxy init audit block) and **`galaxy_init_diagnostics.txt`**.
 
 **RNG:** `galaxy_init_seed` controls reproducibility.
 
@@ -104,8 +105,8 @@ Typical **`outputs/<run_id>/`** contents:
 The binary **does not** draw PNG/MP4. After a run:
 
 ```bash
-# from repo root
-./dev/bin/python plot_cpp_run.py cpp_sim/outputs/<run_id>
+# from repo root (use python3 or your venv’s python)
+python3 plot_cpp_run.py cpp_sim/outputs/<run_id>
 ```
 
 This produces e.g. **`galaxy_initial.png`**, **`galaxy_final.png`**, optional **`galaxy.mp4`**, **`rotation_curve.png`**, and may honor **`render_overlay_mode`** from **`run_info`** (or **`--render-overlay-mode`**): **`none`** | **`minimal`** | **`audit_full`**. Overlays read **`run_info`** and **`render_manifest.json`** so plots show **dynamics vs metrics** and coupling without opening source.

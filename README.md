@@ -1,6 +1,6 @@
 # Galaxy — TPF simulation repository
 
-This repository hosts **simulation and tooling** around **Triality Primordial Field (TPF)**–style galaxy dynamics: a 2D N-body engine, Python reference code, and post-processing, with a clear split between **manuscript-aligned structure**, **exploratory closures**, and **experiment workflows**.
+This repository hosts **simulation and tooling** around **Transformational Physics Framework (TPF)**–style galaxy dynamics: a 2D N-body engine, Python reference code, and post-processing, with a clear split between **manuscript-aligned structure**, **exploratory closures**, and **experiment workflows**.
 
 ## What this repo is
 
@@ -22,9 +22,10 @@ This repository hosts **simulation and tooling** around **Triality Primordial Fi
 | **`plot_cpp_run.py`** | Post-process C++ run directories → galaxy PNGs, animation, rotation curve. |
 | **Python (`main.py`, …)** | Reference N-body + plots; not the only path to science results. |
 
-## Paper vs simulation vs experiments
+## Paper, theory, simulation, experiments
 
-- **Paper** — Defines intended ontology, equations where closed, and what is *not* expanded (∆C, full nonlinear field solve, etc.).
+- **Paper** — The manuscript (e.g. v11) defines intended ontology, equations where closed, and what is *not* expanded (∆C, full nonlinear field solve, etc.). **`TPF_PAPER_V11_SCOPE.md`** maps paper tiers to code.
+- **Theory** — Broader or in-progress reasoning (notes, drafts) that does not automatically ship as simulator behavior until it is reflected in the paper scope doc and implementation.
 - **Simulation** — Integrates particles with a chosen **physics package**; exposes **resolved** parameters in `run_info` / manifests.
 - **Experiments** — Compare branches (e.g. Newtonian control vs TPFCore), tune closures, and record outcomes without conflating **configured** readout with **actual acceleration branch** (see manifests and TPFCore README).
 
