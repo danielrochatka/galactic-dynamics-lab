@@ -89,6 +89,7 @@ void write_run_info(const std::string& output_dir,
   f << "plot_animation_dynamic_zoom\t" << (config.plot_animation_dynamic_zoom ? 1 : 0) << "\n";
   f << "plot_skip_initial_steps\t" << config.plot_skip_initial_steps << "\n";
   f << "plot_skip_initial_snapshots\t" << config.plot_skip_initial_snapshots << "\n";
+  f << "diagnostic_cutoff_radius\t" << config.diagnostic_cutoff_radius << "\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";

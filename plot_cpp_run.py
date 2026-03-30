@@ -178,6 +178,37 @@ def resolve_burnin_skip_settings(
     return effective_steps, effective_snaps
 
 
+def resolve_diagnostic_cutoff_radius(
+    run_info: dict[str, str | int | float],
+    cli_cutoff_radius: float | None,
+) -> tuple[float, str]:
+    """
+    Resolve diagnostic cutoff precedence:
+      1) explicit CLI cutoff
+      2) run_info diagnostic_cutoff_radius
+      3) run_info galaxy_radius
+      4) fail (no silent fallback).
+    Returns (cutoff_radius, source_label).
+    """
+    if cli_cutoff_radius is not None:
+        if not np.isfinite(cli_cutoff_radius) or cli_cutoff_radius <= 0:
+            raise SystemExit("--diagnostic-cutoff-radius must be > 0")
+        return float(cli_cutoff_radius), "cli(--diagnostic-cutoff-radius)"
+
+    raw_cfg = run_info.get("diagnostic_cutoff_radius")
+    if isinstance(raw_cfg, (int, float)) and np.isfinite(raw_cfg) and float(raw_cfg) > 0:
+        return float(raw_cfg), "run_info(diagnostic_cutoff_radius)"
+
+    raw_gr = run_info.get("galaxy_radius")
+    if isinstance(raw_gr, (int, float)) and np.isfinite(raw_gr) and float(raw_gr) > 0:
+        return float(raw_gr), "run_info(galaxy_radius)"
+
+    raise SystemExit(
+        "Diagnostics cutoff radius is undefined. Provide --diagnostic-cutoff-radius, or ensure "
+        "run_info.txt contains diagnostic_cutoff_radius or galaxy_radius."
+    )
+
+
 def resolve_galaxy_radius_meters(
     run_info: dict[str, str | int | float],
     snapshots: list[Snapshot],
@@ -389,6 +420,13 @@ def main() -> None:
         help="Burn-in filter (plotting only): after step filtering, drop first N snapshots. "
         "Overrides run_info plot_skip_initial_snapshots when set.",
     )
+    parser.add_argument(
+        "--diagnostic-cutoff-radius",
+        type=float,
+        default=None,
+        help="Diagnostics-only radial cutoff (meters). Overrides run_info diagnostic_cutoff_radius "
+        "and galaxy_radius when set.",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
@@ -564,7 +602,10 @@ def main() -> None:
         masses = get_masses_from_snapshots(snapshots, run_dir)
         if len(masses) != n_stars:
             masses = np.ones(n_stars) * run_info.get("star_mass", 1.0)
-        cutoff = 50.0  # C++ run_info does not store this; use default
+        cutoff, cutoff_source = resolve_diagnostic_cutoff_radius(
+            run_info, cli_cutoff_radius=args.diagnostic_cutoff_radius
+        )
+        print(f"Diagnostics cutoff radius: {cutoff:g} m (source={cutoff_source})")
         diag = compute_diagnostics(snapshots, masses, cutoff)
         plot_and_save_all(diag, run_dir, cutoff)
         print(f"Saved diagnostic plots in {run_dir}")

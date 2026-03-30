@@ -191,6 +191,8 @@ struct Config {
   int plot_skip_initial_steps = 0;
   /** plot_cpp_run.py: plotting-only burn-in filter: after step filtering, drop first N remaining snapshots. Default 0 (no filtering). */
   int plot_skip_initial_snapshots = 0;
+  /** plot_cpp_run.py diagnostics cutoff radius (m). <=0 means unset and plotter falls back to galaxy_radius if present. */
+  double diagnostic_cutoff_radius = 0.0;
   /**
    * plot_cpp_run.py: text overlay on galaxy_initial/final PNG and animation frames.
    * none | minimal | audit_full. Default none keeps PNG/MP4 pixel-identical to pre-overlay behavior;

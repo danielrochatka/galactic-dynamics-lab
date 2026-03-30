@@ -292,6 +292,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.plot_skip_initial_snapshots = std::stoi(val);
     return true;
   }
+  if (key == "diagnostic_cutoff_radius") {
+    config.diagnostic_cutoff_radius = std::stod(val);
+    return true;
+  }
   if (key == "render_overlay_mode") {
     std::string m = trim(val);
     std::string lo = m;

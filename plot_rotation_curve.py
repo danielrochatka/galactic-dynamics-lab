@@ -73,6 +73,26 @@ def newtonian_m_bh_from_run_info(run_info: dict[str, str | int | float]) -> floa
     return float(NEWTONIAN_REFERENCE_M_BH)
 
 
+def resolve_newtonian_overlay_mass(
+    run_info: dict[str, str | int | float],
+    cli_m_bh: float | None,
+) -> tuple[float, str, bool]:
+    """
+    Resolve Newtonian overlay mass source for CLI usage.
+    Precedence:
+      1) explicit --M-bh
+      2) run_info bh_mass when present and positive
+      3) fallback benchmark NEWTONIAN_REFERENCE_M_BH (explicitly reported)
+    Returns: (mass_kg, source_label, is_fallback_benchmark).
+    """
+    if cli_m_bh is not None:
+        return float(cli_m_bh), "cli(--M-bh)", False
+    m = run_info.get("bh_mass") if run_info else None
+    if isinstance(m, (int, float)) and float(m) > 0:
+        return float(m), "run_info(bh_mass)", False
+    return float(NEWTONIAN_REFERENCE_M_BH), "fallback_benchmark(NEWTONIAN_REFERENCE_M_BH)", True
+
+
 def rotation_curve_x_max(
     run_info: dict[str, str | int | float],
     r_data: np.ndarray,
@@ -316,7 +336,7 @@ def main() -> None:
     run_dir = csv_path.parent
     run_info = load_run_info(run_dir)
     r, v, title_suffix = load_particle_kinematics(csv_path)
-    M_bh = float(args.M_bh) if args.M_bh is not None else newtonian_m_bh_from_run_info(run_info)
+    M_bh, m_source, used_fallback_mass = resolve_newtonian_overlay_mass(run_info, args.M_bh)
     x_lim = rotation_curve_x_max(run_info, r)
     lbl = scatter_label_from_run_info(run_info)
     save_rotation_curve_png(
@@ -330,6 +350,12 @@ def main() -> None:
         filter_scatter_by_xmax=not args.no_filter_scatter,
     )
     print(f"Loaded: {csv_path}")
+    print(f"Newtonian overlay mass: {M_bh:g} kg (source={m_source})")
+    if used_fallback_mass:
+        print(
+            "Warning: no run-derived bh_mass found and no --M-bh was provided; "
+            "using fallback benchmark mass."
+        )
     print(f"Saved: {args.output.resolve()}")
 
 

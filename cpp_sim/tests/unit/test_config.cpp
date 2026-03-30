@@ -26,6 +26,12 @@ TEST_CASE("render_overlay_mode parsing") {
   CHECK(c.render_overlay_mode == "audit_full");
 }
 
+TEST_CASE("plot diagnostics cutoff parsing") {
+  Config c;
+  CHECK(apply_config_kv("diagnostic_cutoff_radius", "123.5", c));
+  CHECK(c.diagnostic_cutoff_radius == doctest::Approx(123.5));
+}
+
 TEST_CASE("galaxy init keys") {
   Config c;
   CHECK(apply_config_kv("galaxy_init_template", "preformed_spiral", c));
