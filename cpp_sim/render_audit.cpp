@@ -1,5 +1,6 @@
 #include "render_audit.hpp"
 #include "galaxy_init.hpp"
+#include "git_provenance.hpp"
 #include "physics/TPFCore/derived_tpf_radial.hpp"
 #include <fstream>
 #include <iomanip>
@@ -106,6 +107,7 @@ void write_render_manifest(const std::string& output_dir,
   const std::string dyn = compute_active_dynamics_branch(config);
   const std::string met = compute_active_metrics_branch(config);
   const std::string acc = compute_acceleration_code_path(config);
+  const GitProvenance gp = resolve_git_provenance();
   const bool cooling_on =
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
        config.simulation_mode == SimulationMode::galaxy);
@@ -157,6 +159,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "galaxy_init_spiral_phase", config.galaxy_init_spiral_phase);
     json_kv_bool(jf, first, "enable_star_star_gravity", config.enable_star_star_gravity);
     json_kv_num(jf, first, "tpf_vdsg_mass_baseline_kg", config.tpf_vdsg_mass_baseline_kg);
+    json_kv(jf, first, "git_commit_full", gp.git_commit_full);
+    json_kv(jf, first, "git_commit_short", gp.git_commit_short);
+    json_kv(jf, first, "git_branch", gp.git_branch);
+    json_kv(jf, first, "git_tag", gp.git_tag);
+    json_kv_bool(jf, first, "git_dirty", gp.git_dirty);
+    json_kv(jf, first, "code_version_label", gp.code_version_label);
     json_kv(jf, first, "config_key_aliases_note",
             "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling).");
     jf << ",\n  \"config_key_aliases\": [\n";
@@ -209,6 +217,12 @@ void write_render_manifest(const std::string& output_dir,
     tf << "galaxy_init_spiral_amplitude\t" << config.galaxy_init_spiral_amplitude << "\n";
     tf << "galaxy_init_spiral_winding\t" << config.galaxy_init_spiral_winding << "\n";
     tf << "galaxy_init_spiral_phase\t" << config.galaxy_init_spiral_phase << "\n";
+    tf << "git_commit_full\t" << gp.git_commit_full << "\n";
+    tf << "git_commit_short\t" << gp.git_commit_short << "\n";
+    tf << "git_branch\t" << gp.git_branch << "\n";
+    tf << "git_tag\t" << gp.git_tag << "\n";
+    tf << "git_dirty\t" << (gp.git_dirty ? 1 : 0) << "\n";
+    tf << "code_version_label\t" << gp.code_version_label << "\n";
     if (galaxy_init_audit && galaxy_init_audit->valid) {
       tf << "galaxy_init_audit_template\t" << galaxy_init_audit->template_name << "\n";
       tf << "galaxy_init_audit_used_legacy_velocity_noise\t"

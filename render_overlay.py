@@ -72,6 +72,24 @@ def _pick_s(mf: dict[str, Any], ri: dict[str, Any], key: str, default: str = "")
     return default if v is None else str(v)
 
 
+def _pick_boolish(mf: dict[str, Any], ri: dict[str, Any], key: str, default: bool = False) -> bool:
+    """Merge manifest + run_info for 0/1, true/false, or string flags."""
+    for src in (mf, ri):
+        if key not in src:
+            continue
+        v = src[key]
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, int):
+            return v != 0
+        s = str(v).strip().lower()
+        if s in ("1", "true", "yes", "on"):
+            return True
+        if s in ("0", "false", "no", "off"):
+            return False
+    return default
+
+
 def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
     """Return (dynamics, metrics, acceleration_code_path) when explicit keys are missing."""
     pp = str(ri.get("physics_package", "Newtonian"))
@@ -160,6 +178,12 @@ def build_overlay_spec(
         "galaxy_init_spiral_amplitude": _pick_f(mf, ri, "galaxy_init_spiral_amplitude", 0.0),
         "galaxy_init_spiral_winding": _pick_f(mf, ri, "galaxy_init_spiral_winding", 0.0),
         "galaxy_init_spiral_phase": _pick_f(mf, ri, "galaxy_init_spiral_phase", 0.0),
+        "git_commit_full": _pick_s(mf, ri, "git_commit_full", "unknown"),
+        "git_commit_short": _pick_s(mf, ri, "git_commit_short", "unknown"),
+        "git_branch": _pick_s(mf, ri, "git_branch", ""),
+        "git_tag": _pick_s(mf, ri, "git_tag", ""),
+        "git_dirty": _pick_boolish(mf, ri, "git_dirty", False),
+        "code_version_label": _pick_s(mf, ri, "code_version_label", "unknown"),
     }
     return spec
 
@@ -171,6 +195,42 @@ def resolve_overlay_mode(run_info: dict[str, Any], cli_override: Optional[str]) 
     if raw is None:
         return "none"
     return str(raw).strip().lower()
+
+
+def provenance_overlay_watermark_text(mode: str, spec: dict[str, Any]) -> str:
+    """
+    Lower-right watermark for minimal / audit_full (empty for none or missing data).
+    Does not duplicate the upper-left audit box; this is rev / branch / tag only.
+    """
+    if mode == "none":
+        return ""
+    lbl = str(spec.get("code_version_label") or "").strip()
+    short = str(spec.get("git_commit_short") or "").strip()
+    dirty_b = bool(spec.get("git_dirty"))
+    br = str(spec.get("git_branch") or "").strip()
+    tg = str(spec.get("git_tag") or "").strip()
+
+    if mode == "minimal":
+        if lbl and lbl != "unknown":
+            return lbl
+        if short and short != "unknown":
+            s = f"rev: {short}"
+            if dirty_b:
+                s += " (dirty)"
+            return s
+        return "rev: unknown"
+
+    if mode == "audit_full":
+        lines: list[str] = []
+        lines.append(f"rev: {short if short else 'unknown'}")
+        if br:
+            lines.append(f"branch: {br}")
+        if tg:
+            lines.append(f"tag: {tg}")
+        lines.append(f"dirty: {'yes' if dirty_b else 'no'}")
+        return "\n".join(lines)
+
+    return ""
 
 
 def _cooling_label(ri: dict[str, Any], spec: dict[str, Any]) -> str:
@@ -270,3 +330,25 @@ def draw_galaxy_render_overlay(
         },
         zorder=20,
     )
+
+    wm = provenance_overlay_watermark_text(mode, spec)
+    if wm:
+        wm_fs = 5 if mode == "audit_full" else 6
+        ax.text(
+            0.99,
+            0.01,
+            wm,
+            transform=ax.transAxes,
+            fontsize=wm_fs,
+            family="monospace",
+            verticalalignment="bottom",
+            horizontalalignment="right",
+            color="white",
+            bbox={
+                "boxstyle": "round,pad=0.28",
+                "facecolor": "black",
+                "edgecolor": "gray",
+                "alpha": 0.42,
+            },
+            zorder=21,
+        )

@@ -15,7 +15,7 @@ LIB_SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/n
 	physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp \
 	physics/TPFCore/derived_tpf_radial.cpp physics/TPFCore/provisional_readout.cpp \
 	physics/TPFCore/tpf_core_package.cpp integrator.cpp galaxy_init.cpp init_conditions.cpp \
-	render_audit.cpp simulation.cpp output.cpp
+	git_provenance.cpp render_audit.cpp simulation.cpp output.cpp
 
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)
 

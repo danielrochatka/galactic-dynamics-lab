@@ -1,5 +1,6 @@
 #include "output.hpp"
 #include "galaxy_init.hpp"
+#include "git_provenance.hpp"
 #include "render_audit.hpp"
 #include <fstream>
 #include <iomanip>
@@ -20,6 +21,8 @@ void write_run_info(const std::string& output_dir,
   path << output_dir << "/run_info.txt";
   std::ofstream f(path.str());
   if (!f) return;
+
+  const GitProvenance gp = resolve_git_provenance();
 
   int n_star = (n_particles >= 0) ? n_particles : config.n_stars;
 
@@ -69,6 +72,15 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
   }
   f << "=== End resolved config ===\n\n";
+
+  f << "=== Code provenance (git) ===\n";
+  f << "git_commit_full\t" << gp.git_commit_full << "\n";
+  f << "git_commit_short\t" << gp.git_commit_short << "\n";
+  f << "git_branch\t" << gp.git_branch << "\n";
+  f << "git_tag\t" << gp.git_tag << "\n";
+  f << "git_dirty\t" << (gp.git_dirty ? 1 : 0) << "\n";
+  f << "code_version_label\t" << gp.code_version_label << "\n";
+  f << "=== End code provenance ===\n\n";
 
   if (config.physics_package == "TPFCore") {
     f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";

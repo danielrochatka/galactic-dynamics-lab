@@ -17,6 +17,7 @@ from render_overlay import (  # noqa: E402
     build_overlay_spec,
     infer_branches_from_run_info,
     load_render_manifest,
+    provenance_overlay_watermark_text,
     resolve_overlay_mode,
 )
 
@@ -85,6 +86,56 @@ class TestRenderOverlay(unittest.TestCase):
             spec = build_overlay_spec(run_dir, ri)
             self.assertEqual(spec["active_dynamics_branch"], "TPF_readout_acceleration:derived_tpf_radial_readout")
             self.assertEqual(spec["run_id"], "test_run")
+
+    def test_build_overlay_spec_git_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            ri: dict = {"physics_package": "Newtonian"}
+            spec = build_overlay_spec(run_dir, ri)
+            self.assertEqual(spec["git_commit_full"], "unknown")
+            self.assertEqual(spec["git_commit_short"], "unknown")
+            self.assertEqual(spec["code_version_label"], "unknown")
+            self.assertFalse(spec["git_dirty"])
+
+    def test_build_overlay_spec_git_from_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            mf = {
+                "git_commit_full": "abcd" * 10,
+                "git_commit_short": "deadbeef",
+                "git_branch": "main",
+                "git_tag": "",
+                "git_dirty": True,
+                "code_version_label": "main@deadbeef-dirty",
+            }
+            (run_dir / "render_manifest.json").write_text(
+                json.dumps(mf), encoding="utf-8"
+            )
+            spec = build_overlay_spec(run_dir, {"physics_package": "Newtonian"})
+            self.assertEqual(spec["git_commit_short"], "deadbeef")
+            self.assertTrue(spec["git_dirty"])
+            self.assertEqual(spec["code_version_label"], "main@deadbeef-dirty")
+
+    def test_provenance_watermark_text(self) -> None:
+        spec = {
+            "code_version_label": "main@abc1234",
+            "git_commit_short": "abc1234",
+            "git_dirty": False,
+            "git_branch": "main",
+            "git_tag": "",
+        }
+        self.assertEqual(
+            provenance_overlay_watermark_text("minimal", spec), "main@abc1234"
+        )
+        spec["code_version_label"] = "unknown"
+        self.assertEqual(
+            provenance_overlay_watermark_text("minimal", spec), "rev: abc1234"
+        )
+        spec["git_dirty"] = True
+        self.assertIn("dirty", provenance_overlay_watermark_text("minimal", spec))
+        full = provenance_overlay_watermark_text("audit_full", spec)
+        self.assertIn("branch: main", full)
+        self.assertIn("dirty: yes", full)
 
 
 if __name__ == "__main__":

@@ -593,6 +593,12 @@ def main() -> None:
         M_bh_rc = newtonian_m_bh_from_run_info(run_info)
         x_max_rc = rotation_curve_x_max(run_info, r_rc)
         scatter_lbl = scatter_label_from_run_info(run_info)
+        rc_prov = run_info.get("code_version_label") if run_info else None
+        rc_prov_s = (
+            str(rc_prov).strip()
+            if isinstance(rc_prov, str) and rc_prov.strip()
+            else None
+        )
         save_rotation_curve_png(
             r_rc,
             v_rc,
@@ -601,6 +607,7 @@ def main() -> None:
             M_bh=M_bh_rc,
             x_max=x_max_rc,
             scatter_label=scatter_lbl,
+            provenance_label=rc_prov_s,
         )
         print(
             f"Saved: {run_dir / 'rotation_curve.png'} "

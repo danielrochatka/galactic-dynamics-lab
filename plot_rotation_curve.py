@@ -53,6 +53,15 @@ def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
         if len(parts) != 2:
             continue
         key, val = parts[0].strip(), parts[1].strip()
+        if key in (
+            "git_commit_full",
+            "git_commit_short",
+            "git_branch",
+            "git_tag",
+            "code_version_label",
+        ):
+            info[key] = val
+            continue
         try:
             if "." in val or "e" in val.lower():
                 info[key] = float(val)
@@ -233,6 +242,7 @@ def save_rotation_curve_png(
     scatter_label: str = "Simulated stars",
     newtonian_label: str | None = None,
     filter_scatter_by_xmax: bool = True,
+    provenance_label: str | None = None,
 ) -> None:
     """
     Scatter r vs v and overlay Newtonian v = sqrt(G*M_bh/r). Arrays need not be pre-sorted.
@@ -297,6 +307,18 @@ def save_rotation_curve_png(
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
+    if provenance_label:
+        fig.text(
+            0.99,
+            0.02,
+            provenance_label,
+            transform=fig.transFigure,
+            ha="right",
+            va="bottom",
+            fontsize=7,
+            color="gray",
+            alpha=0.9,
+        )
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)
