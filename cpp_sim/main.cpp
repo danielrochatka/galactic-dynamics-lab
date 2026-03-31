@@ -87,7 +87,8 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
         (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
     double pct = 100.0 * step / n_steps;
     if (progress_to_terminal) {
-      std::cout << "\r[ ";
+      // Clear the full line before redrawing to prevent remnants when text width shrinks.
+      std::cout << "\r\033[2K[ ";
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
                 << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
@@ -803,17 +804,17 @@ int main(int argc, char** argv) {
       compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
       std::cout << "Running compare simulations (" << n_steps << " steps each).\n" << std::flush;
     }
-    // Compare: always line-based progress (second arg false). In-place \r works for the first leg on many
-    // terminals, but the second leg often fails to redraw after the newline following the first leg.
+    const bool compare_progress_to_terminal = IS_STDOUT_TERMINAL();
     galaxy::ProgressCallback left_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, false, "left");
+        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_to_terminal, "left");
     std::cout << "Left simulation (" << left_cfg.physics_package << ")...\n" << std::flush;
     auto left_snapshots =
         galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, left_progress,
                                compare_progress_interval);
+    if (compare_progress_to_terminal && n_steps > 0) std::cout << "\n";
 
     galaxy::ProgressCallback right_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, false, "right");
+        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_to_terminal, "right");
     std::cout << "Right simulation (" << right_cfg.physics_package << ")...\n" << std::flush;
     auto right_snapshots =
         galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, right_progress,
