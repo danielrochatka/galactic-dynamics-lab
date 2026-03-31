@@ -13,8 +13,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from plot_cpp_compare import (
+    _median_radius_bound,
     _resolve_side_run_dir,
-    _validated_radii_pair,
+    calculate_compare_smart_bound,
     matched_steps_strict,
     render_compare,
 )
@@ -107,8 +108,8 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertNotIn("_smooth_alpha", text)
         self.assertNotIn("_smooth_state", text)
 
-    def test_validated_radii_pair_independent(self) -> None:
-        """Compact vs extended mock: per-side radii can differ by orders of magnitude."""
+    def test_compare_smart_bound_uses_max_of_per_side_medians(self) -> None:
+        """Compare bound uses max(1.2*left_median, 1.2*right_median), not merged median."""
         import numpy as np
 
         from plot_cpp_run import Snapshot
@@ -122,9 +123,13 @@ class TestPlotCppCompare(unittest.TestCase):
         vel_r = np.column_stack([np.cos(th) * 1e5, np.sin(th) * 1e5])
         snap_l = Snapshot(0, 0.0, pos_l, vel_l)
         snap_r = Snapshot(0, 0.0, pos_r, vel_r)
-        r_l, r_r = _validated_radii_pair(snap_l, snap_r, 1e20, 1e20, 150.0, 150.0)
-        self.assertLess(r_l, 1e23)
-        self.assertGreater(r_r, 1e26)
+        left_med, left_bound = _median_radius_bound([snap_l], 150.0)
+        right_med, right_bound = _median_radius_bound([snap_r], 150.0)
+        m_l, m_r, shared = calculate_compare_smart_bound([snap_l], [snap_r], 150.0)
+        self.assertAlmostEqual(m_l, left_med)
+        self.assertAlmostEqual(m_r, right_med)
+        self.assertAlmostEqual(shared, max(left_bound, right_bound))
+        self.assertGreater(shared, 1e26)
 
 
 if __name__ == "__main__":

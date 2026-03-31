@@ -10,8 +10,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
+
 from render_overlay import build_overlay_spec, draw_galaxy_render_overlay, resolve_overlay_mode
-from plot_cpp_run import resolve_galaxy_radius_meters, static_viewport_radius_validated
 
 
 @dataclass
@@ -97,47 +98,41 @@ def _fallback_render_radius_m(run_info: dict) -> float:
         return 150.0
 
 
-def _validated_radii_pair(
-    snap_l,
-    snap_r,
-    galaxy_radius_m_l: float,
-    galaxy_radius_m_r: float,
-    fallback_l: float,
-    fallback_r: float,
-) -> tuple[float, float]:
-    """Per-side validated static viewport half-axes (plot_cpp_run)."""
-    r_l = static_viewport_radius_validated(
-        snap_l.positions,
-        snap_l.velocities,
-        galaxy_radius_m_l,
-        fallback_l,
-    )
-    r_r = static_viewport_radius_validated(
-        snap_r.positions,
-        snap_r.velocities,
-        galaxy_radius_m_r,
-        fallback_r,
-    )
-    return r_l, r_r
+def _median_radius_bound(snapshots: list[object], fallback: float) -> tuple[float, float]:
+    """Return (median_radius, bound=1.2*median_radius) over all finite stars in all snapshots."""
+    radii_chunks: list[np.ndarray] = []
+    for snap in snapshots:
+        p = snap.positions
+        if p.size == 0:
+            continue
+        x = p[:, 0]
+        y = p[:, 1]
+        m = np.isfinite(x) & np.isfinite(y)
+        if not np.any(m):
+            continue
+        radii_chunks.append(np.sqrt(x[m] * x[m] + y[m] * y[m]))
+    if not radii_chunks:
+        fb = float(max(1.0, fallback))
+        return fb, fb
+    r_all = np.concatenate(radii_chunks)
+    if r_all.size == 0:
+        fb = float(max(1.0, fallback))
+        return fb, fb
+    median_r = float(np.median(r_all))
+    if not np.isfinite(median_r) or median_r <= 0:
+        fb = float(max(1.0, fallback))
+        return fb, fb
+    return median_r, float(max(1.2 * median_r, 1.0))
 
 
-def _compare_shared_radius_for_pair(
-    snap_l,
-    snap_r,
-    galaxy_radius_m_l: float,
-    galaxy_radius_m_r: float,
-    fallback_l: float,
-    fallback_r: float,
-) -> float:
-    """
-    Single half-axis for both panels: max(left, right) validated radii.
-    Use only with --shared-viewport: identical scale, but when one side is much more extended
-    than the other, the compact side can look empty and motion can be invisible.
-    """
-    r_l, r_r = _validated_radii_pair(
-        snap_l, snap_r, galaxy_radius_m_l, galaxy_radius_m_r, fallback_l, fallback_r
-    )
-    return max(r_l, r_r)
+def calculate_compare_smart_bound(
+    left_snaps: list[object], right_snaps: list[object], fallback: float
+) -> tuple[float, float, float]:
+    """Per-side median-radius bounds, then shared=max(left_bound,right_bound)."""
+    left_median, left_bound = _median_radius_bound(left_snaps, fallback)
+    right_median, right_bound = _median_radius_bound(right_snaps, fallback)
+    shared = float(max(left_bound, right_bound, max(1.0, fallback)))
+    return left_median, right_median, shared
 
 
 def _draw_panel(ax, side: SideData, snap, radius: float) -> None:
@@ -160,8 +155,6 @@ def render_compare(
     parent_dir: Path,
     no_animation: bool = False,
     overlay_mode: str | None = None,
-    *,
-    shared_viewport: bool = False,
 ) -> None:
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
@@ -179,34 +172,26 @@ def render_compare(
 
     fb_l = _fallback_render_radius_m(left.run_info)
     fb_r = _fallback_render_radius_m(right.run_info)
-    galaxy_radius_m_l = resolve_galaxy_radius_meters(left.run_info, left_snaps, fb_l)
-    galaxy_radius_m_r = resolve_galaxy_radius_meters(right.run_info, right_snaps, fb_r)
-
+    fallback = float(max(fb_l, fb_r, 1.0))
+    left_median, right_median, shared_bound = calculate_compare_smart_bound(
+        left_snaps, right_snaps, fallback
+    )
     print(
-        "Compare viewport: "
-        + (
-            "shared max(left, right) — same axis scale on both panels"
-            if shared_viewport
-            else "per-panel — each side uses its own validated radius (recommended when scales differ a lot)"
-        )
+        f"Compare smart framing: left median r={left_median:.6g} m, "
+        f"right median r={right_median:.6g} m, shared_bound={shared_bound:.6g} m"
     )
 
     def save_static(step_idx: int, out_name: str) -> None:
         ls = left_snaps[step_idx]
         rs = right_snaps[step_idx]
-        r_l, r_r = _validated_radii_pair(
-            ls, rs, galaxy_radius_m_l, galaxy_radius_m_r, fb_l, fb_r
-        )
-        if shared_viewport:
-            r_l = r_r = max(r_l, r_r)
         fig, axes = plt.subplots(1, 2, figsize=(16, 8), facecolor="black")
         for ax in axes:
             ax.set_facecolor("black")
             ax.tick_params(colors="gray")
             for s in ax.spines.values():
                 s.set_color("gray")
-        _draw_panel(axes[0], left, ls, r_l)
-        _draw_panel(axes[1], right, rs, r_r)
+        _draw_panel(axes[0], left, ls, shared_bound)
+        _draw_panel(axes[1], right, rs, shared_bound)
         fig.suptitle(
             f"Compare {compare_run_id} | left={left.run_info.get('physics_package', '?')} "
             f"| right={right.run_info.get('physics_package', '?')} "
@@ -231,36 +216,9 @@ def render_compare(
         for s in ax.spines.values():
             s.set_color("gray")
 
-    raw_radii = [
-        _validated_radii_pair(
-            left_snaps[i],
-            right_snaps[i],
-            galaxy_radius_m_l,
-            galaxy_radius_m_r,
-            fb_l,
-            fb_r,
-        )
-        for i in range(len(steps))
-    ]
-    if shared_viewport:
-        fixed_shared = max(max(r_l, r_r) for r_l, r_r in raw_radii)
-        fixed_l = fixed_r = float(fixed_shared)
-    else:
-        fixed_l = float(max(r_l for r_l, _ in raw_radii))
-        fixed_r = float(max(r_r for _, r_r in raw_radii))
-    print(
-        "Animation viewport lock: "
-        f"left={fixed_l:.6g} m, right={fixed_r:.6g} m"
-    )
-
     def animate(i: int):
-        # Use fixed viewport(s) across animation so true expansion/contraction is visible.
-        # Per-frame autoscaling can keep normalized positions nearly constant and look static.
-        r_l, r_r = fixed_l, fixed_r
-        if shared_viewport:
-            r_l = r_r = fixed_l
-        _draw_panel(axes[0], left, left_snaps[i], r_l)
-        _draw_panel(axes[1], right, right_snaps[i], r_r)
+        _draw_panel(axes[0], left, left_snaps[i], shared_bound)
+        _draw_panel(axes[1], right, right_snaps[i], shared_bound)
         t = float(left_snaps[i].time)
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | t={t:.6g} "
@@ -291,20 +249,8 @@ def main() -> None:
         default=None,
         help="Override per-side run_info overlay mode.",
     )
-    ap.add_argument(
-        "--shared-viewport",
-        action="store_true",
-        help="Use the same axis half-range on both panels (max of validated left/right radii). "
-        "Same physical scale on both sides, but if one run is much more extended, the compact side "
-        "can look empty and stellar motion can be invisible.",
-    )
     args = ap.parse_args()
-    render_compare(
-        args.compare_parent_dir.resolve(),
-        args.no_animation,
-        args.render_overlay_mode,
-        shared_viewport=args.shared_viewport,
-    )
+    render_compare(args.compare_parent_dir.resolve(), args.no_animation, args.render_overlay_mode)
 
 
 if __name__ == "__main__":
