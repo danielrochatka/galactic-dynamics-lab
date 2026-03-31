@@ -57,7 +57,6 @@ from plot_rotation_curve import (
     scatter_label_from_run_info,
 )
 
-
 # -----------------------------------------------------------------------------
 # C++ output format
 # -----------------------------------------------------------------------------
@@ -246,10 +245,14 @@ def resolve_cooling_audit_flags(
 def initial_snapshot_plot_title(
     cooling_active: bool,
     initial_step: int,
+    *,
+    burn_in_plotting: bool = False,
 ) -> str:
-    """Truthful initial-frame title for cooled vs non-cooled runs."""
+    """Truthful first-frame title: cooling, burn-in plotting filter, or true initial."""
     if cooling_active and initial_step > 0:
         return "Galaxy – First saved snapshot after cooling (C++ run)"
+    if burn_in_plotting:
+        return "Galaxy – First plotted snapshot (C++ run)"
     return "Galaxy – Initial (C++ run)"
 
 
@@ -308,6 +311,79 @@ def galaxy_velocity_gated_target_limit(
     if not np.isfinite(target_limit) or target_limit <= 0:
         return degenerate_fallback
     return float(target_limit)
+
+
+def fraction_stars_inside_square_viewport(
+    positions: np.ndarray,
+    half_axis: float,
+) -> float:
+    """Fraction of finite (x,y) inside the square |x|,|y| <= half_axis (matches matplotlib axis limits)."""
+    if positions.size == 0 or len(positions) == 0:
+        return 0.0
+    x = positions[:, 0]
+    y = positions[:, 1]
+    m = np.isfinite(x) & np.isfinite(y)
+    if not np.any(m):
+        return 0.0
+    ins = (np.abs(x[m]) <= half_axis) & (np.abs(y[m]) <= half_axis)
+    return float(np.mean(ins))
+
+
+def bulk_chebyshev_extent_half_axis(
+    positions: np.ndarray,
+    percentile: float = 95.0,
+    cushion: float = 1.18,
+) -> float:
+    """
+    Robust half-axis for square limits: percentile of max(|x|,|y|) among finite points, times cushion.
+    Resists a handful of escapers vs raw max(r).
+    """
+    if positions.size == 0 or len(positions) == 0:
+        return 1.0
+    x = positions[:, 0]
+    y = positions[:, 1]
+    m = np.isfinite(x) & np.isfinite(y)
+    if not np.any(m):
+        return 1.0
+    d = np.maximum(np.abs(x[m]), np.abs(y[m]))
+    if d.size == 0:
+        return 1.0
+    q = float(np.percentile(d, percentile))
+    if not np.isfinite(q) or q <= 0:
+        return 1.0
+    return float(q * cushion)
+
+
+def static_viewport_radius_validated(
+    positions: np.ndarray,
+    velocities: np.ndarray | None,
+    galaxy_radius_m: float,
+    degenerate_fallback: float,
+    min_inside_fraction: float = 0.50,
+) -> float:
+    """
+    Static galaxy frame: start from velocity-gated candidate; if too few stars would appear in the
+    square viewport, fall back to bulk (percentile) extent. Prevents blank plots when escapers or
+    degenerate velocity masks make galaxy_velocity_gated_target_limit far smaller than the data extent.
+    """
+    cand = galaxy_velocity_gated_target_limit(
+        positions, velocities, galaxy_radius_m, degenerate_fallback
+    )
+    if not np.isfinite(cand) or cand <= 0:
+        cand = float(degenerate_fallback)
+    frac = fraction_stars_inside_square_viewport(positions, cand)
+    if frac >= min_inside_fraction:
+        return float(cand)
+    bulk = bulk_chebyshev_extent_half_axis(positions, 95.0, 1.18)
+    bulk_wide = bulk_chebyshev_extent_half_axis(positions, 99.5, 1.12)
+    out = max(cand, bulk, bulk_wide, float(degenerate_fallback))
+    if not np.isfinite(out) or out <= 0:
+        return float(degenerate_fallback)
+    # Second check: if still almost empty, prefer widest bulk
+    frac2 = fraction_stars_inside_square_viewport(positions, out)
+    if frac2 < min_inside_fraction:
+        out = max(out, bulk_chebyshev_extent_half_axis(positions, 99.9, 1.08))
+    return float(out)
 
 
 def calculate_smart_bounds(
@@ -555,15 +631,18 @@ def main() -> None:
 
     initial = snapshots[0]
     final = snapshots[-1]
-    render_radius_initial = galaxy_velocity_gated_target_limit(
+    render_radius_initial = static_viewport_radius_validated(
         initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
     )
-    render_radius_final = galaxy_velocity_gated_target_limit(
+    render_radius_final = static_viewport_radius_validated(
         final.positions, final.velocities, galaxy_radius_m, fallback_radius
     )
 
+    burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
-    initial_title = initial_snapshot_plot_title(cooling_active, initial.step)
+    initial_title = initial_snapshot_plot_title(
+        cooling_active, initial.step, burn_in_plotting=burn_in_plotting
+    )
     save_static_plot(
         initial.positions,
         run_dir / "galaxy_initial.png",

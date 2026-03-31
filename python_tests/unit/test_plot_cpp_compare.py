@@ -12,7 +12,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from plot_cpp_compare import _resolve_side_run_dir, matched_steps_strict, render_compare
+from plot_cpp_compare import (
+    _resolve_side_run_dir,
+    _validated_radii_pair,
+    matched_steps_strict,
+    render_compare,
+)
 
 
 def _write_snapshot(path: Path, step: int, t: float, x: float) -> None:
@@ -93,6 +98,33 @@ class TestPlotCppCompare(unittest.TestCase):
             render_compare(parent, no_animation=True, overlay_mode="none")
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
+
+    def test_compare_animation_does_not_use_ema_radius_smoothing(self) -> None:
+        """EMA on shared radius lagged behind per-frame max(r_l,r_r) and clipped stars in video."""
+        import plot_cpp_compare
+
+        text = Path(plot_cpp_compare.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("_smooth_alpha", text)
+        self.assertNotIn("_smooth_state", text)
+
+    def test_validated_radii_pair_independent(self) -> None:
+        """Compact vs extended mock: per-side radii can differ by orders of magnitude."""
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        # Left: tight disk
+        pos_l = np.random.default_rng(0).normal(scale=1e19, size=(100, 2))
+        vel_l = np.zeros_like(pos_l)
+        # Right: huge ring
+        th = np.linspace(0, 2 * np.pi, 100, endpoint=False)
+        pos_r = np.column_stack([1e27 * np.cos(th), 1e27 * np.sin(th)])
+        vel_r = np.column_stack([np.cos(th) * 1e5, np.sin(th) * 1e5])
+        snap_l = Snapshot(0, 0.0, pos_l, vel_l)
+        snap_r = Snapshot(0, 0.0, pos_r, vel_r)
+        r_l, r_r = _validated_radii_pair(snap_l, snap_r, 1e20, 1e20, 150.0, 150.0)
+        self.assertLess(r_l, 1e23)
+        self.assertGreater(r_r, 1e26)
 
 
 if __name__ == "__main__":
