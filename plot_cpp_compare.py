@@ -87,19 +87,42 @@ def matched_steps_strict(left_steps: set[int], right_steps: set[int]) -> list[in
     return sorted(left_steps)
 
 
-def _common_radius(left_snapshots: list, right_snapshots: list) -> float:
-    import math
+def _fallback_render_radius_m(run_info: dict) -> float:
+    """CLI-style fallback (m) when velocity gating needs a floor; matches plot_cpp_run default."""
+    raw = run_info.get("render_radius", 150.0)
+    try:
+        return max(1.0, float(raw))
+    except (TypeError, ValueError):
+        return 150.0
 
-    max_r = 0.0
-    for snap in left_snapshots + right_snapshots:
-        p = snap.positions
-        if len(p) == 0:
-            continue
-        for i in range(len(p)):
-            ri = math.hypot(float(p[i, 0]), float(p[i, 1]))
-            if ri > max_r:
-                max_r = ri
-    return max(1.0, 1.2 * max_r)
+
+def _compare_shared_radius_for_pair(
+    snap_l,
+    snap_r,
+    galaxy_radius_m_l: float,
+    galaxy_radius_m_r: float,
+    fallback_l: float,
+    fallback_r: float,
+) -> float:
+    """
+    Fair shared half-axis for one frame: same robust viewport as plot_cpp_run per side,
+    then max(left, right) so both panels use identical limits.
+    """
+    from plot_cpp_run import galaxy_velocity_gated_target_limit
+
+    r_l = galaxy_velocity_gated_target_limit(
+        snap_l.positions,
+        snap_l.velocities,
+        galaxy_radius_m_l,
+        fallback_l,
+    )
+    r_r = galaxy_velocity_gated_target_limit(
+        snap_r.positions,
+        snap_r.velocities,
+        galaxy_radius_m_r,
+        fallback_r,
+    )
+    return max(r_l, r_r)
 
 
 def _draw_panel(ax, side: SideData, snap, radius: float) -> None:
@@ -122,6 +145,8 @@ def render_compare(parent_dir: Path, no_animation: bool = False, overlay_mode: s
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
 
+    from plot_cpp_run import resolve_galaxy_radius_meters
+
     mf = _load_compare_manifest(parent_dir)
     left_dir = _resolve_side_run_dir(str(mf["left_dir"]), parent_dir)
     right_dir = _resolve_side_run_dir(str(mf["right_dir"]), parent_dir)
@@ -132,11 +157,18 @@ def render_compare(parent_dir: Path, no_animation: bool = False, overlay_mode: s
     steps = matched_steps_strict(set(left.snapshots_by_step.keys()), set(right.snapshots_by_step.keys()))
     left_snaps = [left.snapshots_by_step[s] for s in steps]
     right_snaps = [right.snapshots_by_step[s] for s in steps]
-    radius = _common_radius(left_snaps, right_snaps)
+
+    fb_l = _fallback_render_radius_m(left.run_info)
+    fb_r = _fallback_render_radius_m(right.run_info)
+    galaxy_radius_m_l = resolve_galaxy_radius_meters(left.run_info, left_snaps, fb_l)
+    galaxy_radius_m_r = resolve_galaxy_radius_meters(right.run_info, right_snaps, fb_r)
 
     def save_static(step_idx: int, out_name: str) -> None:
         ls = left_snaps[step_idx]
         rs = right_snaps[step_idx]
+        radius = _compare_shared_radius_for_pair(
+            ls, rs, galaxy_radius_m_l, galaxy_radius_m_r, fb_l, fb_r
+        )
         fig, axes = plt.subplots(1, 2, figsize=(16, 8), facecolor="black")
         for ax in axes:
             ax.set_facecolor("black")
@@ -169,9 +201,27 @@ def render_compare(parent_dir: Path, no_animation: bool = False, overlay_mode: s
         for s in ax.spines.values():
             s.set_color("gray")
 
+    # Light EMA on shared frame radius to reduce zoom jitter (same spirit as velocity-gated smoothing).
+    _smooth_state: list[float | None] = [None]
+    _smooth_alpha = 0.12
+
     def animate(i: int):
-        _draw_panel(axes[0], left, left_snaps[i], radius)
-        _draw_panel(axes[1], right, right_snaps[i], radius)
+        raw = _compare_shared_radius_for_pair(
+            left_snaps[i],
+            right_snaps[i],
+            galaxy_radius_m_l,
+            galaxy_radius_m_r,
+            fb_l,
+            fb_r,
+        )
+        if _smooth_state[0] is None:
+            _smooth_state[0] = raw
+        else:
+            a = _smooth_alpha
+            _smooth_state[0] = (1.0 - a) * _smooth_state[0] + a * raw
+        radius_i = float(_smooth_state[0])
+        _draw_panel(axes[0], left, left_snaps[i], radius_i)
+        _draw_panel(axes[1], right, right_snaps[i], radius_i)
         t = float(left_snaps[i].time)
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | t={t:.6g} "
