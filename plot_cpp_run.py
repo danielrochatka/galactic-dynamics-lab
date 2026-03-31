@@ -11,6 +11,9 @@ then produces the same kinds of plots as the Python pipeline:
 
 Animation viewport: default uses **smart framing** — one fixed axis half-range from the **median**
   radial distance of all stars across all snapshots, times 1.2 (see `calculate_smart_bounds`).
+  **Non-galaxy** modes (`two_body_orbit`, `symmetric_pair`, `small_n_conservation`, etc.) use the same
+  median × 1.2 rule for **static** PNGs (initial/final), matching animation; `galaxy_radius` in
+  run_info is not used as the disk scale for those modes.
   Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
   command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
   forces smart framing even if run_info requests dynamic zoom.
@@ -71,6 +74,38 @@ class Snapshot:
     time: float
     positions: np.ndarray
     velocities: np.ndarray
+
+
+# Matches cpp_sim/config.hpp enum class SimulationMode (declaration order).
+_SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
+    0: "galaxy",
+    1: "two_body_orbit",
+    2: "symmetric_pair",
+    3: "small_n_conservation",
+    4: "timestep_convergence",
+    5: "tpf_single_source_inspect",
+    6: "tpf_symmetric_pair_inspect",
+    7: "tpf_two_body_sweep",
+    8: "tpf_weak_field_calibration",
+    9: "tpf_newtonian_force_compare",
+    10: "tpf_diagnostic_consistency_audit",
+    11: "tpf_bound_orbit_sweep",
+}
+
+
+def simulation_mode_name_from_run_info(run_info: dict[str, str | int | float]) -> str:
+    """
+    Resolved simulation mode name from run_info.txt.
+    The file may list simulation_mode twice (string then int); the last line wins (typically int).
+    """
+    if not run_info:
+        return "galaxy"
+    raw = run_info.get("simulation_mode")
+    if isinstance(raw, int):
+        return _SIMULATION_MODE_INT_TO_NAME.get(raw, "galaxy")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return "galaxy"
 
 
 def load_snapshot_csv(path: Path) -> Snapshot | None:
@@ -261,9 +296,21 @@ def resolve_galaxy_radius_meters(
     snapshots: list[Snapshot],
     render_radius_arg: float,
 ) -> float:
-    """Prefer run_info galaxy_radius; else max r on the initial snapshot; else CLI fallback."""
+    """
+    Prefer run_info galaxy_radius for **galaxy** mode only.
+
+    For validation / test modes (two_body_orbit, symmetric_pair, …), config galaxy_radius is often a
+    leftover disk scale and must not override the true extent; we use max r on the first snapshot
+    (then CLI fallback) instead.
+    """
+    mode = simulation_mode_name_from_run_info(run_info)
     raw = run_info.get("galaxy_radius")
-    if isinstance(raw, (int, float)) and np.isfinite(raw) and float(raw) > 0:
+    if (
+        mode == "galaxy"
+        and isinstance(raw, (int, float))
+        and np.isfinite(raw)
+        and float(raw) > 0
+    ):
         return float(raw)
     if snapshots and len(snapshots[0].positions) > 0:
         p0 = snapshots[0].positions
@@ -631,12 +678,27 @@ def main() -> None:
 
     initial = snapshots[0]
     final = snapshots[-1]
-    render_radius_initial = static_viewport_radius_validated(
-        initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
-    )
-    render_radius_final = static_viewport_radius_validated(
-        final.positions, final.velocities, galaxy_radius_m, fallback_radius
-    )
+    mode_name = simulation_mode_name_from_run_info(run_info)
+    if mode_name == "galaxy":
+        render_radius_initial = static_viewport_radius_validated(
+            initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
+        )
+        render_radius_final = static_viewport_radius_validated(
+            final.positions, final.velocities, galaxy_radius_m, fallback_radius
+        )
+    else:
+        # Match default animation smart framing: median r over all plotted snapshots, × 1.20
+        smart_static = calculate_smart_bounds(
+            run_dir,
+            fallback=fallback_radius,
+            snapshot_paths=filtered_paths,
+        )
+        render_radius_initial = smart_static
+        render_radius_final = smart_static
+        print(
+            f"  Static viewport (simulation_mode={mode_name}): half-axis = {float(smart_static):.6g} m "
+            "(median r × 1.2 over plotted snapshots; same convention as animation smart framing)"
+        )
 
     burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
