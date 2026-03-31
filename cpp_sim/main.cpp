@@ -141,41 +141,6 @@ std::string state_fingerprint_hex(const galaxy::State& s) {
   return os.str();
 }
 
-std::string json_escape(const std::string& s) {
-  std::string out;
-  out.reserve(s.size() + 8);
-  for (char c : s) {
-    switch (c) {
-      case '\\': out += "\\\\"; break;
-      case '"': out += "\\\""; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
-      default: out.push_back(c); break;
-    }
-  }
-  return out;
-}
-
-void debug_log_ndjson(const std::string& hypothesis_id,
-                      const std::string& location,
-                      const std::string& message,
-                      const std::string& data_json_object) {
-  // #region agent log
-  const char* log_path = "/home/daniel-rochatka/Documents/galaxy/.cursor/debug-fb7c79.log";
-  std::ofstream f(log_path, std::ios::app);
-  if (!f) return;
-  const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now().time_since_epoch()).count();
-  f << "{\"sessionId\":\"fb7c79\",\"runId\":\"runtime\",\"hypothesisId\":\""
-    << json_escape(hypothesis_id)
-    << "\",\"location\":\"" << json_escape(location)
-    << "\",\"message\":\"" << json_escape(message)
-    << "\",\"data\":" << data_json_object
-    << ",\"timestamp\":" << now_ms << "}\n";
-  // #endregion
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -959,20 +924,7 @@ int main(int argc, char** argv) {
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
       std::string cmd = py + " ../plot_cpp_compare.py " + compare_parent_dir;
-      debug_log_ndjson(
-          "H1",
-          "cpp_sim/main.cpp:auto_plot",
-          "compare_renderer_python_selection",
-          std::string("{\"dev_python_exists\":") + (dev_py_exists ? "true" : "false") +
-              ",\"python_cmd\":\"" + json_escape(py) +
-              "\",\"compare_parent_dir\":\"" + json_escape(compare_parent_dir) + "\"}");
       int ret = std::system(cmd.c_str());
-      debug_log_ndjson(
-          "H2",
-          "cpp_sim/main.cpp:auto_plot",
-          "compare_renderer_exit",
-          std::string("{\"system_return_code\":") + std::to_string(ret) +
-              ",\"command\":\"" + json_escape(cmd) + "\"}");
       if (ret != 0) {
         std::cerr << "Warning: compare renderer returned non-zero exit code. Command was:\n  " << cmd << "\n";
       } else {
