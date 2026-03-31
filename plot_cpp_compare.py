@@ -230,8 +230,8 @@ def render_compare(
         return []
 
     anim = animation.FuncAnimation(fig, animate, frames=len(steps), interval=50, blit=False)
-    out_mp4 = parent_dir / "galaxy_compare.mp4"
-    out_gif = parent_dir / "galaxy_compare.gif"
+    out_mp4 = parent_dir / f"{compare_run_id}.mp4"
+    out_gif = parent_dir / f"{compare_run_id}.gif"
     try:
         anim.save(str(out_mp4), writer="ffmpeg", fps=20, dpi=100)
     except Exception:
