@@ -1,2 +1,0 @@
-{"sessionId":"fb7c79","runId":"runtime","hypothesisId":"H1","location":"cpp_sim/main.cpp:auto_plot","message":"compare_renderer_python_selection","data":{"dev_python_exists":true,"python_cmd":"../dev/bin/python3","compare_parent_dir":"outputs/debug_plot_interp"},"timestamp":1774923565285}
-{"sessionId":"fb7c79","runId":"runtime","hypothesisId":"H2","location":"cpp_sim/main.cpp:auto_plot","message":"compare_renderer_exit","data":{"system_return_code":0,"command":"../dev/bin/python3 ../plot_cpp_compare.py outputs/debug_plot_interp"},"timestamp":1774923566723}
