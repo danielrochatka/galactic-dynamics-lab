@@ -8,6 +8,7 @@ namespace galaxy {
 
 namespace {
 constexpr double PI = 3.14159265358979323846;
+constexpr double G_SI = 6.6743e-11;
 }
 
 void init_galaxy_disk(const Config& config, State& state) {
@@ -18,7 +19,7 @@ void init_two_body(const Config& config, State& state) {
   (void)config;
   /* Hardcoded Earth–Moon benchmark (SI). State has no fixed-body flags; both bodies evolve.
    * Use bh_mass = 0 and enable_star_star_gravity = true so only pairwise masses apply.
-   * Note: NewtonianPackage uses a G=1 convention; these are literal SI storage values. */
+   * NewtonianPackage uses SI gravity (G_SI), so these literal SI values are consistent. */
   constexpr double kEarthMass = 5.972e24;
   constexpr double kMoonMass = 7.348e22;
   constexpr double kMoonX = 3.844e8;
@@ -43,7 +44,7 @@ void init_two_body(const Config& config, State& state) {
 void init_two_body_star_around_bh(const Config& config, State& state) {
   state.resize(1);
   double r0 = config.validation_two_body_radius;
-  double v_circ = std::sqrt(config.bh_mass / r0);
+  double v_circ = std::sqrt((G_SI * config.bh_mass) / r0);
   double v0 = config.initial_velocity_scale * config.validation_two_body_speed_ratio * v_circ;
 
   state.x[0] = r0;
@@ -90,7 +91,7 @@ void init_small_n(const Config& config, State& state) {
   for (int i = 0; i < n; ++i) {
     state.x[i] = r[i] * std::cos(theta[i]);
     state.y[i] = r[i] * std::sin(theta[i]);
-    double v_circ = std::sqrt(bh_mass / r[i]);
+    double v_circ = std::sqrt((G_SI * bh_mass) / r[i]);
     state.vx[i] = v_scale * (-v_circ * std::sin(theta[i]));
     state.vy[i] = v_scale * (v_circ * std::cos(theta[i]));
     state.mass[i] = star_mass;

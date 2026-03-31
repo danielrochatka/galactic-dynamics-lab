@@ -2,6 +2,9 @@
 #include <cmath>
 
 namespace galaxy {
+namespace {
+constexpr double G_SI = 6.6743e-11;
+}
 
 void NewtonianPackage::compute_accelerations(const State& state,
                                              double bh_mass,
@@ -20,7 +23,7 @@ void NewtonianPackage::compute_accelerations(const State& state,
     double rx = state.x[i], ry = state.y[i];
     double r_sq = rx * rx + ry * ry + eps2;
     double r_mag = std::sqrt(r_sq);
-    double acc_mag = bh_mass / (r_sq * r_mag);
+    double acc_mag = G_SI * bh_mass / (r_sq * r_mag);
     ax[i] -= acc_mag * rx;
     ay[i] -= acc_mag * ry;
   }
@@ -35,7 +38,7 @@ void NewtonianPackage::compute_accelerations(const State& state,
       double dy = state.y[j] - state.y[i];
       double r_sq = dx * dx + dy * dy + eps2;
       double r_mag = std::sqrt(r_sq);
-      double acc_mag = state.mass[j] / (r_sq * r_mag);
+      double acc_mag = G_SI * state.mass[j] / (r_sq * r_mag);
       ax[i] += acc_mag * dx;
       ay[i] += acc_mag * dy;
     }
@@ -52,7 +55,7 @@ double NewtonianPackage::compute_potential_energy(const State& state,
 
   for (int i = 0; i < n; ++i) {
     double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i] + eps2);
-    pe -= bh_mass * state.mass[i] / r;
+    pe -= G_SI * bh_mass * state.mass[i] / r;
   }
   if (!star_star) return pe;
   for (int i = 0; i < n; ++i) {
@@ -60,7 +63,7 @@ double NewtonianPackage::compute_potential_energy(const State& state,
       double dx = state.x[j] - state.x[i];
       double dy = state.y[j] - state.y[i];
       double r = std::sqrt(dx * dx + dy * dy + eps2);
-      pe -= state.mass[i] * state.mass[j] / r;
+      pe -= G_SI * state.mass[i] * state.mass[j] / r;
     }
   }
   return pe;
