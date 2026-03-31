@@ -182,19 +182,28 @@ int main(int argc, char** argv) {
       auto_plot = true;
   }
 
+  /* First positional is the simulation mode only when it is not a long option (--key=value).
+   * Otherwise mode comes from layered config (package defaults + run config). This allows
+   * e.g. simulation_mode=two_body_orbit in the run config with ./galaxy_sim --output_dir=... */
   bool cli_override_mode = false;
+  int first_cli_config_idx = 2;
   if (argc >= 2) {
-    try {
-      config.simulation_mode = galaxy::parse_mode(argv[1]);
-      cli_override_mode = true;
-      std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
-    } catch (const std::exception& e) {
-      std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
-      return 1;
+    std::string a1 = argv[1];
+    if (a1.size() >= 2 && a1[0] == '-' && a1[1] == '-') {
+      first_cli_config_idx = 1;
+    } else {
+      try {
+        config.simulation_mode = galaxy::parse_mode(argv[1]);
+        cli_override_mode = true;
+        std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
+      } catch (const std::exception& e) {
+        std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
+        return 1;
+      }
     }
   }
 
-  for (int i = 2; i < argc; ++i) {
+  for (int i = first_cli_config_idx; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--plot") continue;
     if (a.size() < 4 || a.substr(0, 2) != "--") continue;
