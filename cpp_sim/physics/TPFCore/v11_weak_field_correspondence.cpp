@@ -95,8 +95,10 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
 
   csv << "z_m,softening_m,Phi_SI,Xi_x_SI,Xi_y_SI,Xi_z_SI,Theta_xx,Theta_yy,Theta_zz,Theta_trace,"
          "Laplacian_trace_check,I_v11,"
-         "C00_eq10_quadratic_term_kappa_Theta0alpha_Theta0alpha,C00_eq10_minus_half_eta00_I_term,C00_eq10_principal_sum_raw_SI,"
-         "Cxx_principal,Cyy_principal,Czz_principal,"
+         "eq10_inner_bracket_C00_before_kappa,C00_eq10_principal_SI_kappa_times_full_bracket,"
+         "Cxx_eq10_principal_SI_kappa_times_full_bracket,Cxx_eq10_normalized_by_kappa,"
+         "Cyy_eq10_principal_SI_kappa_times_full_bracket,Cyy_eq10_normalized_by_kappa,"
+         "Czz_eq10_principal_SI_kappa_times_full_bracket,Czz_eq10_normalized_by_kappa,"
          "eq9_residual_Rx_SI,eq9_residual_Ry_SI,eq9_residual_Rz_SI\n";
 
   const double one_minus_lambda = 1.0 - kLambda4D;
@@ -120,15 +122,20 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
     I_s = sum_sq - kLambda4D * theta_tr * theta_tr;
 
     const double kap = v11_kappa_si();
-    /* Eq. (10) C_00 = kappa * Theta_0^alpha Theta_{0 alpha} - lambda * Theta * Theta_{00} - (1/2) * eta_{00} * I.
-       Static weak field: Theta_{0 mu}=0 => quadratic term = 0; Theta_{00}=0 => second term = 0;
-       eta_{00}=-1 => C00 = I/2. No kappa factor on the I term. */
-    const double c00_quad = 0.0;
-    const double c00_Iterm = 0.5 * I_s;
-    c00 = c00_quad + c00_Iterm;
-    cxx = kap * (theta_xx * theta_xx) - kLambda4D * theta_tr * theta_xx - 0.5 * I_s;
-    cyy = kap * (theta_yy * theta_yy) - kLambda4D * theta_tr * theta_yy - 0.5 * I_s;
-    czz = kap * (theta_zz * theta_zz) - kLambda4D * theta_tr * theta_zz - 0.5 * I_s;
+    /* Manuscript v11 Eq. (10) as used in weak-field reduction: C_{mu nu} = kappa * ( ... - (1/2) g_{mu nu} I + ... ),
+       i.e. kappa multiplies the entire principal bracket including the -(1/2) g I term. DeltaC omitted here.
+       Static weak field, Theta_{0 mu}=0, g_{00}=-1: inner bracket C00 = -(1/2) g_{00} I = +I/2 => C00 = kappa * I/2. */
+    const double inner_00 = 0.5 * I_s;
+    const double inner_xx =
+        theta_xx * theta_xx - kLambda4D * theta_tr * theta_xx - 0.5 * I_s;
+    const double inner_yy =
+        theta_yy * theta_yy - kLambda4D * theta_tr * theta_yy - 0.5 * I_s;
+    const double inner_zz =
+        theta_zz * theta_zz - kLambda4D * theta_tr * theta_zz - 0.5 * I_s;
+    c00 = kap * inner_00;
+    cxx = kap * inner_xx;
+    cyy = kap * inner_yy;
+    czz = kap * inner_zz;
 
     /* Eq. (9) flat static: partial_i Theta^i{}_j - lambda partial_j Theta = (1-lambda) partial_j Theta
        for this Phi ansatz (see summary). On +z axis: Rx=Ry=0, Rz=(1-lambda)*dTheta/dz. */
@@ -144,8 +151,9 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
 
     csv << std::scientific << std::setprecision(17) << z << "," << config.softening << "," << P.Phi(z) << ","
         << 0.0 << "," << 0.0 << "," << P.dPhi_dz(z) << "," << theta_xx << "," << theta_yy << "," << theta_zz << ","
-        << theta_tr << "," << theta_tr << "," << I_s << "," << c00_quad << "," << c00_Iterm << "," << c00 << ","
-        << cxx << "," << cyy << "," << czz << "," << rx << "," << ry << "," << rz << "\n";
+        << theta_tr << "," << theta_tr << "," << I_s << "," << inner_00 << "," << c00 << ","
+        << cxx << "," << inner_xx << "," << cyy << "," << inner_yy << "," << czz << "," << inner_zz << ","
+        << rx << "," << ry << "," << rz << "\n";
     z_last = z;
     I_last = I_s;
   }
@@ -167,12 +175,12 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
   txt << "  I = Theta_{mu nu} Theta^{mu nu} - lambda Theta^2  with lambda = 1/4 (4D).\n";
   txt << "  Here I reduces to sum_ij Theta_ij^2 - lambda * Theta^2 (spatial; Theta_{0mu}=0).\n\n";
   txt << "C_{mu nu} — principal part from manuscript Eq. (10) ONLY (Delta C_{mu nu} deliberately omitted):\n";
-  txt << "  C_principal = kappa * Theta_mu^alpha Theta_{nu alpha} - lambda * Theta * Theta_{mu nu}"
-         " - (1/2) * eta_{mu nu} * I\n";
-  txt << "  eta = diag(-1,1,1,1). kappa = 16*pi*G (SI) multiplies ONLY the quadratic Theta·Theta term.\n";
-  txt << "  Static weak field with Theta_{0 mu}=0: C00 = I/2 (raw SI). There is NO kappa factor in C00 from the\n";
-  txt << "  -(1/2) eta I term; kappa does NOT rescale I in this decomposition. CSV columns separate\n";
-  txt << "  C00_eq10_quadratic_term (=0 here), C00_eq10_minus_half_eta00_I_term (=I/2), and their sum.\n";
+  txt << "  C_principal = kappa * ( Theta_mu^alpha Theta_{nu alpha} - lambda * Theta * Theta_{mu nu}"
+         " - (1/2) * g_{mu nu} * I\n";
+  txt << "  eta = diag(-1,1,1,1) for weak-field g; kappa = 16*pi*G (SI). The factor kappa multiplies the ENTIRE\n";
+  txt << "  parenthesis (including the -(1/2) g I term), matching the paper’s weak-field display C00 ~ (kappa/2) I\n";
+  txt << "  when Theta_{0 mu} ~ 0. CSV: C*_eq10_principal_SI_kappa_times_full_bracket = kappa * (inner bracket);\n";
+  txt << "  C*_eq10_normalized_by_kappa = inner bracket = (principal / kappa) (same units as I; not a dynamics proof).\n";
   txt << "  Delta C: NOT computed (omitted per v11 paper scope; connection-variation terms deferred).\n\n";
   txt << "VDSG: must be off for this audit (tpf_vdsg_coupling == 0). This path does not use VDSG.\n\n";
   txt << "Correspondence reminder (paper): in the calibrated static weak-field sector, Theta_ij Theta^ij\n";

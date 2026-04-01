@@ -70,6 +70,8 @@ void write_run_info(const std::string& output_dir,
     f << "v11_eq9_audited\t1\n";
     f << "v11_eq9_note\tflat_static_axis_residual_Rj_equals_1minus_lambda_dj_Theta_see_CSV_eq9_columns\n";
     f << "v11_phi_input\tcorrespondence_benchmark_-GM_over_sqrt_z2_plus_eps2_softening_is_numerical_only\n";
+    f << "v11_eq10_C_principal_scaling\tkappa_multiplies_entire_principal_bracket_including_minus_half_gI_DeltaC_omitted\n";
+    f << "v11_eq10_weak_field_C00_identity\tC00_principal_SI_equals_kappa_times_I_over_2_when_Theta0mu_zero_g00_minus_1\n";
     f << "=== End v11 weak-field audit header ===\n\n";
   }
   if (config.physics_package == "TPFCore") {

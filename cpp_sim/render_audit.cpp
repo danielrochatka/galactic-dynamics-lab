@@ -169,6 +169,8 @@ void write_render_manifest(const std::string& output_dir,
       json_kv_bool(jf, first, "v11_delta_c_computed", false);
       json_kv(jf, first, "v11_weak_field_audit_scope",
               "static_axis_benchmark_correspondence_only; DeltaC_omitted_per_manuscript_v11");
+      json_kv(jf, first, "v11_eq10_C_principal_scaling",
+              "C_mu_nu = kappa * (principal_bracket_including_minus_half_gI); C00_SI = kappa * I/2 when Theta0mu=0");
     }
     json_kv_int(jf, first, "n_stars", n_star);
     json_kv_int(jf, first, "n_steps", n_steps_done);
@@ -240,6 +242,7 @@ void write_render_manifest(const std::string& output_dir,
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       tf << "v11_delta_c_computed\t0\n";
       tf << "v11_weak_field_audit_scope\tstatic_axis_benchmark_correspondence_only_DeltaC_omitted_per_v11\n";
+      tf << "v11_eq10_C_principal_scaling\tC_mu_nu=kappa*(principal_bracket_including_minus_half_gI);C00_SI=kappa*I/2_when_Theta0mu=0\n";
     }
     tf << "n_stars\t" << n_star << "\n";
     tf << "n_steps\t" << n_steps_done << "\n";
