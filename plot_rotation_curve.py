@@ -301,6 +301,16 @@ def save_rotation_curve_png(
         label=newtonian_label,
     )
     ax.set_xlim(0.0, x_max)  # disk-focused cap from rotation_curve_x_max (e.g. 2× galaxy_radius)
+    # Auto-fit y-axis to the disk-dominated bulk so a few extreme escapers do not flatten the plot.
+    if len(v_plot):
+        y_candidates = np.concatenate([v_plot, v_newton])
+    else:
+        y_candidates = np.concatenate([v_s, v_newton])
+    # Robust cap: keep almost all points while suppressing pathological outliers.
+    y_hi = float(np.percentile(y_candidates, 99.5))
+    if not np.isfinite(y_hi) or y_hi <= 0.0:
+        y_hi = float(np.max(y_candidates)) if len(y_candidates) else 1.0
+    ax.set_ylim(0.0, y_hi * 1.08)
     ax.set_xlabel("Distance from Galactic Center (m)")
     ax.set_ylabel("Orbital Velocity (m/s)")
     ax.set_title(f"Rotation curve — {title_suffix}")
