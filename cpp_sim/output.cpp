@@ -117,6 +117,17 @@ void write_run_info(const std::string& output_dir,
   f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
   f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
   f << "number_of_snapshots\t" << n_snapshots << "\n";
+  if (config.simulation_mode == SimulationMode::earth_moon_benchmark ||
+      config.simulation_mode == SimulationMode::bh_orbit_validation ||
+      config.simulation_mode == SimulationMode::two_body_orbit) {
+    f << "\n=== Two-body run (postprocess diagnostics) ===\n";
+    f << "diagnostics_primary_pair_frame\tplot_cpp_run.py: diagnostic_pair_*.png, diagnostic_com_radius.png, "
+         "diagnostic_relative_angular_momentum_z.png, diagnostic_relative_energy.png (Newtonian equivalent), "
+         "diagnostic_two_body_timeseries.csv, two_body_diagnostics_README.txt\n";
+    f << "diagnostics_secondary_lab_frame\tOrigin-radial plots (diagnostic_median_radius.png, etc.) are secondary; "
+         "titles prefixed when regenerated for these modes\n";
+    f << "=== End two-body diagnostics note ===\n\n";
+  }
   if (cooling_audit) {
     f << "cooling_active\t" << (cooling_audit->cooling_active ? 1 : 0) << "\n";
     f << "cooling_steps\t" << cooling_audit->cooling_steps << "\n";

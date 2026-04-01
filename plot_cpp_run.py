@@ -50,7 +50,14 @@ import pandas as pd
 # Import from existing project (run from repo root or with PYTHONPATH)
 from render import save_static_plot, create_animation, has_ffmpeg
 from render_overlay import build_overlay_spec, resolve_overlay_mode
-from diagnostics import compute_diagnostics, plot_and_save_all
+from diagnostics import (
+    compute_diagnostics,
+    compute_two_body_pair_diagnostics,
+    plot_and_save_all,
+    plot_two_body_pair_diagnostics,
+    save_two_body_timeseries_csv,
+    write_two_body_diagnostics_readme,
+)
 from plot_rotation_curve import (
     load_run_info,
     newtonian_m_bh_from_run_info,
@@ -730,35 +737,41 @@ def main() -> None:
     )
     print(f"Saved: {run_dir / 'galaxy_final.png'}")
 
-    try:
-        r_rc, v_rc = rv_from_plane_arrays(final.positions, final.velocities)
-        title_rc = f"snapshot_{final.step:05d}.csv (step {final.step}, t={final.time:g})"
-        M_bh_rc = newtonian_m_bh_from_run_info(run_info)
-        x_max_rc = rotation_curve_x_max(run_info, r_rc)
-        scatter_lbl = scatter_label_from_run_info(run_info)
-        rc_prov = run_info.get("code_version_label") if run_info else None
-        rc_prov_s = (
-            str(rc_prov).strip()
-            if isinstance(rc_prov, str) and rc_prov.strip()
-            else None
-        )
-        save_rotation_curve_png(
-            r_rc,
-            v_rc,
-            run_dir / "rotation_curve.png",
-            title_rc,
-            M_bh=M_bh_rc,
-            x_max=x_max_rc,
-            scatter_label=scatter_lbl,
-            provenance_label=rc_prov_s,
-        )
+    if mode_name in ("earth_moon_benchmark", "bh_orbit_validation"):
         print(
-            f"Saved: {run_dir / 'rotation_curve.png'} "
-            f"(Keplerian overlay M_bh={M_bh_rc:g} kg; x_max={x_max_rc:g} m; "
-            "red curve is κ-independent — only blue scatter changes with TPF)"
+            "Skipping rotation_curve.png for two-body mode (Keplerian disk overlay is not the primary "
+            "interpretation tool; use diagnostic_pair_*.png and diagnostic_two_body_timeseries.csv)."
         )
-    except Exception as exc:
-        print(f"Warning: could not write rotation_curve.png: {exc}")
+    else:
+        try:
+            r_rc, v_rc = rv_from_plane_arrays(final.positions, final.velocities)
+            title_rc = f"snapshot_{final.step:05d}.csv (step {final.step}, t={final.time:g})"
+            M_bh_rc = newtonian_m_bh_from_run_info(run_info)
+            x_max_rc = rotation_curve_x_max(run_info, r_rc)
+            scatter_lbl = scatter_label_from_run_info(run_info)
+            rc_prov = run_info.get("code_version_label") if run_info else None
+            rc_prov_s = (
+                str(rc_prov).strip()
+                if isinstance(rc_prov, str) and rc_prov.strip()
+                else None
+            )
+            save_rotation_curve_png(
+                r_rc,
+                v_rc,
+                run_dir / "rotation_curve.png",
+                title_rc,
+                M_bh=M_bh_rc,
+                x_max=x_max_rc,
+                scatter_label=scatter_lbl,
+                provenance_label=rc_prov_s,
+            )
+            print(
+                f"Saved: {run_dir / 'rotation_curve.png'} "
+                f"(Keplerian overlay M_bh={M_bh_rc:g} kg; x_max={x_max_rc:g} m; "
+                "red curve is κ-independent — only blue scatter changes with TPF)"
+            )
+        except Exception as exc:
+            print(f"Warning: could not write rotation_curve.png: {exc}")
 
     # Optional animation
     if not args.no_animation:
@@ -814,10 +827,43 @@ def main() -> None:
             run_info, cli_cutoff_radius=args.diagnostic_cutoff_radius
         )
         print(f"Diagnostics cutoff radius: {cutoff:g} m (source={cutoff_source})")
-        diag = compute_diagnostics(snapshots, masses, cutoff)
-        plot_and_save_all(diag, run_dir, cutoff)
-        print(f"Saved diagnostic plots in {run_dir}")
-        print(f"  Final median_r: {diag['median_r'][-1]:.2f}, L_z: {diag['L_z'][-1]:.2f}")
+        physics_pkg = str(run_info.get("physics_package", "") or "Newtonian")
+        if mode_name in ("earth_moon_benchmark", "bh_orbit_validation"):
+            bh_m = run_info.get("bh_mass", 0.0)
+            bh_m_f = float(bh_m) if isinstance(bh_m, (int, float)) else 0.0
+            try:
+                pair_diag = compute_two_body_pair_diagnostics(
+                    snapshots, masses, mode_name, bh_m_f
+                )
+                save_two_body_timeseries_csv(pair_diag, run_dir)
+                write_two_body_diagnostics_readme(run_dir, mode_name, physics_pkg)
+                plot_two_body_pair_diagnostics(pair_diag, run_dir, physics_pkg)
+                print(
+                    f"Primary two-body diagnostics in {run_dir}: "
+                    "diagnostic_pair_separation.png, diagnostic_pair_relative_speed.png, "
+                    "diagnostic_com_radius.png, diagnostic_relative_angular_momentum_z.png, "
+                    "diagnostic_relative_energy.png (if finite), diagnostic_two_body_timeseries.csv, "
+                    "two_body_diagnostics_README.txt"
+                )
+                print(
+                    f"  Final pair separation: {float(pair_diag['pair_separation'][-1]):.6g} m; "
+                    f"pair relative speed: {float(pair_diag['pair_relative_speed'][-1]):.6g} m/s; "
+                    f"|R_COM| (lab): {float(pair_diag['center_of_mass_radius'][-1]):.6g} m"
+                )
+            except ValueError as exc:
+                print(f"Warning: primary two-body diagnostics skipped: {exc}")
+            diag = compute_diagnostics(snapshots, masses, cutoff)
+            plot_and_save_all(diag, run_dir, cutoff, lab_frame_secondary=True)
+            print(
+                f"Secondary lab-frame / origin-radial plots in {run_dir} (titles prefixed); "
+                f"final median_r (secondary): {diag['median_r'][-1]:.6g}, "
+                f"L_z about origin (secondary): {diag['L_z'][-1]:.6g}"
+            )
+        else:
+            diag = compute_diagnostics(snapshots, masses, cutoff)
+            plot_and_save_all(diag, run_dir, cutoff)
+            print(f"Saved diagnostic plots in {run_dir}")
+            print(f"  Final median_r: {diag['median_r'][-1]:.2f}, L_z: {diag['L_z'][-1]:.2f}")
     else:
         print("Skipping diagnostics (--no-diagnostics or single snapshot).")
 
