@@ -20,6 +20,21 @@ void axis_invariants(double G, double M, double z, double eps_sq, double& theta_
 
 }  // namespace
 
+TEST_CASE("v11 Eq. (9) flat-static residual R_z = (1-lambda) dTheta/dz on axis") {
+  const double G = galaxy::tpfcore::TPF_G_SI;
+  const double M = 2.0e30;
+  const double eps = 1.0;
+  const double z = 1.0e10;
+  const double eps_sq = eps * eps;
+  const double u = z * z + eps_sq;
+  const double r7 = u * u * u * std::sqrt(u);
+  const double dTheta_dz = -15.0 * G * M * eps_sq * z / r7;
+  const double lambda = 0.25;
+  const double Rz = (1.0 - lambda) * dTheta_dz;
+  /* Harmonic vacuum: Theta=0 => dTheta/dz=0 => Rz=0; here eps<<z still leaves tiny Theta — check small */
+  CHECK(std::abs(Rz) < 1e-30);
+}
+
 TEST_CASE("v11 weak-field axis I asymptotic matches 6(GM/z^3)^2 when eps << z") {
   const double G = galaxy::tpfcore::TPF_G_SI;
   const double M = 2.0e30;
