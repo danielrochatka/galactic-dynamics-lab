@@ -161,6 +161,7 @@ class TestPostprocessTruthfulness(unittest.TestCase):
             str(bin_path),
             "galaxy",
             "--physics_package=TPFCore",
+            "--tpfcore_enable_provisional_readout=true",
             "--n_stars=8",
             "--n_steps=20",
             "--snapshot_every=10",
