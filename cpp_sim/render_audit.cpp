@@ -209,6 +209,11 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
     json_kv_bool(jf, first, "tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
+      json_kv_bool(jf, first, "tpfcore_enable_provisional_readout_operative_for_this_run", false);
+      json_kv(jf, first, "tpf_dynamics_mode_operative_for_this_run", "none_audit_only");
+    }
     json_kv(jf, first, "tpfcore_readout_mode", config.tpfcore_readout_mode);
     json_kv(jf, first, "render_overlay_mode", config.render_overlay_mode);
     json_kv(jf, first, "galaxy_init_template", config.galaxy_init_template);
@@ -288,8 +293,18 @@ void write_render_manifest(const std::string& output_dir,
     tf << "tpf_kappa\t" << config.tpf_kappa << "\n";
     tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
     tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
-    tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-    tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      tf << "v11_weak_field_correspondence_audit_only\t1\n";
+      tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
+      tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";
+      tf << "tpf_dynamics_mode_operative_for_this_run\tnone_audit_only\n";
+      tf << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
+         << "\n";
+      tf << "tpfcore_enable_provisional_readout_operative_for_this_run\t0\n";
+    } else {
+      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+      tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+    }
     tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";

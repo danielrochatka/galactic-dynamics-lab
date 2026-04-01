@@ -89,9 +89,22 @@ void write_run_info(const std::string& output_dir,
     f << "=== End v11 weak-field audit header ===\n\n";
   }
   if (config.physics_package == "TPFCore") {
-    f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
-    f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-    f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      f << "v11_audit_tpfcore_dynamics_note\tno particle integration; TPFCore acceleration API (legacy_readout / "
+           "direct_tpf) not used in this mode\n";
+      f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
+      f << "tpf_dynamics_mode_effective_for_this_run\tnone_audit_only_no_integrator\n";
+      f << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
+         << "\n";
+      f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_v11_audit_mode\n";
+      f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
+      f << "v11_audit_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are inherited layered-config "
+           "artifacts; not used for particle accelerations in this mode\n";
+    } else {
+      f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+      f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+      f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    }
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
@@ -117,17 +130,28 @@ void write_run_info(const std::string& output_dir,
   f << "=== End code provenance ===\n\n";
 
   if (config.physics_package == "TPFCore") {
-    f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
-    f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-    f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-    f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs direct_tpf); legacy_readout uses "
-         "tpfcore_enable_provisional_readout as gate; direct_tpf does not use that gate (stub throws until implemented)\n";
-    f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
-         "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
-         "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "
-         "diagnostics)\n";
-    f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
-    f << "=== End TPFCore parameter roles ===\n\n";
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      f << "=== TPFCore (v11 correspondence audit only: dynamics routing not operative) ===\n";
+      f << "note\tlayered config may still set tpf_dynamics_mode, tpfcore_enable_provisional_readout, readout_mode; "
+           "they are inherited only and not used for particle accelerations in this audit-only mode\n";
+      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
+      f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi) — not used "
+           "by all v11 benchmarks\n";
+      f << "inspection\ttpfcore_probe_radius_min/max, probe_samples (sampling range for correspondence audit)\n";
+      f << "=== End TPFCore v11 audit note ===\n\n";
+    } else {
+      f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
+      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
+      f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
+      f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs direct_tpf); legacy_readout uses "
+           "tpfcore_enable_provisional_readout as gate; direct_tpf does not use that gate (stub throws until implemented)\n";
+      f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
+           "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
+           "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "
+           "diagnostics)\n";
+      f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
+      f << "=== End TPFCore parameter roles ===\n\n";
+    }
   }
 
   f << "dt\t" << config.dt << "\n";
@@ -183,8 +207,13 @@ void write_run_info(const std::string& output_dir,
   f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   if (config.physics_package == "TPFCore") {
     double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-    f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
-    f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+    if (config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
+      f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+      f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+    } else {
+      f << "v11_audit_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved config section above "
+           "(configured vs effective; not operative)\n";
+    }
     f << "tpfcore_provisional_source_ansatz\t1\n";
     f << "tpfcore_source_softening\t" << src_eps << "\n";
     f << "tpfcore_probe_radius_min\t" << config.tpfcore_probe_radius_min << "\n";
@@ -192,7 +221,11 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
     f << "tpfcore_residual_method\tanalytic\n";
     f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
-    f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    if (config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
+      f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    } else {
+      f << "v11_audit_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved config section above\n";
+    }
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_readout_scale_note\tweak-field calibrated effective scale (K_eff); not proof of final TPF dynamics\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";

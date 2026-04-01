@@ -256,12 +256,20 @@ int main(int argc, char** argv) {
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
   if (config.physics_package == "TPFCore") {
-    std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
-              << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
-              << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
-    if (config.tpfcore_readout_mode == "tr_coherence_readout")
-      std::cout << "  theta_tt_scale: " << config.tpfcore_theta_tt_scale << "  theta_tr_scale: " << config.tpfcore_theta_tr_scale;
-    std::cout << "\n";
+    if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
+      std::cout << "v11 correspondence audit: tpf_dynamics_mode / provisional readout are configured-inherited only "
+                   "(not operative); no TPFCore particle accelerations this run.\n";
+      std::cout << "  (configured: tpf_dynamics_mode=" << config.tpf_dynamics_mode
+                << ", tpfcore_enable_provisional_readout=" << (config.tpfcore_enable_provisional_readout ? "true" : "false")
+                << ", tpfcore_readout_mode=" << config.tpfcore_readout_mode << ")\n";
+    } else {
+      std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
+                << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
+                << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
+      if (config.tpfcore_readout_mode == "tr_coherence_readout")
+        std::cout << "  theta_tt_scale: " << config.tpfcore_theta_tt_scale << "  theta_tr_scale: " << config.tpfcore_theta_tr_scale;
+      std::cout << "\n";
+    }
   }
   std::cout << "------------------------\n";
 
@@ -279,15 +287,19 @@ int main(int argc, char** argv) {
     std::cout << "Physics: TPFCore (primitive TPF structure)\n";
     std::cout << "  Provisional source ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi)\n";
     std::cout << "  Parameter roles: lambda=1/4 (fixed theory) | eps (numerical regularization) | readout (provisional experimental)\n";
-    std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
-    if (tpf && tpf->provisional_readout_enabled()) {
-      std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [weak-field calibrated])";
-      if (config.tpfcore_readout_mode == "tr_coherence_readout")
-        std::cout << " [exploratory t-r; theta_tt_scale=" << config.tpfcore_theta_tt_scale << ", theta_tr_scale=" << config.tpfcore_theta_tr_scale << "]";
-      if (config.tpfcore_dump_readout_debug)
-        std::cout << " [readout debug CSV enabled]";
+    if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
+      std::cout << "  v11 audit: TPFCore acceleration routing not used (no legacy_readout / direct_tpf dynamics this run).\n";
+    } else {
+      std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
+      if (tpf && tpf->provisional_readout_enabled()) {
+        std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [weak-field calibrated])";
+        if (config.tpfcore_readout_mode == "tr_coherence_readout")
+          std::cout << " [exploratory t-r; theta_tt_scale=" << config.tpfcore_theta_tt_scale << ", theta_tr_scale=" << config.tpfcore_theta_tr_scale << "]";
+        if (config.tpfcore_dump_readout_debug)
+          std::cout << " [readout debug CSV enabled]";
+      }
+      std::cout << "\n";
     }
-    std::cout << "\n";
 
     if (config.tpf_dynamics_mode == "legacy_readout" && !tpf->provisional_readout_enabled()) {
       bool is_dynamical =
