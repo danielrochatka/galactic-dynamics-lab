@@ -179,6 +179,13 @@ void write_render_manifest(const std::string& output_dir,
         json_kv(jf, first, "v11_weak_field_audit_scope",
                 "earth_moon_line_of_centers_phi_Eq44_acceleration_Eq45_vs_Newtonian_Eq46; not_full_many_body_tpf; "
                 "DeltaC_omitted");
+        json_kv(jf, first, "v11_earth_moon_benchmark_png_note",
+                "auto-generated when plot_v11_earth_moon_line_benchmark.py succeeds; requires python3 numpy matplotlib");
+        json_kv(jf, first, "v11_earth_moon_benchmark_png_files",
+                "tpf_v11_earth_moon_line_correspondence_benchmark_compare.png;"
+                "tpf_v11_earth_moon_line_correspondence_benchmark_difference.png;"
+                "tpf_v11_earth_moon_line_correspondence_benchmark_earth_zoom.png;"
+                "tpf_v11_earth_moon_line_correspondence_benchmark_normalized_shape.png");
       } else {
         json_kv(jf, first, "v11_weak_field_audit_scope",
                 "static_axis_benchmark_correspondence_only; DeltaC_omitted_per_manuscript_v11");
@@ -258,6 +265,11 @@ void write_render_manifest(const std::string& output_dir,
       tf << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
       if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
         tf << "v11_weak_field_audit_scope\tearth_moon_line_phi_Eq44_Eq45_vs_Newtonian_Eq46_not_full_many_body_DeltaC_omitted\n";
+        tf << "v11_earth_moon_benchmark_png_note\tauto_generated_when_plot_v11_earth_moon_line_benchmark_py_succeeds\n";
+        tf << "v11_earth_moon_benchmark_png_files\ttpf_v11_earth_moon_line_correspondence_benchmark_compare.png;"
+              "tpf_v11_earth_moon_line_correspondence_benchmark_difference.png;"
+              "tpf_v11_earth_moon_line_correspondence_benchmark_earth_zoom.png;"
+              "tpf_v11_earth_moon_line_correspondence_benchmark_normalized_shape.png\n";
       } else {
         tf << "v11_weak_field_audit_scope\tstatic_axis_benchmark_correspondence_only_DeltaC_omitted_per_v11\n";
         tf << "v11_eq10_C_principal_scaling\tC_mu_nu=kappa*(principal_bracket_including_minus_half_gI);C00_SI=kappa*I/2_when_Theta0mu=0\n";

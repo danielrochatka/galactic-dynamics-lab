@@ -6,9 +6,12 @@
 
 #include "v11_weak_field_correspondence.hpp"
 #include "derived_tpf_radial.hpp"
+#include <cstdlib>
 #include <cmath>
 #include <fstream>
+#include <sys/stat.h>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 
@@ -91,6 +94,28 @@ double em_orbital_omega_rad_s(const Config& c) {
   }
   if (!(T > 0.0) || !std::isfinite(T)) throw std::runtime_error("em_orbital_omega: invalid period T");
   return 2.0 * M_PI / T;
+}
+
+/** Post-process only: matplotlib PNGs from CSV (same repo as plot_cpp_run.py). No physics changes. */
+void try_run_v11_earth_moon_line_benchmark_pngs(const std::string& output_dir) {
+  const char* candidates[] = {"../plot_v11_earth_moon_line_benchmark.py", "plot_v11_earth_moon_line_benchmark.py"};
+  for (const char* rel : candidates) {
+    struct stat st;
+    if (stat(rel, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+    std::ostringstream cmd;
+    cmd << "python3 \"" << rel << "\" \"" << output_dir << "\"";
+    const int r = std::system(cmd.str().c_str());
+    if (r == 0) {
+      std::cout << "Wrote PNG plots (tpf_v11_earth_moon_line_correspondence_benchmark_*.png) via "
+                   "plot_v11_earth_moon_line_benchmark.py\n";
+      return;
+    }
+    std::cerr << "Note: PNG plots not generated (python3 failed for " << rel << ", exit " << r << "). "
+                 "Install numpy, pandas, matplotlib like plot_cpp_run.py.\n";
+    return;
+  }
+  std::cerr << "Note: PNG plots not generated (plot_v11_earth_moon_line_benchmark.py not found; run galaxy_sim "
+               "from cpp_sim/ or repo root).\n";
 }
 
 /**
@@ -304,6 +329,17 @@ void run_earth_moon_line_correspondence_benchmark(const Config& config, const st
         << a_tpf << "," << a_n46 << "," << (a_tpf - a_n46) << "\n";
   }
 
+  std::ostringstream meta_path;
+  meta_path << output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.plot_meta.json";
+  {
+    std::ofstream mj(meta_path.str());
+    if (mj) {
+      mj << std::scientific << std::setprecision(17);
+      mj << "{\"v11_em_calib_surface_radius_m\":" << RE << ",\"v11_em_mean_distance_m\":" << D
+         << ",\"barycenter_m\":" << xb << "}\n";
+    }
+  }
+
   const char* em_csv_name = "tpf_v11_earth_moon_line_correspondence_benchmark.csv";
   std::ostringstream gnu_script_path;
   gnu_script_path << output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.gnu";
@@ -358,8 +394,12 @@ void run_earth_moon_line_correspondence_benchmark(const Config& config, const st
   txt << "  benchmark_difference_* — algebraic gap between those two benchmark constructions; NOT 'new physics'.\n\n";
   txt << "Artifacts:\n";
   txt << "  " << csv_path.str() << "\n";
+  txt << "  " << meta_path.str() << " (annotation metadata for PNG plots; not used in field formulas)\n";
   txt << "  " << txt_path.str() << "\n";
-  if (wrote_gnu) txt << "  " << gnu_script_path.str() << " (gnuplot; correspondence plot)\n";
+  if (wrote_gnu) txt << "  " << gnu_script_path.str() << " (gnuplot; optional manual plot)\n";
+  txt << "  PNG plots: auto-generated when python3 + matplotlib succeed (see appended block below if present).\n";
+
+  try_run_v11_earth_moon_line_benchmark_pngs(output_dir);
 }
 
 }  // namespace

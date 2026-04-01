@@ -71,6 +71,11 @@ void write_run_info(const std::string& output_dir,
       f << "v11_phi_input\tweak_field_Poisson_correspondence_phi_Eq44_point_mass_line_exterior_only\n";
       f << "v11_eq9_audited\t0\n";
       f << "v11_eq9_note\tnot_applicable_earth_moon_benchmark_is_1D_phi_Eq44_to_acceleration_Eq45_vs_Newtonian_Eq46\n";
+      f << "v11_earth_moon_benchmark_png_note\tauto-generated_when_plot_v11_earth_moon_line_benchmark_py_succeeds_requires_python3_numpy_matplotlib\n";
+      f << "v11_earth_moon_benchmark_png_files\ttpf_v11_earth_moon_line_correspondence_benchmark_compare.png;"
+            "tpf_v11_earth_moon_line_correspondence_benchmark_difference.png;"
+            "tpf_v11_earth_moon_line_correspondence_benchmark_earth_zoom.png;"
+            "tpf_v11_earth_moon_line_correspondence_benchmark_normalized_shape.png\n";
     } else {
       f << "v11_audit_claim\tstatic_weak_field_tensor_correspondence_on_positive_z_axis_only\n";
       f << "v11_eq9_audited\t1\n";
