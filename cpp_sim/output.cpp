@@ -35,6 +35,7 @@ void write_run_info(const std::string& output_dir,
   f << "physics_package\t" << config.physics_package << "\n";
   f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
+  f << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
@@ -60,6 +61,16 @@ void write_run_info(const std::string& output_dir,
     f << "galaxy_init_spiral_winding\t" << config.galaxy_init_spiral_winding << "\n";
     f << "galaxy_init_spiral_phase\t" << config.galaxy_init_spiral_phase << "\n";
     f << "velocity_noise\t" << config.velocity_noise << "\n";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    f << "\n=== v11 weak-field correspondence audit (manuscript v11; not integrator dynamics) ===\n";
+    f << "v11_audit_claim\tstatic_weak_field_tensor_correspondence_on_positive_z_axis_only\n";
+    f << "v11_delta_c_computed\t0\n";
+    f << "v11_delta_c_note\tDeltaC_mu_nu omitted per manuscript v11 (connection-variation terms deferred)\n";
+    f << "v11_eq9_audited\t0\n";
+    f << "v11_eq9_note\tconfiguration_equation_divergence_not_checked_in_this_artifact\n";
+    f << "v11_phi_input\tcorrespondence_benchmark_-GM_over_sqrt_z2_plus_eps2_softening_is_numerical_only\n";
+    f << "=== End v11 weak-field audit header ===\n\n";
   }
   if (config.physics_package == "TPFCore") {
     f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";

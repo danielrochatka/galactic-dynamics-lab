@@ -52,6 +52,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
   if (t == "tpf_diagnostic_consistency_audit") return SimulationMode::tpf_diagnostic_consistency_audit;
   if (t == "tpf_bound_orbit_sweep") return SimulationMode::tpf_bound_orbit_sweep;
+  if (t == "tpf_v11_weak_field_correspondence") return SimulationMode::tpf_v11_weak_field_correspondence;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -72,6 +73,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
     case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
     case SimulationMode::tpf_bound_orbit_sweep: return "tpf_bound_orbit_sweep";
+    case SimulationMode::tpf_v11_weak_field_correspondence: return "tpf_v11_weak_field_correspondence";
   }
   return "unknown";
 }
@@ -159,6 +161,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
       throw std::runtime_error("tpf_dynamics_mode must be legacy_readout or direct_tpf, got: " + val);
     }
     config.tpf_dynamics_mode = s;
+    return true;
+  }
+  if (key == "tpf_analysis_mode") {
+    std::string s = trim(val);
+    if (s != "none" && s != "v11_weak_field_correspondence") {
+      throw std::runtime_error("tpf_analysis_mode must be none or v11_weak_field_correspondence, got: " + val);
+    }
+    config.tpf_analysis_mode = s;
     return true;
   }
   if (key == "tpf_kappa") {

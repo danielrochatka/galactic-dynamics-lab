@@ -22,6 +22,8 @@ enum class SimulationMode {
   tpf_newtonian_force_compare,
   tpf_diagnostic_consistency_audit,
   tpf_bound_orbit_sweep,
+  /** v11 static weak-field correspondence audit (Ξ,Θ,I,C principal); not particle dynamics. */
+  tpf_v11_weak_field_correspondence,
   /** Canonical Earth–Moon SI benchmark (same IC as legacy two_body_orbit string). */
   earth_moon_benchmark,
   /** Single star + central mass; uses init_two_body_star_around_bh. */
@@ -88,6 +90,12 @@ struct Config {
    * - direct_tpf: future direct TPF dynamics path (not implemented yet); does not use the provisional-readout gate; VDSG must be 0.
    */
   std::string tpf_dynamics_mode = "legacy_readout";
+
+  /**
+   * TPFCore audit/analysis layer (no substitute for dynamics).
+   * none (default) | v11_weak_field_correspondence — manuscript v11 static weak-field tensor correspondence only.
+   */
+  std::string tpf_analysis_mode = "none";
 
   /** TPFCore only: gate for legacy_readout dynamics (required for that path; ignored for direct_tpf). VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
   bool tpfcore_enable_provisional_readout = false;

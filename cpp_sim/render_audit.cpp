@@ -74,6 +74,10 @@ bool tpf_vdsg_active_for_audit(const Config& config) {
 }  // namespace
 
 std::string compute_active_dynamics_branch(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    return "TPF_v11_weak_field_correspondence_audit (correspondence-only; not legacy_readout; not direct_tpf "
+           "dynamics)";
+  }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
   if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct";
@@ -86,6 +90,9 @@ std::string compute_active_dynamics_branch(const Config& config) {
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    return "v11_paper_tensors (Xi,Theta,I,C_principal per Eq.(10) minus DeltaC; DeltaC omitted per v11 scope)";
+  }
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
     if (config.tpf_dynamics_mode == "direct_tpf") {
@@ -102,6 +109,9 @@ std::string compute_active_metrics_branch(const Config& config) {
 }
 
 std::string compute_acceleration_code_path(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";
+  }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
   if (config.tpf_dynamics_mode == "direct_tpf") {
@@ -154,6 +164,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "physics_package", config.physics_package);
     json_kv(jf, first, "physics_package_compare", config.physics_package_compare);
     json_kv(jf, first, "simulation_mode", mode_to_string(config.simulation_mode));
+    json_kv(jf, first, "tpf_analysis_mode", config.tpf_analysis_mode);
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      json_kv_bool(jf, first, "v11_delta_c_computed", false);
+      json_kv(jf, first, "v11_weak_field_audit_scope",
+              "static_axis_benchmark_correspondence_only; DeltaC_omitted_per_manuscript_v11");
+    }
     json_kv_int(jf, first, "n_stars", n_star);
     json_kv_int(jf, first, "n_steps", n_steps_done);
     json_kv_int(jf, first, "n_snapshots", n_snapshots);
@@ -220,6 +236,11 @@ void write_render_manifest(const std::string& output_dir,
     tf << "physics_package\t" << config.physics_package << "\n";
     tf << "physics_package_compare\t" << config.physics_package_compare << "\n";
     tf << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
+    tf << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
+    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+      tf << "v11_delta_c_computed\t0\n";
+      tf << "v11_weak_field_audit_scope\tstatic_axis_benchmark_correspondence_only_DeltaC_omitted_per_v11\n";
+    }
     tf << "n_stars\t" << n_star << "\n";
     tf << "n_steps\t" << n_steps_done << "\n";
     tf << "n_snapshots\t" << n_snapshots << "\n";

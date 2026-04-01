@@ -16,7 +16,8 @@ CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor -MMD -MP
 LIB_SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
 	physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp \
 	physics/TPFCore/derived_tpf_radial.cpp physics/TPFCore/provisional_readout.cpp \
-	physics/TPFCore/tpf_core_package.cpp integrator.cpp galaxy_init.cpp init_conditions.cpp \
+	physics/TPFCore/tpf_core_package.cpp physics/TPFCore/v11_weak_field_correspondence.cpp \
+	integrator.cpp galaxy_init.cpp init_conditions.cpp \
 	git_provenance.cpp render_audit.cpp simulation.cpp output.cpp
 
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)

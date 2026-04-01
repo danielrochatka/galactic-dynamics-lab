@@ -57,3 +57,11 @@ TEST_CASE("explicit tpf_vdsg_coupling still works") {
   CHECK(apply_config_kv("tpf_vdsg_coupling", "1e-99", c));
   CHECK(c.tpf_vdsg_coupling == doctest::Approx(1e-99));
 }
+
+TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
+  Config c;
+  CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));
+  CHECK(c.tpf_analysis_mode == "v11_weak_field_correspondence");
+  CHECK(apply_config_kv("simulation_mode", "tpf_v11_weak_field_correspondence", c));
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
+}

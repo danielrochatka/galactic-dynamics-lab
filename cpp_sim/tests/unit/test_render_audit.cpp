@@ -66,6 +66,15 @@ TEST_CASE("compute_acceleration_code_path: includes shunt when explicitly enable
         " + accumulate_vdsg_velocity_modifier + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)");
 }
 
+TEST_CASE("compute_active_dynamics_branch: v11 weak-field correspondence audit mode") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_v11_weak_field_correspondence;
+  c.physics_package = "TPFCore";
+  CHECK(galaxy::compute_active_dynamics_branch(c).find("TPF_v11_weak_field_correspondence_audit") == 0);
+  CHECK(galaxy::compute_active_metrics_branch(c).find("v11_paper_tensors") == 0);
+  CHECK(galaxy::compute_acceleration_code_path(c).find("audit-only") != std::string::npos);
+}
+
 TEST_CASE("compute_acceleration_code_path: direct_tpf stub") {
   Config c;
   c.physics_package = "TPFCore";

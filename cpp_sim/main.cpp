@@ -8,6 +8,7 @@
 #include "output.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
+#include "physics/TPFCore/v11_weak_field_correspondence.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
 
@@ -200,7 +201,8 @@ int main(int argc, char** argv) {
         std::cerr << e.what() << "\nAllowed: galaxy, earth_moon_benchmark, bh_orbit_validation, two_body_orbit (deprecated), "
                      "symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, "
                      "tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, "
-                     "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
+                     "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep, "
+                     "tpf_v11_weak_field_correspondence\n";
         return 1;
       }
     }
@@ -665,6 +667,42 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (!tpfcore) {
+      std::cerr << "tpf_v11_weak_field_correspondence requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    if (config.tpf_analysis_mode != "v11_weak_field_correspondence") {
+      std::cerr << "tpf_v11_weak_field_correspondence requires tpf_analysis_mode = v11_weak_field_correspondence.\n";
+      return 1;
+    }
+    if (config.tpf_vdsg_coupling != 0.0 || !std::isfinite(config.tpf_vdsg_coupling)) {
+      std::cerr << "v11 weak-field correspondence audit requires tpf_vdsg_coupling = 0 (VDSG is not in manuscript v11).\n";
+      return 1;
+    }
+    if (!(config.bh_mass > 0.0)) {
+      std::cerr << "tpf_v11_weak_field_correspondence requires bh_mass > 0 (point-mass source M in kg).\n";
+      return 1;
+    }
+    if (!(config.tpfcore_probe_radius_min > 0.0) || !(config.tpfcore_probe_radius_max > config.tpfcore_probe_radius_min)) {
+      std::cerr << "tpf_v11_weak_field_correspondence requires tpfcore_probe_radius_min > 0 and "
+                   "tpfcore_probe_radius_max > tpfcore_probe_radius_min (positive z axis samples).\n";
+      return 1;
+    }
+    std::cout << "Audit mode: tpf_v11_weak_field_correspondence (manuscript v11 static weak-field correspondence only)\n";
+    std::cout << "  No particle integration; Delta C_mu_nu omitted; VDSG off.\n";
+    galaxy::run_v11_weak_field_correspondence_audit(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_profile.csv\n";
+    std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    galaxy::write_render_manifest(config.output_dir, config, 0, 0, 0, nullptr);
+    std::cout << "Wrote " << config.output_dir << "/render_manifest.json, render_manifest.txt\n";
+    return 0;
+  }
+
   galaxy::State state;
   int n_steps = config.n_steps;
   int snapshot_every = config.snapshot_every;
@@ -678,6 +716,7 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_newtonian_force_compare:
     case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
     case galaxy::SimulationMode::tpf_bound_orbit_sweep:
+    case galaxy::SimulationMode::tpf_v11_weak_field_correspondence:
       std::cerr << "Internal error: inspection/utility/sweep/calibration/audit modes should have returned earlier.\n";
       return 1;
     case galaxy::SimulationMode::galaxy: {
