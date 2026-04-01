@@ -171,6 +171,39 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_analysis_mode = s;
     return true;
   }
+  if (key == "v11_weak_field_correspondence_benchmark") {
+    std::string s = trim(val);
+    if (s != "axis_monopole" && s != "earth_moon_line_of_centers") {
+      throw std::runtime_error(
+          "v11_weak_field_correspondence_benchmark must be axis_monopole or earth_moon_line_of_centers, got: " + val);
+    }
+    config.v11_weak_field_correspondence_benchmark = s;
+    return true;
+  }
+  if (key == "v11_em_mass_earth_kg") {
+    config.v11_em_mass_earth_kg = std::stod(val);
+    return true;
+  }
+  if (key == "v11_em_mass_moon_kg") {
+    config.v11_em_mass_moon_kg = std::stod(val);
+    return true;
+  }
+  if (key == "v11_em_mean_distance_m") {
+    config.v11_em_mean_distance_m = std::stod(val);
+    return true;
+  }
+  if (key == "v11_em_sidereal_period_s") {
+    config.v11_em_sidereal_period_s = std::stod(val);
+    return true;
+  }
+  if (key == "v11_em_calib_surface_radius_m") {
+    config.v11_em_calib_surface_radius_m = std::stod(val);
+    return true;
+  }
+  if (key == "v11_em_calib_surface_g_m_s2") {
+    config.v11_em_calib_surface_g_m_s2 = std::stod(val);
+    return true;
+  }
   if (key == "tpf_kappa") {
     config.tpf_kappa = std::stod(val);
     return true;

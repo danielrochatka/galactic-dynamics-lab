@@ -64,14 +64,23 @@ void write_run_info(const std::string& output_dir,
   }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     f << "\n=== v11 weak-field correspondence audit (manuscript v11; not integrator dynamics) ===\n";
-    f << "v11_audit_claim\tstatic_weak_field_tensor_correspondence_on_positive_z_axis_only\n";
+    f << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
+    if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+      f << "v11_audit_claim\tearth_moon_weak_field_line_of_centers_correspondence_benchmark_only_not_full_tpf_solver\n";
+      f << "v11_extensions_note\tVDSG_off_DeltaC_omitted_no_direct_tpf_no_orbit_integrator_paper_extensions_off\n";
+      f << "v11_phi_input\tweak_field_Poisson_correspondence_phi_Eq44_point_mass_line_exterior_only\n";
+      f << "v11_eq9_audited\t0\n";
+      f << "v11_eq9_note\tnot_applicable_earth_moon_benchmark_is_1D_phi_Eq44_to_acceleration_Eq45_vs_Newtonian_Eq46\n";
+    } else {
+      f << "v11_audit_claim\tstatic_weak_field_tensor_correspondence_on_positive_z_axis_only\n";
+      f << "v11_eq9_audited\t1\n";
+      f << "v11_eq9_note\tflat_static_axis_residual_Rj_equals_1minus_lambda_dj_Theta_see_CSV_eq9_columns\n";
+      f << "v11_phi_input\tcorrespondence_benchmark_-GM_over_sqrt_z2_plus_eps2_softening_is_numerical_only\n";
+      f << "v11_eq10_C_principal_scaling\tkappa_multiplies_entire_principal_bracket_including_minus_half_gI_DeltaC_omitted\n";
+      f << "v11_eq10_weak_field_C00_identity\tC00_principal_SI_equals_kappa_times_I_over_2_when_Theta0mu_zero_g00_minus_1\n";
+    }
     f << "v11_delta_c_computed\t0\n";
     f << "v11_delta_c_note\tDeltaC_mu_nu omitted per manuscript v11 (connection-variation terms deferred)\n";
-    f << "v11_eq9_audited\t1\n";
-    f << "v11_eq9_note\tflat_static_axis_residual_Rj_equals_1minus_lambda_dj_Theta_see_CSV_eq9_columns\n";
-    f << "v11_phi_input\tcorrespondence_benchmark_-GM_over_sqrt_z2_plus_eps2_softening_is_numerical_only\n";
-    f << "v11_eq10_C_principal_scaling\tkappa_multiplies_entire_principal_bracket_including_minus_half_gI_DeltaC_omitted\n";
-    f << "v11_eq10_weak_field_C00_identity\tC00_principal_SI_equals_kappa_times_I_over_2_when_Theta0mu_zero_g00_minus_1\n";
     f << "=== End v11 weak-field audit header ===\n\n";
   }
   if (config.physics_package == "TPFCore") {

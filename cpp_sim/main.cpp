@@ -680,20 +680,38 @@ int main(int argc, char** argv) {
       std::cerr << "v11 weak-field correspondence audit requires tpf_vdsg_coupling = 0 (VDSG is not in manuscript v11).\n";
       return 1;
     }
-    if (!(config.bh_mass > 0.0)) {
-      std::cerr << "tpf_v11_weak_field_correspondence requires bh_mass > 0 (point-mass source M in kg).\n";
+    const bool v11_em = (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers");
+    if (!v11_em && !(config.bh_mass > 0.0)) {
+      std::cerr << "tpf_v11_weak_field_correspondence (axis_monopole) requires bh_mass > 0 (point-mass source M in kg).\n";
       return 1;
     }
-    if (!(config.tpfcore_probe_radius_min > 0.0) || !(config.tpfcore_probe_radius_max > config.tpfcore_probe_radius_min)) {
+    if (v11_em) {
+      const double D = config.v11_em_mean_distance_m;
+      if (!(config.tpfcore_probe_radius_min > 0.0) ||
+          !(config.tpfcore_probe_radius_max > config.tpfcore_probe_radius_min) ||
+          !(config.tpfcore_probe_radius_max < D)) {
+        std::cerr << "earth_moon_line_of_centers: require 0 < tpfcore_probe_radius_min < "
+                     "tpfcore_probe_radius_max < v11_em_mean_distance_m (line-of-centers interior sampling).\n";
+        return 1;
+      }
+    } else if (!(config.tpfcore_probe_radius_min > 0.0) ||
+               !(config.tpfcore_probe_radius_max > config.tpfcore_probe_radius_min)) {
       std::cerr << "tpf_v11_weak_field_correspondence requires tpfcore_probe_radius_min > 0 and "
                    "tpfcore_probe_radius_max > tpfcore_probe_radius_min (positive z axis samples).\n";
       return 1;
     }
     std::cout << "Audit mode: tpf_v11_weak_field_correspondence (manuscript v11 static weak-field correspondence only)\n";
+    std::cout << "  Benchmark: " << config.v11_weak_field_correspondence_benchmark << "\n";
     std::cout << "  No particle integration; Delta C_mu_nu omitted; VDSG off.\n";
     galaxy::run_v11_weak_field_correspondence_audit(config, config.output_dir);
-    std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_profile.csv\n";
-    std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_summary.txt\n";
+    if (v11_em) {
+      std::cout << "Wrote " << config.output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.csv\n";
+      std::cout << "Wrote " << config.output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark_summary.txt\n";
+      std::cout << "Wrote " << config.output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.gnu\n";
+    } else {
+      std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_profile.csv\n";
+      std::cout << "Wrote " << config.output_dir << "/tpf_v11_weak_field_correspondence_summary.txt\n";
+    }
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";

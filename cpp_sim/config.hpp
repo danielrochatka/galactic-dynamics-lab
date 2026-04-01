@@ -97,6 +97,28 @@ struct Config {
    */
   std::string tpf_analysis_mode = "none";
 
+  /**
+   * v11 weak-field correspondence audit only: which benchmark geometry to write.
+   * axis_monopole — existing +z axis tensor audit (default).
+   * earth_moon_line_of_centers — manuscript Sec. XI C–D line-of-centers φ / a (TPF correspondence vs Newtonian) CSV; no particle stepping.
+   */
+  std::string v11_weak_field_correspondence_benchmark = "axis_monopole";
+  /** Paper Table II (v11): Earth mass (kg). */
+  double v11_em_mass_earth_kg = 5.972e24;
+  /** Paper Table II (v11): Moon mass (kg). */
+  double v11_em_mass_moon_kg = 7.348e22;
+  /** Paper Table II (v11): mean Earth–Moon center distance D (m). */
+  double v11_em_mean_distance_m = 3.844e8;
+  /**
+   * Sidereal orbital period T (s) for Ω = 2π/T (paper Sec. XI D). If <= 0, use Kepler
+   * T = 2π√(D³/(G(ME+MM))) with the same ME, MM, D and TPF_G_SI.
+   */
+  double v11_em_sidereal_period_s = 0.0;
+  /** Calibration point x_cal (m from Earth center) for aTPF(x_cal) ≈ -calib_g (paper: Earth surface along line). */
+  double v11_em_calib_surface_radius_m = 6.371e6;
+  /** Target magnitude of surface acceleration (m/s²); paper uses ~9.81. */
+  double v11_em_calib_surface_g_m_s2 = 9.81;
+
   /** TPFCore only: gate for legacy_readout dynamics (required for that path; ignored for direct_tpf). VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
   bool tpfcore_enable_provisional_readout = false;
   /** TPFCore configured readout mode string (see provisional_readout.cpp). May label metrics while VDSG supersedes ax, ay. */

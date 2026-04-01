@@ -75,6 +75,10 @@ bool tpf_vdsg_active_for_audit(const Config& config) {
 
 std::string compute_active_dynamics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+      return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
+             "legacy_readout; not direct_tpf dynamics; not orbit integration)";
+    }
     return "TPF_v11_weak_field_correspondence_audit (correspondence-only; not legacy_readout; not direct_tpf "
            "dynamics)";
   }
@@ -91,6 +95,9 @@ std::string compute_active_dynamics_branch(const Config& config) {
 
 std::string compute_active_metrics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+      return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
+    }
     return "v11_paper_tensors (Xi,Theta,I,C_principal per Eq.(10) minus DeltaC; DeltaC omitted per v11 scope)";
   }
   if (config.physics_package == "Newtonian") return "none";
@@ -167,10 +174,17 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "tpf_analysis_mode", config.tpf_analysis_mode);
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       json_kv_bool(jf, first, "v11_delta_c_computed", false);
-      json_kv(jf, first, "v11_weak_field_audit_scope",
-              "static_axis_benchmark_correspondence_only; DeltaC_omitted_per_manuscript_v11");
-      json_kv(jf, first, "v11_eq10_C_principal_scaling",
-              "C_mu_nu = kappa * (principal_bracket_including_minus_half_gI); C00_SI = kappa * I/2 when Theta0mu=0");
+      json_kv(jf, first, "v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
+      if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+        json_kv(jf, first, "v11_weak_field_audit_scope",
+                "earth_moon_line_of_centers_phi_Eq44_acceleration_Eq45_vs_Newtonian_Eq46; not_full_many_body_tpf; "
+                "DeltaC_omitted");
+      } else {
+        json_kv(jf, first, "v11_weak_field_audit_scope",
+                "static_axis_benchmark_correspondence_only; DeltaC_omitted_per_manuscript_v11");
+        json_kv(jf, first, "v11_eq10_C_principal_scaling",
+                "C_mu_nu = kappa * (principal_bracket_including_minus_half_gI); C00_SI = kappa * I/2 when Theta0mu=0");
+      }
     }
     json_kv_int(jf, first, "n_stars", n_star);
     json_kv_int(jf, first, "n_steps", n_steps_done);
@@ -241,8 +255,13 @@ void write_render_manifest(const std::string& output_dir,
     tf << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       tf << "v11_delta_c_computed\t0\n";
-      tf << "v11_weak_field_audit_scope\tstatic_axis_benchmark_correspondence_only_DeltaC_omitted_per_v11\n";
-      tf << "v11_eq10_C_principal_scaling\tC_mu_nu=kappa*(principal_bracket_including_minus_half_gI);C00_SI=kappa*I/2_when_Theta0mu=0\n";
+      tf << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
+      if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+        tf << "v11_weak_field_audit_scope\tearth_moon_line_phi_Eq44_Eq45_vs_Newtonian_Eq46_not_full_many_body_DeltaC_omitted\n";
+      } else {
+        tf << "v11_weak_field_audit_scope\tstatic_axis_benchmark_correspondence_only_DeltaC_omitted_per_v11\n";
+        tf << "v11_eq10_C_principal_scaling\tC_mu_nu=kappa*(principal_bracket_including_minus_half_gI);C00_SI=kappa*I/2_when_Theta0mu=0\n";
+      }
     }
     tf << "n_stars\t" << n_star << "\n";
     tf << "n_steps\t" << n_steps_done << "\n";

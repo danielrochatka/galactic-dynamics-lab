@@ -1,6 +1,6 @@
 /**
  * v11 weak-field correspondence audit (manuscript v11, static sector).
- * Correspondence-only: Φ is the paper's benchmark static potential for a point mass (softened for numerics).
+ * Correspondence-only: benchmark potentials / 1D fields as stated in the paper.
  * No ΔC_{μν}, no particle dynamics, no legacy readout, no VDSG.
  */
 
@@ -76,9 +76,30 @@ struct AxisPointMassPhi {
   }
 };
 
-}  // namespace
+/** Ω = 2π/T; if T <= 0, Kepler circular period from D and G(ME+MM). */
+double em_orbital_omega_rad_s(const Config& c) {
+  const double G = tpfcore::TPF_G_SI;
+  const double ME = c.v11_em_mass_earth_kg;
+  const double MM = c.v11_em_mass_moon_kg;
+  const double D = c.v11_em_mean_distance_m;
+  double T = c.v11_em_sidereal_period_s;
+  if (T <= 0.0 || !std::isfinite(T)) {
+    if (!(D > 0.0) || !std::isfinite(D)) throw std::runtime_error("em_orbital_omega: invalid D");
+    const double mtot = ME + MM;
+    if (!(mtot > 0.0)) throw std::runtime_error("em_orbital_omega: ME+MM must be positive");
+    T = 2.0 * M_PI * std::sqrt((D * D * D) / (G * mtot));
+  }
+  if (!(T > 0.0) || !std::isfinite(T)) throw std::runtime_error("em_orbital_omega: invalid period T");
+  return 2.0 * M_PI / T;
+}
 
-void run_v11_weak_field_correspondence_audit(const Config& config, const std::string& output_dir) {
+/**
+ * Paper v11 Sec. XI: x-axis from Earth center (0) to Moon (D). Point-mass exterior φ from Eq. (44):
+ *   φ(x) = α ( ME/|x| + MM/|D−x| ),  0 < x < D.
+ * Eq. (45): aTPF(x) = −dφ/dx + Ω²(x − xb),  xb = D MM/(ME+MM).
+ * Single calibration: aTPF(x_cal) = −g0 with x_cal = calib radius (paper: Earth surface along +x).
+ */
+void run_axis_monopole_audit(const Config& config, const std::string& output_dir) {
   AxisPointMassPhi P;
   P.G = tpfcore::TPF_G_SI;
   P.M_kg = config.bh_mass;
@@ -166,7 +187,7 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
   txt << "=== TPF manuscript v11 — weak-field correspondence audit (NOT dynamics) ===\n\n";
   txt << "Scope: static weak-field sector only. This run does not implement direct TPF particle integration,\n";
   txt << "legacy provisional readout accelerations, geodesic motion, or Einstein equations.\n\n";
-  txt << "Potential Phi (correspondence benchmark only; numerical softening eps = config softening):\n";
+  txt << "Benchmark: axis_monopole (this summary). Potential Phi (correspondence benchmark only; numerical softening eps = config softening):\n";
   txt << "  Phi(z) = -G*M / sqrt(z^2 + eps^2)  on the +z axis (point mass M = bh_mass at origin).\n";
   txt << "Paper construction (static, flat spatial background, Theta_{0mu} = 0):\n";
   txt << "  Xi_i = d_i Phi, Xi_0 = 0  =>  on axis Xi_z = dPhi/dz.\n";
@@ -214,6 +235,141 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
   txt << "Outputs:\n";
   txt << "  " << csv_path.str() << "\n";
   txt << "  " << txt_path.str() << "\n";
+}
+
+void run_earth_moon_line_correspondence_benchmark(const Config& config, const std::string& output_dir) {
+  const double G = tpfcore::TPF_G_SI;
+  const double ME = config.v11_em_mass_earth_kg;
+  const double MM = config.v11_em_mass_moon_kg;
+  const double D = config.v11_em_mean_distance_m;
+  const double RE = config.v11_em_calib_surface_radius_m;
+  const double g0 = config.v11_em_calib_surface_g_m_s2;
+
+  if (!(ME > 0.0) || !(MM > 0.0) || !(D > 0.0) || !(RE > 0.0) || !(RE < D) || !(g0 > 0.0)) {
+    throw std::runtime_error(
+        "earth_moon_line_of_centers: require positive ME, MM, D, g0 and 0 < RE < D (paper line-of-centers).");
+  }
+
+  const double Omega = em_orbital_omega_rad_s(config);
+  const double xb = D * MM / (ME + MM);
+
+  /* Denominator for calibration: d/dx (ME/x + MM/(D-x)) at x=RE is -ME/RE^2 + MM/(D-RE)^2 */
+  const double dphi_prefactor_denom = ME / (RE * RE)-MM / ((D - RE) * (D - RE));
+  if (!(std::isfinite(dphi_prefactor_denom)) || std::abs(dphi_prefactor_denom) < 1e-200) {
+    throw std::runtime_error("earth_moon_line_of_centers: invalid calibration denominator at RE (check RE vs D).");
+  }
+  /* aTPF(RE) = alpha * (ME/RE^2 - MM/(D-RE)^2) + Omega^2(RE-xb) = -g0  (paper: ~9.81 m/s^2 along +x toward Earth) */
+  const double alpha = (-g0 - Omega * Omega * (RE - xb)) / dphi_prefactor_denom;
+
+  const double x_min = config.tpfcore_probe_radius_min;
+  const double x_max = config.tpfcore_probe_radius_max;
+  const int ns = std::max(2, config.tpfcore_probe_samples);
+
+  if (!(x_min > 0.0) || !(x_max > x_min) || !(x_max < D)) {
+    throw std::runtime_error(
+        "earth_moon_line_of_centers: require 0 < tpfcore_probe_radius_min < tpfcore_probe_radius_max < "
+        "v11_em_mean_distance_m (interior point-mass line; paper Sec. XI D).");
+  }
+
+  std::ostringstream csv_path;
+  csv_path << output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.csv";
+  std::ofstream csv(csv_path.str());
+  if (!csv) throw std::runtime_error("failed to open " + csv_path.str());
+
+  csv << "x_m,D_m,M_Earth_kg,M_Moon_kg,Omega_rad_s,x_b_m,G_SI,alpha_calibrated_SI,"
+         "phi_tpf_SI,dphi_dx_SI,neg_dphi_dx_SI,centrifugal_tpf_Omega2_x_minus_xb_m_s2,"
+         "a_tpf_correspondence_Eq45_m_s2,a_newtonian_line_Eq46_m_s2,"
+         "benchmark_difference_TPF_Eq45_minus_Newtonian_Eq46_m_s2\n";
+
+  for (int i = 0; i < ns; ++i) {
+    double t = (ns == 1) ? 0.0 : static_cast<double>(i) / static_cast<double>(ns - 1);
+    double x = x_min + t * (x_max - x_min);
+    if (!(x > 0.0) || !(x < D)) continue;
+
+    /* Eq. (44): φ(x) = α ( ME/x + MM/(D-x) ) */
+    const double phi = alpha * (ME / x + MM / (D - x));
+    /* dφ/dx = α ( -ME/x² + MM/(D-x)² ) */
+    const double dphi_dx = alpha * (-ME / (x * x) + MM / ((D - x) * (D - x)));
+    const double neg_dphi_dx = -dphi_dx;
+
+    /* Eq. (45): co-rotating frame about barycenter */
+    const double cf_tpf = Omega * Omega * (x - xb);
+    const double a_tpf = neg_dphi_dx + cf_tpf;
+
+    /* Eq. (46): benchmark Newtonian line-of-centers in rotating frame (paper display; centrifugal −Ω² x) */
+    const double a_n46 = -G * ME / (x * x) + G * MM / ((D - x) * (D - x)) - Omega * Omega * x;
+
+    csv << std::scientific << std::setprecision(17) << x << "," << D << "," << ME << "," << MM << "," << Omega << ","
+        << xb << "," << G << "," << alpha << "," << phi << "," << dphi_dx << "," << neg_dphi_dx << "," << cf_tpf << ","
+        << a_tpf << "," << a_n46 << "," << (a_tpf - a_n46) << "\n";
+  }
+
+  const char* em_csv_name = "tpf_v11_earth_moon_line_correspondence_benchmark.csv";
+  std::ostringstream gnu_script_path;
+  gnu_script_path << output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark.gnu";
+  std::ofstream gnu(gnu_script_path.str());
+  bool wrote_gnu = false;
+  if (gnu) {
+    wrote_gnu = true;
+    gnu << "# Correspondence benchmark only — not direct TPF dynamics.\n";
+    gnu << "# Plots TPF weak-field correspondence (Eq. 45) vs benchmark Newtonian line-of-centers (Eq. 46).\n";
+    gnu << "# Run from the output directory: gnuplot tpf_v11_earth_moon_line_correspondence_benchmark.gnu\n";
+    gnu << "set datafile separator comma\n";
+    gnu << "set key top right\n";
+    gnu << "set xlabel \"x from Earth center (m) — line of centers toward Moon\"\n";
+    gnu << "set ylabel \"a_x (m/s^2) — co-rotating frame (paper Sec. XI D)\"\n";
+    gnu << "plot '" << em_csv_name << "' using 1:13 every ::1 with lines lw 2 title "
+           "'TPF correspondence Eq.45 (calibrated phi Eq.44)', \\\n";
+    gnu << "     '' using 1:14 every ::1 with lines lw 2 title 'Benchmark Newtonian Eq.46', \\\n";
+    gnu << "     '' using 1:15 every ::1 with lines dt 2 title "
+           "'Benchmark difference (TPF Eq.45 minus Newtonian Eq.46)'\n";
+  }
+
+  std::ostringstream txt_path;
+  txt_path << output_dir << "/tpf_v11_earth_moon_line_correspondence_benchmark_summary.txt";
+  std::ofstream txt(txt_path.str());
+  if (!txt) throw std::runtime_error("failed to open " + txt_path.str());
+
+  txt << "=== TPF manuscript v11 — Earth–Moon weak-field LINE-OF-CENTERS correspondence benchmark ===\n\n";
+  txt << "NOT full TPF many-body dynamics. NOT direct_tpf. NOT a particle integrator. NOT GR completion.\n";
+  txt << "NOT VDSG. Delta C_mu_nu omitted. Paper-faithful static / weak-field / correspondence mapping only.\n\n";
+  txt << "Paper references (v11 Sec. XI C–D):\n";
+  txt << "  (42) nabla^2 phi = alpha rho  (weak-field Poisson correspondence).\n";
+  txt << "  (43)-(44) phi from 3D Green's function for compact sources: point-mass exterior form used here.\n";
+  txt << "  (45) aTPF(x) = -dphi/dx + Omega^2 (x - xb)  (co-rotating frame; xb = D*MM/(ME+MM)).\n";
+  txt << "  (46) benchmark Newtonian line-of-centers field in the same rotating frame (paper display):\n";
+  txt << "       a(x) = -G*ME/x^2*sgn(x) + G*MM/(D-x)^2*sgn(D-x) - Omega^2 x  (interior: 0 < x < D).\n";
+  txt << "  (47) interpretive identification aTPF ~ C_xx along the line in the calibrated weak-field limit (audit labels only).\n\n";
+  txt << "Inputs (defaults from paper Table II where applicable):\n";
+  txt << "  ME = " << std::scientific << ME << " kg, MM = " << MM << " kg, D = " << D << " m\n";
+  txt << "  Omega = " << Omega << " rad/s";
+  if (config.v11_em_sidereal_period_s <= 0.0)
+    txt << " (Kepler T = 2*pi*sqrt(D^3/(G*(ME+MM))) because v11_em_sidereal_period_s <= 0)\n";
+  else
+    txt << " (T = " << config.v11_em_sidereal_period_s << " s from config)\n";
+  txt << "  xb = " << xb << " m\n";
+  txt << "  Calibration (paper): aTPF(x_cal) = -g0 with x_cal = RE = " << RE << " m, g0 = " << g0 << " m/s^2\n";
+  txt << "  => alpha = " << std::scientific << alpha << " SI (coupling from Eq. (44); not asserted equal to -G)\n";
+  txt << "  Compare: -G = " << -G << " SI (Newtonian gradient uses G explicitly in Eq. 46 column).\n\n";
+  txt << "Sampling: x in [" << x_min << ", " << x_max << "] m, n = " << ns << " (tpfcore_probe_* keys).\n\n";
+  txt << "Column semantics:\n";
+  txt << "  a_tpf_correspondence_Eq45_m_s2 — correspondence benchmark from (44)-(45) only.\n";
+  txt << "  a_newtonian_line_Eq46_m_s2 — standard rotating-frame line-of-centers from paper Eq. (46).\n";
+  txt << "  benchmark_difference_* — algebraic gap between those two benchmark constructions; NOT 'new physics'.\n\n";
+  txt << "Artifacts:\n";
+  txt << "  " << csv_path.str() << "\n";
+  txt << "  " << txt_path.str() << "\n";
+  if (wrote_gnu) txt << "  " << gnu_script_path.str() << " (gnuplot; correspondence plot)\n";
+}
+
+}  // namespace
+
+void run_v11_weak_field_correspondence_audit(const Config& config, const std::string& output_dir) {
+  if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
+    run_earth_moon_line_correspondence_benchmark(config, output_dir);
+    return;
+  }
+  run_axis_monopole_audit(config, output_dir);
 }
 
 }  // namespace galaxy
