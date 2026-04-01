@@ -6,7 +6,8 @@ main.o: main.cpp accel_pipeline_stats.hpp config.hpp force_compare.hpp \
  physics/TPFCore/../../accel_pipeline_stats.hpp \
  physics/TPFCore/../../types.hpp physics/TPFCore/../physics_package.hpp \
  physics/TPFCore/derived_tpf_radial.hpp physics/TPFCore/source_ansatz.hpp \
- simulation.hpp
+ physics/TPFCore/v11_weak_field_correspondence.hpp \
+ physics/TPFCore/../../config.hpp simulation.hpp
 accel_pipeline_stats.hpp:
 config.hpp:
 force_compare.hpp:
@@ -25,4 +26,6 @@ physics/TPFCore/../../types.hpp:
 physics/TPFCore/../physics_package.hpp:
 physics/TPFCore/derived_tpf_radial.hpp:
 physics/TPFCore/source_ansatz.hpp:
+physics/TPFCore/v11_weak_field_correspondence.hpp:
+physics/TPFCore/../../config.hpp:
 simulation.hpp:
