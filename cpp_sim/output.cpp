@@ -62,6 +62,7 @@ void write_run_info(const std::string& output_dir,
     f << "velocity_noise\t" << config.velocity_noise << "\n";
   }
   if (config.physics_package == "TPFCore") {
+    f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
     f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
@@ -92,9 +93,12 @@ void write_run_info(const std::string& output_dir,
     f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
     f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
     f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-    f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to accelerations), readout_mode (configured label; "
-         "may differ from integrator ax,ay path when tpf_vdsg_coupling != 0), readout_scale, theta_tt_scale, "
-         "theta_tr_scale, dump_readout_debug (experimental readout closures; diagnostics)\n";
+    f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs direct_tpf); legacy_readout uses "
+         "tpfcore_enable_provisional_readout as gate; direct_tpf does not use that gate (stub throws until implemented)\n";
+    f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
+         "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
+         "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "
+         "diagnostics)\n";
     f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
     f << "=== End TPFCore parameter roles ===\n\n";
   }
@@ -152,6 +156,7 @@ void write_run_info(const std::string& output_dir,
   f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   if (config.physics_package == "TPFCore") {
     double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+    f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
     f << "tpfcore_provisional_source_ansatz\t1\n";
     f << "tpfcore_source_softening\t" << src_eps << "\n";

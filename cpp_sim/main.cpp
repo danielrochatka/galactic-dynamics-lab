@@ -254,7 +254,8 @@ int main(int argc, char** argv) {
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
   if (config.physics_package == "TPFCore") {
-    std::cout << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
+    std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
+              << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
               << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
     if (config.tpfcore_readout_mode == "tr_coherence_readout")
       std::cout << "  theta_tt_scale: " << config.tpfcore_theta_tt_scale << "  theta_tr_scale: " << config.tpfcore_theta_tr_scale;
@@ -286,7 +287,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "\n";
 
-    if (!tpf->provisional_readout_enabled()) {
+    if (config.tpf_dynamics_mode == "legacy_readout" && !tpf->provisional_readout_enabled()) {
       bool is_dynamical =
           (config.simulation_mode == galaxy::SimulationMode::galaxy ||
            config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
@@ -296,9 +297,11 @@ int main(int argc, char** argv) {
            config.simulation_mode == galaxy::SimulationMode::small_n_conservation ||
            config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
       if (is_dynamical) {
-        std::cerr << "TPFCore does not support dynamical modes (galaxy, earth_moon_benchmark, bh_orbit_validation, etc.) "
-                     "unless provisional readout is enabled.\n";
-        std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
+        std::cerr << "TPFCore legacy_readout does not support dynamical modes (galaxy, earth_moon_benchmark, "
+                     "bh_orbit_validation, etc.) unless provisional readout is enabled.\n";
+        std::cerr << "Set tpfcore_enable_provisional_readout = true, or use tpf_dynamics_mode = direct_tpf for the "
+                     "future direct path, or physics_package = Newtonian, or inspection modes: "
+                     "tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
         return 1;
       }
     }

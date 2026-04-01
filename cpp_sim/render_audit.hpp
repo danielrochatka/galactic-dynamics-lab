@@ -8,7 +8,7 @@ namespace galaxy {
 
 struct GalaxyInitAudit;
 
-/** TPF readout baseline identity (TPF_readout_acceleration:<mode>); not toggled by tpf_vdsg_coupling. */
+/** TPF dynamics branch label: Newtonian, TPF_direct, TPF_legacy_readout[:mode], TPF_legacy_readout_plus_VDSG[:mode], or disabled. */
 std::string compute_active_dynamics_branch(const Config& config);
 
 /** Provisional readout / diagnostic identity (Theta→readout path); not necessarily ax,ay driver when VDSG on. */

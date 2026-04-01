@@ -10,9 +10,11 @@
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
  * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
  *
- * compute_accelerations requires tpfcore_enable_provisional_readout (gate to this API).
- * When tpf_vdsg_coupling != 0, ax, ay are filled by VDSG (provisional readout closures do not supply them).
- * When VDSG is off, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
+ * Dynamics routing: tpf_dynamics_mode legacy_readout uses provisional readout (+ optional VDSG); that path
+ * requires tpfcore_enable_provisional_readout. direct_tpf calls compute_direct_tpf_accelerations (stub until
+ * implemented); VDSG must be zero on that path.
+ * When tpf_vdsg_coupling != 0 on legacy_readout, ax, ay include the VDSG additive modifier on top of readout baseline.
+ * When VDSG is off on legacy_readout, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
  * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
  */
 
@@ -35,9 +37,8 @@ class TPFCorePackage : public PhysicsPackage {
   void init_from_config(const Config& config) override;
 
   /**
-   * Particle accelerations. Requires provisional readout enabled (else throws).
-   * If tpf_vdsg_coupling != 0: ax, ay from VDSG SI centripetal path.
-   * Else: ax, ay from compute_provisional_readout_acceleration for configured mode.
+   * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
+   * direct_tpf: compute_direct_tpf_accelerations (not implemented yet — throws); nonzero tpf_vdsg_coupling errors.
    */
   void compute_accelerations(const State& state,
                             double bh_mass,
@@ -120,6 +121,7 @@ class TPFCorePackage : public PhysicsPackage {
                                        const std::string& output_dir) const;
 
  private:
+  std::string tpf_dynamics_mode_;
   bool provisional_readout_;
   std::string readout_mode_;
   double readout_scale_;
@@ -143,6 +145,13 @@ class TPFCorePackage : public PhysicsPackage {
                            std::vector<double>& ax,
                            std::vector<double>& ay,
                            AccelPipelineStats* stats_out) const;
+
+  void compute_direct_tpf_accelerations(const State& state,
+                                        double bh_mass,
+                                        double softening,
+                                        bool star_star,
+                                        std::vector<double>& ax,
+                                        std::vector<double>& ay) const;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

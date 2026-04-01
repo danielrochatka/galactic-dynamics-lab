@@ -82,7 +82,14 @@ struct Config {
    */
   std::string physics_package_compare = "";
 
-  /** TPFCore only: gate for compute_accelerations (required; else TPFCore throws). Not “readout drives” alone — VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
+  /**
+   * TPFCore only: how dynamical accelerations are produced.
+   * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
+   * - direct_tpf: future direct TPF dynamics path (not implemented yet); does not use the provisional-readout gate; VDSG must be 0.
+   */
+  std::string tpf_dynamics_mode = "legacy_readout";
+
+  /** TPFCore only: gate for legacy_readout dynamics (required for that path; ignored for direct_tpf). VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
   bool tpfcore_enable_provisional_readout = false;
   /** TPFCore configured readout mode string (see provisional_readout.cpp). May label metrics while VDSG supersedes ax, ay. */
   std::string tpfcore_readout_mode = "tensor_radial_projection";

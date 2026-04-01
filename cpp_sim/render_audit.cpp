@@ -2,6 +2,7 @@
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
 #include "physics/TPFCore/derived_tpf_radial.hpp"
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -64,18 +65,35 @@ std::string run_id_from_paths(const std::string& output_dir, const Config& confi
 
 }  // namespace
 
+namespace {
+
+bool tpf_vdsg_active_for_audit(const Config& config) {
+  return std::isfinite(config.tpf_vdsg_coupling) && (config.tpf_vdsg_coupling != 0.0);
+}
+
+}  // namespace
+
 std::string compute_active_dynamics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
+  if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct";
+  /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCore_dynamics_DISABLED (provisional_readout off)";
-  /* Baseline readout + optional additive VDSG modifier; branch label is readout identity (not VDSG-only). */
-  return "TPF_readout_acceleration:" + config.tpfcore_readout_mode;
+    return "TPFCore_dynamics_DISABLED (legacy_readout; provisional_readout off)";
+  const std::string& mode = config.tpfcore_readout_mode;
+  if (tpf_vdsg_active_for_audit(config)) return "TPF_legacy_readout_plus_VDSG:" + mode;
+  return "TPF_legacy_readout:" + mode;
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
+    if (config.tpf_dynamics_mode == "direct_tpf") {
+      if (config.tpfcore_enable_provisional_readout)
+        return "tpfcore_readout:" + config.tpfcore_readout_mode +
+               " (metrics/diagnostics only; dynamics=TPF_direct)";
+      return "TPFCore_metrics_n/a (direct_tpf; provisional readout off)";
+    }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
     return "TPFCore_metrics_n/a (provisional_readout off)";
@@ -86,8 +104,15 @@ std::string compute_active_metrics_branch(const Config& config) {
 std::string compute_acceleration_code_path(const Config& config) {
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
+  if (config.tpf_dynamics_mode == "direct_tpf") {
+    std::string s =
+        "TPFCorePackage::compute_direct_tpf_accelerations (direct_tpf path; not implemented yet)";
+    if (config.tpf_global_accel_shunt_enable)
+      s += "; global |a| shunt is configured but not applied until the direct path is implemented";
+    return s;
+  }
   if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCorePackage::compute_accelerations (throws without provisional readout)";
+    return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";
   std::string base;
   if (tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode))
     base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
@@ -209,6 +234,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
     tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
     tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+    tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";

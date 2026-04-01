@@ -48,7 +48,8 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
 }
 
 TPFCorePackage::TPFCorePackage()
-    : provisional_readout_(false),
+    : tpf_dynamics_mode_("legacy_readout"),
+      provisional_readout_(false),
       readout_mode_("tensor_radial_projection"),
       readout_scale_(1.0),
       theta_tt_scale_(1.0),
@@ -62,6 +63,7 @@ TPFCorePackage::TPFCorePackage()
       pipeline_diagnostics_csv_(true) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
+  tpf_dynamics_mode_ = config.tpf_dynamics_mode;
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
   readout_scale_ = config.tpfcore_readout_scale;
@@ -280,17 +282,44 @@ void TPFCorePackage::eval_accel_pipeline(const State& state,
   }
 }
 
+void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
+                                                      double bh_mass,
+                                                      double softening,
+                                                      bool star_star,
+                                                      std::vector<double>& ax,
+                                                      std::vector<double>& ay) const {
+  (void)state;
+  (void)bh_mass;
+  (void)softening;
+  (void)star_star;
+  (void)ax;
+  (void)ay;
+  throw std::runtime_error(
+      "direct_tpf selected but compute_direct_tpf_accelerations is not implemented yet");
+}
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
                                             bool star_star,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
+  if (tpf_dynamics_mode_ == "direct_tpf") {
+    if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf is incompatible with nonzero tpf_vdsg_coupling (VDSG is not wired to the "
+          "direct TPF dynamics path yet). Set tpf_vdsg_coupling = 0.");
+    }
+    compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    return;
+  }
+
   if (!provisional_readout_) {
     throw std::runtime_error(
-        "TPFCore does not support acceleration readout unless provisional readout is enabled. "
-        "Set tpfcore_enable_provisional_readout = true in config, or use Newtonian for dynamics, "
-        "or run inspection modes (tpf_single_source_inspect, tpf_symmetric_pair_inspect).");
+        "TPFCore legacy_readout dynamics require provisional readout. "
+        "Set tpfcore_enable_provisional_readout = true, set tpf_dynamics_mode = direct_tpf for the future direct "
+        "path, use Newtonian for dynamics, or run inspection modes (tpf_single_source_inspect, "
+        "tpf_symmetric_pair_inspect).");
   }
 
   const int n = state.n();
@@ -307,8 +336,9 @@ void TPFCorePackage::compute_accelerations(const State& state,
     std::cerr << "VDSG velocity modifier: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
               << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0; additive excess "
                  "a_N*(doppler_scale-1), doppler_scale=1+lambda_eff*|v_rel|/c)\n";
+    std::cerr << "tpf_dynamics_mode: legacy_readout (provisional readout + optional VDSG)\n";
     std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
-              << "  (tpfcore_enable_provisional_readout; required to call TPFCore accelerations)\n";
+              << "  (tpfcore_enable_provisional_readout; required for legacy_readout accelerations)\n";
     std::cerr << "Global |a| shunt (velocity cap): "
               << (shunt_enable_ ? "ENABLED" : "OFF")
               << "  (tpf_global_accel_shunt_enable; independent of tpf_vdsg_coupling; clean λ=0 baseline when off)\n";

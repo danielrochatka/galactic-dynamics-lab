@@ -8,6 +8,7 @@ omits explicit keys (older runs).
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -96,6 +97,7 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
     vdsg = _f(ri, "tpf_vdsg_coupling", 0.0)
     prov = _i(ri, "tpfcore_enable_provisional_readout", 0)
     rmode = str(ri.get("tpfcore_readout_mode", ""))
+    dyn_mode = str(ri.get("tpf_dynamics_mode", "legacy_readout")).strip() or "legacy_readout"
     if pp == "Newtonian":
         return (
             "Newtonian_pairwise_G_SI",
@@ -104,13 +106,29 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
         )
     if pp != "TPFCore":
         return (f"{pp} (non-TPFCore)", "unknown", "unknown_package")
+    if dyn_mode == "direct_tpf":
+        if prov != 0:
+            met = f"tpfcore_readout:{rmode} (metrics/diagnostics only; dynamics=TPF_direct)"
+        else:
+            met = "TPFCore_metrics_n/a (direct_tpf; provisional readout off)"
+        acc = (
+            "TPFCorePackage::compute_direct_tpf_accelerations "
+            "(direct_tpf path; not implemented yet)"
+        )
+        shunt_on = bool(_pick_boolish({}, ri, "tpf_global_accel_shunt_enable", False))
+        if shunt_on:
+            acc += (
+                "; global |a| shunt is configured but not applied until the direct path is implemented"
+            )
+        return "TPF_direct", met, acc
     if prov == 0:
         return (
-            "TPFCore_dynamics_DISABLED (provisional_readout off)",
+            "TPFCore_dynamics_DISABLED (legacy_readout; provisional_readout off)",
             "TPFCore_metrics_n/a (provisional_readout off)",
-            "TPFCorePackage::compute_accelerations (throws without provisional readout)",
+            "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)",
         )
-    dyn = f"TPF_readout_acceleration:{rmode}"
+    vdsg_active = math.isfinite(vdsg) and vdsg != 0.0
+    dyn = f"TPF_legacy_readout_plus_VDSG:{rmode}" if vdsg_active else f"TPF_legacy_readout:{rmode}"
     met = f"tpfcore_readout:{rmode}"
     if rmode in _DERIVED_READOUT_MODES:
         base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"

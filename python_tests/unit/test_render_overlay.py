@@ -46,7 +46,7 @@ class TestRenderOverlay(unittest.TestCase):
             "tpfcore_readout_mode": "derived_tpf_radial_readout",
         }
         d, m, acc = infer_branches_from_run_info(ri)
-        self.assertEqual(d, "TPF_readout_acceleration:derived_tpf_radial_readout")
+        self.assertEqual(d, "TPF_legacy_readout_plus_VDSG:derived_tpf_radial_readout")
         self.assertIn("derived_tpf_radial", m)
         self.assertIn("accumulate_vdsg_velocity_modifier", acc)
         self.assertIn("shunt OFF", acc)
@@ -60,7 +60,7 @@ class TestRenderOverlay(unittest.TestCase):
             "tpfcore_readout_mode": "tensor_radial_projection",
         }
         d, m, acc = infer_branches_from_run_info(ri)
-        self.assertIn("TPF_readout_acceleration", d)
+        self.assertIn("TPF_legacy_readout:", d)
         self.assertIn("tensor_radial_projection", m)
 
     def test_load_render_manifest_missing(self) -> None:
@@ -70,7 +70,7 @@ class TestRenderOverlay(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             mf = {
-                "active_dynamics_branch": "TPF_readout_acceleration:derived_tpf_radial_readout",
+                "active_dynamics_branch": "TPF_legacy_readout_plus_VDSG:derived_tpf_radial_readout",
                 "active_metrics_branch": "tpfcore_readout:derived_tpf_radial_readout",
                 "acceleration_code_path": "TPFCorePackage::compute_provisional_readout_acceleration + "
                 "derived_tpf_radial_profile + accumulate_vdsg_velocity_modifier + "
@@ -84,7 +84,10 @@ class TestRenderOverlay(unittest.TestCase):
             )
             ri = {"physics_package": "TPFCore", "simulation_mode": "galaxy"}
             spec = build_overlay_spec(run_dir, ri)
-            self.assertEqual(spec["active_dynamics_branch"], "TPF_readout_acceleration:derived_tpf_radial_readout")
+            self.assertEqual(
+                spec["active_dynamics_branch"],
+                "TPF_legacy_readout_plus_VDSG:derived_tpf_radial_readout",
+            )
             self.assertEqual(spec["run_id"], "test_run")
 
     def test_build_overlay_spec_git_defaults(self) -> None:

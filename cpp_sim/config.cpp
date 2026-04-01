@@ -153,6 +153,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_theta_tr_scale = std::stod(val);
     return true;
   }
+  if (key == "tpf_dynamics_mode") {
+    std::string s = trim(val);
+    if (s != "legacy_readout" && s != "direct_tpf") {
+      throw std::runtime_error("tpf_dynamics_mode must be legacy_readout or direct_tpf, got: " + val);
+    }
+    config.tpf_dynamics_mode = s;
+    return true;
+  }
   if (key == "tpf_kappa") {
     config.tpf_kappa = std::stod(val);
     return true;
