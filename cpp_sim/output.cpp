@@ -181,6 +181,11 @@ void write_run_info(const std::string& output_dir,
          "diagnostic_two_body_timeseries.csv, two_body_diagnostics_README.txt\n";
     f << "diagnostics_secondary_lab_frame\tOrigin-radial plots (diagnostic_median_radius.png, etc.) are secondary; "
          "titles prefixed when regenerated for these modes\n";
+    if (config.simulation_mode == SimulationMode::bh_orbit_validation) {
+      f << "bh_orbit_validation_postprocess\tplot_cpp_run.py: same primary pair PNGs + footnotes; "
+           "bh_orbit_trajectory_xy.png, bh_orbit_trajectory_xy_zoom.png, bh_orbit_separation_extrema.png "
+           "(experimental; not paper correspondence; not direct_tpf; compare Newtonian vs TPFCore legacy_readout with VDSG off)\n";
+    }
     f << "=== End two-body diagnostics note ===\n\n";
   }
   if (cooling_audit) {

@@ -211,6 +211,13 @@ def write_two_body_diagnostics_readme(output_dir: Path, mode: str, physics_packa
             "TPFCore: the plotted energy is a Newtonian post-processing equivalent only.",
             "It is NOT claimed equal to a TPF Hamiltonian or conserved TPF scalar.",
         ]
+    if mode == "bh_orbit_validation":
+        lines += [
+            "",
+            "bh_orbit_validation extras (plot_cpp_run.py): bh_orbit_trajectory_xy.png, bh_orbit_trajectory_xy_zoom.png,",
+            "bh_orbit_separation_extrema.png — experimental visuals; footnotes state Newtonian baseline vs TPFCore legacy_readout,",
+            "VDSG coupling from run_info, and that this is not paper correspondence mode and not direct_tpf.",
+        ]
     (output_dir / "two_body_diagnostics_README.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -260,12 +267,40 @@ def _save_plot_with_note(
     plt.close(fig)
 
 
+def _save_plot(
+    output_path: Path,
+    time: np.ndarray,
+    y: np.ndarray,
+    ylabel: str,
+    title: str,
+    footnote: str | None = None,
+) -> None:
+    """Time-series plot: x-axis is simulation time, one point per snapshot."""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(time, y, color="steelblue", linewidth=1)
+    ax.scatter(time, y, s=8, c="steelblue", zorder=5)  # show every snapshot point
+    ax.set_xlabel("Time (simulation units)")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    if footnote:
+        fig.text(0.5, 0.02, footnote, ha="center", fontsize=8)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.18 if footnote else 0.12)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
 def plot_two_body_pair_diagnostics(
     diag: dict[str, np.ndarray | str],
     output_dir: Path,
     physics_package: str,
+    *,
+    title_suffix: str = "",
+    footnote: str | None = None,
 ) -> None:
     """Primary PNG set for two-body modes."""
+    suf = (" " + title_suffix.strip()) if title_suffix.strip() else ""
     tpf_note = (
         "Newtonian equivalent only for TPFCore — not a TPF conserved scalar."
         if physics_package.strip() == "TPFCore"
@@ -277,58 +312,158 @@ def plot_two_body_pair_diagnostics(
         t,
         diag["pair_separation"],
         "Pair separation (m)",
-        "Primary: pair separation |Δr| vs time (lab-frame positions)",
+        "Primary: pair separation |Δr| vs time (lab-frame positions)" + suf,
+        footnote=footnote,
     )
     _save_plot(
         output_dir / "diagnostic_pair_relative_speed.png",
         t,
         diag["pair_relative_speed"],
         "Pair relative speed (m/s)",
-        "Primary: |Δv| vs time (lab-frame velocities)",
+        "Primary: |Δv| vs time (lab-frame velocities)" + suf,
+        footnote=footnote,
     )
     _save_plot(
         output_dir / "diagnostic_com_radius.png",
         t,
         diag["center_of_mass_radius"],
         "|R_COM| from origin (m)",
-        "COM radius in lab frame (drift here is not 'escape' of the pair)",
+        "COM radius in lab frame (drift here is not 'escape' of the pair)" + suf,
+        footnote=footnote,
     )
     _save_plot(
         output_dir / "diagnostic_relative_angular_momentum_z.png",
         t,
         diag["relative_angular_momentum_z"],
         "L_z about COM (SI)",
-        "Primary: angular momentum about center of mass (z)",
+        "Primary: angular momentum about center of mass (z)" + suf,
+        footnote=footnote,
     )
     E = diag["newtonian_specific_energy"]
     if np.any(np.isfinite(E)):
+        e_foot = tpf_note
+        if footnote:
+            e_foot = (tpf_note + " | " + footnote) if tpf_note else footnote
         _save_plot_with_note(
             output_dir / "diagnostic_relative_energy.png",
             t,
             E,
             "Newtonian specific energy (J/kg)",
-            "Primary: Newtonian specific mechanical energy (see README)",
-            footnote=tpf_note,
+            "Primary: Newtonian specific mechanical energy (see README)" + suf,
+            footnote=e_foot,
         )
 
 
-def _save_plot(
-    output_path: Path,
-    time: np.ndarray,
-    y: np.ndarray,
-    ylabel: str,
-    title: str,
+def bh_orbit_validation_plot_footnote(physics_package: str, tpf_vdsg_coupling: float) -> str:
+    """Honest labels for experimental bh_orbit_validation postprocess (not paper / not direct_tpf)."""
+    pkg = physics_package.strip()
+    vdsg = float(tpf_vdsg_coupling)
+    vdsg_part = (
+        "VDSG off (tpf_vdsg_coupling = 0) — baseline for legacy_readout compare."
+        if vdsg == 0.0
+        else f"tpf_vdsg_coupling = {vdsg:g} (nonzero; not the recommended clean baseline)."
+    )
+    if pkg == "Newtonian":
+        return f"Newtonian baseline · {vdsg_part} Not paper correspondence mode."
+    if pkg == "TPFCore":
+        return (
+            f"TPFCore legacy_readout experimental · not direct_tpf · not paper mode · {vdsg_part}"
+        )
+    return f"{physics_package} · {vdsg_part}"
+
+
+def _local_extrema_indices(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Interior local minima and maxima (for periapsis / apoapsis markers on r(t))."""
+    n = len(y)
+    if n < 3:
+        return np.array([], dtype=int), np.array([], dtype=int)
+    mins: list[int] = []
+    maxs: list[int] = []
+    for i in range(1, n - 1):
+        if y[i] < y[i - 1] and y[i] <= y[i + 1]:
+            mins.append(i)
+        elif y[i] > y[i - 1] and y[i] >= y[i + 1]:
+            maxs.append(i)
+    return np.array(mins, dtype=int), np.array(maxs, dtype=int)
+
+
+def plot_bh_orbit_validation_extras(
+    snapshots: list,
+    diag: dict[str, np.ndarray | str],
+    output_dir: Path,
+    physics_package: str,
+    tpf_vdsg_coupling: float,
 ) -> None:
-    """Time-series plot: x-axis is simulation time, one point per snapshot."""
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(time, y, color="steelblue", linewidth=1)
-    ax.scatter(time, y, s=8, c="steelblue", zorder=5)  # show every snapshot point
-    ax.set_xlabel("Time (simulation units)")
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    """
+    bh_orbit_validation only: orbit in x–y, separation with periapsis/apoapsis markers, zoomed orbit shape.
+    """
+    foot = bh_orbit_validation_plot_footnote(physics_package, tpf_vdsg_coupling)
+    t = diag["time"]
+    sep = np.asarray(diag["pair_separation"], dtype=np.float64)
+    mins_i, maxs_i = _local_extrema_indices(sep)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    xs: list[float] = []
+    ys: list[float] = []
+    for snap in snapshots:
+        p = snap.positions
+        if p.shape[0] >= 1:
+            xs.append(float(p[0, 0]))
+            ys.append(float(p[0, 1]))
+    ax.plot(xs, ys, "-", color="steelblue", lw=1.2, label="Star path (lab frame)")
+    ax.scatter(xs, ys, s=10, c="steelblue", zorder=5)
+    ax.scatter([0.0], [0.0], s=120, c="black", marker="*", zorder=6, label="BH at origin")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_title("BH orbit validation — full trajectory (one star, fixed BH)" + " (experimental)")
     ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
     fig.tight_layout()
-    fig.savefig(output_path, dpi=150)
+    fig.subplots_adjust(bottom=0.14)
+    fig.savefig(output_dir / "bh_orbit_trajectory_xy.png", dpi=150)
+    plt.close(fig)
+
+    r_arr = np.hypot(np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64))
+    r_max = float(np.nanmax(r_arr)) if r_arr.size else 1.0
+    zoom = max(r_max * 1.25, 1.0)
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.plot(xs, ys, "-", color="#1f77b4", lw=1.2)
+    ax.scatter(xs, ys, s=8, c="#1f77b4", zorder=5)
+    ax.scatter([0.0], [0.0], s=100, c="black", marker="*", zorder=6)
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_xlim(-zoom, zoom)
+    ax.set_ylim(-zoom, zoom)
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_title("Orbit shape (zoom to extent · experimental)")
+    ax.grid(True, alpha=0.3)
+    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.12)
+    fig.savefig(output_dir / "bh_orbit_trajectory_xy_zoom.png", dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax.plot(t, sep, "-", color="steelblue", lw=1.2, label="|r_star| (vs origin)")
+    ax.scatter(t, sep, s=8, c="steelblue", zorder=5)
+    for idx in mins_i[:12]:
+        ax.axvline(float(t[idx]), color="#2ca02c", ls="--", lw=0.8, alpha=0.7)
+    for idx in maxs_i[:12]:
+        ax.axvline(float(t[idx]), color="#d62728", ls=":", lw=0.8, alpha=0.7)
+    ax.set_xlabel("Time (simulation units)")
+    ax.set_ylabel("Separation (m)")
+    ax.set_title(
+        "Star–BH separation vs time (green dashed ≈ periapsis-like minima; "
+        "red dotted ≈ apoapsis-like maxima; sampling-limited)"
+    )
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.18)
+    fig.savefig(output_dir / "bh_orbit_separation_extrema.png", dpi=150)
     plt.close(fig)
 
 

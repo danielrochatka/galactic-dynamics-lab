@@ -8,6 +8,8 @@ then produces the same kinds of plots as the Python pipeline:
   - rotation_curve.png (final snapshot vs Keplerian √(GM/r); M_bh from run_info when present)
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
+  - **bh_orbit_validation**: primary pair diagnostics plus `bh_orbit_trajectory_xy.png`, `bh_orbit_trajectory_xy_zoom.png`,
+    `bh_orbit_separation_extrema.png` (footnotes distinguish Newtonian baseline vs TPFCore legacy_readout experimental; VDSG status from run_info)
 
 Animation viewport: default uses **smart framing** — one fixed axis half-range from the **median**
   radial distance of all stars across all snapshots, times 1.2 (see `calculate_smart_bounds`).
@@ -51,9 +53,11 @@ import pandas as pd
 from render import save_static_plot, create_animation, has_ffmpeg
 from render_overlay import build_overlay_spec, resolve_overlay_mode
 from diagnostics import (
+    bh_orbit_validation_plot_footnote,
     compute_diagnostics,
     compute_two_body_pair_diagnostics,
     plot_and_save_all,
+    plot_bh_orbit_validation_extras,
     plot_two_body_pair_diagnostics,
     save_two_body_timeseries_csv,
     write_two_body_diagnostics_readme,
@@ -84,9 +88,10 @@ class Snapshot:
 
 
 # Matches cpp_sim/config.hpp enum class SimulationMode (declaration order).
+# Index 1 is two_body_orbit in C++; postprocess uses the same diagnostics as earth_moon_benchmark.
 _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
     0: "galaxy",
-    1: "earth_moon_benchmark",  # legacy enum id was two_body_orbit; same IC
+    1: "earth_moon_benchmark",
     2: "symmetric_pair",
     3: "small_n_conservation",
     4: "timestep_convergence",
@@ -97,8 +102,9 @@ _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
     9: "tpf_newtonian_force_compare",
     10: "tpf_diagnostic_consistency_audit",
     11: "tpf_bound_orbit_sweep",
-    12: "earth_moon_benchmark",
-    13: "bh_orbit_validation",
+    12: "tpf_v11_weak_field_correspondence",
+    13: "earth_moon_benchmark",
+    14: "bh_orbit_validation",
 }
 
 
@@ -837,7 +843,23 @@ def main() -> None:
                 )
                 save_two_body_timeseries_csv(pair_diag, run_dir)
                 write_two_body_diagnostics_readme(run_dir, mode_name, physics_pkg)
-                plot_two_body_pair_diagnostics(pair_diag, run_dir, physics_pkg)
+                if mode_name == "bh_orbit_validation":
+                    vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
+                    vdsg_f = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
+                    foot = bh_orbit_validation_plot_footnote(physics_pkg, vdsg_f)
+                    title_suf = "(bh_orbit_validation · experimental)"
+                    plot_two_body_pair_diagnostics(
+                        pair_diag,
+                        run_dir,
+                        physics_pkg,
+                        title_suffix=title_suf,
+                        footnote=foot,
+                    )
+                    plot_bh_orbit_validation_extras(
+                        snapshots, pair_diag, run_dir, physics_pkg, vdsg_f
+                    )
+                else:
+                    plot_two_body_pair_diagnostics(pair_diag, run_dir, physics_pkg)
                 print(
                     f"Primary two-body diagnostics in {run_dir}: "
                     "diagnostic_pair_separation.png, diagnostic_pair_relative_speed.png, "
@@ -845,6 +867,13 @@ def main() -> None:
                     "diagnostic_relative_energy.png (if finite), diagnostic_two_body_timeseries.csv, "
                     "two_body_diagnostics_README.txt"
                 )
+                if mode_name == "bh_orbit_validation":
+                    print(
+                        "  bh_orbit_validation extras: bh_orbit_trajectory_xy.png, "
+                        "bh_orbit_trajectory_xy_zoom.png, bh_orbit_separation_extrema.png "
+                        "(footnotes: Newtonian baseline vs TPFCore legacy_readout experimental; VDSG off baseline; "
+                        "not paper mode; not direct_tpf)"
+                    )
                 print(
                     f"  Final pair separation: {float(pair_diag['pair_separation'][-1]):.6g} m; "
                     f"pair relative speed: {float(pair_diag['pair_relative_speed'][-1]):.6g} m/s; "
