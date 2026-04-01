@@ -32,7 +32,7 @@ From **`cpp_sim/`**:
 | Mode | Purpose |
 |------|---------|
 | `galaxy` | Disk N-body (production morphology runs). |
-| `two_body_orbit`, `symmetric_pair`, `small_n_conservation`, `timestep_convergence` | Validation / checks. |
+| `earth_moon_benchmark`, `bh_orbit_validation`, `symmetric_pair`, `small_n_conservation`, `timestep_convergence` | Validation / checks. (`two_body_orbit` is a deprecated alias for `earth_moon_benchmark` in C++.) |
 | `tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`, … | Package-specific **inspection** (require `physics_package = TPFCore`). |
 | `tpf_two_body_sweep`, `tpf_weak_field_calibration`, `tpf_newtonian_force_compare`, `tpf_bound_orbit_sweep`, `tpf_diagnostic_consistency_audit` | TPFCore **sweeps / calibration / diagnostics** (see binary help and `SimulationMode` in `config.hpp`). |
 

@@ -169,8 +169,8 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep)
       f << "tpf_sweep_summary\tsee tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
-    if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit)
-      f << "detailed_follow_up\tTPFCore two_body_orbit: full snapshots + regime + trajectory diagnostics (use after tpf_two_body_sweep to inspect a chosen speed_ratio)\n";
+    if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation)
+      f << "detailed_follow_up\tTPFCore bh_orbit_validation: full snapshots + regime + trajectory diagnostics (use after tpf_two_body_sweep to inspect a chosen speed_ratio)\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

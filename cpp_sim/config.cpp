@@ -35,7 +35,13 @@ bool file_exists(const std::string& path) {
 SimulationMode parse_mode(const std::string& s) {
   std::string t = trim(s);
   if (t == "galaxy") return SimulationMode::galaxy;
-  if (t == "two_body_orbit") return SimulationMode::two_body_orbit;
+  if (t == "earth_moon_benchmark") return SimulationMode::earth_moon_benchmark;
+  if (t == "bh_orbit_validation") return SimulationMode::bh_orbit_validation;
+  if (t == "two_body_orbit") {
+    std::cerr << "Warning: simulation_mode \"two_body_orbit\" is deprecated; use \"earth_moon_benchmark\" "
+                 "(same Earth–Moon SI benchmark).\n";
+    return SimulationMode::earth_moon_benchmark;
+  }
   if (t == "symmetric_pair") return SimulationMode::symmetric_pair;
   if (t == "small_n_conservation") return SimulationMode::small_n_conservation;
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
@@ -52,7 +58,10 @@ SimulationMode parse_mode(const std::string& s) {
 std::string mode_to_string(SimulationMode m) {
   switch (m) {
     case SimulationMode::galaxy: return "galaxy";
-    case SimulationMode::two_body_orbit: return "two_body_orbit";
+    /* Legacy enum value (int 1 in old run_info): same physics as earth_moon_benchmark. */
+    case SimulationMode::two_body_orbit: return "earth_moon_benchmark";
+    case SimulationMode::earth_moon_benchmark: return "earth_moon_benchmark";
+    case SimulationMode::bh_orbit_validation: return "bh_orbit_validation";
     case SimulationMode::symmetric_pair: return "symmetric_pair";
     case SimulationMode::small_n_conservation: return "small_n_conservation";
     case SimulationMode::timestep_convergence: return "timestep_convergence";

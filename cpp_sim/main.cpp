@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
 
   /* First positional is the simulation mode only when it is not a long option (--key=value).
    * Otherwise mode comes from layered config (package defaults + run config). This allows
-   * e.g. simulation_mode=two_body_orbit in the run config with ./galaxy_sim --output_dir=... */
+   * e.g. simulation_mode=earth_moon_benchmark in the run config with ./galaxy_sim --output_dir=... */
   bool cli_override_mode = false;
   int first_cli_config_idx = 2;
   if (argc >= 2) {
@@ -197,7 +197,10 @@ int main(int argc, char** argv) {
         cli_override_mode = true;
         std::cout << "CLI override applied: simulation_mode=" << galaxy::mode_to_string(config.simulation_mode) << "\n";
       } catch (const std::exception& e) {
-        std::cerr << e.what() << "\nAllowed: galaxy, two_body_orbit, symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
+        std::cerr << e.what() << "\nAllowed: galaxy, earth_moon_benchmark, bh_orbit_validation, two_body_orbit (deprecated), "
+                     "symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, "
+                     "tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, "
+                     "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep\n";
         return 1;
       }
     }
@@ -229,12 +232,15 @@ int main(int argc, char** argv) {
   std::string run_cfg_physics = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "physics_package");
   std::string run_cfg_mode_str = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "simulation_mode");
 
-  /* Hard failure: run config says TPFCore + two_body_orbit but resolved is galaxy with no CLI override */
+  /* Hard failure: run config says TPFCore + dynamical validation mode but resolved is galaxy with no CLI override */
   if (!run_config_path.empty() && cli_override_mode == false) {
-    if (run_cfg_physics == "TPFCore" && run_cfg_mode_str == "two_body_orbit" &&
+    if (run_cfg_physics == "TPFCore" &&
+        (run_cfg_mode_str == "two_body_orbit" || run_cfg_mode_str == "earth_moon_benchmark" ||
+         run_cfg_mode_str == "bh_orbit_validation") &&
         config.simulation_mode == galaxy::SimulationMode::galaxy) {
-      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPFCore and simulation_mode=two_body_orbit, "
-                << "but resolved simulation_mode is galaxy. Refusing to run. Fix config precedence or run: ./galaxy_sim two_body_orbit\n";
+      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPFCore and simulation_mode="
+                << run_cfg_mode_str << ", but resolved simulation_mode is galaxy. Refusing to run. "
+                << "Fix config precedence or run e.g.: ./galaxy_sim earth_moon_benchmark\n";
       return 1;
     }
   }
@@ -281,13 +287,17 @@ int main(int argc, char** argv) {
     std::cout << "\n";
 
     if (!tpf->provisional_readout_enabled()) {
-      bool is_dynamical = (config.simulation_mode == galaxy::SimulationMode::galaxy ||
-                           config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
-                           config.simulation_mode == galaxy::SimulationMode::symmetric_pair ||
-                           config.simulation_mode == galaxy::SimulationMode::small_n_conservation ||
-                           config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
+      bool is_dynamical =
+          (config.simulation_mode == galaxy::SimulationMode::galaxy ||
+           config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
+           config.simulation_mode == galaxy::SimulationMode::earth_moon_benchmark ||
+           config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation ||
+           config.simulation_mode == galaxy::SimulationMode::symmetric_pair ||
+           config.simulation_mode == galaxy::SimulationMode::small_n_conservation ||
+           config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
       if (is_dynamical) {
-        std::cerr << "TPFCore does not support dynamical modes (galaxy, two_body_orbit, etc.) unless provisional readout is enabled.\n";
+        std::cerr << "TPFCore does not support dynamical modes (galaxy, earth_moon_benchmark, bh_orbit_validation, etc.) "
+                     "unless provisional readout is enabled.\n";
         std::cerr << "Use physics_package = Newtonian for dynamics, or run inspection modes: tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
         return 1;
       }
@@ -590,7 +600,7 @@ int main(int argc, char** argv) {
     std::ofstream txt(out_dir + "/tpf_bound_orbit_sweep.txt");
     if (txt) {
       txt << "TPFCore bound-orbit sweep (experimental_radial_r_scaling, fixed closure)\n";
-      txt << "Orchestration/reporting only; same formulas and total time as production two_body_orbit.\n";
+      txt << "Orchestration/reporting only; same formulas and total time as a single bh_orbit_validation run.\n";
       txt << "Speed list: 0.40, 0.425, 0.45, 0.475, 0.49, 0.495, 0.499, 0.5, 0.505, 0.51, 0.525, 0.55\n";
       txt << "Initial radius: " << R0 << ", n_steps: " << config.validation_n_steps << ", snapshot_every: " << config.validation_snapshot_every << "\n\n";
 
@@ -690,14 +700,25 @@ int main(int argc, char** argv) {
                 << ", sim_time=" << (n_steps * config.dt) << "\n";
       break;
     }
-    case galaxy::SimulationMode::two_body_orbit: {
+    case galaxy::SimulationMode::two_body_orbit:
+    case galaxy::SimulationMode::earth_moon_benchmark: {
       galaxy::init_two_body(config, state);
       config.bh_mass = 0.0;
       config.enable_star_star_gravity = true;
       n_steps = config.validation_n_steps;
       snapshot_every = config.validation_snapshot_every;
-      std::cout << "Two-body orbit: Earth–Moon benchmark (SI), n=" << state.n()
+      std::cout << "Earth–Moon benchmark (SI), n=" << state.n()
                 << " (pairwise gravity; bh_mass cleared for this mode)\n";
+      break;
+    }
+    case galaxy::SimulationMode::bh_orbit_validation: {
+      galaxy::init_two_body_star_around_bh(config, state);
+      config.enable_star_star_gravity = false;
+      n_steps = config.validation_n_steps;
+      snapshot_every = config.validation_snapshot_every;
+      std::cout << "BH orbit validation: n=" << state.n() << " star, r0=" << config.validation_two_body_radius
+                << " m, speed_ratio=" << config.validation_two_body_speed_ratio
+                << " (star–star gravity off; central mass from bh_mass)\n";
       break;
     }
     case galaxy::SimulationMode::symmetric_pair: {
@@ -724,9 +745,9 @@ int main(int argc, char** argv) {
       std::vector<double> dts = {config.dt, config.dt / 2, config.dt / 4};
       config.enable_star_star_gravity = false;
 
-      std::cout << "Timestep convergence (two_body), total_time=" << total_time << "\n";
+      std::cout << "Timestep convergence (star_around_bh IC), total_time=" << total_time << "\n";
       std::ofstream summary(config.output_dir + "/validation_timestep_convergence.txt");
-      summary << "Timestep convergence (two_body_orbit)\n";
+      summary << "Timestep convergence (star_around_bh IC; same initializer as bh_orbit_validation)\n";
       summary << "dt\tfinal_x\tfinal_y\tfinal_r\tL_z\tE_drift\n";
 
       double E0 = 0;
@@ -1041,7 +1062,7 @@ int main(int argc, char** argv) {
         if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
             (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
           std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
-        if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit && snapshots[0].state.n() == 1) {
+        if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation && snapshots[0].state.n() == 1) {
           tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
           std::cout << "Wrote " << config.output_dir << "/tpf_step0_orbit_audit.txt\n";
         }

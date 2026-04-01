@@ -17,7 +17,7 @@ class TestSimulationModeFromRunInfo(unittest.TestCase):
     def test_int_from_cpp_enum_second_line_wins(self) -> None:
         # load_run_info overwrites duplicate keys; final simulation_mode is often int
         ri = {"simulation_mode": 1}
-        self.assertEqual(simulation_mode_name_from_run_info(ri), "two_body_orbit")
+        self.assertEqual(simulation_mode_name_from_run_info(ri), "earth_moon_benchmark")
 
     def test_string_mode(self) -> None:
         ri = {"simulation_mode": "symmetric_pair"}
@@ -33,9 +33,12 @@ class TestResolveGalaxyRadiusNonGalaxy(unittest.TestCase):
         pos = np.array([[0.0, 0.0], [3.844e8, 0.0]], dtype=float)
         vel = np.zeros((2, 2), dtype=float)
         snap = Snapshot(step=0, time=0.0, positions=pos, velocities=vel)
-        ri = {"galaxy_radius": 50.0, "simulation_mode": 1}
+        ri = {"galaxy_radius": 50.0, "simulation_mode": 12}
         r = resolve_galaxy_radius_meters(ri, [snap], render_radius_arg=150.0)
         self.assertAlmostEqual(r, 3.844e8, delta=1.0)
+
+    def test_bh_orbit_int_maps(self) -> None:
+        self.assertEqual(simulation_mode_name_from_run_info({"simulation_mode": 13}), "bh_orbit_validation")
 
     def test_galaxy_mode_uses_config_radius(self) -> None:
         ri = {"galaxy_radius": 50.0, "simulation_mode": 0}

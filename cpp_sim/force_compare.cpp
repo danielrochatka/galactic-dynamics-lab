@@ -169,7 +169,7 @@ void run_snapshot_replay_audit(const Config& config,
   const bool star_star = false;
 
   txt << "--- Snapshot replay audit ---\n";
-  txt << "  Reference path: Newtonian two_body_orbit, n_steps=" << n_steps
+  txt << "  Reference path: Newtonian star_around_bh (bh_orbit_validation IC), n_steps=" << n_steps
       << ", snapshot_every=" << snapshot_every << ", points=" << snapshots.size() << "\n";
 
   double max_ratio_rad = 0.0, min_ratio_rad = 1e300;

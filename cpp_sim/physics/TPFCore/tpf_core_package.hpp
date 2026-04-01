@@ -89,12 +89,12 @@ class TPFCorePackage : public PhysicsPackage {
   /** Last integrator-step pipeline stats (updated every compute_accelerations). */
   const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
 
-  /** Live two_body_orbit force audit (Newtonian vs TPF for the actual evolving state). */
+  /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
                                     const Config& config,
                                     const std::string& output_dir) const;
 
-  /** Exact step-0 orbit audit: raw numbers for two_body_orbit initial state only. */
+  /** Exact step-0 orbit audit: raw numbers for bh_orbit_validation initial state only. */
   void write_step0_orbit_audit(const std::vector<Snapshot>& snapshots,
                                const Config& config,
                                const std::string& output_dir) const;

@@ -1057,7 +1057,7 @@ void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& s
 
   TrajectorySummary sum = compute_trajectory_summary(snapshots);
   if (!sum.valid) {
-    f << "\nTrajectory classification is only computed for single-body dynamical runs (e.g. two_body_orbit).\n";
+    f << "\nTrajectory classification is only computed for single-body dynamical runs (e.g. bh_orbit_validation).\n";
     f << "This run has " << n_part << " particles. No trajectory class assigned.\n";
     return;
   }
@@ -1207,7 +1207,7 @@ void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& s
                                                   const Config& config,
                                                   const std::string& output_dir) const {
   if (!provisional_readout_ || snapshots.empty()) return;
-  if (config.simulation_mode != SimulationMode::two_body_orbit) return;
+  if (config.simulation_mode != SimulationMode::bh_orbit_validation) return;
   const int n_part = snapshots[0].state.n();
   if (n_part != 1) return;
 
@@ -1229,7 +1229,7 @@ void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& s
       << "ax_newt,ay_newt,a_rad_newt,a_tan_newt,"
       << "diff_x,diff_y,diff_rad,diff_tan\n";
 
-  txt << "TPFCore live two_body_orbit force audit (Newtonian vs TPF, same evolving state)\n";
+  txt << "TPFCore live orbit force audit — bh_orbit_validation (Newtonian vs TPF, same evolving state)\n";
   txt << "Diagnostics only; does not alter integrator or motion law.\n";
   txt << "Positions, velocities, and accelerations are taken from the same snapshots used by the integrator (every validation_snapshot_every steps). For steps 0,1,2,5,10,20,50,100 set validation_snapshot_every=1 for a short run.\n\n";
 
@@ -1342,7 +1342,7 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
                                              const Config& config,
                                              const std::string& output_dir) const {
   if (!provisional_readout_ || snapshots.empty()) return;
-  if (config.simulation_mode != SimulationMode::two_body_orbit) return;
+  if (config.simulation_mode != SimulationMode::bh_orbit_validation) return;
   if (snapshots[0].state.n() != 1) return;
 
   PhysicsPackage* newton = get_physics_package("Newtonian");
@@ -1407,7 +1407,7 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   (void)ay_d;
 
   txt << std::scientific << std::setprecision(16);
-  txt << "TPFCore step-0 orbit audit (exact initial state of two_body_orbit)\n";
+  txt << "TPFCore step-0 orbit audit (exact initial state of bh_orbit_validation)\n";
   txt << "Diagnostics only; no averaging or summaries. All values exact for step 0.\n\n";
 
   txt << "x = " << x << "\n";

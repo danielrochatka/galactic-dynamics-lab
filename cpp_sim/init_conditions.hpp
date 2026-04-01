@@ -9,7 +9,7 @@ namespace galaxy {
 // Galaxy: annulus disk, template-driven ICs (see galaxy_init.hpp); v_circ from enclosed mass or TPF derived radial.
 void init_galaxy_disk(const Config& config, State& state);
 
-// Earth–Moon SI benchmark for two_body_orbit: n=2, clears and resizes state arrays.
+// Earth–Moon SI benchmark for earth_moon_benchmark / legacy two_body_orbit: n=2, clears and resizes state arrays.
 void init_two_body(const Config& config, State& state);
 
 // Legacy validation: one particle at (r0,0) with v from speed_ratio * v_circ(BH); BH mass from config.

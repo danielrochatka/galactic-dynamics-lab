@@ -8,7 +8,7 @@ namespace galaxy {
 /** SI speed of light (m/s). TPF bounce closure (Sec. IX, Eq. 31). */
 constexpr double c = 299792458.0;
 
-// Simulation mode: matches Python VALIDATION_MODES + "galaxy" + TPFCore inspection modes
+// Simulation mode: see config.py VALIDATION_MODES (Python) + "galaxy" + TPFCore inspection modes
 enum class SimulationMode {
   galaxy,
   two_body_orbit,
@@ -21,7 +21,11 @@ enum class SimulationMode {
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
   tpf_diagnostic_consistency_audit,
-  tpf_bound_orbit_sweep
+  tpf_bound_orbit_sweep,
+  /** Canonical Earth–Moon SI benchmark (same IC as legacy two_body_orbit string). */
+  earth_moon_benchmark,
+  /** Single star + central mass; uses init_two_body_star_around_bh. */
+  bh_orbit_validation
 };
 
 SimulationMode parse_mode(const std::string& s);
@@ -128,7 +132,7 @@ struct Config {
   double tpf_cooling_fraction = 0.2;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
-  /** TPFCore diagnostics: enable live two_body_orbit Newtonian-vs-TPF force audit. */
+  /** TPFCore diagnostics: enable live Newtonian-vs-TPF force audit for bh_orbit_validation runs. */
   bool tpfcore_live_orbit_force_audit = false;
   /** TPFCore inspection: probe radius min. */
   double tpfcore_probe_radius_min = 1.0;

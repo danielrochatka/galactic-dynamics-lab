@@ -49,8 +49,8 @@ def _run_and_report(
     )
 
 
-def run_two_body_orbit(config: SimulationConfig) -> None:
-    """One star orbiting fixed BH; verify bounded orbit and conservation."""
+def run_bh_orbit_validation(config: SimulationConfig) -> None:
+    """One star orbiting fixed BH; same IC family as C++ bh_orbit_validation / timestep_convergence."""
     r0 = config.validation_two_body_radius
     v_circ = np.sqrt(config.bh_mass / r0)
     v0 = config.validation_two_body_speed_ratio * v_circ
@@ -60,7 +60,7 @@ def run_two_body_orbit(config: SimulationConfig) -> None:
     n_steps = config.validation_n_steps
     snap_every = config.validation_snapshot_every
 
-    print("Two-body orbit: 1 star, r0={}, v0={} (speed_ratio={})".format(
+    print("BH orbit validation: 1 star, r0={}, v0={} (speed_ratio={})".format(
         r0, v0, config.validation_two_body_speed_ratio))
     snapshots = _run_and_report(
         config, positions, velocities, masses,
@@ -215,7 +215,7 @@ def run_small_n_conservation(config: SimulationConfig) -> None:
 
 
 def run_timestep_convergence(config: SimulationConfig) -> None:
-    """Run two_body_orbit at dt, dt/2, dt/4 (same total time) and compare outputs."""
+    """Run star-around-BH IC at dt, dt/2, dt/4 (same total time) and compare outputs."""
     r0 = config.validation_two_body_radius
     v_circ = np.sqrt(config.bh_mass / r0)
     v0 = config.validation_two_body_speed_ratio * v_circ
@@ -251,7 +251,7 @@ def run_timestep_convergence(config: SimulationConfig) -> None:
             "E_drift": abs(E_final - E0),
         })
     base = results[0]
-    print("\n--- Timestep convergence (two_body_orbit) ---")
+    print("\n--- Timestep convergence (bh_orbit_validation IC) ---")
     print("  dt      final_x   final_y   final_r   L_z       E_drift")
     for r in results:
         print("  {:.6f} {:8.4f} {:8.4f} {:8.4f} {:8.4f} {:8.2e}".format(
@@ -263,7 +263,7 @@ def run_timestep_convergence(config: SimulationConfig) -> None:
 
     out = config.output_dir / "validation_timestep_convergence.txt"
     lines = [
-        "Timestep convergence (two_body_orbit)",
+        "Timestep convergence (bh_orbit_validation IC)",
         "dt\tfinal_x\tfinal_y\tfinal_r\tL_z\tE_drift",
     ]
     for r in results:
@@ -272,14 +272,31 @@ def run_timestep_convergence(config: SimulationConfig) -> None:
     print(f"Saved: {out}")
 
 
+def run_earth_moon_benchmark_notice(_config: SimulationConfig) -> None:
+    """Earth–Moon SI benchmark exists only in cpp_sim (galaxy_sim); Python pipeline does not implement it."""
+    print(
+        "simulation_mode=earth_moon_benchmark is implemented by cpp_sim/galaxy_sim (Earth–Moon SI), "
+        "not this Python pipeline. Use: ./cpp_sim/galaxy_sim earth_moon_benchmark"
+    )
+
+
 def run_validation(config: SimulationConfig) -> None:
     """Dispatch to the requested validation mode."""
     mode = config.simulation_mode
     if mode not in VALIDATION_MODES or mode == "galaxy":
         raise ValueError("simulation_mode must be one of: " + ", ".join(VALIDATION_MODES) + " (and not 'galaxy')")
     print("Validation mode:", mode)
-    if mode == "two_body_orbit":
-        run_two_body_orbit(config)
+    if mode == "bh_orbit_validation":
+        run_bh_orbit_validation(config)
+    elif mode == "earth_moon_benchmark":
+        run_earth_moon_benchmark_notice(config)
+    elif mode == "two_body_orbit":
+        print(
+            'Warning: simulation_mode "two_body_orbit" is deprecated in the Python pipeline. '
+            "It previously meant one star + BH; use bh_orbit_validation. "
+            "(In C++, the string two_body_orbit is deprecated: use earth_moon_benchmark for Earth–Moon.)"
+        )
+        run_bh_orbit_validation(config)
     elif mode == "symmetric_pair":
         run_symmetric_pair(config)
     elif mode == "small_n_conservation":

@@ -11,7 +11,7 @@ then produces the same kinds of plots as the Python pipeline:
 
 Animation viewport: default uses **smart framing** — one fixed axis half-range from the **median**
   radial distance of all stars across all snapshots, times 1.2 (see `calculate_smart_bounds`).
-  **Non-galaxy** modes (`two_body_orbit`, `symmetric_pair`, `small_n_conservation`, etc.) use the same
+  **Non-galaxy** modes (`earth_moon_benchmark`, `bh_orbit_validation`, `symmetric_pair`, etc.) use the same
   median × 1.2 rule for **static** PNGs (initial/final), matching animation; `galaxy_radius` in
   run_info is not used as the disk scale for those modes.
   Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
@@ -79,7 +79,7 @@ class Snapshot:
 # Matches cpp_sim/config.hpp enum class SimulationMode (declaration order).
 _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
     0: "galaxy",
-    1: "two_body_orbit",
+    1: "earth_moon_benchmark",  # legacy enum id was two_body_orbit; same IC
     2: "symmetric_pair",
     3: "small_n_conservation",
     4: "timestep_convergence",
@@ -90,6 +90,8 @@ _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
     9: "tpf_newtonian_force_compare",
     10: "tpf_diagnostic_consistency_audit",
     11: "tpf_bound_orbit_sweep",
+    12: "earth_moon_benchmark",
+    13: "bh_orbit_validation",
 }
 
 
@@ -299,7 +301,7 @@ def resolve_galaxy_radius_meters(
     """
     Prefer run_info galaxy_radius for **galaxy** mode only.
 
-    For validation / test modes (two_body_orbit, symmetric_pair, …), config galaxy_radius is often a
+    For validation / test modes (earth_moon_benchmark, bh_orbit_validation, symmetric_pair, …), config galaxy_radius is often a
     leftover disk scale and must not override the true extent; we use max r on the first snapshot
     (then CLI fallback) instead.
     """

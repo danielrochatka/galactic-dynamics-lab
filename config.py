@@ -12,7 +12,15 @@ from pathlib import Path
 from typing import Any
 
 
-VALIDATION_MODES = ("galaxy", "two_body_orbit", "symmetric_pair", "small_n_conservation", "timestep_convergence")
+VALIDATION_MODES = (
+    "galaxy",
+    "earth_moon_benchmark",
+    "bh_orbit_validation",
+    "two_body_orbit",
+    "symmetric_pair",
+    "small_n_conservation",
+    "timestep_convergence",
+)
 
 # Project root (directory containing config.py)
 _PROJECT_ROOT = Path(__file__).resolve().parent
