@@ -30,6 +30,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from text_layout import add_fitted_footer, set_fitted_title
 G_SI = 6.6743e-11
 # Fallback M_bh when run_info has no positive bh_mass (legacy astronomical benchmark only).
 NEWTONIAN_REFERENCE_M_BH = 1.0e41
@@ -313,22 +314,27 @@ def save_rotation_curve_png(
     ax.set_ylim(0.0, y_hi * 1.08)
     ax.set_xlabel("Distance from Galactic Center (m)")
     ax.set_ylabel("Orbital Velocity (m/s)")
-    ax.set_title(f"Rotation curve — {title_suffix}")
+    set_fitted_title(
+        ax,
+        f"Rotation curve — {title_suffix}",
+        fontsize=12,
+        min_fontsize=6,
+    )
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     if provenance_label:
-        fig.text(
-            0.01,
-            0.02,
+        add_fitted_footer(
+            fig,
             provenance_label,
-            transform=fig.transFigure,
+            x=0.01,
+            y=0.02,
             ha="left",
             va="bottom",
             fontsize=7,
+            min_fontsize=5,
             color="gray",
-            alpha=0.9,
-        )
+        ).set_alpha(0.9)
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)
