@@ -11,6 +11,19 @@ import numpy as np
 
 from text_layout import add_fitted_footer, set_fitted_title
 
+from display_units import (
+    SeriesDisplay,
+    SpatialDisplay,
+    apply_suppress_tick_offset,
+    scale_angular_momentum_display,
+    scale_angular_momentum_origin_display,
+    scale_energy_display,
+    series_display_for_galaxy_diagnostics,
+    series_display_for_two_body,
+    series_display_generic_validation,
+    spatial_display_for_xy_plot,
+)
+
 # SI gravitational constant (matches cpp_sim/init_conditions.cpp)
 G_SI = 6.6743e-11
 
@@ -248,19 +261,24 @@ def save_two_body_timeseries_csv(diag: dict[str, np.ndarray | str], output_dir: 
 
 def _save_plot_with_note(
     output_path: Path,
-    time: np.ndarray,
+    time_si: np.ndarray,
     y: np.ndarray,
     ylabel: str,
     title: str,
+    *,
+    series: SeriesDisplay,
     footnote: str | None = None,
 ) -> None:
+    t_plot = np.asarray(time_si, dtype=np.float64) * series.time_factor
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.plot(time, y, color="steelblue", linewidth=1)
-    ax.scatter(time, y, s=8, c="steelblue", zorder=5)
-    ax.set_xlabel("Time (simulation units)")
+    ax.plot(t_plot, y, color="steelblue", linewidth=1)
+    ax.scatter(t_plot, y, s=8, c="steelblue", zorder=5)
+    ax.set_xlabel(f"Time ({series.time_unit})")
     ax.set_ylabel(ylabel)
     set_fitted_title(ax, title, fontsize=12, min_fontsize=6)
     ax.grid(True, alpha=0.3)
+    if series.suppress_tick_offset:
+        apply_suppress_tick_offset(ax)
     if footnote:
         add_fitted_footer(fig, footnote, fontsize=8, min_fontsize=5)
     fig.tight_layout()
@@ -271,24 +289,57 @@ def _save_plot_with_note(
 
 def _save_plot(
     output_path: Path,
-    time: np.ndarray,
-    y: np.ndarray,
+    time_si: np.ndarray,
+    y_si: np.ndarray,
     ylabel: str,
     title: str,
+    *,
+    series: SeriesDisplay,
+    y_scale: float,
     footnote: str | None = None,
 ) -> None:
-    """Time-series plot: x-axis is simulation time, one point per snapshot."""
+    """Time-series plot: SI arrays converted to display units via series + y_scale."""
+    t_plot = np.asarray(time_si, dtype=np.float64) * series.time_factor
+    y_plot = np.asarray(y_si, dtype=np.float64) * float(y_scale)
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(time, y, color="steelblue", linewidth=1)
-    ax.scatter(time, y, s=8, c="steelblue", zorder=5)  # show every snapshot point
-    ax.set_xlabel("Time (simulation units)")
+    ax.plot(t_plot, y_plot, color="steelblue", linewidth=1)
+    ax.scatter(t_plot, y_plot, s=8, c="steelblue", zorder=5)  # show every snapshot point
+    ax.set_xlabel(f"Time ({series.time_unit})")
     ax.set_ylabel(ylabel)
     set_fitted_title(ax, title, fontsize=12, min_fontsize=6)
     ax.grid(True, alpha=0.3)
+    if series.suppress_tick_offset:
+        apply_suppress_tick_offset(ax)
     if footnote:
         add_fitted_footer(fig, footnote, fontsize=8, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.18 if footnote else 0.12)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
+def _save_plot_fraction(
+    output_path: Path,
+    time_si: np.ndarray,
+    y: np.ndarray,
+    ylabel: str,
+    title: str,
+    *,
+    series: SeriesDisplay,
+) -> None:
+    """Dimensionless fraction vs time (y in [0,1]); only time axis uses display units."""
+    t_plot = np.asarray(time_si, dtype=np.float64) * series.time_factor
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(t_plot, y, color="steelblue", linewidth=1)
+    ax.scatter(t_plot, y, s=8, c="steelblue", zorder=5)
+    ax.set_xlabel(f"Time ({series.time_unit})")
+    ax.set_ylabel(ylabel)
+    set_fitted_title(ax, title, fontsize=12, min_fontsize=6)
+    ax.grid(True, alpha=0.3)
+    if series.suppress_tick_offset:
+        apply_suppress_tick_offset(ax)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.12)
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
 
@@ -301,8 +352,9 @@ def plot_two_body_pair_diagnostics(
     title_suffix: str = "",
     footnote: str | None = None,
     context_label: str = "",
+    series: SeriesDisplay,
 ) -> None:
-    """Primary PNG set for two-body modes."""
+    """Primary PNG set for two-body modes (display units from `series`; data arrays remain SI in memory)."""
     suf = (" " + title_suffix.strip()) if title_suffix.strip() else ""
     tpf_note = (
         "Newtonian equivalent only for TPFCore — not a TPF conserved scalar."
@@ -311,49 +363,62 @@ def plot_two_body_pair_diagnostics(
     )
     t = diag["time"]
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
+    disp_note = "Axes use display units; CSV remains SI."
+    foot_disp = (footnote + " | " + disp_note) if footnote else disp_note
     _save_plot(
         output_dir / "diagnostic_pair_separation.png",
         t,
         diag["pair_separation"],
-        "Pair separation (m)",
+        f"Pair separation ({series.distance_unit})",
         ctx + "Primary: pair separation |Δr| vs time (lab-frame positions)" + suf,
-        footnote=footnote,
+        series=series,
+        y_scale=series.distance_factor,
+        footnote=foot_disp,
     )
     _save_plot(
         output_dir / "diagnostic_pair_relative_speed.png",
         t,
         diag["pair_relative_speed"],
-        "Pair relative speed (m/s)",
+        f"Pair relative speed ({series.speed_unit})",
         ctx + "Primary: |Δv| vs time (lab-frame velocities)" + suf,
-        footnote=footnote,
+        series=series,
+        y_scale=series.speed_factor,
+        footnote=foot_disp,
     )
     _save_plot(
         output_dir / "diagnostic_com_radius.png",
         t,
         diag["center_of_mass_radius"],
-        "|R_COM| from origin (m)",
+        f"|R_COM| from origin ({series.distance_unit})",
         ctx + "Primary: COM radius in lab frame (drift here is not 'escape' of the pair)" + suf,
-        footnote=footnote,
+        series=series,
+        y_scale=series.distance_factor,
+        footnote=foot_disp,
     )
-    _save_plot(
+    Lz_plot, Lz_ylab = scale_angular_momentum_display(np.asarray(diag["relative_angular_momentum_z"]))
+    _save_plot_with_note(
         output_dir / "diagnostic_relative_angular_momentum_z.png",
         t,
-        diag["relative_angular_momentum_z"],
-        "L_z about COM (SI)",
+        Lz_plot,
+        Lz_ylab,
         ctx + "Primary: angular momentum about center of mass (z)" + suf,
-        footnote=footnote,
+        series=series,
+        footnote=foot_disp,
     )
     E = diag["newtonian_specific_energy"]
     if np.any(np.isfinite(E)):
         e_foot = tpf_note
         if footnote:
             e_foot = (tpf_note + " | " + footnote) if tpf_note else footnote
+        e_foot = (e_foot + " | " + disp_note) if e_foot else disp_note
+        E_plot, E_ylab = scale_energy_display(np.asarray(E))
         _save_plot_with_note(
             output_dir / "diagnostic_relative_energy.png",
             t,
-            E,
-            "Newtonian specific energy (J/kg)",
-            ctx + "Primary: Newtonian_reference specific mechanical energy (see README)" + suf,
+            E_plot,
+            E_ylab,
+            ctx + "Primary: Newtonian specific mechanical energy (see README)" + suf,
+            series=series,
             footnote=e_foot,
         )
 
@@ -404,10 +469,14 @@ def plot_bh_orbit_validation_extras(
     bh_orbit_validation only: orbit in x–y, separation with periapsis/apoapsis markers, zoomed orbit shape.
     """
     foot = bh_orbit_validation_plot_footnote(physics_package, tpf_vdsg_coupling)
+    foot = foot + " | Axes: display units; CSV SI."
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
     t = diag["time"]
     sep = np.asarray(diag["pair_separation"], dtype=np.float64)
     mins_i, maxs_i = _local_extrema_indices(sep)
+    series = series_display_for_two_body(
+        "bh_orbit_validation", max_distance_m=float(np.max(sep)) if sep.size else 1.0
+    )
 
     fig, ax = plt.subplots(figsize=(8, 8))
     xs: list[float] = []
@@ -417,12 +486,19 @@ def plot_bh_orbit_validation_extras(
         if p.shape[0] >= 1:
             xs.append(float(p[0, 0]))
             ys.append(float(p[0, 1]))
-    ax.plot(xs, ys, "-", color="steelblue", lw=1.2, label="Star path (lab frame)")
-    ax.scatter(xs, ys, s=10, c="steelblue", zorder=5)
+    xs_a = np.array(xs, dtype=np.float64)
+    ys_a = np.array(ys, dtype=np.float64)
+    r_arr = np.hypot(xs_a, ys_a)
+    half_extent = float(np.nanmax(r_arr)) * 1.2 if r_arr.size else 1.0
+    spatial: SpatialDisplay = spatial_display_for_xy_plot("bh_orbit_validation", half_extent)
+    xf = spatial.factor
+    u = spatial.unit
+    ax.plot(xs_a * xf, ys_a * xf, "-", color="steelblue", lw=1.2, label="Star path (lab frame)")
+    ax.scatter(xs_a * xf, ys_a * xf, s=10, c="steelblue", zorder=5)
     ax.scatter([0.0], [0.0], s=120, c="black", marker="*", zorder=6, label="BH at origin")
     ax.set_aspect("equal", adjustable="datalim")
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
+    ax.set_xlabel(f"x ({u})")
+    ax.set_ylabel(f"y ({u})")
     set_fitted_title(
         ax,
         ctx + "Primary: trajectory x-y (one star, fixed BH at origin) (experimental)",
@@ -431,24 +507,27 @@ def plot_bh_orbit_validation_extras(
     )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
+    apply_suppress_tick_offset(ax)
     add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.14)
     fig.savefig(output_dir / "bh_orbit_trajectory_xy.png", dpi=150)
     plt.close(fig)
 
-    r_arr = np.hypot(np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64))
     r_max = float(np.nanmax(r_arr)) if r_arr.size else 1.0
     zoom = max(r_max * 1.25, 1.0)
+    spatial_z = spatial_display_for_xy_plot("bh_orbit_validation", zoom)
+    xfz = spatial_z.factor
+    uz = spatial_z.unit
     fig, ax = plt.subplots(figsize=(7, 7))
-    ax.plot(xs, ys, "-", color="#1f77b4", lw=1.2)
-    ax.scatter(xs, ys, s=8, c="#1f77b4", zorder=5)
+    ax.plot(xs_a * xfz, ys_a * xfz, "-", color="#1f77b4", lw=1.2)
+    ax.scatter(xs_a * xfz, ys_a * xfz, s=8, c="#1f77b4", zorder=5)
     ax.scatter([0.0], [0.0], s=100, c="black", marker="*", zorder=6)
     ax.set_aspect("equal", adjustable="datalim")
-    ax.set_xlim(-zoom, zoom)
-    ax.set_ylim(-zoom, zoom)
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
+    ax.set_xlim(-zoom * xfz, zoom * xfz)
+    ax.set_ylim(-zoom * xfz, zoom * xfz)
+    ax.set_xlabel(f"x ({uz})")
+    ax.set_ylabel(f"y ({uz})")
     set_fitted_title(
         ax,
         ctx + "Primary: trajectory x-y zoom to extent (experimental)",
@@ -456,21 +535,24 @@ def plot_bh_orbit_validation_extras(
         min_fontsize=6,
     )
     ax.grid(True, alpha=0.3)
+    apply_suppress_tick_offset(ax)
     add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.12)
     fig.savefig(output_dir / "bh_orbit_trajectory_xy_zoom.png", dpi=150)
     plt.close(fig)
 
+    t_plot = np.asarray(t, dtype=np.float64) * series.time_factor
+    sep_plot = sep * series.distance_factor
     fig, ax = plt.subplots(figsize=(9, 4.5))
-    ax.plot(t, sep, "-", color="steelblue", lw=1.2, label="|r_star| (vs origin)")
-    ax.scatter(t, sep, s=8, c="steelblue", zorder=5)
+    ax.plot(t_plot, sep_plot, "-", color="steelblue", lw=1.2, label=f"|r_star| ({series.distance_unit})")
+    ax.scatter(t_plot, sep_plot, s=8, c="steelblue", zorder=5)
     for idx in mins_i[:12]:
-        ax.axvline(float(t[idx]), color="#2ca02c", ls="--", lw=0.8, alpha=0.7)
+        ax.axvline(float(t_plot[idx]), color="#2ca02c", ls="--", lw=0.8, alpha=0.7)
     for idx in maxs_i[:12]:
-        ax.axvline(float(t[idx]), color="#d62728", ls=":", lw=0.8, alpha=0.7)
-    ax.set_xlabel("Time (simulation units)")
-    ax.set_ylabel("Separation (m)")
+        ax.axvline(float(t_plot[idx]), color="#d62728", ls=":", lw=0.8, alpha=0.7)
+    ax.set_xlabel(f"Time ({series.time_unit})")
+    ax.set_ylabel(f"Separation ({series.distance_unit})")
     set_fitted_title(
         ax,
         ctx + "Primary: star–BH separation vs time (green dashed ≈ periapsis-like minima; "
@@ -480,11 +562,33 @@ def plot_bh_orbit_validation_extras(
     )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
+    apply_suppress_tick_offset(ax)
     add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.18)
     fig.savefig(output_dir / "bh_orbit_separation_extrema.png", dpi=150)
     plt.close(fig)
+
+
+def _series_for_bulk_diagnostics(
+    simulation_mode: str,
+    two_body_secondary: bool,
+    diagnostics: dict[str, np.ndarray],
+    cutoff_radius: float,
+) -> SeriesDisplay:
+    max_r = max(
+        float(np.max(diagnostics["median_r"])),
+        float(np.max(diagnostics["mean_r"])),
+        float(np.max(diagnostics["std_r"])),
+        float(np.max(diagnostics["max_r"])),
+        float(cutoff_radius),
+    )
+    max_t = float(np.max(diagnostics["time"]))
+    if two_body_secondary and simulation_mode == "earth_moon_benchmark":
+        return series_display_for_two_body("earth_moon_benchmark", max_distance_m=max_r)
+    if simulation_mode == "galaxy":
+        return series_display_for_galaxy_diagnostics(max_r, max_t)
+    return series_display_generic_validation(max_r)
 
 
 def plot_and_save_all(
@@ -494,6 +598,8 @@ def plot_and_save_all(
     *,
     lab_frame_secondary: bool = False,
     context_label: str = "",
+    simulation_mode: str = "galaxy",
+    two_body_secondary: bool = False,
 ) -> None:
     """
     Save one PNG per diagnostic in output_dir (one point per snapshot, time = simulation time).
@@ -507,52 +613,82 @@ def plot_and_save_all(
         else ""
     )
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
+    series = _series_for_bulk_diagnostics(
+        simulation_mode, two_body_secondary, diagnostics, cutoff_radius
+    )
+    disp_note = "Axes use display units; CSV remains SI."
     t = diagnostics["time"]
+    du = series.distance_unit
     _save_plot(
         output_dir / "diagnostic_median_radius.png",
-        t, diagnostics["median_r"],
-        "Median radius from origin (m)",
-        ctx + prefix + "Median |r| from origin vs time",
+        t,
+        diagnostics["median_r"],
+        f"Median radius from origin ({du})",
+        ctx + prefix + "Median |r| from origin vs time | " + disp_note,
+        series=series,
+        y_scale=series.distance_factor,
     )
     _save_plot(
         output_dir / "diagnostic_mean_radius.png",
-        t, diagnostics["mean_r"],
-        "Mean radius from origin (m)",
-        ctx + prefix + "Mean |r| from origin vs time",
+        t,
+        diagnostics["mean_r"],
+        f"Mean radius from origin ({du})",
+        ctx + prefix + "Mean |r| from origin vs time | " + disp_note,
+        series=series,
+        y_scale=series.distance_factor,
     )
     _save_plot(
         output_dir / "diagnostic_std_radius.png",
-        t, diagnostics["std_r"],
-        "Std of |r| from origin (m)",
-        ctx + prefix + "Std of star radii from origin vs time",
+        t,
+        diagnostics["std_r"],
+        f"Std of |r| from origin ({du})",
+        ctx + prefix + "Std of star radii from origin vs time | " + disp_note,
+        series=series,
+        y_scale=series.distance_factor,
     )
     _save_plot(
         output_dir / "diagnostic_max_radius.png",
-        t, diagnostics["max_r"],
-        "Max radius from origin (m)",
-        ctx + prefix + "Max |r| from origin vs time",
+        t,
+        diagnostics["max_r"],
+        f"Max radius from origin ({du})",
+        ctx + prefix + "Max |r| from origin vs time | " + disp_note,
+        series=series,
+        y_scale=series.distance_factor,
     )
-    _save_plot(
+    _save_plot_fraction(
         output_dir / "diagnostic_frac_vr_positive.png",
-        t, diagnostics["frac_vr_pos"],
+        t,
+        diagnostics["frac_vr_pos"],
         "Fraction with v_r > 0 (origin radial)",
-        ctx + prefix + "Fraction of bodies with v_r > 0 vs time",
+        ctx + prefix + "Fraction of bodies with v_r > 0 vs time | " + disp_note,
+        series=series,
     )
-    _save_plot(
+    _save_plot_fraction(
         output_dir / "diagnostic_frac_vr_negative.png",
-        t, diagnostics["frac_vr_neg"],
+        t,
+        diagnostics["frac_vr_neg"],
         "Fraction with v_r < 0 (origin radial)",
-        ctx + prefix + "Fraction of bodies with v_r < 0 vs time",
+        ctx + prefix + "Fraction of bodies with v_r < 0 vs time | " + disp_note,
+        series=series,
     )
-    _save_plot(
+    cut_disp = float(cutoff_radius) * series.distance_factor
+    _save_plot_fraction(
         output_dir / "diagnostic_frac_beyond_cutoff.png",
-        t, diagnostics["frac_beyond_cutoff"],
-        f"Fraction beyond r = {cutoff_radius} (origin)",
-        ctx + prefix + f"Fraction of bodies beyond r = {cutoff_radius} vs time",
+        t,
+        diagnostics["frac_beyond_cutoff"],
+        "Fraction beyond cutoff (origin radial)",
+        ctx
+        + prefix
+        + f"Fraction beyond r = {cut_disp:.6g} {du} (diagnostic cutoff; display) vs time | "
+        + disp_note,
+        series=series,
     )
-    _save_plot(
+    Lz_plot, Lz_ylab = scale_angular_momentum_origin_display(np.asarray(diagnostics["L_z"]))
+    _save_plot_with_note(
         output_dir / "diagnostic_angular_momentum_z.png",
-        t, diagnostics["L_z"],
-        "Total L_z about origin (SI)",
-        ctx + prefix + "Total L_z about simulation origin vs time",
+        t,
+        Lz_plot,
+        Lz_ylab,
+        ctx + prefix + "Total L_z about simulation origin vs time | " + disp_note,
+        series=series,
     )

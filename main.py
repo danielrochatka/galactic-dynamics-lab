@@ -26,6 +26,7 @@ from physics import (
     compute_kinetic_energy,
     compute_potential_energy,
 )
+from display_units import spatial_display_for_xy_plot
 from render import create_animation, has_ffmpeg, save_static_plot, save_radial_velocity_plot
 from simulation import run_simulation
 from diagnostics import compute_diagnostics, plot_and_save_all
@@ -76,6 +77,7 @@ def main() -> None:
     print()
 
     # Static initial plot
+    sd_render = spatial_display_for_xy_plot("galaxy", float(config.render_radius))
     if config.render_initial_final:
         init_path = config.output_dir / "galaxy_initial.png"
         save_static_plot(
@@ -83,6 +85,7 @@ def main() -> None:
             init_path,
             title="Galaxy – Initial",
             render_radius=config.render_radius,
+            spatial_display=sd_render,
         )
         print(f"Saved: {init_path}")
 
@@ -140,6 +143,7 @@ def main() -> None:
             final_path,
             title="Galaxy – Final",
             render_radius=config.render_radius,
+            spatial_display=sd_render,
         )
         print(f"Saved: {final_path}")
 
@@ -157,6 +161,8 @@ def main() -> None:
             render_radius=config.render_radius,
             interval=50,
             progress_interval=50,
+            spatial_display=sd_render,
+            simulation_mode="galaxy",
         )
         if not success:
             print("  Animation save failed (install ffmpeg or Pillow)")
@@ -169,7 +175,13 @@ def main() -> None:
         snapshots, masses, config.diagnostic_cutoff_radius
     )
     if config.render_diagnostics:
-        plot_and_save_all(diag, config.output_dir, config.diagnostic_cutoff_radius)
+        plot_and_save_all(
+            diag,
+            config.output_dir,
+            config.diagnostic_cutoff_radius,
+            simulation_mode="galaxy",
+            two_body_secondary=False,
+        )
         for name in [
             "diagnostic_median_radius.png",
             "diagnostic_mean_radius.png",

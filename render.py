@@ -14,6 +14,12 @@ import numpy as np
 
 from text_layout import set_fitted_title
 
+from display_units import (
+    SpatialDisplay,
+    apply_suppress_tick_offset,
+    format_animation_time_caption,
+)
+
 RenderRadius = Union[float, Callable[..., float]]
 
 
@@ -33,13 +39,17 @@ def _resolve_render_radius(
     return float(render_radius)
 
 
-def _setup_axes(ax: plt.Axes, render_radius: float) -> None:
-    """Configure axes: equal aspect, fixed range."""
+def _setup_axes(
+    ax: plt.Axes,
+    display_half_extent: float,
+    xy_unit: str,
+) -> None:
+    """Configure axes: equal aspect, fixed range in display length units."""
     ax.set_aspect("equal")
-    ax.set_xlim(-render_radius, render_radius)
-    ax.set_ylim(-render_radius, render_radius)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    ax.set_xlim(-display_half_extent, display_half_extent)
+    ax.set_ylim(-display_half_extent, display_half_extent)
+    ax.set_xlabel(f"x ({xy_unit})")
+    ax.set_ylabel(f"y ({xy_unit})")
 
 
 def scatter_frame(
@@ -50,16 +60,20 @@ def scatter_frame(
     velocities: Optional[np.ndarray] = None,
     star_size: float = 2.0,
     bh_size: float = 80.0,
+    spatial_display: Optional[SpatialDisplay] = None,
 ) -> None:
-    """Draw one frame: black hole + stars."""
+    """Draw one frame: black hole + stars. Positions are SI (m); axes use display units when set."""
     ax.clear()
-    r = _resolve_render_radius(render_radius, positions, velocities)
-    _setup_axes(ax, r)
+    r_m = _resolve_render_radius(render_radius, positions, velocities)
+    sd = spatial_display if spatial_display is not None else SpatialDisplay(1.0, "m")
+    f = sd.factor
+    r_disp = r_m * f
+    _setup_axes(ax, r_disp, sd.unit)
 
     # Stars
     ax.scatter(
-        positions[:, 0],
-        positions[:, 1],
+        positions[:, 0] * f,
+        positions[:, 1] * f,
         s=star_size,
         c="white",
         edgecolors="none",
@@ -68,8 +82,8 @@ def scatter_frame(
     )
     # Black hole
     ax.scatter(
-        [bh_position[0]],
-        [bh_position[1]],
+        [bh_position[0] * f],
+        [bh_position[1] * f],
         s=bh_size,
         c="yellow",
         marker="*",
@@ -77,6 +91,7 @@ def scatter_frame(
         linewidths=0.5,
         zorder=10,
     )
+    apply_suppress_tick_offset(ax)
 
 
 def _radial_velocity(positions: np.ndarray, velocities: np.ndarray) -> np.ndarray:
@@ -100,7 +115,8 @@ def save_radial_velocity_plot(
     ax.tick_params(colors="gray")
     for spine in ax.spines.values():
         spine.set_color("gray")
-    _setup_axes(ax, render_radius)
+    sd = SpatialDisplay(1.0, "m")
+    _setup_axes(ax, render_radius * sd.factor, sd.unit)
 
     # Diverging colormap: blue = inward (v_r < 0), red = outward (v_r > 0)
     v_abs_max = float(np.nanmax(np.abs(vr))) if np.any(np.isfinite(vr)) else 1.0
@@ -145,8 +161,9 @@ def save_static_plot(
     run_info: Optional[dict[str, Any]] = None,
     overlay_step: int = 0,
     overlay_time: float = 0.0,
+    spatial_display: Optional[SpatialDisplay] = None,
 ) -> None:
-    """Save a single static scatter plot."""
+    """Save a single static scatter plot. Positions remain SI; axes use display units when provided."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
     ax.set_facecolor("black")
     ax.tick_params(colors="gray")
@@ -155,7 +172,13 @@ def save_static_plot(
     ax.spines["left"].set_color("gray")
     ax.spines["right"].set_color("gray")
 
-    scatter_frame(ax, positions, render_radius=render_radius, velocities=velocities)
+    scatter_frame(
+        ax,
+        positions,
+        render_radius=render_radius,
+        velocities=velocities,
+        spatial_display=spatial_display,
+    )
     set_fitted_title(ax, title, color="white", fontsize=14, min_fontsize=6)
     if (
         overlay_mode != "none"
@@ -188,6 +211,8 @@ def create_animation(
     overlay_mode: str = "none",
     overlay_spec: Optional[dict[str, Any]] = None,
     run_info: Optional[dict[str, Any]] = None,
+    spatial_display: Optional[SpatialDisplay] = None,
+    simulation_mode: str = "galaxy",
 ) -> bool:
     """
     Create animation (MP4 or GIF) from snapshots.
@@ -211,9 +236,14 @@ def create_animation(
         snap = snapshots[frame_idx]
         vel = getattr(snap, "velocities", None)
         scatter_frame(
-            ax, snap.positions, render_radius=render_radius, velocities=vel
+            ax,
+            snap.positions,
+            render_radius=render_radius,
+            velocities=vel,
+            spatial_display=spatial_display,
         )
-        ax.set_title(f"Step {snap.step}  |  t = {snap.time:.1f}", color="white")
+        tc = format_animation_time_caption(float(snap.time), simulation_mode)
+        ax.set_title(f"Step {snap.step}  |  {tc}", color="white")
         if (
             overlay_mode != "none"
             and overlay_spec is not None

@@ -63,6 +63,7 @@ from diagnostics import (
     save_two_body_timeseries_csv,
     write_two_body_diagnostics_readme,
 )
+from display_units import series_display_for_two_body, spatial_display_for_xy_plot
 from plot_rotation_curve import (
     load_run_info,
     newtonian_m_bh_from_run_info,
@@ -763,6 +764,18 @@ def main() -> None:
             "(median r × 1.2 over plotted snapshots; same convention as animation smart framing)"
         )
 
+    if mode_name == "galaxy":
+        spatial_half_axis_m = max(float(render_radius_initial), float(render_radius_final))
+    else:
+        spatial_half_axis_m = float(
+            calculate_smart_bounds(
+                run_dir,
+                fallback=fallback_radius,
+                snapshot_paths=filtered_paths,
+            )
+        )
+    spatial_display = spatial_display_for_xy_plot(mode_name, spatial_half_axis_m)
+
     burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
     legacy_initial_title = initial_snapshot_plot_title(
@@ -789,6 +802,7 @@ def main() -> None:
         velocities=initial.velocities,
         overlay_step=initial.step,
         overlay_time=float(initial.time),
+        spatial_display=spatial_display,
         **overlay_kw,
     )
     write_compat_alias(initial_mode_aware, initial_legacy)
@@ -801,6 +815,7 @@ def main() -> None:
         velocities=final.velocities,
         overlay_step=final.step,
         overlay_time=float(final.time),
+        spatial_display=spatial_display,
         **overlay_kw,
     )
     write_compat_alias(final_mode_aware, final_legacy)
@@ -884,6 +899,8 @@ def main() -> None:
             render_radius=render_radius_cb,
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
+            spatial_display=spatial_display,
+            simulation_mode=mode_name,
             **overlay_kw,
         )
         if ok:
@@ -923,6 +940,11 @@ def main() -> None:
                 )
                 save_two_body_timeseries_csv(pair_diag, run_dir)
                 write_two_body_diagnostics_readme(run_dir, mode_name, physics_pkg)
+                max_pair_d = max(
+                    float(np.max(pair_diag["pair_separation"])),
+                    float(np.max(pair_diag["center_of_mass_radius"])),
+                )
+                pair_series = series_display_for_two_body(mode_name, max_distance_m=max_pair_d)
                 if mode_name == "bh_orbit_validation":
                     vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
                     vdsg_f = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
@@ -935,13 +957,18 @@ def main() -> None:
                         title_suffix=title_suf,
                         footnote=foot,
                         context_label=title_context,
+                        series=pair_series,
                     )
                     plot_bh_orbit_validation_extras(
                         snapshots, pair_diag, run_dir, physics_pkg, vdsg_f, context_label=title_context
                     )
                 else:
                     plot_two_body_pair_diagnostics(
-                        pair_diag, run_dir, physics_pkg, context_label=title_context
+                        pair_diag,
+                        run_dir,
+                        physics_pkg,
+                        context_label=title_context,
+                        series=pair_series,
                     )
                 write_compat_alias(
                     run_dir / "diagnostic_two_body_timeseries.csv",
@@ -1003,7 +1030,13 @@ def main() -> None:
                 print(f"Warning: primary two-body diagnostics skipped: {exc}")
             diag = compute_diagnostics(snapshots, masses, cutoff)
             plot_and_save_all(
-                diag, run_dir, cutoff, lab_frame_secondary=True, context_label=title_context
+                diag,
+                run_dir,
+                cutoff,
+                lab_frame_secondary=True,
+                context_label=title_context,
+                simulation_mode=mode_name,
+                two_body_secondary=True,
             )
             secondary_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",
@@ -1027,7 +1060,14 @@ def main() -> None:
             )
         else:
             diag = compute_diagnostics(snapshots, masses, cutoff)
-            plot_and_save_all(diag, run_dir, cutoff, context_label=title_context)
+            plot_and_save_all(
+                diag,
+                run_dir,
+                cutoff,
+                context_label=title_context,
+                simulation_mode=mode_name,
+                two_body_secondary=False,
+            )
             galaxy_diag_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",
                 "diagnostic_mean_radius.png": "mean_radius_origin",

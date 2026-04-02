@@ -31,6 +31,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from text_layout import add_fitted_footer, set_fitted_title
+
+from display_units import apply_suppress_tick_offset, rotation_curve_display
+
 G_SI = 6.6743e-11
 # Fallback M_bh when run_info has no positive bh_mass (legacy astronomical benchmark only).
 NEWTONIAN_REFERENCE_M_BH = 1.0e41
@@ -284,10 +287,17 @@ def save_rotation_curve_png(
     if newtonian_label is None:
         newtonian_label = f"Newtonian √(GM_bh/r), M_bh={M_bh:.6g} kg (κ-independent)"
 
+    rf, vf, xl, yl = rotation_curve_display(x_max)
+    r_plot_d = r_plot * rf
+    v_plot_d = v_plot * vf
+    r_line_d = r_line * rf
+    v_newton_d = v_newton * vf
+    x_max_d = x_max * rf
+
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.scatter(
-        r_plot,
-        v_plot,
+        r_plot_d,
+        v_plot_d,
         s=5,
         alpha=0.6,
         c="blue",
@@ -295,25 +305,26 @@ def save_rotation_curve_png(
         label=scatter_label,
     )
     ax.plot(
-        r_line,
-        v_newton,
+        r_line_d,
+        v_newton_d,
         "r--",
         linewidth=2,
         label=newtonian_label,
     )
-    ax.set_xlim(0.0, x_max)  # disk-focused cap from rotation_curve_x_max (e.g. 2× galaxy_radius)
+    ax.set_xlim(0.0, x_max_d)  # disk-focused cap from rotation_curve_x_max (e.g. 2× galaxy_radius)
     # Auto-fit y-axis to the disk-dominated bulk so a few extreme escapers do not flatten the plot.
-    if len(v_plot):
-        y_candidates = np.concatenate([v_plot, v_newton])
+    if len(v_plot_d):
+        y_candidates = np.concatenate([v_plot_d, v_newton_d])
     else:
-        y_candidates = np.concatenate([v_s, v_newton])
+        y_candidates = np.concatenate([v_s * vf, v_newton_d])
     # Robust cap: keep almost all points while suppressing pathological outliers.
     y_hi = float(np.percentile(y_candidates, 99.5))
     if not np.isfinite(y_hi) or y_hi <= 0.0:
         y_hi = float(np.max(y_candidates)) if len(y_candidates) else 1.0
     ax.set_ylim(0.0, y_hi * 1.08)
-    ax.set_xlabel("Distance from Galactic Center (m)")
-    ax.set_ylabel("Orbital Velocity (m/s)")
+    ax.set_xlabel(xl)
+    ax.set_ylabel(yl)
+    apply_suppress_tick_offset(ax)
     set_fitted_title(
         ax,
         f"Rotation curve — {title_suffix}",
@@ -323,18 +334,19 @@ def save_rotation_curve_png(
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    if provenance_label:
-        add_fitted_footer(
-            fig,
-            provenance_label,
-            x=0.01,
-            y=0.02,
-            ha="left",
-            va="bottom",
-            fontsize=7,
-            min_fontsize=5,
-            color="gray",
-        ).set_alpha(0.9)
+    disp_note = "Axes: display units; snapshot CSV SI."
+    foot_txt = (provenance_label + " | " + disp_note) if provenance_label else disp_note
+    add_fitted_footer(
+        fig,
+        foot_txt,
+        x=0.01,
+        y=0.02,
+        ha="left",
+        va="bottom",
+        fontsize=7,
+        min_fontsize=5,
+        color="gray",
+    ).set_alpha(0.9)
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)
