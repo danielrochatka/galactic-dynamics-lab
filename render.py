@@ -19,35 +19,41 @@ from display_units import (
     apply_suppress_tick_offset,
     format_animation_time_caption,
 )
+from framing import SquareViewport
 
-RenderRadius = Union[float, Callable[..., float]]
+# float: centered origin; SquareViewport: explicit center + half-axis; callable: from current positions
+ViewportSpec = Union[float, SquareViewport, Callable[[np.ndarray, Optional[np.ndarray]], SquareViewport]]
 
 
-def _resolve_render_radius(
-    render_radius: RenderRadius,
+def _resolve_square_viewport(
+    spec: ViewportSpec,
     positions: np.ndarray,
     velocities: Optional[np.ndarray] = None,
-) -> float:
-    if callable(render_radius):
+) -> SquareViewport:
+    if isinstance(spec, SquareViewport):
+        return spec
+    if callable(spec):
         if (
             velocities is not None
             and velocities.size > 0
             and len(velocities) == len(positions)
         ):
-            return float(render_radius(positions, velocities))
-        return float(render_radius(positions))
-    return float(render_radius)
+            return spec(positions, velocities)
+        return spec(positions, None)
+    return SquareViewport.centered_origin(float(spec))
 
 
-def _setup_axes(
+def _setup_axes_square(
     ax: plt.Axes,
+    center_x: float,
+    center_y: float,
     display_half_extent: float,
     xy_unit: str,
 ) -> None:
-    """Configure axes: equal aspect, fixed range in display length units."""
+    """Equal-aspect square |x-cx|,|y-cy| <= half (display length units)."""
     ax.set_aspect("equal")
-    ax.set_xlim(-display_half_extent, display_half_extent)
-    ax.set_ylim(-display_half_extent, display_half_extent)
+    ax.set_xlim(center_x - display_half_extent, center_x + display_half_extent)
+    ax.set_ylim(center_y - display_half_extent, center_y + display_half_extent)
     ax.set_xlabel(f"x ({xy_unit})")
     ax.set_ylabel(f"y ({xy_unit})")
 
@@ -56,7 +62,7 @@ def scatter_frame(
     ax: plt.Axes,
     positions: np.ndarray,
     bh_position: tuple[float, float] = (0.0, 0.0),
-    render_radius: RenderRadius = 150.0,
+    render_radius: ViewportSpec = 150.0,
     velocities: Optional[np.ndarray] = None,
     star_size: float = 2.0,
     bh_size: float = 80.0,
@@ -64,11 +70,13 @@ def scatter_frame(
 ) -> None:
     """Draw one frame: black hole + stars. Positions are SI (m); axes use display units when set."""
     ax.clear()
-    r_m = _resolve_render_radius(render_radius, positions, velocities)
+    vp = _resolve_square_viewport(render_radius, positions, velocities)
     sd = spatial_display if spatial_display is not None else SpatialDisplay(1.0, "m")
     f = sd.factor
-    r_disp = r_m * f
-    _setup_axes(ax, r_disp, sd.unit)
+    cx = vp.center_x * f
+    cy = vp.center_y * f
+    h_disp = vp.half_axis * f
+    _setup_axes_square(ax, cx, cy, h_disp, sd.unit)
 
     # Stars
     ax.scatter(
@@ -116,7 +124,8 @@ def save_radial_velocity_plot(
     for spine in ax.spines.values():
         spine.set_color("gray")
     sd = SpatialDisplay(1.0, "m")
-    _setup_axes(ax, render_radius * sd.factor, sd.unit)
+    h = float(render_radius) * sd.factor
+    _setup_axes_square(ax, 0.0, 0.0, h, sd.unit)
 
     # Diverging colormap: blue = inward (v_r < 0), red = outward (v_r > 0)
     v_abs_max = float(np.nanmax(np.abs(vr))) if np.any(np.isfinite(vr)) else 1.0
@@ -153,7 +162,7 @@ def save_static_plot(
     positions: np.ndarray,
     output_path: Path,
     title: str = "Galaxy",
-    render_radius: RenderRadius = 150.0,
+    render_radius: ViewportSpec = 150.0,
     velocities: Optional[np.ndarray] = None,
     *,
     overlay_mode: str = "none",
@@ -204,7 +213,7 @@ def save_static_plot(
 def create_animation(
     snapshots: list,
     output_path: Path,
-    render_radius: RenderRadius = 150.0,
+    render_radius: ViewportSpec = 150.0,
     interval: int = 50,
     progress_interval: int = 50,
     *,
@@ -213,6 +222,7 @@ def create_animation(
     run_info: Optional[dict[str, Any]] = None,
     spatial_display: Optional[SpatialDisplay] = None,
     simulation_mode: str = "galaxy",
+    mutable_frame_index: Optional[dict[str, int]] = None,
 ) -> bool:
     """
     Create animation (MP4 or GIF) from snapshots.
@@ -233,6 +243,8 @@ def create_animation(
     ax.spines["right"].set_color("gray")
 
     def animate(frame_idx: int) -> list:
+        if mutable_frame_index is not None:
+            mutable_frame_index["i"] = int(frame_idx)
         snap = snapshots[frame_idx]
         vel = getattr(snap, "velocities", None)
         scatter_frame(

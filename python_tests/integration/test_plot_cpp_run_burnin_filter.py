@@ -1,4 +1,4 @@
-"""Integration tests for plot_cpp_run burn-in filtering and smart bounds."""
+"""Integration tests for plot_cpp_run burn-in filtering and geometric framing."""
 
 from __future__ import annotations
 
@@ -80,19 +80,34 @@ class TestPlotCppRunBurninFilter(unittest.TestCase):
             )
             self.assertEqual([s.step for _, s in out], [10, 15])
 
-    def test_smart_bounds_uses_filtered_paths(self) -> None:
+    def test_geometric_framing_respects_filtered_snapshots(self) -> None:
+        """Burn-in should shrink the global viewport when outlier early snapshots are dropped."""
+        import numpy as np
+
         import plot_cpp_run as pcr
+        from framing import global_viewport_from_snapshots
 
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
             p0 = d / "snapshot_00000.csv"
             p1 = d / "snapshot_00001.csv"
-            _write_snapshot(p0, 0, [(1.0, 0.0), (1.0, 0.0)])  # median r = 1
-            _write_snapshot(p1, 1, [(100.0, 0.0), (100.0, 0.0)])  # median r = 100
-            b_all = pcr.calculate_smart_bounds(d, fallback=1.0, snapshot_paths=[p0, p1])
-            b_filtered = pcr.calculate_smart_bounds(d, fallback=1.0, snapshot_paths=[p1])
-            self.assertAlmostEqual(b_all, 60.6, places=6)  # median([1,1,100,100]) * 1.2
-            self.assertAlmostEqual(b_filtered, 120.0, places=6)
+            # Early frame pulls x extent to ~1000 m; late frame is compact around 10 m.
+            _write_snapshot(p0, 0, [(1000.0, 0.0), (1000.0, 0.0)])
+            _write_snapshot(p1, 1, [(10.0, 0.0), (10.0, 0.0)])
+            rec = pcr.load_all_snapshot_records(d)
+            snaps_all = [s for _, s in rec]
+            snaps_filt = [s for _, s in pcr.filter_snapshots_for_plotting(rec, 0, 1)]
+            extra = np.array([[0.0, 0.0]], dtype=np.float64)
+            vp_all = global_viewport_from_snapshots(
+                snaps_all, extra_xy=extra, fallback_half_axis=1.0
+            )
+            vp_filt = global_viewport_from_snapshots(
+                snaps_filt, extra_xy=extra, fallback_half_axis=1.0
+            )
+            self.assertGreater(vp_all.half_axis, vp_filt.half_axis)
+            # Filtered: x in {0, 10}; span ~10 after trim → half ≈ 0.5 * span * 1.15
+            self.assertGreater(vp_filt.half_axis, 5.0)
+            self.assertLess(vp_filt.half_axis, 6.0)
 
     def test_resolve_skip_settings_cli_overrides_run_info(self) -> None:
         import plot_cpp_run as pcr

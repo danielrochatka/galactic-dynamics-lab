@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from framing import SquareViewport, global_viewport_from_snapshots
 from render_overlay import build_overlay_spec, draw_galaxy_render_overlay, resolve_overlay_mode
 
 
@@ -91,7 +92,7 @@ def matched_steps_strict(left_steps: set[int], right_steps: set[int]) -> list[in
 
 
 def _fallback_render_radius_m(run_info: dict) -> float:
-    """CLI-style fallback (m) when velocity gating needs a floor; matches plot_cpp_run default."""
+    """CLI-style fallback (m) when viewport extent is degenerate; matches plot_cpp_run default."""
     raw = run_info.get("render_radius", 150.0)
     try:
         return max(1.0, float(raw))
@@ -99,47 +100,29 @@ def _fallback_render_radius_m(run_info: dict) -> float:
         return 150.0
 
 
-def _median_radius_bound(snapshots: list[object], fallback: float) -> tuple[float, float]:
-    """Return (median_radius, bound=1.2*median_radius) over all finite stars in all snapshots."""
-    radii_chunks: list[np.ndarray] = []
-    for snap in snapshots:
-        p = snap.positions
-        if p.size == 0:
-            continue
-        x = p[:, 0]
-        y = p[:, 1]
-        m = np.isfinite(x) & np.isfinite(y)
-        if not np.any(m):
-            continue
-        radii_chunks.append(np.sqrt(x[m] * x[m] + y[m] * y[m]))
-    if not radii_chunks:
-        fb = float(max(1.0, fallback))
-        return fb, fb
-    r_all = np.concatenate(radii_chunks)
-    if r_all.size == 0:
-        fb = float(max(1.0, fallback))
-        return fb, fb
-    median_r = float(np.median(r_all))
-    if not np.isfinite(median_r) or median_r <= 0:
-        fb = float(max(1.0, fallback))
-        return fb, fb
-    return median_r, float(max(1.2 * median_r, 1.0))
-
-
-def calculate_compare_smart_bound(
+def calculate_compare_smart_viewport(
     left_snaps: list[object], right_snaps: list[object], fallback: float
-) -> tuple[float, float, float]:
-    """Per-side median-radius bounds, then shared=max(left_bound,right_bound)."""
-    left_median, left_bound = _median_radius_bound(left_snaps, fallback)
-    right_median, right_bound = _median_radius_bound(right_snaps, fallback)
-    shared = float(max(left_bound, right_bound, max(1.0, fallback)))
-    return left_median, right_median, shared
+) -> SquareViewport:
+    """One square viewport containing all particles from both sides (all matched frames) plus origin."""
+    combo = list(left_snaps) + list(right_snaps)
+    return global_viewport_from_snapshots(
+        combo,
+        extra_xy=np.array([[0.0, 0.0]], dtype=np.float64),
+        trim_fraction=0.01,
+        margin=1.15,
+        fallback_half_axis=float(max(1.0, fallback)),
+    )
 
 
-def _draw_panel(ax, side: SideData, snap, radius: float) -> None:
+def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float) -> None:
     from render import scatter_frame
 
-    scatter_frame(ax, snap.positions, velocities=getattr(snap, "velocities", None), render_radius=radius)
+    scatter_frame(
+        ax,
+        snap.positions,
+        velocities=getattr(snap, "velocities", None),
+        render_radius=viewport,
+    )
     ax.set_title(
         f"{side.label} / {str(side.run_info.get('physics_package', '?')).lower()} / primary trajectory x-y",
         color="white",
@@ -178,12 +161,10 @@ def render_compare(
     fb_l = _fallback_render_radius_m(left.run_info)
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
-    left_median, right_median, shared_bound = calculate_compare_smart_bound(
-        left_snaps, right_snaps, fallback
-    )
+    shared_vp = calculate_compare_smart_viewport(left_snaps, right_snaps, fallback)
     print(
-        f"Compare smart framing: left median r={left_median:.6g} m, "
-        f"right median r={right_median:.6g} m, shared_bound={shared_bound:.6g} m"
+        f"Compare smart framing: center=({shared_vp.center_x:.6g}, {shared_vp.center_y:.6g}) m, "
+        f"half_axis={shared_vp.half_axis:.6g} m"
     )
 
     def save_static(step_idx: int, out_name: str) -> None:
@@ -195,8 +176,8 @@ def render_compare(
             ax.tick_params(colors="gray")
             for s in ax.spines.values():
                 s.set_color("gray")
-        _draw_panel(axes[0], left, ls, shared_bound)
-        _draw_panel(axes[1], right, rs, shared_bound)
+        _draw_panel(axes[0], left, ls, shared_vp)
+        _draw_panel(axes[1], right, rs, shared_vp)
         fig.suptitle(
             f"Compare {compare_run_id} | left={left.run_info.get('physics_package', '?')} "
             f"| right={right.run_info.get('physics_package', '?')} "
@@ -232,8 +213,8 @@ def render_compare(
             s.set_color("gray")
 
     def animate(i: int):
-        _draw_panel(axes[0], left, left_snaps[i], shared_bound)
-        _draw_panel(axes[1], right, right_snaps[i], shared_bound)
+        _draw_panel(axes[0], left, left_snaps[i], shared_vp)
+        _draw_panel(axes[1], right, right_snaps[i], shared_vp)
         t = float(left_snaps[i].time)
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | t={t:.6g} "

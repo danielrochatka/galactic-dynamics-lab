@@ -13,9 +13,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from plot_cpp_compare import (
-    _median_radius_bound,
     _resolve_side_run_dir,
-    calculate_compare_smart_bound,
+    calculate_compare_smart_viewport,
     matched_steps_strict,
     render_compare,
 )
@@ -108,28 +107,21 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertNotIn("_smooth_alpha", text)
         self.assertNotIn("_smooth_state", text)
 
-    def test_compare_smart_bound_uses_max_of_per_side_medians(self) -> None:
-        """Compare bound uses max(1.2*left_median, 1.2*right_median), not merged median."""
+    def test_compare_smart_viewport_contains_both_extents(self) -> None:
+        """Shared viewport is computed from the union of both sides' point clouds (+ origin)."""
         import numpy as np
 
         from plot_cpp_run import Snapshot
 
-        # Left: tight disk
         pos_l = np.random.default_rng(0).normal(scale=1e19, size=(100, 2))
         vel_l = np.zeros_like(pos_l)
-        # Right: huge ring
         th = np.linspace(0, 2 * np.pi, 100, endpoint=False)
         pos_r = np.column_stack([1e27 * np.cos(th), 1e27 * np.sin(th)])
         vel_r = np.column_stack([np.cos(th) * 1e5, np.sin(th) * 1e5])
         snap_l = Snapshot(0, 0.0, pos_l, vel_l)
         snap_r = Snapshot(0, 0.0, pos_r, vel_r)
-        left_med, left_bound = _median_radius_bound([snap_l], 150.0)
-        right_med, right_bound = _median_radius_bound([snap_r], 150.0)
-        m_l, m_r, shared = calculate_compare_smart_bound([snap_l], [snap_r], 150.0)
-        self.assertAlmostEqual(m_l, left_med)
-        self.assertAlmostEqual(m_r, right_med)
-        self.assertAlmostEqual(shared, max(left_bound, right_bound))
-        self.assertGreater(shared, 1e26)
+        vp = calculate_compare_smart_viewport([snap_l], [snap_r], 150.0)
+        self.assertGreater(vp.half_axis, 1e26)
 
 
 if __name__ == "__main__":

@@ -11,14 +11,13 @@ then produces the same kinds of plots as the Python pipeline:
   - **bh_orbit_validation**: primary pair diagnostics plus `bh_orbit_trajectory_xy.png`, `bh_orbit_trajectory_xy_zoom.png`,
     `bh_orbit_separation_extrema.png` (footnotes distinguish Newtonian baseline vs TPFCore legacy_readout experimental; VDSG status from run_info)
 
-Animation viewport: default uses **smart framing** — one fixed axis half-range from the **median**
-  radial distance of all stars across all snapshots, times 1.2 (see `calculate_smart_bounds`).
-  **Non-galaxy** modes (`earth_moon_benchmark`, `bh_orbit_validation`, `symmetric_pair`, etc.) use the same
-  median × 1.2 rule for **static** PNGs (initial/final), matching animation; `galaxy_radius` in
-  run_info is not used as the disk scale for those modes.
-  Set **`plot_animation_dynamic_zoom = true`** in the run config (or **`--dynamic-zoom`** on the
-  command line) for the legacy **per-frame** velocity-gated smoothed zoom. **`--no-dynamic-zoom`**
-  forces smart framing even if run_info requests dynamic zoom.
+Animation viewport: default **smart framing** — one square viewport from **x/y quantile bounds**
+  over all plotted particles (all snapshots), plus the origin (BH marker), margin, and a square
+  half-axis (see `framing.global_viewport_from_snapshots`). Same rule for **galaxy** and non-galaxy
+  modes; no median-radius proxy.
+  Set **`plot_animation_dynamic_zoom = true`** (or **`--dynamic-zoom`**) for **windowed** geometric
+  framing per frame with exponential smoothing on center and log(half-axis). **`--no-dynamic-zoom`**
+  forces fixed global smart framing even if run_info requests dynamic zoom.
 Burn-in filter (plotting only): `--skip-initial-steps` and/or `--skip-initial-snapshots` ignore
 early snapshots for plotting products (animation/PNGs/diagnostics). You can also set
 `plot_skip_initial_steps` / `plot_skip_initial_snapshots` in the run config (written to
@@ -31,7 +30,7 @@ Usage:
 Outputs are written into the same run_dir (or run_dir/plots if you prefer;
   currently we write into run_dir to match "same run folder").
 
-Requires: numpy, pandas, matplotlib. Optional: ffmpeg or Pillow for animation.
+Requires: numpy, matplotlib. Optional: ffmpeg or Pillow for animation.
 
 Galaxy runs: cpp_sim writes render_manifest.json and render_manifest.txt (with active_dynamics_branch,
 active_metrics_branch, acceleration_code_path). plot_cpp_run draws optional text overlay on galaxy_*.png
@@ -46,11 +45,15 @@ import shutil
 from pathlib import Path
 from dataclasses import dataclass
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 # Import from existing project (run from repo root or with PYTHONPATH)
+from framing import (
+    DynamicViewportSmoother,
+    SquareViewport,
+    global_viewport_from_snapshots,
+    viewport_window_snapshots,
+)
 from render import save_static_plot, create_animation, has_ffmpeg
 from render_overlay import build_overlay_spec, resolve_overlay_mode
 from diagnostics import (
@@ -394,155 +397,12 @@ def resolve_galaxy_radius_meters(
     return max(float(render_radius_arg), 1.0)
 
 
-def galaxy_velocity_gated_target_limit(
-    positions: np.ndarray,
-    velocities: np.ndarray,
-    galaxy_radius_m: float,
-    degenerate_fallback: float,
-) -> float:
-    """
-    Velocity-gated viewport: mean r of 'stable' stars (mostly tangential motion) + 30% cushion;
-    if too few stable stars, use 1.2 * galaxy_radius_m. Static plots use this directly.
-    """
-    if positions.size == 0 or len(positions) == 0:
-        return degenerate_fallback
-    if velocities is None or len(velocities) != len(positions):
-        return float(max(1.2 * galaxy_radius_m, degenerate_fallback))
-    df = pd.DataFrame(
-        {
-            "x": positions[:, 0],
-            "y": positions[:, 1],
-            "vx": velocities[:, 0],
-            "vy": velocities[:, 1],
-        }
-    )
-    r = np.sqrt(df["x"] ** 2 + df["y"] ** 2).to_numpy()
-    if len(r) == 0:
-        return degenerate_fallback
-    r_safe = np.maximum(r, 1e-30)
-    v_rad = (df["x"] * df["vx"] + df["y"] * df["vy"]).to_numpy() / r_safe
-    v_total = np.sqrt(df["vx"] ** 2 + df["vy"] ** 2).to_numpy()
-    stable_mask = np.abs(v_rad) < (0.3 * v_total)
-    stable_stars = r[stable_mask]
-    n = len(r)
-    if len(stable_stars) > (0.1 * n):
-        target_limit = float(np.mean(stable_stars) * 1.30)
-    else:
-        target_limit = float(1.2 * galaxy_radius_m)
-    if not np.isfinite(target_limit) or target_limit <= 0:
-        return degenerate_fallback
-    return float(target_limit)
-
-
-def fraction_stars_inside_square_viewport(
-    positions: np.ndarray,
-    half_axis: float,
-) -> float:
-    """Fraction of finite (x,y) inside the square |x|,|y| <= half_axis (matches matplotlib axis limits)."""
-    if positions.size == 0 or len(positions) == 0:
-        return 0.0
-    x = positions[:, 0]
-    y = positions[:, 1]
-    m = np.isfinite(x) & np.isfinite(y)
-    if not np.any(m):
-        return 0.0
-    ins = (np.abs(x[m]) <= half_axis) & (np.abs(y[m]) <= half_axis)
-    return float(np.mean(ins))
-
-
-def bulk_chebyshev_extent_half_axis(
-    positions: np.ndarray,
-    percentile: float = 95.0,
-    cushion: float = 1.18,
-) -> float:
-    """
-    Robust half-axis for square limits: percentile of max(|x|,|y|) among finite points, times cushion.
-    Resists a handful of escapers vs raw max(r).
-    """
-    if positions.size == 0 or len(positions) == 0:
-        return 1.0
-    x = positions[:, 0]
-    y = positions[:, 1]
-    m = np.isfinite(x) & np.isfinite(y)
-    if not np.any(m):
-        return 1.0
-    d = np.maximum(np.abs(x[m]), np.abs(y[m]))
-    if d.size == 0:
-        return 1.0
-    q = float(np.percentile(d, percentile))
-    if not np.isfinite(q) or q <= 0:
-        return 1.0
-    return float(q * cushion)
-
-
-def static_viewport_radius_validated(
-    positions: np.ndarray,
-    velocities: np.ndarray | None,
-    galaxy_radius_m: float,
-    degenerate_fallback: float,
-    min_inside_fraction: float = 0.50,
-) -> float:
-    """
-    Static galaxy frame: start from velocity-gated candidate; if too few stars would appear in the
-    square viewport, fall back to bulk (percentile) extent. Prevents blank plots when escapers or
-    degenerate velocity masks make galaxy_velocity_gated_target_limit far smaller than the data extent.
-    """
-    cand = galaxy_velocity_gated_target_limit(
-        positions, velocities, galaxy_radius_m, degenerate_fallback
-    )
-    if not np.isfinite(cand) or cand <= 0:
-        cand = float(degenerate_fallback)
-    frac = fraction_stars_inside_square_viewport(positions, cand)
-    if frac >= min_inside_fraction:
-        return float(cand)
-    bulk = bulk_chebyshev_extent_half_axis(positions, 95.0, 1.18)
-    bulk_wide = bulk_chebyshev_extent_half_axis(positions, 99.5, 1.12)
-    out = max(cand, bulk, bulk_wide, float(degenerate_fallback))
-    if not np.isfinite(out) or out <= 0:
-        return float(degenerate_fallback)
-    # Second check: if still almost empty, prefer widest bulk
-    frac2 = fraction_stars_inside_square_viewport(positions, out)
-    if frac2 < min_inside_fraction:
-        out = max(out, bulk_chebyshev_extent_half_axis(positions, 99.9, 1.08))
-    return float(out)
-
-
-def calculate_smart_bounds(
-    output_dir: Path,
-    fallback: float = 150.0,
-    snapshot_paths: list[Path] | None = None,
-) -> float:
-    """
-    Global animation axis half-range: median of r = sqrt(x^2 + y^2) over every star in every
-    snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
-    """
-    paths = snapshot_paths if snapshot_paths is not None else sorted(
-        output_dir.glob("snapshot_*.csv"), key=snapshot_csv_numeric_sort_key
-    )
-    if not paths:
-        return float(max(fallback, 1.0))
-    radii_chunks: list[np.ndarray] = []
-    for path in paths:
-        try:
-            df = pd.read_csv(path, skiprows=1, usecols=["x", "y"])
-        except (ValueError, KeyError):
-            try:
-                df = pd.read_csv(path, skiprows=2, header=None, usecols=[1, 2], names=["x", "y"])
-            except Exception:
-                continue
-        x = df["x"].to_numpy(dtype=np.float64, copy=False)
-        y = df["y"].to_numpy(dtype=np.float64, copy=False)
-        radii_chunks.append(np.sqrt(x * x + y * y))
-    if not radii_chunks:
-        return float(max(fallback, 1.0))
-    r_all = np.concatenate(radii_chunks)
-    if r_all.size == 0:
-        return float(max(fallback, 1.0))
-    med = float(np.median(r_all))
-    static_bound = med * 1.20
-    if not np.isfinite(static_bound) or static_bound <= 0:
-        return float(max(fallback, 1.0))
-    return float(static_bound)
+# Smart framing defaults (display layer only; SI in/out)
+_SMART_FRAMING_TRIM = 0.01
+_SMART_FRAMING_MARGIN = 1.15
+_DYNAMIC_FRAMING_WINDOW = 7
+_DYNAMIC_FRAMING_ALPHA = 0.12
+_BH_MARKER_XY = np.array([[0.0, 0.0]], dtype=np.float64)
 
 
 def plot_animation_dynamic_zoom_from_run_info(
@@ -550,7 +410,7 @@ def plot_animation_dynamic_zoom_from_run_info(
 ) -> bool:
     """
     Read plot_animation_dynamic_zoom from run_info (written by cpp_sim).
-    Default False if missing: smart framing (fixed bounds from calculate_smart_bounds).
+    Default False if missing: fixed global geometric smart framing.
     """
     raw = run_info.get("plot_animation_dynamic_zoom")
     if raw is None:
@@ -564,23 +424,6 @@ def plot_animation_dynamic_zoom_from_run_info(
         if s in ("1", "true", "yes"):
             return True
     return False
-
-
-def galaxy_velocity_gated_smoothed_limit(
-    positions: np.ndarray,
-    velocities: np.ndarray,
-    galaxy_radius_m: float,
-    degenerate_fallback: float,
-) -> float:
-    """Same target as galaxy_velocity_gated_target_limit, smoothed on plt.current_zoom_limit (alpha=0.1)."""
-    if not hasattr(plt, "current_zoom_limit"):
-        plt.current_zoom_limit = 1e20
-    target_limit = galaxy_velocity_gated_target_limit(
-        positions, velocities, galaxy_radius_m, degenerate_fallback
-    )
-    alpha = 0.1
-    plt.current_zoom_limit = (1.0 - alpha) * plt.current_zoom_limit + alpha * target_limit
-    return float(plt.current_zoom_limit)
 
 
 def get_masses_from_snapshots(snapshots: list[Snapshot], run_dir: Path) -> np.ndarray:
@@ -631,13 +474,13 @@ def main() -> None:
     zoom_group.add_argument(
         "--no-dynamic-zoom",
         action="store_true",
-        help="Animation: smart framing (median r × 1.2 over all snapshots). "
+        help="Animation: fixed global geometric smart framing (quantile x/y bounds + margin). "
         "Overrides run_info plot_animation_dynamic_zoom.",
     )
     zoom_group.add_argument(
         "--dynamic-zoom",
         action="store_true",
-        help="Animation: legacy per-frame velocity-gated smoothed zoom (overrides run_info).",
+        help="Animation: windowed geometric framing with smoothed center and log(half-axis) (overrides run_info).",
     )
     parser.add_argument(
         "--render-overlay-mode",
@@ -732,7 +575,6 @@ def main() -> None:
         )
 
     fallback_radius = float(args.render_radius)
-    galaxy_radius_m = resolve_galaxy_radius_meters(run_info, snapshots, fallback_radius)
     if args.dynamic_zoom:
         use_animation_dynamic_zoom = True
     elif args.no_dynamic_zoom:
@@ -756,38 +598,23 @@ def main() -> None:
     mode_label = "tpf_v11_correspondence" if mode_name == "tpf_v11_weak_field_correspondence" else mode_name
     physics_label = physics_label_from_run_info(run_info, mode_name)
     title_context = f"{mode_label} / {physics_label}"
-    if mode_name == "galaxy":
-        render_radius_initial = static_viewport_radius_validated(
-            initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
-        )
-        render_radius_final = static_viewport_radius_validated(
-            final.positions, final.velocities, galaxy_radius_m, fallback_radius
-        )
-    else:
-        # Match default animation smart framing: median r over all plotted snapshots, × 1.20
-        smart_static = calculate_smart_bounds(
-            run_dir,
-            fallback=fallback_radius,
-            snapshot_paths=filtered_paths,
-        )
-        render_radius_initial = smart_static
-        render_radius_final = smart_static
-        print(
-            f"  Static viewport (simulation_mode={mode_name}): half-axis = {float(smart_static):.6g} m "
-            "(median r × 1.2 over plotted snapshots; same convention as animation smart framing)"
-        )
 
-    if mode_name == "galaxy":
-        spatial_half_axis_m = max(float(render_radius_initial), float(render_radius_final))
-    else:
-        spatial_half_axis_m = float(
-            calculate_smart_bounds(
-                run_dir,
-                fallback=fallback_radius,
-                snapshot_paths=filtered_paths,
-            )
-        )
+    global_viewport = global_viewport_from_snapshots(
+        snapshots,
+        extra_xy=_BH_MARKER_XY,
+        trim_fraction=_SMART_FRAMING_TRIM,
+        margin=_SMART_FRAMING_MARGIN,
+        fallback_half_axis=fallback_radius,
+    )
+    render_radius_initial = global_viewport
+    render_radius_final = global_viewport
+    spatial_half_axis_m = float(global_viewport.half_axis)
     spatial_display = spatial_display_for_xy_plot(mode_name, spatial_half_axis_m)
+    print(
+        f"  Smart framing (simulation_mode={mode_name}): center=({global_viewport.center_x:.6g}, "
+        f"{global_viewport.center_y:.6g}) m, half_axis={spatial_half_axis_m:.6g} m "
+        f"(geometric quantile trim={_SMART_FRAMING_TRIM:g}, margin={_SMART_FRAMING_MARGIN:g}, origin in cloud)"
+    )
 
     burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
@@ -882,25 +709,38 @@ def main() -> None:
     # Optional animation
     if not args.no_animation:
         print("Creating animation...")
+        anim_mutable_idx: dict[str, int] = {"i": 0}
         if use_animation_dynamic_zoom:
-            plt.current_zoom_limit = 1e20
-            render_radius_cb = lambda pos, vel: galaxy_velocity_gated_smoothed_limit(
-                pos, vel, galaxy_radius_m, fallback_radius
+            smoother = DynamicViewportSmoother(
+                alpha=_DYNAMIC_FRAMING_ALPHA,
+                min_half_axis=max(1.0, fallback_radius * 1e-18),
             )
-        else:
-            static_bound = calculate_smart_bounds(
-                run_dir,
-                fallback=fallback_radius,
-                snapshot_paths=filtered_paths,
-            )
-            render_radius_cb = static_bound
 
-        if use_animation_dynamic_zoom:
-            print("  Animation viewport: dynamic zoom (velocity-gated, smoothed per frame)")
-        else:
+            def render_radius_cb(
+                pos: np.ndarray, vel: np.ndarray | None
+            ) -> SquareViewport:
+                _ = pos, vel
+                win = viewport_window_snapshots(
+                    snapshots, anim_mutable_idx["i"], _DYNAMIC_FRAMING_WINDOW
+                )
+                raw = global_viewport_from_snapshots(
+                    win,
+                    extra_xy=_BH_MARKER_XY,
+                    trim_fraction=_SMART_FRAMING_TRIM,
+                    margin=_SMART_FRAMING_MARGIN,
+                    fallback_half_axis=fallback_radius,
+                )
+                return smoother.step(raw)
+
+            render_radius_anim = render_radius_cb
             print(
-                f"  Animation viewport: smart framing (fixed half-axis = {float(render_radius_cb):.6g} m, "
-                "median r × 1.2 over all snapshots)"
+                f"  Animation viewport: dynamic geometric (window={_DYNAMIC_FRAMING_WINDOW} frames, "
+                f"EMA alpha={_DYNAMIC_FRAMING_ALPHA:g} on center and log half-axis)"
+            )
+        else:
+            render_radius_anim = global_viewport
+            print(
+                f"  Animation viewport: fixed global smart framing (half_axis={global_viewport.half_axis:.6g} m)"
             )
         if has_ffmpeg():
             print("  Using ffmpeg for MP4")
@@ -909,11 +749,12 @@ def main() -> None:
         ok = create_animation(
             snapshots,
             run_dir / "galaxy",
-            render_radius=render_radius_cb,
+            render_radius=render_radius_anim,
             interval=50,
             progress_interval=max(1, len(snapshots) // 20),
             spatial_display=spatial_display,
             simulation_mode=mode_name,
+            mutable_frame_index=anim_mutable_idx,
             **overlay_kw,
         )
         if ok:
