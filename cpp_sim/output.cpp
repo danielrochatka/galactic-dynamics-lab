@@ -5,6 +5,7 @@
 #include "render_audit.hpp"
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 
 namespace galaxy {
@@ -337,19 +338,24 @@ void write_run_info(const std::string& output_dir,
 
 void write_snapshots(const std::string& output_dir,
                      const std::vector<Snapshot>& snapshots) {
+  /* Decimal precision: default ostringstream uses 6 significant digits in scientific format, which
+   * quantizes Earth–Moon-scale coordinates (~1e8 m) to ~10–100 m steps. Consecutive snapshots then
+   * repeat identical x or y text while vx,vy still tick, producing sawtooth-like artifacts in
+   * post-processed separation, energy, and Lz. Use max_digits10 for IEEE-754 double round-trip. */
+  const int csv_prec = std::numeric_limits<double>::max_digits10;
   for (const auto& snap : snapshots) {
     std::ostringstream fname;
     fname << output_dir << "/snapshot_" << std::setfill('0') << std::setw(5) << snap.step << ".csv";
     std::ofstream f(fname.str());
     if (!f) continue;
 
-    f << "# step," << snap.step << ",time," << std::scientific << snap.time << "\n";
+    f << std::scientific << std::setprecision(csv_prec);
+    f << "# step," << snap.step << ",time," << snap.time << "\n";
     f << "i,x,y,vx,vy,mass\n";
     const State& s = snap.state;
     for (int i = 0; i < s.n(); ++i) {
-      f << i << ","
-        << std::scientific << s.x[i] << "," << s.y[i] << ","
-        << s.vx[i] << "," << s.vy[i] << "," << s.mass[i] << "\n";
+      f << i << "," << s.x[i] << "," << s.y[i] << "," << s.vx[i] << "," << s.vy[i] << "," << s.mass[i]
+        << "\n";
     }
   }
 }
