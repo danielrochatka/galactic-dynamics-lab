@@ -169,6 +169,17 @@ def write_compat_alias(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
+# Numeric step in snapshot_<step>.csv stem (not lex sort: e.g. snapshot_100000 must follow snapshot_99999).
+_SNAPSHOT_STEM_NUMERIC_STEP = re.compile(r"^snapshot_(\d+)$", re.IGNORECASE)
+
+
+def snapshot_csv_numeric_sort_key(path: Path) -> tuple[int, str]:
+    m = _SNAPSHOT_STEM_NUMERIC_STEP.match(path.stem)
+    if m:
+        return (int(m.group(1)), path.name)
+    return (10**18, path.name)
+
+
 def load_snapshot_csv(path: Path) -> Snapshot | None:
     """
     Load one snapshot_XXXXX.csv file.
@@ -217,14 +228,16 @@ def load_all_snapshots(run_dir: Path) -> list[Snapshot]:
 
 
 def load_all_snapshot_records(run_dir: Path) -> list[tuple[Path, Snapshot]]:
-    """Find all snapshot_*.csv in run_dir, sort by step, load and return (path, snapshot)."""
+    """Find all snapshot_*.csv in run_dir, sort by numeric step (then name), load and return (path, snapshot)."""
     pattern = "snapshot_*.csv"
-    files = sorted(run_dir.glob(pattern), key=lambda p: p.stem)
+    files = sorted(run_dir.glob(pattern), key=snapshot_csv_numeric_sort_key)
     records: list[tuple[Path, Snapshot]] = []
     for p in files:
         snap = load_snapshot_csv(p)
         if snap is not None:
             records.append((p, snap))
+    # Tie-break by CSV header (filename width can differ from step for edge cases).
+    records.sort(key=lambda ps: (ps[1].step, ps[1].time, ps[0].name))
     return records
 
 
@@ -504,7 +517,7 @@ def calculate_smart_bounds(
     snapshot_*.csv, times 1.20. Only the x and y columns are read from each CSV.
     """
     paths = snapshot_paths if snapshot_paths is not None else sorted(
-        output_dir.glob("snapshot_*.csv"), key=lambda p: p.stem
+        output_dir.glob("snapshot_*.csv"), key=snapshot_csv_numeric_sort_key
     )
     if not paths:
         return float(max(fallback, 1.0))

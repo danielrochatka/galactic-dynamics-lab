@@ -45,6 +45,23 @@ class TestTwoBodyPairDiagnostics(unittest.TestCase):
         expected_E = 0.5 * 1.0**2 - G_SI * M / r
         self.assertAlmostEqual(float(d["newtonian_specific_energy"][0]), expected_E, delta=1e-20)
 
+    def test_output_sorted_by_time_when_snapshots_shuffled(self) -> None:
+        """Regression: shuffled input must not produce scrambled line-plot order."""
+        pos_a = np.array([[-1.0, 0.0], [1.0, 0.0]], dtype=float)
+        vel = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=float)
+        pos_b = np.array([[-1.0, 0.0], [2.0, 0.0]], dtype=float)
+        snaps = [
+            _Snap(2.0, pos_b, vel),
+            _Snap(0.0, pos_a, vel),
+            _Snap(1.0, pos_a, vel),
+        ]
+        m = np.array([1.0, 1.0])
+        d = compute_two_body_pair_diagnostics(snaps, m, "earth_moon_benchmark", 0.0)
+        np.testing.assert_array_equal(d["time"], np.array([0.0, 1.0, 2.0]))
+        self.assertAlmostEqual(float(d["pair_separation"][0]), 2.0)
+        self.assertAlmostEqual(float(d["pair_separation"][1]), 2.0)
+        self.assertAlmostEqual(float(d["pair_separation"][2]), 3.0)
+
 
 if __name__ == "__main__":
     unittest.main()

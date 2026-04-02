@@ -4,6 +4,7 @@ Diagnostics from simulation snapshots: time series and plots.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -91,6 +92,43 @@ def compute_diagnostics(
         "frac_beyond_cutoff": frac_beyond_cutoff,
         "L_z": L_z,
     }
+
+
+_PAIR_DIAG_TIME_SERIES_KEYS = (
+    "time",
+    "pair_separation",
+    "pair_relative_speed",
+    "center_of_mass_x",
+    "center_of_mass_y",
+    "center_of_mass_radius",
+    "relative_angular_momentum_z",
+    "newtonian_specific_energy",
+)
+
+
+def _finalize_pair_diag_time_order(diag: dict[str, np.ndarray | str]) -> None:
+    """
+    Sort per-snapshot arrays by simulation time (stable; ties keep original index order).
+    Ensures line plots and diagnostic_two_body_timeseries.csv are monotonic in time.
+    """
+    t = np.asarray(diag["time"], dtype=np.float64)
+    n = int(t.size)
+    if n <= 1:
+        return
+    if not bool(np.all(t[1:] >= t[:-1])):
+        print(
+            "Warning: two-body diagnostic time series was not monotonic in time (often from "
+            "lexicographic snapshot_*.csv ordering when step indices mix 5- and 6-digit widths). "
+            "Sorting by time for plots and CSV.",
+            file=sys.stderr,
+            flush=True,
+        )
+    row_idx = np.arange(n, dtype=np.int64)
+    order = np.lexsort((row_idx, t))
+    for k in _PAIR_DIAG_TIME_SERIES_KEYS:
+        if k not in diag:
+            continue
+        diag[k] = np.asarray(diag[k])[order]
 
 
 def compute_two_body_pair_diagnostics(
@@ -185,7 +223,7 @@ def compute_two_body_pair_diagnostics(
     else:
         raise ValueError(f"unknown two-body diagnostics mode: {mode}")
 
-    return {
+    out: dict[str, np.ndarray | str] = {
         "time": time,
         "pair_separation": pair_sep,
         "pair_relative_speed": pair_rel_speed,
@@ -196,6 +234,8 @@ def compute_two_body_pair_diagnostics(
         "newtonian_specific_energy": E_spec,
         "variant": variant,
     }
+    _finalize_pair_diag_time_order(out)
+    return out
 
 
 def write_two_body_diagnostics_readme(output_dir: Path, mode: str, physics_package: str) -> None:
@@ -210,6 +250,7 @@ def write_two_body_diagnostics_readme(output_dir: Path, mode: str, physics_packa
         "Lab frame: snapshot x,y,vx,vy are in the simulation inertial frame (origin at code origin).",
         "For bh_orbit_validation the central mass is fixed at the origin and is NOT a CSV particle row.",
         "",
+        "Rows in diagnostic_two_body_timeseries.csv are ordered by increasing simulation time.",
         "Columns in diagnostic_two_body_timeseries.csv:",
         "  pair_separation: |r1 - r0| (two-mass) or |r_star| (star vs origin/BH).",
         "  pair_relative_speed: |v1 - v0| or |v_star| (BH velocity taken as 0 in lab).",
