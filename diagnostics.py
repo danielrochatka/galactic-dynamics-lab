@@ -9,6 +9,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from text_layout import add_fitted_footer, set_fitted_title
+
 # SI gravitational constant (matches cpp_sim/init_conditions.cpp)
 G_SI = 6.6743e-11
 
@@ -257,10 +259,10 @@ def _save_plot_with_note(
     ax.scatter(time, y, s=8, c="steelblue", zorder=5)
     ax.set_xlabel("Time (simulation units)")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_fitted_title(ax, title, fontsize=12, min_fontsize=6)
     ax.grid(True, alpha=0.3)
     if footnote:
-        fig.text(0.5, 0.02, footnote, ha="center", fontsize=8)
+        add_fitted_footer(fig, footnote, fontsize=8, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.18 if footnote else 0.12)
     fig.savefig(output_path, dpi=150)
@@ -281,10 +283,10 @@ def _save_plot(
     ax.scatter(time, y, s=8, c="steelblue", zorder=5)  # show every snapshot point
     ax.set_xlabel("Time (simulation units)")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    set_fitted_title(ax, title, fontsize=12, min_fontsize=6)
     ax.grid(True, alpha=0.3)
     if footnote:
-        fig.text(0.5, 0.02, footnote, ha="center", fontsize=8)
+        add_fitted_footer(fig, footnote, fontsize=8, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.18 if footnote else 0.12)
     fig.savefig(output_path, dpi=150)
@@ -421,12 +423,15 @@ def plot_bh_orbit_validation_extras(
     ax.set_aspect("equal", adjustable="datalim")
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
-    ax.set_title(
-        ctx + "Primary: trajectory x-y (one star, fixed BH at origin) (experimental)"
+    set_fitted_title(
+        ax,
+        ctx + "Primary: trajectory x-y (one star, fixed BH at origin) (experimental)",
+        fontsize=12,
+        min_fontsize=6,
     )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
-    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
+    add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.14)
     fig.savefig(output_dir / "bh_orbit_trajectory_xy.png", dpi=150)
@@ -444,9 +449,14 @@ def plot_bh_orbit_validation_extras(
     ax.set_ylim(-zoom, zoom)
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
-    ax.set_title(ctx + "Primary: trajectory x-y zoom to extent (experimental)")
+    set_fitted_title(
+        ax,
+        ctx + "Primary: trajectory x-y zoom to extent (experimental)",
+        fontsize=12,
+        min_fontsize=6,
+    )
     ax.grid(True, alpha=0.3)
-    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
+    add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.12)
     fig.savefig(output_dir / "bh_orbit_trajectory_xy_zoom.png", dpi=150)
@@ -461,13 +471,16 @@ def plot_bh_orbit_validation_extras(
         ax.axvline(float(t[idx]), color="#d62728", ls=":", lw=0.8, alpha=0.7)
     ax.set_xlabel("Time (simulation units)")
     ax.set_ylabel("Separation (m)")
-    ax.set_title(
+    set_fitted_title(
+        ax,
         ctx + "Primary: star–BH separation vs time (green dashed ≈ periapsis-like minima; "
-        "red dotted ≈ apoapsis-like maxima; sampling-limited)"
+        "red dotted ≈ apoapsis-like maxima; sampling-limited)",
+        fontsize=12,
+        min_fontsize=6,
     )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
-    fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
+    add_fitted_footer(fig, foot, fontsize=7, min_fontsize=5)
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.18)
     fig.savefig(output_dir / "bh_orbit_separation_extrema.png", dpi=150)

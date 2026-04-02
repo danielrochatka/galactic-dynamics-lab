@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
 
+from text_layout import set_fitted_title
 
 RenderRadius = Union[float, Callable[..., float]]
 
@@ -126,7 +127,7 @@ def save_radial_velocity_plot(
         [0.0], [0.0],
         s=80, c="yellow", marker="*", edgecolors="orange", linewidths=0.5, zorder=10,
     )
-    ax.set_title(title, color="white", fontsize=14)
+    set_fitted_title(ax, title, color="white", fontsize=14, min_fontsize=6)
     fig.tight_layout()
     fig.savefig(output_path, dpi=150, facecolor="black", edgecolor="none")
     plt.close(fig)
@@ -155,7 +156,7 @@ def save_static_plot(
     ax.spines["right"].set_color("gray")
 
     scatter_frame(ax, positions, render_radius=render_radius, velocities=velocities)
-    ax.set_title(title, color="white", fontsize=14)
+    set_fitted_title(ax, title, color="white", fontsize=14, min_fontsize=6)
     if (
         overlay_mode != "none"
         and overlay_spec is not None
