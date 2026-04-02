@@ -298,6 +298,7 @@ def plot_two_body_pair_diagnostics(
     *,
     title_suffix: str = "",
     footnote: str | None = None,
+    context_label: str = "",
 ) -> None:
     """Primary PNG set for two-body modes."""
     suf = (" " + title_suffix.strip()) if title_suffix.strip() else ""
@@ -307,12 +308,13 @@ def plot_two_body_pair_diagnostics(
         else None
     )
     t = diag["time"]
+    ctx = (context_label.strip() + " — ") if context_label.strip() else ""
     _save_plot(
         output_dir / "diagnostic_pair_separation.png",
         t,
         diag["pair_separation"],
         "Pair separation (m)",
-        "Primary: pair separation |Δr| vs time (lab-frame positions)" + suf,
+        ctx + "Primary: pair separation |Δr| vs time (lab-frame positions)" + suf,
         footnote=footnote,
     )
     _save_plot(
@@ -320,7 +322,7 @@ def plot_two_body_pair_diagnostics(
         t,
         diag["pair_relative_speed"],
         "Pair relative speed (m/s)",
-        "Primary: |Δv| vs time (lab-frame velocities)" + suf,
+        ctx + "Primary: |Δv| vs time (lab-frame velocities)" + suf,
         footnote=footnote,
     )
     _save_plot(
@@ -328,7 +330,7 @@ def plot_two_body_pair_diagnostics(
         t,
         diag["center_of_mass_radius"],
         "|R_COM| from origin (m)",
-        "COM radius in lab frame (drift here is not 'escape' of the pair)" + suf,
+        ctx + "Primary: COM radius in lab frame (drift here is not 'escape' of the pair)" + suf,
         footnote=footnote,
     )
     _save_plot(
@@ -336,7 +338,7 @@ def plot_two_body_pair_diagnostics(
         t,
         diag["relative_angular_momentum_z"],
         "L_z about COM (SI)",
-        "Primary: angular momentum about center of mass (z)" + suf,
+        ctx + "Primary: angular momentum about center of mass (z)" + suf,
         footnote=footnote,
     )
     E = diag["newtonian_specific_energy"]
@@ -349,7 +351,7 @@ def plot_two_body_pair_diagnostics(
             t,
             E,
             "Newtonian specific energy (J/kg)",
-            "Primary: Newtonian specific mechanical energy (see README)" + suf,
+            ctx + "Primary: Newtonian_reference specific mechanical energy (see README)" + suf,
             footnote=e_foot,
         )
 
@@ -393,11 +395,14 @@ def plot_bh_orbit_validation_extras(
     output_dir: Path,
     physics_package: str,
     tpf_vdsg_coupling: float,
+    *,
+    context_label: str = "",
 ) -> None:
     """
     bh_orbit_validation only: orbit in x–y, separation with periapsis/apoapsis markers, zoomed orbit shape.
     """
     foot = bh_orbit_validation_plot_footnote(physics_package, tpf_vdsg_coupling)
+    ctx = (context_label.strip() + " — ") if context_label.strip() else ""
     t = diag["time"]
     sep = np.asarray(diag["pair_separation"], dtype=np.float64)
     mins_i, maxs_i = _local_extrema_indices(sep)
@@ -416,7 +421,9 @@ def plot_bh_orbit_validation_extras(
     ax.set_aspect("equal", adjustable="datalim")
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
-    ax.set_title("BH orbit validation — full trajectory (one star, fixed BH)" + " (experimental)")
+    ax.set_title(
+        ctx + "Primary: trajectory x-y (one star, fixed BH at origin) (experimental)"
+    )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
     fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
@@ -437,7 +444,7 @@ def plot_bh_orbit_validation_extras(
     ax.set_ylim(-zoom, zoom)
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
-    ax.set_title("Orbit shape (zoom to extent · experimental)")
+    ax.set_title(ctx + "Primary: trajectory x-y zoom to extent (experimental)")
     ax.grid(True, alpha=0.3)
     fig.text(0.5, 0.02, foot, ha="center", fontsize=7)
     fig.tight_layout()
@@ -455,7 +462,7 @@ def plot_bh_orbit_validation_extras(
     ax.set_xlabel("Time (simulation units)")
     ax.set_ylabel("Separation (m)")
     ax.set_title(
-        "Star–BH separation vs time (green dashed ≈ periapsis-like minima; "
+        ctx + "Primary: star–BH separation vs time (green dashed ≈ periapsis-like minima; "
         "red dotted ≈ apoapsis-like maxima; sampling-limited)"
     )
     ax.grid(True, alpha=0.3)
@@ -473,6 +480,7 @@ def plot_and_save_all(
     cutoff_radius: float,
     *,
     lab_frame_secondary: bool = False,
+    context_label: str = "",
 ) -> None:
     """
     Save one PNG per diagnostic in output_dir (one point per snapshot, time = simulation time).
@@ -485,52 +493,53 @@ def plot_and_save_all(
         if lab_frame_secondary
         else ""
     )
+    ctx = (context_label.strip() + " — ") if context_label.strip() else ""
     t = diagnostics["time"]
     _save_plot(
         output_dir / "diagnostic_median_radius.png",
         t, diagnostics["median_r"],
         "Median radius from origin (m)",
-        prefix + "Median |r| from origin vs time",
+        ctx + prefix + "Median |r| from origin vs time",
     )
     _save_plot(
         output_dir / "diagnostic_mean_radius.png",
         t, diagnostics["mean_r"],
         "Mean radius from origin (m)",
-        prefix + "Mean |r| from origin vs time",
+        ctx + prefix + "Mean |r| from origin vs time",
     )
     _save_plot(
         output_dir / "diagnostic_std_radius.png",
         t, diagnostics["std_r"],
         "Std of |r| from origin (m)",
-        prefix + "Std of star radii from origin vs time",
+        ctx + prefix + "Std of star radii from origin vs time",
     )
     _save_plot(
         output_dir / "diagnostic_max_radius.png",
         t, diagnostics["max_r"],
         "Max radius from origin (m)",
-        prefix + "Max |r| from origin vs time",
+        ctx + prefix + "Max |r| from origin vs time",
     )
     _save_plot(
         output_dir / "diagnostic_frac_vr_positive.png",
         t, diagnostics["frac_vr_pos"],
         "Fraction with v_r > 0 (origin radial)",
-        prefix + "Fraction of bodies with v_r > 0 vs time",
+        ctx + prefix + "Fraction of bodies with v_r > 0 vs time",
     )
     _save_plot(
         output_dir / "diagnostic_frac_vr_negative.png",
         t, diagnostics["frac_vr_neg"],
         "Fraction with v_r < 0 (origin radial)",
-        prefix + "Fraction of bodies with v_r < 0 vs time",
+        ctx + prefix + "Fraction of bodies with v_r < 0 vs time",
     )
     _save_plot(
         output_dir / "diagnostic_frac_beyond_cutoff.png",
         t, diagnostics["frac_beyond_cutoff"],
         f"Fraction beyond r = {cutoff_radius} (origin)",
-        prefix + f"Fraction of bodies beyond r = {cutoff_radius} vs time",
+        ctx + prefix + f"Fraction of bodies beyond r = {cutoff_radius} vs time",
     )
     _save_plot(
         output_dir / "diagnostic_angular_momentum_z.png",
         t, diagnostics["L_z"],
         "Total L_z about origin (SI)",
-        prefix + "Total L_z about simulation origin vs time",
+        ctx + prefix + "Total L_z about simulation origin vs time",
     )

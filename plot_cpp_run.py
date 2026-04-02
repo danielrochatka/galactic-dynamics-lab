@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -121,6 +122,50 @@ def simulation_mode_name_from_run_info(run_info: dict[str, str | int | float]) -
     if isinstance(raw, str) and raw.strip():
         return raw.strip()
     return "galaxy"
+
+
+def _slug(raw: str) -> str:
+    s = re.sub(r"[^a-zA-Z0-9]+", "_", str(raw).strip().lower()).strip("_")
+    return s or "unknown"
+
+
+def physics_label_from_run_info(
+    run_info: dict[str, str | int | float],
+    mode_name: str,
+) -> str:
+    if mode_name == "tpf_v11_weak_field_correspondence":
+        return "paper_mode"
+    pkg = str(run_info.get("physics_package", "Newtonian") or "Newtonian")
+    if pkg == "Newtonian":
+        return "newtonian"
+    if pkg != "TPFCore":
+        return _slug(pkg)
+    dyn = str(run_info.get("tpf_dynamics_mode", "legacy_readout") or "legacy_readout")
+    if dyn == "direct_tpf":
+        return "tpfcore_direct_tpf"
+    readout = str(run_info.get("tpfcore_readout_mode", "legacy_readout") or "legacy_readout")
+    vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
+    vdsg = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
+    vdsg_lbl = "vdsg_off" if vdsg == 0.0 else "vdsg_on"
+    return f"tpfcore_{_slug(readout)}_{vdsg_lbl}"
+
+
+def mode_aware_name(
+    mode: str,
+    physics: str,
+    scope: str,
+    quantity: str,
+    stage: str,
+    ext: str,
+) -> str:
+    return f"{mode}__{physics}__{scope}__{quantity}__{stage}.{ext}"
+
+
+def write_compat_alias(src: Path, dst: Path) -> None:
+    if src == dst or not src.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
 
 
 def load_snapshot_csv(path: Path) -> Snapshot | None:
@@ -694,6 +739,9 @@ def main() -> None:
     initial = snapshots[0]
     final = snapshots[-1]
     mode_name = simulation_mode_name_from_run_info(run_info)
+    mode_label = "tpf_v11_correspondence" if mode_name == "tpf_v11_weak_field_correspondence" else mode_name
+    physics_label = physics_label_from_run_info(run_info, mode_name)
+    title_context = f"{mode_label} / {physics_label}"
     if mode_name == "galaxy":
         render_radius_initial = static_viewport_radius_validated(
             initial.positions, initial.velocities, galaxy_radius_m, fallback_radius
@@ -717,12 +765,25 @@ def main() -> None:
 
     burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
-    initial_title = initial_snapshot_plot_title(
+    legacy_initial_title = initial_snapshot_plot_title(
         cooling_active, initial.step, burn_in_plotting=burn_in_plotting
+    )
+    initial_title = f"{title_context} — primary trajectory x-y (initial)"
+    if "first plotted snapshot" in legacy_initial_title.lower():
+        initial_title = f"{title_context} — primary trajectory x-y (first plotted snapshot)"
+    final_title = f"{title_context} — primary trajectory x-y (final)"
+
+    initial_legacy = run_dir / "galaxy_initial.png"
+    initial_mode_aware = run_dir / mode_aware_name(
+        mode_label, physics_label, "primary", "trajectory_xy", "initial", "png"
+    )
+    final_legacy = run_dir / "galaxy_final.png"
+    final_mode_aware = run_dir / mode_aware_name(
+        mode_label, physics_label, "primary", "trajectory_xy", "final", "png"
     )
     save_static_plot(
         initial.positions,
-        run_dir / "galaxy_initial.png",
+        initial_mode_aware,
         title=initial_title,
         render_radius=render_radius_initial,
         velocities=initial.velocities,
@@ -730,18 +791,20 @@ def main() -> None:
         overlay_time=float(initial.time),
         **overlay_kw,
     )
-    print(f"Saved: {run_dir / 'galaxy_initial.png'}")
+    write_compat_alias(initial_mode_aware, initial_legacy)
+    print(f"Saved: {initial_mode_aware} (legacy alias: {initial_legacy.name})")
     save_static_plot(
         final.positions,
-        run_dir / "galaxy_final.png",
-        title="Galaxy – Final (C++ run)",
+        final_mode_aware,
+        title=final_title,
         render_radius=render_radius_final,
         velocities=final.velocities,
         overlay_step=final.step,
         overlay_time=float(final.time),
         **overlay_kw,
     )
-    print(f"Saved: {run_dir / 'galaxy_final.png'}")
+    write_compat_alias(final_mode_aware, final_legacy)
+    print(f"Saved: {final_mode_aware} (legacy alias: {final_legacy.name})")
 
     if mode_name in ("earth_moon_benchmark", "bh_orbit_validation"):
         print(
@@ -751,7 +814,10 @@ def main() -> None:
     else:
         try:
             r_rc, v_rc = rv_from_plane_arrays(final.positions, final.velocities)
-            title_rc = f"snapshot_{final.step:05d}.csv (step {final.step}, t={final.time:g})"
+            title_rc = (
+                f"{title_context} — rotation curve from snapshot_{final.step:05d}.csv "
+                f"(step {final.step}, t={final.time:g})"
+            )
             M_bh_rc = newtonian_m_bh_from_run_info(run_info)
             x_max_rc = rotation_curve_x_max(run_info, r_rc)
             scatter_lbl = scatter_label_from_run_info(run_info)
@@ -764,15 +830,21 @@ def main() -> None:
             save_rotation_curve_png(
                 r_rc,
                 v_rc,
-                run_dir / "rotation_curve.png",
+                run_dir / mode_aware_name(
+                    mode_label, physics_label, "primary", "rotation_curve", "final", "png"
+                ),
                 title_rc,
                 M_bh=M_bh_rc,
                 x_max=x_max_rc,
                 scatter_label=scatter_lbl,
                 provenance_label=rc_prov_s,
             )
+            write_compat_alias(
+                run_dir / mode_aware_name(mode_label, physics_label, "primary", "rotation_curve", "final", "png"),
+                run_dir / "rotation_curve.png",
+            )
             print(
-                f"Saved: {run_dir / 'rotation_curve.png'} "
+                f"Saved: {run_dir / mode_aware_name(mode_label, physics_label, 'primary', 'rotation_curve', 'final', 'png')} "
                 f"(Keplerian overlay M_bh={M_bh_rc:g} kg; x_max={x_max_rc:g} m; "
                 "red curve is κ-independent — only blue scatter changes with TPF)"
             )
@@ -816,8 +888,16 @@ def main() -> None:
         )
         if ok:
             if (run_dir / "galaxy.mp4").exists():
+                write_compat_alias(
+                    run_dir / "galaxy.mp4",
+                    run_dir / mode_aware_name(mode_label, physics_label, "primary", "trajectory_xy", "animation", "mp4"),
+                )
                 print(f"Saved: {run_dir / 'galaxy.mp4'}")
             else:
+                write_compat_alias(
+                    run_dir / "galaxy.gif",
+                    run_dir / mode_aware_name(mode_label, physics_label, "primary", "trajectory_xy", "animation", "gif"),
+                )
                 print(f"Saved: {run_dir / 'galaxy.gif'}")
         else:
             print("  Animation failed (install ffmpeg or Pillow)")
@@ -854,12 +934,52 @@ def main() -> None:
                         physics_pkg,
                         title_suffix=title_suf,
                         footnote=foot,
+                        context_label=title_context,
                     )
                     plot_bh_orbit_validation_extras(
-                        snapshots, pair_diag, run_dir, physics_pkg, vdsg_f
+                        snapshots, pair_diag, run_dir, physics_pkg, vdsg_f, context_label=title_context
                     )
                 else:
-                    plot_two_body_pair_diagnostics(pair_diag, run_dir, physics_pkg)
+                    plot_two_body_pair_diagnostics(
+                        pair_diag, run_dir, physics_pkg, context_label=title_context
+                    )
+                write_compat_alias(
+                    run_dir / "diagnostic_two_body_timeseries.csv",
+                    run_dir
+                    / mode_aware_name(
+                        mode_label, physics_label, "primary", "two_body_timeseries", "final", "csv"
+                    ),
+                )
+                write_compat_alias(
+                    run_dir / "two_body_diagnostics_README.txt",
+                    run_dir
+                    / mode_aware_name(
+                        mode_label, physics_label, "primary", "two_body_summary", "final", "txt"
+                    ),
+                )
+                primary_aliases = {
+                    "diagnostic_pair_separation.png": "pair_separation",
+                    "diagnostic_pair_relative_speed.png": "pair_relative_speed",
+                    "diagnostic_com_radius.png": "center_of_mass_radius",
+                    "diagnostic_relative_angular_momentum_z.png": "relative_angular_momentum_z",
+                    "diagnostic_relative_energy.png": "newtonian_reference_specific_energy",
+                }
+                for old, quantity in primary_aliases.items():
+                    write_compat_alias(
+                        run_dir / old,
+                        run_dir / mode_aware_name(mode_label, physics_label, "primary", quantity, "timeseries", "png"),
+                    )
+                bh_aliases = {
+                    "bh_orbit_trajectory_xy.png": "trajectory_xy",
+                    "bh_orbit_trajectory_xy_zoom.png": "trajectory_xy_zoom",
+                    "bh_orbit_separation_extrema.png": "pair_separation_extrema",
+                }
+                for old, quantity in bh_aliases.items():
+                    write_compat_alias(
+                        run_dir / old,
+                        run_dir
+                        / mode_aware_name(mode_label, physics_label, "primary", quantity, "final", "png"),
+                    )
                 print(
                     f"Primary two-body diagnostics in {run_dir}: "
                     "diagnostic_pair_separation.png, diagnostic_pair_relative_speed.png, "
@@ -882,7 +1002,24 @@ def main() -> None:
             except ValueError as exc:
                 print(f"Warning: primary two-body diagnostics skipped: {exc}")
             diag = compute_diagnostics(snapshots, masses, cutoff)
-            plot_and_save_all(diag, run_dir, cutoff, lab_frame_secondary=True)
+            plot_and_save_all(
+                diag, run_dir, cutoff, lab_frame_secondary=True, context_label=title_context
+            )
+            secondary_aliases = {
+                "diagnostic_median_radius.png": "median_radius_origin",
+                "diagnostic_mean_radius.png": "mean_radius_origin",
+                "diagnostic_std_radius.png": "std_radius_origin",
+                "diagnostic_max_radius.png": "max_radius_origin",
+                "diagnostic_frac_vr_positive.png": "frac_vr_positive_origin",
+                "diagnostic_frac_vr_negative.png": "frac_vr_negative_origin",
+                "diagnostic_frac_beyond_cutoff.png": "frac_beyond_cutoff_origin",
+                "diagnostic_angular_momentum_z.png": "angular_momentum_z_origin",
+            }
+            for old, quantity in secondary_aliases.items():
+                write_compat_alias(
+                    run_dir / old,
+                    run_dir / mode_aware_name(mode_label, physics_label, "secondary", quantity, "timeseries", "png"),
+                )
             print(
                 f"Secondary lab-frame / origin-radial plots in {run_dir} (titles prefixed); "
                 f"final median_r (secondary): {diag['median_r'][-1]:.6g}, "
@@ -890,7 +1027,22 @@ def main() -> None:
             )
         else:
             diag = compute_diagnostics(snapshots, masses, cutoff)
-            plot_and_save_all(diag, run_dir, cutoff)
+            plot_and_save_all(diag, run_dir, cutoff, context_label=title_context)
+            galaxy_diag_aliases = {
+                "diagnostic_median_radius.png": "median_radius_origin",
+                "diagnostic_mean_radius.png": "mean_radius_origin",
+                "diagnostic_std_radius.png": "std_radius_origin",
+                "diagnostic_max_radius.png": "max_radius_origin",
+                "diagnostic_frac_vr_positive.png": "frac_vr_positive_origin",
+                "diagnostic_frac_vr_negative.png": "frac_vr_negative_origin",
+                "diagnostic_frac_beyond_cutoff.png": "frac_beyond_cutoff_origin",
+                "diagnostic_angular_momentum_z.png": "angular_momentum_z_origin",
+            }
+            for old, quantity in galaxy_diag_aliases.items():
+                write_compat_alias(
+                    run_dir / old,
+                    run_dir / mode_aware_name(mode_label, physics_label, "primary", quantity, "timeseries", "png"),
+                )
             print(f"Saved diagnostic plots in {run_dir}")
             print(f"  Final median_r: {diag['median_r'][-1]:.2f}, L_z: {diag['L_z'][-1]:.2f}")
     else:

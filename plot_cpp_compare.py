@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -139,7 +140,11 @@ def _draw_panel(ax, side: SideData, snap, radius: float) -> None:
     from render import scatter_frame
 
     scatter_frame(ax, snap.positions, velocities=getattr(snap, "velocities", None), render_radius=radius)
-    ax.set_title(f"{side.label} ({side.run_info.get('physics_package', '?')})", color="white", fontsize=11)
+    ax.set_title(
+        f"{side.label} / {str(side.run_info.get('physics_package', '?')).lower()} / primary trajectory x-y",
+        color="white",
+        fontsize=11,
+    )
     if side.overlay_mode != "none":
         draw_galaxy_render_overlay(
             ax,
@@ -164,8 +169,8 @@ def render_compare(
     right_dir = _resolve_side_run_dir(str(mf["right_dir"]), parent_dir)
     compare_run_id = str(mf.get("compare_run_id", parent_dir.name))
 
-    left = _load_side_data(left_dir, "left", overlay_mode)
-    right = _load_side_data(right_dir, "right", overlay_mode)
+    left = _load_side_data(left_dir, "left_primary", overlay_mode)
+    right = _load_side_data(right_dir, "right_compare", overlay_mode)
     steps = matched_steps_strict(set(left.snapshots_by_step.keys()), set(right.snapshots_by_step.keys()))
     left_snaps = [left.snapshots_by_step[s] for s in steps]
     right_snaps = [right.snapshots_by_step[s] for s in steps]
@@ -203,8 +208,18 @@ def render_compare(
         fig.savefig(parent_dir / out_name, dpi=150, facecolor="black", edgecolor="none")
         plt.close(fig)
 
-    save_static(0, "galaxy_initial_compare.png")
-    save_static(len(steps) - 1, "galaxy_final_compare.png")
+    mode_aware_initial = (
+        f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
+        f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__initial_side_by_side.png"
+    )
+    mode_aware_final = (
+        f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
+        f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__final_side_by_side.png"
+    )
+    save_static(0, mode_aware_initial)
+    save_static(len(steps) - 1, mode_aware_final)
+    shutil.copy2(parent_dir / mode_aware_initial, parent_dir / "galaxy_initial_compare.png")
+    shutil.copy2(parent_dir / mode_aware_final, parent_dir / "galaxy_final_compare.png")
 
     if no_animation:
         return
@@ -230,12 +245,24 @@ def render_compare(
         return []
 
     anim = animation.FuncAnimation(fig, animate, frames=len(steps), interval=50, blit=False)
+    mode_aware_anim_mp4 = (
+        parent_dir
+        / f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
+          f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__animation_side_by_side.mp4"
+    )
+    mode_aware_anim_gif = (
+        parent_dir
+        / f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
+          f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__animation_side_by_side.gif"
+    )
     out_mp4 = parent_dir / f"{compare_run_id}.mp4"
     out_gif = parent_dir / f"{compare_run_id}.gif"
     try:
-        anim.save(str(out_mp4), writer="ffmpeg", fps=20, dpi=100)
+        anim.save(str(mode_aware_anim_mp4), writer="ffmpeg", fps=20, dpi=100)
+        shutil.copy2(mode_aware_anim_mp4, out_mp4)
     except Exception:
-        anim.save(str(out_gif), writer="pillow", fps=15, dpi=100)
+        anim.save(str(mode_aware_anim_gif), writer="pillow", fps=15, dpi=100)
+        shutil.copy2(mode_aware_anim_gif, out_gif)
     plt.close(fig)
 
 
@@ -255,4 +282,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
