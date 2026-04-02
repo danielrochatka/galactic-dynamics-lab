@@ -171,6 +171,10 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "physics_package", config.physics_package);
     json_kv(jf, first, "physics_package_compare", config.physics_package_compare);
     json_kv(jf, first, "simulation_mode", mode_to_string(config.simulation_mode));
+    json_kv(jf, first, "artifact_naming_convention", "<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>");
+    json_kv(jf, first, "artifact_scope_note_primary", "primary = main interpretation outputs for selected mode");
+    json_kv(jf, first, "artifact_scope_note_secondary",
+            "secondary = lab/origin-radial diagnostics when pair-frame diagnostics are primary");
     json_kv(jf, first, "tpf_analysis_mode", config.tpf_analysis_mode);
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       json_kv_bool(jf, first, "v11_delta_c_computed", false);
@@ -264,6 +268,9 @@ void write_render_manifest(const std::string& output_dir,
     tf << "physics_package\t" << config.physics_package << "\n";
     tf << "physics_package_compare\t" << config.physics_package_compare << "\n";
     tf << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
+    tf << "artifact_naming_convention\t<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>\n";
+    tf << "artifact_scope_note_primary\tprimary=main interpretation outputs for selected mode\n";
+    tf << "artifact_scope_note_secondary\tsecondary=lab/origin-radial diagnostics when pair frame is primary\n";
     tf << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       tf << "v11_delta_c_computed\t0\n";

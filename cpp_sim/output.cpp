@@ -36,6 +36,9 @@ void write_run_info(const std::string& output_dir,
   f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
   f << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
+  f << "artifact_naming_convention\t<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>\n";
+  f << "artifact_label_scope_primary\tprimary=main interpretation outputs (mode-dependent)\n";
+  f << "artifact_label_scope_secondary\tsecondary=lab/origin radial diagnostics where applicable\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
@@ -179,6 +182,8 @@ void write_run_info(const std::string& output_dir,
     f << "diagnostics_primary_pair_frame\tplot_cpp_run.py: diagnostic_pair_*.png, diagnostic_com_radius.png, "
          "diagnostic_relative_angular_momentum_z.png, diagnostic_relative_energy.png (Newtonian equivalent), "
          "diagnostic_two_body_timeseries.csv, two_body_diagnostics_README.txt\n";
+    f << "diagnostics_primary_pair_frame_mode_aware_alias\tplot_cpp_run.py also writes "
+         "<mode>__<physics>__primary__<quantity>__<stage> aliases for these files\n";
     f << "diagnostics_secondary_lab_frame\tOrigin-radial plots (diagnostic_median_radius.png, etc.) are secondary; "
          "titles prefixed when regenerated for these modes\n";
     if (config.simulation_mode == SimulationMode::bh_orbit_validation) {
