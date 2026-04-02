@@ -36,7 +36,10 @@ def set_fitted_title(
     margin_px: float = 12.0,
 ) -> Text:
     """Set an axis title and scale font size down to fit plot width."""
-    title_artist = ax.set_title(title, color=color, fontsize=fontsize)
+    title_kwargs = {"fontsize": fontsize}
+    if color is not None:
+        title_kwargs["color"] = color
+    title_artist = ax.set_title(title, **title_kwargs)
     fig = ax.figure
     fig.canvas.draw()
     ax_bbox = ax.get_window_extent(renderer=fig.canvas.get_renderer())
@@ -63,7 +66,10 @@ def add_fitted_footer(
     margin_px: float = 12.0,
 ) -> Text:
     """Add figure-level footer text and shrink it to stay inside the canvas."""
-    txt = fig.text(x, y, text, ha=ha, va=va, fontsize=fontsize, color=color)
+    text_kwargs = {"ha": ha, "va": va, "fontsize": fontsize}
+    if color is not None:
+        text_kwargs["color"] = color
+    txt = fig.text(x, y, text, **text_kwargs)
     fig.canvas.draw()
     fig_w_px = fig.get_figwidth() * fig.dpi
     _fit_text_to_pixel_width(
