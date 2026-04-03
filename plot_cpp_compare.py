@@ -14,6 +14,13 @@ from pathlib import Path
 import numpy as np
 
 from framing import SquareViewport, global_viewport_from_snapshots
+from display_units import (
+    DisplayUnitConfig,
+    display_unit_config_from_run_info,
+    format_animation_time_caption,
+    series_display_generic_validation,
+    spatial_display_for_xy_plot,
+)
 from render_overlay import build_overlay_spec, draw_galaxy_render_overlay, resolve_overlay_mode
 
 
@@ -25,6 +32,14 @@ class SideData:
     overlay_mode: str
     overlay_spec: dict
     snapshots_by_step: dict[int, object]
+
+
+@dataclass(frozen=True)
+class CompareDisplaySelection:
+    config: DisplayUnitConfig
+    active_distance_unit: str
+    active_time_unit: str
+    active_velocity_unit: str
 
 
 def _load_compare_manifest(parent: Path) -> dict:
@@ -114,7 +129,56 @@ def calculate_compare_smart_viewport(
     )
 
 
-def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float) -> None:
+def _resolve_compare_preferred_unit(left: str, right: str) -> str:
+    l = (left or "auto").strip()
+    r = (right or "auto").strip()
+    if l == "auto" and r == "auto":
+        return "auto"
+    if l == "auto":
+        return r
+    if r == "auto":
+        return l
+    if l == r:
+        return l
+    return "auto"
+
+
+def resolve_compare_display_selection(
+    left_cfg: DisplayUnitConfig,
+    right_cfg: DisplayUnitConfig,
+    shared_half_axis_m: float,
+    max_time_s: float,
+    max_speed_m_s: float,
+) -> CompareDisplaySelection:
+    cfg = DisplayUnitConfig(
+        distance_unit=_resolve_compare_preferred_unit(left_cfg.distance_unit, right_cfg.distance_unit),
+        time_unit=_resolve_compare_preferred_unit(left_cfg.time_unit, right_cfg.time_unit),
+        velocity_unit=_resolve_compare_preferred_unit(left_cfg.velocity_unit, right_cfg.velocity_unit),
+        units_in_overlay=left_cfg.units_in_overlay and right_cfg.units_in_overlay,
+        show_unit_reference=left_cfg.show_unit_reference and right_cfg.show_unit_reference,
+    )
+    spatial = spatial_display_for_xy_plot(
+        "galaxy_compare",
+        float(max(shared_half_axis_m, 1.0)),
+        preferred_unit=cfg.distance_unit,
+    )
+    series = series_display_generic_validation(
+        float(max(shared_half_axis_m, 1.0)),
+        max_time_s=float(max_time_s),
+        max_speed_m_s=float(max_speed_m_s),
+        preferred_distance_unit=cfg.distance_unit,
+        preferred_time_unit=cfg.time_unit,
+        preferred_velocity_unit=cfg.velocity_unit,
+    )
+    return CompareDisplaySelection(
+        config=cfg,
+        active_distance_unit=spatial.unit,
+        active_time_unit=series.time_unit,
+        active_velocity_unit=series.speed_unit,
+    )
+
+
+def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, spatial_display) -> None:
     from render import scatter_frame
 
     scatter_frame(
@@ -122,6 +186,7 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float) -> N
         snap.positions,
         velocities=getattr(snap, "velocities", None),
         render_radius=viewport,
+        spatial_display=spatial_display,
     )
     ax.set_title(
         f"{side.label} / {str(side.run_info.get('physics_package', '?')).lower()} / primary trajectory x-y",
@@ -162,9 +227,30 @@ def render_compare(
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
     shared_vp = calculate_compare_smart_viewport(left_snaps, right_snaps, fallback)
+    max_time_s = max(float(left_snaps[-1].time), float(right_snaps[-1].time))
+    max_speed_m_s = max(
+        float(np.max(np.linalg.norm(s.velocities, axis=1))) for s in (left_snaps + right_snaps)
+    )
+    left_disp_cfg = display_unit_config_from_run_info(left.run_info)
+    right_disp_cfg = display_unit_config_from_run_info(right.run_info)
+    shared_display = resolve_compare_display_selection(
+        left_disp_cfg, right_disp_cfg, shared_vp.half_axis, max_time_s, max_speed_m_s
+    )
+    spatial_display = spatial_display_for_xy_plot(
+        "galaxy_compare",
+        shared_vp.half_axis,
+        preferred_unit=shared_display.config.distance_unit,
+    )
+    for side in (left, right):
+        side.overlay_spec["active_display_distance_unit"] = shared_display.active_distance_unit
+        side.overlay_spec["active_display_time_unit"] = shared_display.active_time_unit
+        side.overlay_spec["active_display_velocity_unit"] = shared_display.active_velocity_unit
+        side.overlay_spec["display_units_in_overlay"] = shared_display.config.units_in_overlay
+        side.overlay_spec["display_show_unit_reference"] = shared_display.config.show_unit_reference
     print(
         f"Compare smart framing: center=({shared_vp.center_x:.6g}, {shared_vp.center_y:.6g}) m, "
-        f"half_axis={shared_vp.half_axis:.6g} m"
+        f"half_axis={shared_vp.half_axis:.6g} m, display_distance_unit={shared_display.active_distance_unit}, "
+        f"display_time_unit={shared_display.active_time_unit}, display_velocity_unit={shared_display.active_velocity_unit}"
     )
 
     def save_static(step_idx: int, out_name: str) -> None:
@@ -176,15 +262,29 @@ def render_compare(
             ax.tick_params(colors="gray")
             for s in ax.spines.values():
                 s.set_color("gray")
-        _draw_panel(axes[0], left, ls, shared_vp)
-        _draw_panel(axes[1], right, rs, shared_vp)
+        _draw_panel(axes[0], left, ls, shared_vp, spatial_display=spatial_display)
+        _draw_panel(axes[1], right, rs, shared_vp, spatial_display=spatial_display)
         fig.suptitle(
             f"Compare {compare_run_id} | left={left.run_info.get('physics_package', '?')} "
             f"| right={right.run_info.get('physics_package', '?')} "
-            f"| rev={left.run_info.get('code_version_label', 'unknown')}",
+            f"| rev={left.run_info.get('code_version_label', 'unknown')} "
+            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,
         )
+        if shared_display.config.show_unit_reference:
+            fig.text(
+                0.995,
+                0.01,
+                f"distance display = {shared_display.active_distance_unit}\n"
+                f"time display = {shared_display.active_time_unit}\n"
+                f"velocity display = {shared_display.active_velocity_unit}",
+                ha="right",
+                va="bottom",
+                fontsize=8,
+                color="white",
+            )
         fig.tight_layout()
         fig.savefig(parent_dir / out_name, dpi=150, facecolor="black", edgecolor="none")
         plt.close(fig)
@@ -211,15 +311,32 @@ def render_compare(
         ax.tick_params(colors="gray")
         for s in ax.spines.values():
             s.set_color("gray")
+    if shared_display.config.show_unit_reference:
+        fig.text(
+            0.995,
+            0.01,
+            f"distance display = {shared_display.active_distance_unit}\n"
+            f"time display = {shared_display.active_time_unit}\n"
+            f"velocity display = {shared_display.active_velocity_unit}",
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color="white",
+        )
 
     def animate(i: int):
-        _draw_panel(axes[0], left, left_snaps[i], shared_vp)
-        _draw_panel(axes[1], right, right_snaps[i], shared_vp)
+        _draw_panel(axes[0], left, left_snaps[i], shared_vp, spatial_display=spatial_display)
+        _draw_panel(axes[1], right, right_snaps[i], shared_vp, spatial_display=spatial_display)
         t = float(left_snaps[i].time)
+        tc = format_animation_time_caption(
+            t, "galaxy_compare", preferred_time_unit=shared_display.config.time_unit
+        )
         fig.suptitle(
-            f"Compare {compare_run_id} | step={steps[i]} | t={t:.6g} "
+            f"Compare {compare_run_id} | step={steps[i]} | {tc} "
             f"| left={left.run_info.get('physics_package', '?')} "
-            f"| right={right.run_info.get('physics_package', '?')}",
+            f"| right={right.run_info.get('physics_package', '?')} "
+            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,
         )

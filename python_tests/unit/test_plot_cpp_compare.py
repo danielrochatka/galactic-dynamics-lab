@@ -13,11 +13,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from plot_cpp_compare import (
+    resolve_compare_display_selection,
     _resolve_side_run_dir,
     calculate_compare_smart_viewport,
     matched_steps_strict,
     render_compare,
 )
+from display_units import DisplayUnitConfig
 
 
 def _write_snapshot(path: Path, step: int, t: float, x: float) -> None:
@@ -42,6 +44,11 @@ def _write_run_info(run_dir: Path, pkg: str) -> None:
                 "code_version_label\ttest@abc1234",
                 "n_steps\t10",
                 "dt\t0.1",
+                "display_distance_unit\tauto",
+                "display_time_unit\tauto",
+                "display_velocity_unit\tauto",
+                "display_units_in_overlay\t1",
+                "display_show_unit_reference\t1",
             ]
         )
         + "\n",
@@ -123,7 +130,33 @@ class TestPlotCppCompare(unittest.TestCase):
         vp = calculate_compare_smart_viewport([snap_l], [snap_r], 150.0)
         self.assertGreater(vp.half_axis, 1e26)
 
+    def test_compare_display_selection_shared_distance_unit(self) -> None:
+        left = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
+        right = DisplayUnitConfig(distance_unit="auto", time_unit="day", velocity_unit="km/s")
+        sel = resolve_compare_display_selection(
+            left, right, shared_half_axis_m=1.0e12, max_time_s=86400.0 * 5, max_speed_m_s=2.0e3
+        )
+        self.assertEqual(sel.active_distance_unit, "AU")
+        self.assertEqual(sel.active_time_unit, "day")
+        self.assertEqual(sel.active_velocity_unit, "km/s")
+
+    def test_compare_display_selection_conflicting_explicit_units_falls_back_to_auto(self) -> None:
+        left = DisplayUnitConfig(distance_unit="km", time_unit="hr", velocity_unit="m/s")
+        right = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
+        sel = resolve_compare_display_selection(
+            left, right, shared_half_axis_m=2.0e11, max_time_s=86400.0 * 10, max_speed_m_s=5.0e3
+        )
+        self.assertEqual(sel.config.distance_unit, "auto")
+
+    def test_compare_display_selection_overlay_flags_require_both_sides_enabled(self) -> None:
+        left = DisplayUnitConfig(units_in_overlay=True, show_unit_reference=True)
+        right = DisplayUnitConfig(units_in_overlay=False, show_unit_reference=False)
+        sel = resolve_compare_display_selection(
+            left, right, shared_half_axis_m=1.0e9, max_time_s=100.0, max_speed_m_s=1.0
+        )
+        self.assertFalse(sel.config.units_in_overlay)
+        self.assertFalse(sel.config.show_unit_reference)
+
 
 if __name__ == "__main__":
     unittest.main()
-
