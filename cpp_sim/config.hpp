@@ -143,7 +143,9 @@ struct Config {
   /** TPFCore derived-radial readout modes: theta_tr scale in diagnostics (not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
   /**
-   * TPFCore hybrid radial: coupling κ from geometric invariant I to effective mass density ρ_eff = κ I (SI ledger).
+   * TPFCore closure-only κ for derived radial ledger:
+   *   ρ_eff,closure ~ κ_closure * I
+   * This is a PROVISIONAL closure coefficient for the derived radial shell model, not the paper Eq. (10) κ.
    * Default 1e32.
    */
   double tpf_kappa = 1.0e32;

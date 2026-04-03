@@ -84,13 +84,13 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
-  if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct";
+  if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct_MISSING_not_implemented";
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCore_dynamics_DISABLED (legacy_readout; provisional_readout off)";
+    return "TPFCore_PROVISIONAL_legacy_readout_DISABLED (provisional_readout off)";
   const std::string& mode = config.tpfcore_readout_mode;
-  if (tpf_vdsg_active_for_audit(config)) return "TPF_legacy_readout_plus_VDSG:" + mode;
-  return "TPF_legacy_readout:" + mode;
+  if (tpf_vdsg_active_for_audit(config)) return "TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:" + mode;
+  return "TPF_PROVISIONAL_legacy_readout:" + mode;
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
@@ -209,6 +209,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
+    json_kv_num(jf, first, "tpfcore_closure_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
@@ -248,9 +249,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_bool(jf, first, "git_dirty", gp.git_dirty);
     json_kv(jf, first, "code_version_label", gp.code_version_label);
     json_kv(jf, first, "config_key_aliases_note",
-            "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling).");
+            "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling). "
+            "Legacy key tpf_kappa maps to tpfcore_closure_kappa; parser accepts both (canonical: tpfcore_closure_kappa).");
     jf << ",\n  \"config_key_aliases\": [\n";
     jf << "    {\"legacy\": \"tpf_gdd_coupling\", \"canonical\": \"tpf_vdsg_coupling\", "
+          "\"accepted_in_config_parser\": true},\n";
+    jf << "    {\"legacy\": \"tpf_kappa\", \"canonical\": \"tpfcore_closure_kappa\", "
           "\"accepted_in_config_parser\": true}\n  ]";
     jf << "\n}\n";
   }
@@ -297,6 +301,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "galaxy_radius\t" << config.galaxy_radius << "\n";
     tf << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
     tf << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
+    tf << "tpfcore_closure_kappa\t" << config.tpf_kappa << "\n";
     tf << "tpf_kappa\t" << config.tpf_kappa << "\n";
     tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
     tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
@@ -345,6 +350,7 @@ void write_render_manifest(const std::string& output_dir,
          << (galaxy_init_audit->used_legacy_velocity_noise ? 1 : 0) << "\n";
     }
     tf << "config_key_aliases\ttpf_gdd_coupling -> tpf_vdsg_coupling (legacy alias; canonical tpf_vdsg_coupling)\n";
+    tf << "config_key_aliases\ttpf_kappa -> tpfcore_closure_kappa (legacy alias; canonical tpfcore_closure_kappa)\n";
     tf << "=== end render_manifest.txt ===\n";
   }
 }

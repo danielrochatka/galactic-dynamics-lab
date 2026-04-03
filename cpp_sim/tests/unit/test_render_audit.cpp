@@ -17,16 +17,17 @@ TEST_CASE("compute_active_dynamics_branch: TPF legacy_readout labels VDSG in bra
   c.tpfcore_enable_provisional_readout = true;
   c.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c.tpf_vdsg_coupling = 0.0;
-  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_legacy_readout:derived_tpf_radial_readout");
+  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_PROVISIONAL_legacy_readout:derived_tpf_radial_readout");
   c.tpf_vdsg_coupling = 1e-20;
-  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_legacy_readout_plus_VDSG:derived_tpf_radial_readout");
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:derived_tpf_radial_readout");
 }
 
 TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   Config c;
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
-  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_direct");
+  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_direct_MISSING_not_implemented");
 }
 
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {

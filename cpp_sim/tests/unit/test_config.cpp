@@ -84,6 +84,12 @@ TEST_CASE("explicit tpf_vdsg_coupling still works") {
   CHECK(c.tpf_vdsg_coupling == doctest::Approx(1e-99));
 }
 
+TEST_CASE("tpfcore_closure_kappa key maps to closure ledger coefficient") {
+  Config c;
+  CHECK(apply_config_kv("tpfcore_closure_kappa", "4.5e12", c));
+  CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
+}
+
 TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
   Config c;
   CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));

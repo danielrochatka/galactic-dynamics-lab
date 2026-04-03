@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Regression: nonzero tpf_vdsg_coupling must surface in active_dynamics_branch as TPF_legacy_readout_plus_VDSG:<mode>.
+# Regression: nonzero tpf_vdsg_coupling must surface in active_dynamics_branch as
+# TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:<mode>.
 # acceleration_code_path string is unchanged (same pipeline; VDSG is additive on legacy_readout).
 set -euo pipefail
 if [[ -z "${CPP_SIM_ROOT:-}" ]]; then
@@ -20,8 +21,8 @@ common=(galaxy --physics_package=TPFCore --tpfcore_enable_provisional_readout=tr
 
 d0=$(grep -m1 '^active_dynamics_branch' "$OUT0/run_info.txt" | cut -f2)
 d1=$(grep -m1 '^active_dynamics_branch' "$OUT1/run_info.txt" | cut -f2)
-echo "$d0" | grep -q '^TPF_legacy_readout:derived_tpf_radial_readout$'
-echo "$d1" | grep -q '^TPF_legacy_readout_plus_VDSG:derived_tpf_radial_readout$'
+echo "$d0" | grep -q '^TPF_PROVISIONAL_legacy_readout:derived_tpf_radial_readout$'
+echo "$d1" | grep -q '^TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:derived_tpf_radial_readout$'
 test "$d0" != "$d1"
 grep -q 'accumulate_vdsg_velocity_modifier' "$OUT0/run_info.txt"
 grep -Fq 'global |a| shunt OFF' "$OUT0/run_info.txt"
