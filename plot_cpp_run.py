@@ -66,7 +66,13 @@ from diagnostics import (
     save_two_body_timeseries_csv,
     write_two_body_diagnostics_readme,
 )
-from display_units import series_display_for_two_body, spatial_display_for_xy_plot
+from display_units import (
+    display_unit_config_from_run_info,
+    series_display_generic_validation,
+    series_display_for_galaxy_diagnostics,
+    series_display_for_two_body,
+    spatial_display_for_xy_plot,
+)
 from plot_rotation_curve import (
     load_run_info,
     newtonian_m_bh_from_run_info,
@@ -609,7 +615,60 @@ def main() -> None:
     render_radius_initial = global_viewport
     render_radius_final = global_viewport
     spatial_half_axis_m = float(global_viewport.half_axis)
-    spatial_display = spatial_display_for_xy_plot(mode_name, spatial_half_axis_m)
+    unit_cfg = display_unit_config_from_run_info(run_info)
+    spatial_display = spatial_display_for_xy_plot(
+        mode_name,
+        spatial_half_axis_m,
+        preferred_unit=unit_cfg.distance_unit,
+    )
+    max_time_s = float(max(s.time for s in snapshots)) if snapshots else 0.0
+    max_speed_m_s = 0.0
+    if snapshots:
+        max_speed_m_s = float(
+            max(np.nanmax(np.linalg.norm(s.velocities, axis=1)) for s in snapshots)
+        )
+    overlay_spec["active_display_distance_unit"] = spatial_display.unit
+    if mode_name in ("earth_moon_benchmark", "bh_orbit_validation"):
+        series_preview = series_display_for_two_body(
+            mode_name,
+            max_distance_m=max(spatial_half_axis_m, 1.0),
+            max_time_s=max_time_s,
+            max_speed_m_s=max_speed_m_s,
+            preferred_distance_unit=unit_cfg.distance_unit,
+            preferred_time_unit=unit_cfg.time_unit,
+            preferred_velocity_unit=unit_cfg.velocity_unit,
+        )
+    elif mode_name == "galaxy":
+        series_preview = series_display_for_galaxy_diagnostics(
+            max(spatial_half_axis_m, 1.0),
+            max_time_s,
+            max_speed_m_s=max_speed_m_s,
+            preferred_distance_unit=unit_cfg.distance_unit,
+            preferred_time_unit=unit_cfg.time_unit,
+            preferred_velocity_unit=unit_cfg.velocity_unit,
+        )
+    else:
+        series_preview = series_display_generic_validation(
+            max(spatial_half_axis_m, 1.0),
+            max_time_s=max_time_s,
+            max_speed_m_s=max_speed_m_s,
+            preferred_distance_unit=unit_cfg.distance_unit,
+            preferred_time_unit=unit_cfg.time_unit,
+            preferred_velocity_unit=unit_cfg.velocity_unit,
+        )
+    overlay_spec["active_display_time_unit"] = (
+        series_preview.time_unit
+    )
+    overlay_spec["active_display_velocity_unit"] = (
+        series_preview.speed_unit
+    )
+    unit_reference_text = None
+    if unit_cfg.show_unit_reference:
+        unit_reference_text = (
+            f"distance display = {overlay_spec['active_display_distance_unit']}\\n"
+            f"time display = {overlay_spec['active_display_time_unit']}\\n"
+            f"velocity display = {overlay_spec['active_display_velocity_unit']}"
+        )
     print(
         f"  Smart framing (simulation_mode={mode_name}): center=({global_viewport.center_x:.6g}, "
         f"{global_viewport.center_y:.6g}) m, half_axis={spatial_half_axis_m:.6g} m "
@@ -643,6 +702,7 @@ def main() -> None:
         overlay_step=initial.step,
         overlay_time=float(initial.time),
         spatial_display=spatial_display,
+        unit_reference_text=unit_reference_text,
         **overlay_kw,
     )
     write_compat_alias(initial_mode_aware, initial_legacy)
@@ -656,6 +716,7 @@ def main() -> None:
         overlay_step=final.step,
         overlay_time=float(final.time),
         spatial_display=spatial_display,
+        unit_reference_text=unit_reference_text,
         **overlay_kw,
     )
     write_compat_alias(final_mode_aware, final_legacy)
@@ -693,6 +754,8 @@ def main() -> None:
                 x_max=x_max_rc,
                 scatter_label=scatter_lbl,
                 provenance_label=rc_prov_s,
+                preferred_distance_unit=unit_cfg.distance_unit,
+                preferred_velocity_unit=unit_cfg.velocity_unit,
             )
             write_compat_alias(
                 run_dir / mode_aware_name(mode_label, physics_label, "primary", "rotation_curve", "final", "png"),
@@ -754,6 +817,8 @@ def main() -> None:
             progress_interval=max(1, len(snapshots) // 20),
             spatial_display=spatial_display,
             simulation_mode=mode_name,
+            preferred_time_unit=unit_cfg.time_unit,
+            unit_reference_text=unit_reference_text,
             mutable_frame_index=anim_mutable_idx,
             **overlay_kw,
         )
@@ -798,7 +863,15 @@ def main() -> None:
                     float(np.max(pair_diag["pair_separation"])),
                     float(np.max(pair_diag["center_of_mass_radius"])),
                 )
-                pair_series = series_display_for_two_body(mode_name, max_distance_m=max_pair_d)
+                pair_series = series_display_for_two_body(
+                    mode_name,
+                    max_distance_m=max_pair_d,
+                    max_time_s=float(np.max(pair_diag["time"])),
+                    max_speed_m_s=float(np.max(pair_diag["pair_relative_speed"])),
+                    preferred_distance_unit=unit_cfg.distance_unit,
+                    preferred_time_unit=unit_cfg.time_unit,
+                    preferred_velocity_unit=unit_cfg.velocity_unit,
+                )
                 if mode_name == "bh_orbit_validation":
                     vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
                     vdsg_f = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
@@ -814,7 +887,13 @@ def main() -> None:
                         series=pair_series,
                     )
                     plot_bh_orbit_validation_extras(
-                        snapshots, pair_diag, run_dir, physics_pkg, vdsg_f, context_label=title_context
+                        snapshots,
+                        pair_diag,
+                        run_dir,
+                        physics_pkg,
+                        vdsg_f,
+                        context_label=title_context,
+                        unit_config=unit_cfg,
                     )
                 else:
                     plot_two_body_pair_diagnostics(
@@ -891,6 +970,7 @@ def main() -> None:
                 context_label=title_context,
                 simulation_mode=mode_name,
                 two_body_secondary=True,
+                unit_config=unit_cfg,
             )
             secondary_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",
@@ -921,6 +1001,7 @@ def main() -> None:
                 context_label=title_context,
                 simulation_mode=mode_name,
                 two_body_secondary=False,
+                unit_config=unit_cfg,
             )
             galaxy_diag_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",

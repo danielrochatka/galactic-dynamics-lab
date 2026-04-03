@@ -30,6 +30,19 @@ bool file_exists(const std::string& path) {
   return f.good();
 }
 
+std::string lower_copy(std::string s) {
+  for (char& c : s) {
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  }
+  return s;
+}
+
+bool in_list(const std::string& s, const std::initializer_list<const char*>& vals) {
+  for (const char* v : vals)
+    if (s == v) return true;
+  return false;
+}
+
 }  // namespace
 
 SimulationMode parse_mode(const std::string& s) {
@@ -373,16 +386,44 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     return true;
   }
   if (key == "render_overlay_mode") {
-    std::string m = trim(val);
-    std::string lo = m;
-    for (char& c : lo) {
-      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    }
+    std::string lo = lower_copy(trim(val));
     if (lo == "none" || lo == "minimal" || lo == "audit_full") {
       config.render_overlay_mode = lo;
       return true;
     }
     throw std::runtime_error("render_overlay_mode must be none, minimal, or audit_full");
+  }
+  if (key == "display_distance_unit") {
+    const std::string s = trim(val);
+    if (in_list(s, {"auto", "m", "km", "AU", "ly", "pc", "kpc"})) {
+      config.display_distance_unit = s;
+      return true;
+    }
+    throw std::runtime_error("display_distance_unit must be auto, m, km, AU, ly, pc, or kpc");
+  }
+  if (key == "display_time_unit") {
+    const std::string s = trim(val);
+    if (in_list(s, {"auto", "s", "min", "hr", "day", "yr", "kyr", "Myr"})) {
+      config.display_time_unit = s;
+      return true;
+    }
+    throw std::runtime_error("display_time_unit must be auto, s, min, hr, day, yr, kyr, or Myr");
+  }
+  if (key == "display_velocity_unit") {
+    const std::string s = trim(val);
+    if (in_list(s, {"auto", "m/s", "km/s"})) {
+      config.display_velocity_unit = s;
+      return true;
+    }
+    throw std::runtime_error("display_velocity_unit must be auto, m/s, or km/s");
+  }
+  if (key == "display_units_in_overlay") {
+    config.display_units_in_overlay = parse_bool(val);
+    return true;
+  }
+  if (key == "display_show_unit_reference") {
+    config.display_show_unit_reference = parse_bool(val);
+    return true;
   }
   if (key == "tpf_gdd_coupling") {
     config.tpf_vdsg_coupling = std::stod(val);

@@ -12,8 +12,16 @@ from dataclasses import dataclass
 import numpy as np
 
 # IAU / CODATA-friendly constants (display only)
+METERS_PER_AU = 1.495978707e11
 METERS_PER_LY = 9.460731e15
-SECONDS_PER_JULIAN_YEAR = 365.25 * 86400.0
+METERS_PER_PC = 3.085677581491367e16
+METERS_PER_KPC = 1.0e3 * METERS_PER_PC
+SECONDS_PER_MINUTE = 60.0
+SECONDS_PER_HOUR = 3600.0
+SECONDS_PER_DAY = 86400.0
+SECONDS_PER_JULIAN_YEAR = 365.25 * SECONDS_PER_DAY
+SECONDS_PER_KYR = 1.0e3 * SECONDS_PER_JULIAN_YEAR
+SECONDS_PER_MYR = 1.0e6 * SECONDS_PER_JULIAN_YEAR
 
 
 @dataclass(frozen=True)
@@ -21,56 +29,12 @@ class SpatialDisplay:
     """Multiply SI position (meters) by `factor` to get axis coordinates."""
 
     factor: float
-    unit: str  # short label: "m", "km", "ly", "kly", "Mly"
-
-
-def spatial_display_for_xy_plot(mode: str, half_axis_m: float) -> SpatialDisplay:
-    """
-    Choose x/y axis units for top-down scatter/animation from viewport half-axis (meters).
-    """
-    ha = float(half_axis_m)
-    if not np.isfinite(ha) or ha <= 0:
-        ha = 1.0
-
-    if mode == "earth_moon_benchmark":
-        return SpatialDisplay(1e-3, "km")
-
-    if mode == "bh_orbit_validation":
-        if ha >= 5.0e5:
-            return SpatialDisplay(1e-3, "km")
-        return SpatialDisplay(1.0, "m")
-
-    if mode == "galaxy":
-        return _pick_astronomical_distance_scale(ha)
-
-    # Other modes: heuristic from extent
-    if ha >= 0.5 * 1e6 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / (1e6 * METERS_PER_LY), "Mly")
-    if ha >= 0.5 * 1e3 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / (1e3 * METERS_PER_LY), "kly")
-    if ha >= 0.5 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / METERS_PER_LY, "ly")
-    if ha >= 5.0e5:
-        return SpatialDisplay(1e-3, "km")
-    return SpatialDisplay(1.0, "m")
-
-
-def _pick_astronomical_distance_scale(half_axis_m: float) -> SpatialDisplay:
-    """Galaxy-scale runs: ly / kly / Mly from viewport size; fall back to km/m for compact toy runs."""
-    if half_axis_m >= 0.5 * 1e6 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / (1e6 * METERS_PER_LY), "Mly")
-    if half_axis_m >= 0.5 * 1e3 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / (1e3 * METERS_PER_LY), "kly")
-    if half_axis_m >= 0.5 * METERS_PER_LY:
-        return SpatialDisplay(1.0 / METERS_PER_LY, "ly")
-    if half_axis_m >= 5.0e5:
-        return SpatialDisplay(1e-3, "km")
-    return SpatialDisplay(1.0, "m")
+    unit: str
 
 
 @dataclass(frozen=True)
 class SeriesDisplay:
-    """Scale SI series to human-readable plot axes (two-body + generic diagnostics)."""
+    """Scale SI series to human-readable plot axes."""
 
     distance_factor: float
     distance_unit: str
@@ -81,156 +45,238 @@ class SeriesDisplay:
     suppress_tick_offset: bool
 
 
-def series_display_for_two_body(mode: str, *, max_distance_m: float) -> SeriesDisplay:
-    """Pair separation, COM radius, speeds vs time for earth_moon / bh_orbit."""
-    md = float(max_distance_m)
-    if not np.isfinite(md) or md <= 0:
-        md = 1.0
-
-    if mode == "earth_moon_benchmark":
-        return SeriesDisplay(
-            distance_factor=1e-3,
-            distance_unit="km",
-            speed_factor=1e-3,
-            speed_unit="km/s",
-            time_factor=1.0,
-            time_unit="s",
-            suppress_tick_offset=True,
-        )
-
-    if mode == "bh_orbit_validation":
-        if md >= 5.0e5:
-            return SeriesDisplay(
-                distance_factor=1e-3,
-                distance_unit="km",
-                speed_factor=1.0,
-                speed_unit="m/s",
-                time_factor=1.0,
-                time_unit="s",
-                suppress_tick_offset=True,
-            )
-        return SeriesDisplay(
-            distance_factor=1.0,
-            distance_unit="m",
-            speed_factor=1.0,
-            speed_unit="m/s",
-            time_factor=1.0,
-            time_unit="s",
-            suppress_tick_offset=True,
-        )
-
-    raise ValueError(f"series_display_for_two_body: unsupported mode {mode!r}")
+@dataclass(frozen=True)
+class DisplayUnitConfig:
+    distance_unit: str = "auto"
+    time_unit: str = "auto"
+    velocity_unit: str = "auto"
+    units_in_overlay: bool = True
+    show_unit_reference: bool = True
 
 
-def series_display_for_galaxy_diagnostics(
-    max_radius_m: float, max_time_s: float
+def _boolish(raw: object, default: bool) -> bool:
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return int(raw) != 0
+    s = str(raw).strip().lower()
+    if s in ("1", "true", "yes", "on"):
+        return True
+    if s in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def display_unit_config_from_run_info(run_info: dict[str, str | int | float]) -> DisplayUnitConfig:
+    return DisplayUnitConfig(
+        distance_unit=str(run_info.get("display_distance_unit", "auto") or "auto").strip(),
+        time_unit=str(run_info.get("display_time_unit", "auto") or "auto").strip(),
+        velocity_unit=str(run_info.get("display_velocity_unit", "auto") or "auto").strip(),
+        units_in_overlay=_boolish(run_info.get("display_units_in_overlay"), True),
+        show_unit_reference=_boolish(run_info.get("display_show_unit_reference"), True),
+    )
+
+
+def _distance_from_unit(unit: str) -> SpatialDisplay:
+    mapping = {
+        "m": SpatialDisplay(1.0, "m"),
+        "km": SpatialDisplay(1e-3, "km"),
+        "AU": SpatialDisplay(1.0 / METERS_PER_AU, "AU"),
+        "ly": SpatialDisplay(1.0 / METERS_PER_LY, "ly"),
+        "pc": SpatialDisplay(1.0 / METERS_PER_PC, "pc"),
+        "kpc": SpatialDisplay(1.0 / METERS_PER_KPC, "kpc"),
+    }
+    if unit not in mapping:
+        raise ValueError(f"Unsupported distance unit: {unit}")
+    return mapping[unit]
+
+
+def _time_from_unit(unit: str) -> tuple[float, str]:
+    mapping = {
+        "s": (1.0, "s"),
+        "min": (1.0 / SECONDS_PER_MINUTE, "min"),
+        "hr": (1.0 / SECONDS_PER_HOUR, "hr"),
+        "day": (1.0 / SECONDS_PER_DAY, "day"),
+        "yr": (1.0 / SECONDS_PER_JULIAN_YEAR, "yr"),
+        "kyr": (1.0 / SECONDS_PER_KYR, "kyr"),
+        "Myr": (1.0 / SECONDS_PER_MYR, "Myr"),
+    }
+    if unit not in mapping:
+        raise ValueError(f"Unsupported time unit: {unit}")
+    return mapping[unit]
+
+
+def _velocity_from_unit(unit: str) -> tuple[float, str]:
+    mapping = {
+        "m/s": (1.0, "m/s"),
+        "km/s": (1e-3, "km/s"),
+    }
+    if unit not in mapping:
+        raise ValueError(f"Unsupported velocity unit: {unit}")
+    return mapping[unit]
+
+
+def _auto_distance_unit(scale_m: float) -> str:
+    x = float(scale_m)
+    if not np.isfinite(x) or x <= 0:
+        return "m"
+    if x >= 0.2 * METERS_PER_KPC:
+        return "kpc"
+    if x >= 0.1 * METERS_PER_PC:
+        return "pc"
+    if x >= 0.5 * METERS_PER_LY:
+        return "ly"
+    if x >= 0.5 * METERS_PER_AU:
+        return "AU"
+    if x >= 1e3:
+        return "km"
+    return "m"
+
+
+def _auto_time_unit(scale_s: float) -> str:
+    x = float(scale_s)
+    if not np.isfinite(x) or x < 0:
+        return "s"
+    if x >= 0.5 * SECONDS_PER_MYR:
+        return "Myr"
+    if x >= 0.5 * SECONDS_PER_KYR:
+        return "kyr"
+    if x >= 2.0 * SECONDS_PER_JULIAN_YEAR:
+        return "yr"
+    if x >= 2.0 * SECONDS_PER_DAY:
+        return "day"
+    if x >= 2.0 * SECONDS_PER_HOUR:
+        return "hr"
+    if x >= 2.0 * SECONDS_PER_MINUTE:
+        return "min"
+    return "s"
+
+
+def _auto_velocity_unit(scale_m_s: float) -> str:
+    x = float(scale_m_s)
+    if not np.isfinite(x) or x < 0:
+        return "m/s"
+    if x >= 1e3:
+        return "km/s"
+    return "m/s"
+
+
+def _resolve_distance_unit(preferred_unit: str, scale_m: float) -> SpatialDisplay:
+    unit = preferred_unit if preferred_unit != "auto" else _auto_distance_unit(scale_m)
+    return _distance_from_unit(unit)
+
+
+def _resolve_time_unit(preferred_unit: str, scale_s: float) -> tuple[float, str]:
+    unit = preferred_unit if preferred_unit != "auto" else _auto_time_unit(scale_s)
+    return _time_from_unit(unit)
+
+
+def _resolve_velocity_unit(preferred_unit: str, scale_m_s: float) -> tuple[float, str]:
+    unit = preferred_unit if preferred_unit != "auto" else _auto_velocity_unit(scale_m_s)
+    return _velocity_from_unit(unit)
+
+
+def spatial_display_for_xy_plot(
+    mode: str,
+    half_axis_m: float,
+    *,
+    preferred_unit: str = "auto",
+) -> SpatialDisplay:
+    _ = mode
+    return _resolve_distance_unit(preferred_unit, half_axis_m)
+
+
+def series_display_for_two_body(
+    mode: str,
+    *,
+    max_distance_m: float,
+    max_time_s: float | None = None,
+    max_speed_m_s: float | None = None,
+    preferred_distance_unit: str = "auto",
+    preferred_time_unit: str = "auto",
+    preferred_velocity_unit: str = "auto",
 ) -> SeriesDisplay:
-    """
-    Secondary / galaxy diagnostic time series: radii in ly/kly/Mly, time usually seconds.
-    """
-    mr = float(max_radius_m)
-    if not np.isfinite(mr) or mr <= 0:
-        mr = 1.0
-    mt = float(max_time_s)
-    if not np.isfinite(mt) or mt < 0:
-        mt = 0.0
-
-    dist = _pick_astronomical_distance_scale(mr)
-
-    # Time: keep seconds unless the run spans many years (galaxy orbits)
-    if mt >= 1.0e9 * SECONDS_PER_JULIAN_YEAR:
-        tf = 1.0 / (1e6 * SECONDS_PER_JULIAN_YEAR)
-        tu = "Myr"
-    elif mt >= 1.0e3 * SECONDS_PER_JULIAN_YEAR:
-        tf = 1.0 / (1e3 * SECONDS_PER_JULIAN_YEAR)
-        tu = "kyr"
-    elif mt >= 3600.0 * 24 * 365.25 * 10:
-        tf = 1.0 / SECONDS_PER_JULIAN_YEAR
-        tu = "yr"
-    else:
-        tf = 1.0
-        tu = "s"
-
+    if mode not in ("earth_moon_benchmark", "bh_orbit_validation"):
+        raise ValueError(f"series_display_for_two_body: unsupported mode {mode!r}")
+    md = float(max_distance_m)
+    mt = float(max_time_s) if max_time_s is not None else 0.0
+    mv = float(max_speed_m_s) if max_speed_m_s is not None else 0.0
+    dist = _resolve_distance_unit(preferred_distance_unit, md)
+    tf, tu = _resolve_time_unit(preferred_time_unit, mt)
+    vf, vu = _resolve_velocity_unit(preferred_velocity_unit, mv)
     return SeriesDisplay(
         distance_factor=dist.factor,
         distance_unit=dist.unit,
-        speed_factor=1e-3,
-        speed_unit="km/s",
+        speed_factor=vf,
+        speed_unit=vu,
         time_factor=tf,
         time_unit=tu,
         suppress_tick_offset=True,
     )
 
 
-def series_display_generic_validation(max_radius_m: float) -> SeriesDisplay:
-    """symmetric_pair, small_n, etc.: m/km/ly heuristics from spatial extent."""
-    mr = float(max_radius_m)
-    if not np.isfinite(mr) or mr <= 0:
-        mr = 1.0
-    if mr >= 0.5 * METERS_PER_LY:
-        d = _pick_astronomical_distance_scale(mr)
-        return SeriesDisplay(
-            distance_factor=d.factor,
-            distance_unit=d.unit,
-            speed_factor=1e-3,
-            speed_unit="km/s",
-            time_factor=1.0,
-            time_unit="s",
-            suppress_tick_offset=True,
-        )
-    if mr >= 5.0e5:
-        return SeriesDisplay(
-            distance_factor=1e-3,
-            distance_unit="km",
-            speed_factor=1e-3,
-            speed_unit="km/s",
-            time_factor=1.0,
-            time_unit="s",
-            suppress_tick_offset=True,
-        )
+def series_display_for_galaxy_diagnostics(
+    max_radius_m: float,
+    max_time_s: float,
+    *,
+    max_speed_m_s: float = 0.0,
+    preferred_distance_unit: str = "auto",
+    preferred_time_unit: str = "auto",
+    preferred_velocity_unit: str = "auto",
+) -> SeriesDisplay:
+    dist = _resolve_distance_unit(preferred_distance_unit, max_radius_m)
+    tf, tu = _resolve_time_unit(preferred_time_unit, max_time_s)
+    vf, vu = _resolve_velocity_unit(preferred_velocity_unit, max_speed_m_s)
     return SeriesDisplay(
-        distance_factor=1.0,
-        distance_unit="m",
-        speed_factor=1.0,
-        speed_unit="m/s",
-        time_factor=1.0,
-        time_unit="s",
+        distance_factor=dist.factor,
+        distance_unit=dist.unit,
+        speed_factor=vf,
+        speed_unit=vu,
+        time_factor=tf,
+        time_unit=tu,
         suppress_tick_offset=True,
     )
 
 
-def rotation_curve_display(x_max_m: float) -> tuple[float, float, str, str]:
-    """
-    Returns (r_factor, v_factor, x_label, y_label) for r (m) and v (m/s) inputs.
-    Plotted values are r_plot = r_m * r_factor, v_plot = v_m_s * v_factor.
-    """
-    xm = float(x_max_m)
-    if not np.isfinite(xm) or xm <= 0:
-        xm = 1.0
-    if xm >= 0.5 * 1e6 * METERS_PER_LY:
-        rf = 1.0 / (1e6 * METERS_PER_LY)
-        xl = "Distance from galactic center (Mly)"
-    elif xm >= 0.5 * 1e3 * METERS_PER_LY:
-        rf = 1.0 / (1e3 * METERS_PER_LY)
-        xl = "Distance from galactic center (kly)"
-    elif xm >= 0.5 * METERS_PER_LY:
-        rf = 1.0 / METERS_PER_LY
-        xl = "Distance from galactic center (ly)"
-    elif xm >= 5.0e8:
-        rf = 1e-3
-        xl = "Distance from galactic center (km)"
-    else:
-        rf = 1.0
-        xl = "Distance from galactic center (m)"
+def series_display_generic_validation(
+    max_radius_m: float,
+    *,
+    max_time_s: float = 0.0,
+    max_speed_m_s: float = 0.0,
+    preferred_distance_unit: str = "auto",
+    preferred_time_unit: str = "auto",
+    preferred_velocity_unit: str = "auto",
+) -> SeriesDisplay:
+    dist = _resolve_distance_unit(preferred_distance_unit, max_radius_m)
+    tf, tu = _resolve_time_unit(preferred_time_unit, max_time_s)
+    vf, vu = _resolve_velocity_unit(preferred_velocity_unit, max_speed_m_s)
+    return SeriesDisplay(
+        distance_factor=dist.factor,
+        distance_unit=dist.unit,
+        speed_factor=vf,
+        speed_unit=vu,
+        time_factor=tf,
+        time_unit=tu,
+        suppress_tick_offset=True,
+    )
 
-    # Speed: km/s for galaxy-scale; m/s when distances are small (tests / toy)
-    if xm >= 1e9:
-        vf = 1e-3
-        yl = "Orbital speed (km/s)"
-    else:
-        vf = 1.0
-        yl = "Orbital speed (m/s)"
-    return rf, vf, xl, yl
+
+def rotation_curve_display(
+    x_max_m: float,
+    *,
+    preferred_distance_unit: str = "auto",
+    preferred_velocity_unit: str = "auto",
+) -> tuple[float, float, str, str]:
+    d = _resolve_distance_unit(preferred_distance_unit, x_max_m)
+    v = _resolve_velocity_unit(preferred_velocity_unit, x_max_m / max(SECONDS_PER_DAY, 1.0))
+    return (
+        d.factor,
+        v[0],
+        f"Distance from galactic center ({d.unit})",
+        f"Orbital speed ({v[1]})",
+    )
 
 
 def apply_suppress_tick_offset(ax) -> None:
@@ -243,9 +289,6 @@ def apply_suppress_tick_offset(ax) -> None:
 
 
 def scale_angular_momentum_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
-    """
-    Scale L_z (SI) to a compact magnitude with honest y-label suffix.
-    """
     y = np.asarray(y_si, dtype=np.float64)
     finite = y[np.isfinite(y)]
     if finite.size == 0:
@@ -254,7 +297,6 @@ def scale_angular_momentum_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
     if m <= 0 or not np.isfinite(m):
         return y, "L_z (SI)"
     exp = int(np.floor(np.log10(m)))
-    # Keep exponent a multiple of 3 when large
     if abs(exp) >= 6:
         exp3 = (exp // 3) * 3
         s = 10.0 ** (-exp3)
@@ -263,7 +305,6 @@ def scale_angular_momentum_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
 
 
 def scale_angular_momentum_origin_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
-    """Total L_z about origin — same scaling rule as COM L_z."""
     y_plot, lab = scale_angular_momentum_display(y_si)
     if "about COM" in lab:
         return y_plot, lab.replace("L_z about COM", "Total L_z about origin")
@@ -271,7 +312,6 @@ def scale_angular_momentum_origin_display(y_si: np.ndarray) -> tuple[np.ndarray,
 
 
 def scale_energy_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
-    """Newtonian specific energy J/kg — use MJ/kg when |values| are huge."""
     y = np.asarray(y_si, dtype=np.float64)
     finite = y[np.isfinite(y)]
     if finite.size == 0:
@@ -282,15 +322,10 @@ def scale_energy_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
     return y, "Newtonian specific energy (J/kg)"
 
 
-def format_animation_time_caption(time_s: float, mode: str) -> str:
-    """Short time string for animation frame title (SI time in seconds)."""
+def format_animation_time_caption(time_s: float, mode: str, *, preferred_time_unit: str = "auto") -> str:
     t = float(time_s)
     if not np.isfinite(t):
         return "t = ?"
-    if mode == "galaxy" and t >= 1000.0 * SECONDS_PER_JULIAN_YEAR:
-        return f"t = {t / SECONDS_PER_JULIAN_YEAR:.3g} yr"
-    if t >= 1e7:
-        return f"t = {t:.4g} s"
-    if t >= 1000:
-        return f"t = {t:.4g} s"
-    return f"t = {t:.6g} s"
+    _ = mode
+    tf, tu = _resolve_time_unit(preferred_time_unit, t)
+    return f"t = {t * tf:.6g} {tu}"
