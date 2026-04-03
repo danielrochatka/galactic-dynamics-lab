@@ -41,6 +41,11 @@ void write_run_info(const std::string& output_dir,
   f << "artifact_label_scope_primary\tprimary=main interpretation outputs (mode-dependent)\n";
   f << "artifact_label_scope_secondary\tsecondary=lab/origin radial diagnostics where applicable\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
+  f << "display_distance_unit\t" << config.display_distance_unit << "\n";
+  f << "display_time_unit\t" << config.display_time_unit << "\n";
+  f << "display_velocity_unit\t" << config.display_velocity_unit << "\n";
+  f << "display_units_in_overlay\t" << (config.display_units_in_overlay ? 1 : 0) << "\n";
+  f << "display_show_unit_reference\t" << (config.display_show_unit_reference ? 1 : 0) << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
   f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
@@ -171,6 +176,11 @@ void write_run_info(const std::string& output_dir,
   f << "plot_skip_initial_snapshots\t" << config.plot_skip_initial_snapshots << "\n";
   f << "diagnostic_cutoff_radius\t" << config.diagnostic_cutoff_radius << "\n";
   f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
+  f << "display_distance_unit\t" << config.display_distance_unit << "\n";
+  f << "display_time_unit\t" << config.display_time_unit << "\n";
+  f << "display_velocity_unit\t" << config.display_velocity_unit << "\n";
+  f << "display_units_in_overlay\t" << (config.display_units_in_overlay ? 1 : 0) << "\n";
+  f << "display_show_unit_reference\t" << (config.display_show_unit_reference ? 1 : 0) << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
   f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
