@@ -310,18 +310,41 @@ def draw_galaxy_render_overlay(
         f"Step: {step_str}",
         f"t = {time_s:.6g}",
     ]
+    unit_lines: list[str] = []
     if bool(spec.get("display_units_in_overlay", True)):
         du = str(spec.get("active_display_distance_unit") or spec.get("display_distance_unit") or "auto")
         tu = str(spec.get("active_display_time_unit") or spec.get("display_time_unit") or "auto")
         vu = str(spec.get("active_display_velocity_unit") or spec.get("display_velocity_unit") or "auto")
-        lines_min += [
+        unit_lines = [
             f"Display distance: {du}",
             f"Display time: {tu}",
             f"Display velocity: {vu}",
         ]
+        lines_min += unit_lines
 
     if mode == "minimal":
-        text = "\n".join(lines_min[:10])
+        if unit_lines:
+            compact = [
+                lines_min[0],  # run id
+                lines_min[1],  # dynamics
+                lines_min[3],  # coupling
+                lines_min[9],  # step
+                lines_min[10],  # time
+                *unit_lines,
+            ]
+        else:
+            compact = [
+                lines_min[0],  # run id
+                lines_min[1],  # dynamics
+                lines_min[3],  # coupling
+                lines_min[4],  # cooling
+                lines_min[5],  # template
+                lines_min[6],  # seed
+                lines_min[7],  # stars
+                lines_min[9],  # step
+                lines_min[10],  # time
+            ]
+        text = "\n".join(compact)
         fontsize = 7
     elif mode == "audit_full":
         extra = [

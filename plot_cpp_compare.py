@@ -329,7 +329,10 @@ def render_compare(
         _draw_panel(axes[1], right, right_snaps[i], shared_vp, spatial_display=spatial_display)
         t = float(left_snaps[i].time)
         tc = format_animation_time_caption(
-            t, "galaxy_compare", preferred_time_unit=shared_display.config.time_unit
+            t,
+            "galaxy_compare",
+            preferred_time_unit=shared_display.config.time_unit,
+            active_time_unit=shared_display.active_time_unit,
         )
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | {tc} "

@@ -322,10 +322,19 @@ def scale_energy_display(y_si: np.ndarray) -> tuple[np.ndarray, str]:
     return y, "Newtonian specific energy (J/kg)"
 
 
-def format_animation_time_caption(time_s: float, mode: str, *, preferred_time_unit: str = "auto") -> str:
+def format_animation_time_caption(
+    time_s: float,
+    mode: str,
+    *,
+    preferred_time_unit: str = "auto",
+    active_time_unit: str | None = None,
+) -> str:
     t = float(time_s)
     if not np.isfinite(t):
         return "t = ?"
     _ = mode
-    tf, tu = _resolve_time_unit(preferred_time_unit, t)
+    if active_time_unit is not None:
+        tf, tu = _time_from_unit(str(active_time_unit))
+    else:
+        tf, tu = _resolve_time_unit(preferred_time_unit, t)
     return f"t = {t * tf:.6g} {tu}"
