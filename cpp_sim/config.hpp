@@ -271,6 +271,20 @@ struct Config {
    * set minimal or audit_full in run config for audit labels.
    */
   std::string render_overlay_mode = "none";
+  /**
+   * Display-unit controls for postprocess (plot_cpp_run.py, render.py, diagnostics.py).
+   * Internal simulation, integration, snapshots, and numeric run_info values remain SI.
+   * Supported distance: auto | m | km | AU | ly | pc | kpc
+   * Supported time: auto | s | min | hr | day | yr | kyr | Myr
+   * Supported velocity: auto | m/s | km/s
+   */
+  std::string display_distance_unit = "auto";
+  std::string display_time_unit = "auto";
+  std::string display_velocity_unit = "auto";
+  /** Include active display units in overlays/captions when true. */
+  bool display_units_in_overlay = true;
+  /** Show a compact display-unit reference block when true. */
+  bool display_show_unit_reference = true;
 
   // Validation-only
   double validation_two_body_radius = kDefaultValidationTwoBodyRadiusM;

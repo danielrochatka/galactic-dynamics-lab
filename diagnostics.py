@@ -13,6 +13,7 @@ import numpy as np
 from text_layout import add_fitted_footer, set_fitted_title
 
 from display_units import (
+    DisplayUnitConfig,
     SeriesDisplay,
     SpatialDisplay,
     apply_suppress_tick_offset,
@@ -505,6 +506,7 @@ def plot_bh_orbit_validation_extras(
     tpf_vdsg_coupling: float,
     *,
     context_label: str = "",
+    unit_config: DisplayUnitConfig | None = None,
 ) -> None:
     """
     bh_orbit_validation only: orbit in x–y, separation with periapsis/apoapsis markers, zoomed orbit shape.
@@ -515,8 +517,15 @@ def plot_bh_orbit_validation_extras(
     t = diag["time"]
     sep = np.asarray(diag["pair_separation"], dtype=np.float64)
     mins_i, maxs_i = _local_extrema_indices(sep)
+    cfg = unit_config if unit_config is not None else DisplayUnitConfig()
     series = series_display_for_two_body(
         "bh_orbit_validation", max_distance_m=float(np.max(sep)) if sep.size else 1.0
+        ,
+        max_time_s=float(np.max(t)) if len(t) else 0.0,
+        max_speed_m_s=float(np.max(diag["pair_relative_speed"])) if len(t) else 0.0,
+        preferred_distance_unit=cfg.distance_unit,
+        preferred_time_unit=cfg.time_unit,
+        preferred_velocity_unit=cfg.velocity_unit,
     )
 
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -531,7 +540,9 @@ def plot_bh_orbit_validation_extras(
     ys_a = np.array(ys, dtype=np.float64)
     r_arr = np.hypot(xs_a, ys_a)
     half_extent = float(np.nanmax(r_arr)) * 1.2 if r_arr.size else 1.0
-    spatial: SpatialDisplay = spatial_display_for_xy_plot("bh_orbit_validation", half_extent)
+    spatial: SpatialDisplay = spatial_display_for_xy_plot(
+        "bh_orbit_validation", half_extent, preferred_unit=cfg.distance_unit
+    )
     xf = spatial.factor
     u = spatial.unit
     ax.plot(xs_a * xf, ys_a * xf, "-", color="steelblue", lw=1.2, label="Star path (lab frame)")
@@ -557,7 +568,9 @@ def plot_bh_orbit_validation_extras(
 
     r_max = float(np.nanmax(r_arr)) if r_arr.size else 1.0
     zoom = max(r_max * 1.25, 1.0)
-    spatial_z = spatial_display_for_xy_plot("bh_orbit_validation", zoom)
+    spatial_z = spatial_display_for_xy_plot(
+        "bh_orbit_validation", zoom, preferred_unit=cfg.distance_unit
+    )
     xfz = spatial_z.factor
     uz = spatial_z.unit
     fig, ax = plt.subplots(figsize=(7, 7))
@@ -616,6 +629,7 @@ def _series_for_bulk_diagnostics(
     two_body_secondary: bool,
     diagnostics: dict[str, np.ndarray],
     cutoff_radius: float,
+    unit_config: DisplayUnitConfig,
 ) -> SeriesDisplay:
     max_r = max(
         float(np.max(diagnostics["median_r"])),
@@ -626,10 +640,29 @@ def _series_for_bulk_diagnostics(
     )
     max_t = float(np.max(diagnostics["time"]))
     if two_body_secondary and simulation_mode == "earth_moon_benchmark":
-        return series_display_for_two_body("earth_moon_benchmark", max_distance_m=max_r)
+        return series_display_for_two_body(
+            "earth_moon_benchmark",
+            max_distance_m=max_r,
+            max_time_s=max_t,
+            preferred_distance_unit=unit_config.distance_unit,
+            preferred_time_unit=unit_config.time_unit,
+            preferred_velocity_unit=unit_config.velocity_unit,
+        )
     if simulation_mode == "galaxy":
-        return series_display_for_galaxy_diagnostics(max_r, max_t)
-    return series_display_generic_validation(max_r)
+        return series_display_for_galaxy_diagnostics(
+            max_r,
+            max_t,
+            preferred_distance_unit=unit_config.distance_unit,
+            preferred_time_unit=unit_config.time_unit,
+            preferred_velocity_unit=unit_config.velocity_unit,
+        )
+    return series_display_generic_validation(
+        max_r,
+        max_time_s=max_t,
+        preferred_distance_unit=unit_config.distance_unit,
+        preferred_time_unit=unit_config.time_unit,
+        preferred_velocity_unit=unit_config.velocity_unit,
+    )
 
 
 def plot_and_save_all(
@@ -641,6 +674,7 @@ def plot_and_save_all(
     context_label: str = "",
     simulation_mode: str = "galaxy",
     two_body_secondary: bool = False,
+    unit_config: DisplayUnitConfig | None = None,
 ) -> None:
     """
     Save one PNG per diagnostic in output_dir (one point per snapshot, time = simulation time).
@@ -654,8 +688,9 @@ def plot_and_save_all(
         else ""
     )
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
+    cfg = unit_config if unit_config is not None else DisplayUnitConfig()
     series = _series_for_bulk_diagnostics(
-        simulation_mode, two_body_secondary, diagnostics, cutoff_radius
+        simulation_mode, two_body_secondary, diagnostics, cutoff_radius, cfg
     )
     disp_note = "Axes use display units; CSV remains SI."
     t = diagnostics["time"]

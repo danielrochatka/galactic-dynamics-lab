@@ -115,6 +115,21 @@ This produces mode-aware filenames using **`<mode>__<physics>__<scope>__<quantit
 Burn-in plotting filter (does not modify raw snapshots): `plot_cpp_run.py --skip-initial-steps <step>` and/or `--skip-initial-snapshots <N>`, or set `plot_skip_initial_steps` / `plot_skip_initial_snapshots` in the run config (written to `run_info.txt`). CLI overrides config.
 Diagnostics cutoff for post-processing: set `diagnostic_cutoff_radius` in run config (written to `run_info.txt`) or pass `--diagnostic-cutoff-radius` to `plot_cpp_run.py`. No hardcoded physical cutoff is used.
 
+### Display units (postprocess only, SI internals preserved)
+
+Internal integration, physics, snapshot CSV numeric values, and run_info numeric physics values remain **SI**. Display units are a plotting/render concern driven by config keys written into `run_info.txt` and consumed by postprocess.
+
+Config keys:
+
+- `display_distance_unit = auto | m | km | AU | ly | pc | kpc`
+- `display_time_unit = auto | s | min | hr | day | yr | kyr | Myr`
+- `display_velocity_unit = auto | m/s | km/s`
+- `display_units_in_overlay = true|false`
+- `display_show_unit_reference = true|false`
+
+`auto` uses practical scale-based heuristics in the display layer (e.g., compact runs in m/km, solar-system scales in AU, galaxy scales in ly/pc/kpc; short runs in s/min/hr/day and long runs in yr/kyr/Myr). Explicit units force that display unit wherever the product shows converted values.
+Declared compare renders (`plot_cpp_compare.py`) reuse this same unit policy and choose one shared display unit set across both panels from shared compare framing/time scales.
+
 ---
 
 ## Application vs physics package

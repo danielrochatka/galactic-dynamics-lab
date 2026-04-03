@@ -171,6 +171,7 @@ def save_static_plot(
     overlay_step: int = 0,
     overlay_time: float = 0.0,
     spatial_display: Optional[SpatialDisplay] = None,
+    unit_reference_text: str | None = None,
 ) -> None:
     """Save a single static scatter plot. Positions remain SI; axes use display units when provided."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
@@ -189,6 +190,18 @@ def save_static_plot(
         spatial_display=spatial_display,
     )
     set_fitted_title(ax, title, color="white", fontsize=14, min_fontsize=6)
+    if unit_reference_text:
+        ax.text(
+            0.99,
+            0.01,
+            unit_reference_text,
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=7,
+            color="white",
+            bbox=dict(boxstyle="round,pad=0.25", fc="black", ec="white", alpha=0.5),
+        )
     if (
         overlay_mode != "none"
         and overlay_spec is not None
@@ -222,6 +235,8 @@ def create_animation(
     run_info: Optional[dict[str, Any]] = None,
     spatial_display: Optional[SpatialDisplay] = None,
     simulation_mode: str = "galaxy",
+    preferred_time_unit: str = "auto",
+    unit_reference_text: str | None = None,
     mutable_frame_index: Optional[dict[str, int]] = None,
 ) -> bool:
     """
@@ -254,8 +269,22 @@ def create_animation(
             velocities=vel,
             spatial_display=spatial_display,
         )
-        tc = format_animation_time_caption(float(snap.time), simulation_mode)
+        tc = format_animation_time_caption(
+            float(snap.time), simulation_mode, preferred_time_unit=preferred_time_unit
+        )
         ax.set_title(f"Step {snap.step}  |  {tc}", color="white")
+        if unit_reference_text:
+            ax.text(
+                0.99,
+                0.01,
+                unit_reference_text,
+                transform=ax.transAxes,
+                ha="right",
+                va="bottom",
+                fontsize=7,
+                color="white",
+                bbox=dict(boxstyle="round,pad=0.25", fc="black", ec="white", alpha=0.5),
+            )
         if (
             overlay_mode != "none"
             and overlay_spec is not None

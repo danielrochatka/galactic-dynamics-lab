@@ -212,6 +212,14 @@ def build_overlay_spec(
         "git_tag": _pick_s(mf, ri, "git_tag", ""),
         "git_dirty": _pick_boolish(mf, ri, "git_dirty", False),
         "code_version_label": _pick_s(mf, ri, "code_version_label", "unknown"),
+        "display_distance_unit": _pick_s(mf, ri, "display_distance_unit", "auto"),
+        "display_time_unit": _pick_s(mf, ri, "display_time_unit", "auto"),
+        "display_velocity_unit": _pick_s(mf, ri, "display_velocity_unit", "auto"),
+        "display_units_in_overlay": _pick_boolish(mf, ri, "display_units_in_overlay", True),
+        "display_show_unit_reference": _pick_boolish(mf, ri, "display_show_unit_reference", True),
+        "active_display_distance_unit": _pick_s(mf, ri, "active_display_distance_unit", ""),
+        "active_display_time_unit": _pick_s(mf, ri, "active_display_time_unit", ""),
+        "active_display_velocity_unit": _pick_s(mf, ri, "active_display_velocity_unit", ""),
     }
     return spec
 
@@ -302,6 +310,15 @@ def draw_galaxy_render_overlay(
         f"Step: {step_str}",
         f"t = {time_s:.6g}",
     ]
+    if bool(spec.get("display_units_in_overlay", True)):
+        du = str(spec.get("active_display_distance_unit") or spec.get("display_distance_unit") or "auto")
+        tu = str(spec.get("active_display_time_unit") or spec.get("display_time_unit") or "auto")
+        vu = str(spec.get("active_display_velocity_unit") or spec.get("display_velocity_unit") or "auto")
+        lines_min += [
+            f"Display distance: {du}",
+            f"Display time: {tu}",
+            f"Display velocity: {vu}",
+        ]
 
     if mode == "minimal":
         text = "\n".join(lines_min[:10])
