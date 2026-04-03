@@ -217,7 +217,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.v11_em_calib_surface_g_m_s2 = std::stod(val);
     return true;
   }
-  if (key == "tpf_kappa") {
+  if (key == "tpfcore_closure_kappa" || key == "tpf_kappa") {
     config.tpf_kappa = std::stod(val);
     return true;
   }
