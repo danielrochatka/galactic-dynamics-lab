@@ -818,6 +818,7 @@ def main() -> None:
             spatial_display=spatial_display,
             simulation_mode=mode_name,
             preferred_time_unit=unit_cfg.time_unit,
+            active_time_unit=series_preview.time_unit,
             unit_reference_text=unit_reference_text,
             mutable_frame_index=anim_mutable_idx,
             **overlay_kw,

@@ -236,6 +236,7 @@ def create_animation(
     spatial_display: Optional[SpatialDisplay] = None,
     simulation_mode: str = "galaxy",
     preferred_time_unit: str = "auto",
+    active_time_unit: str | None = None,
     unit_reference_text: str | None = None,
     mutable_frame_index: Optional[dict[str, int]] = None,
 ) -> bool:
@@ -270,7 +271,10 @@ def create_animation(
             spatial_display=spatial_display,
         )
         tc = format_animation_time_caption(
-            float(snap.time), simulation_mode, preferred_time_unit=preferred_time_unit
+            float(snap.time),
+            simulation_mode,
+            preferred_time_unit=preferred_time_unit,
+            active_time_unit=active_time_unit,
         )
         ax.set_title(f"Step {snap.step}  |  {tc}", color="white")
         if unit_reference_text:

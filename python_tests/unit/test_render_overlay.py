@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from render_overlay import (  # noqa: E402
     build_overlay_spec,
+    draw_galaxy_render_overlay,
     infer_branches_from_run_info,
     load_render_manifest,
     provenance_overlay_watermark_text,
@@ -139,6 +140,51 @@ class TestRenderOverlay(unittest.TestCase):
         full = provenance_overlay_watermark_text("audit_full", spec)
         self.assertIn("branch: main", full)
         self.assertIn("dirty: yes", full)
+
+    def test_minimal_overlay_includes_display_units_when_enabled(self) -> None:
+        class _FakeAx:
+            def __init__(self) -> None:
+                self.transAxes = object()
+                self.text_calls: list[tuple[float, float, str]] = []
+
+            def text(self, x, y, text, **kwargs):  # type: ignore[no-untyped-def]
+                _ = kwargs
+                self.text_calls.append((x, y, text))
+
+        ax = _FakeAx()
+        spec = {
+            "run_id": "r1",
+            "active_dynamics_branch": "dyn",
+            "active_metrics_branch": "met",
+            "physics_package": "Newtonian",
+            "tpf_vdsg_coupling": 0.0,
+            "galaxy_init_template": "disk",
+            "galaxy_init_seed": 7,
+            "n_stars": 128,
+            "bh_mass": 1.0,
+            "n_steps_total": 100,
+            "display_units_in_overlay": True,
+            "active_display_distance_unit": "kpc",
+            "active_display_time_unit": "Myr",
+            "active_display_velocity_unit": "km/s",
+            "code_version_label": "unknown",
+            "git_commit_short": "abc1234",
+            "git_dirty": False,
+            "git_branch": "",
+            "git_tag": "",
+        }
+        draw_galaxy_render_overlay(
+            ax,
+            "minimal",
+            spec,
+            run_info={"simulation_mode": "galaxy"},
+            step=10,
+            time_s=1.0,
+        )
+        overlay_text = ax.text_calls[0][2]
+        self.assertIn("Display distance: kpc", overlay_text)
+        self.assertIn("Display time: Myr", overlay_text)
+        self.assertIn("Display velocity: km/s", overlay_text)
 
 
 if __name__ == "__main__":
