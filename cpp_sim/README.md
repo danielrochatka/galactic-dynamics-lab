@@ -128,7 +128,6 @@ Config keys:
 - `display_show_unit_reference = true|false`
 
 `auto` uses practical scale-based heuristics in the display layer (e.g., compact runs in m/km, solar-system scales in AU, galaxy scales in ly/pc/kpc; short runs in s/min/hr/day and long runs in yr/kyr/Myr). Explicit units force that display unit wherever the product shows converted values.
-Declared compare renders (`plot_cpp_compare.py`) reuse this same unit policy and choose one shared display unit set across both panels from shared compare framing/time scales.
 
 ---
 

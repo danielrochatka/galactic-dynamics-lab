@@ -17,8 +17,6 @@ Set in run config (`configs/*.cfg`):
 - `display_show_unit_reference = true|false`
 
 These are written by C++ into `run_info.txt` and read by Python postprocess (`plot_cpp_run.py`, diagnostics, rotation-curve plotting, render overlay).
-The same keys are also used by compare rendering (`plot_cpp_compare.py`) so side-by-side panels share one display-unit choice.
-If both compare sides force conflicting explicit units (for example `km` vs `AU`), compare falls back to `auto` for that dimension so both panels remain consistent.
 
 ## Auto mode policy
 
@@ -33,5 +31,4 @@ If both compare sides force conflicting explicit units (for example `km` vs `AU`
 - Axis labels include units (for example `x (AU)`, `Time (day)`, `Orbital speed (km/s)`).
 - Overlays can include active display unit labels.
 - Optional unit-reference text can be shown on PNG/MP4 frames.
-- Compare PNG/MP4 outputs use shared distance/time/velocity display units across both panels.
 - Raw CSV and SI run outputs are unchanged.
