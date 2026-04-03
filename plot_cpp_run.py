@@ -779,7 +779,7 @@ def main() -> None:
     if not args.no_diagnostics and len(snapshots) > 1:
         masses = get_masses_from_snapshots(snapshots, run_dir)
         if len(masses) != n_stars:
-            masses = np.ones(n_stars) * run_info.get("star_mass", 1.0)
+            masses = np.ones(n_stars) * run_info.get("star_mass", 1.98847e30)
         cutoff, cutoff_source = resolve_diagnostic_cutoff_radius(
             run_info, cli_cutoff_radius=args.diagnostic_cutoff_radius
         )

@@ -8,6 +8,19 @@ namespace galaxy {
 /** SI speed of light (m/s). TPF bounce closure (Sec. IX, Eq. 31). */
 constexpr double c = 299792458.0;
 
+/** Solar mass [kg]; consistent with display_units / Earth–Moon SI literals. */
+constexpr double kSolarMassKg = 1.98847e30;
+/** Default SMBH mass for galaxy runs (~10^6 M_sun). */
+constexpr double kDefaultBhMassKg = 1.0e6 * kSolarMassKg;
+/** Default disk scale [m] ~10 kpc (galactic disk order). */
+constexpr double kDefaultGalaxyRadiusM = 3.0e20;
+/** Default inner disk radius [m] ~1 kpc. */
+constexpr double kDefaultInnerRadiusM = 3.0e19;
+/** Default Plummer-style softening [m] ~330 AU (numerical at galaxy scale). */
+constexpr double kDefaultSofteningM = 1.0e16;
+/** Default BH-orbit validation radius [m] ~0.5 pc (works with kDefaultBhMassKg circular speeds). */
+constexpr double kDefaultValidationTwoBodyRadiusM = 5.0e18;
+
 // Simulation mode: see config.py VALIDATION_MODES (Python) + "galaxy" + TPFCore inspection modes
 enum class SimulationMode {
   galaxy,
@@ -61,19 +74,19 @@ struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
 
   int n_stars = 5000;
-  double star_mass = 0.05;
-  double bh_mass = 1000.0;
+  double star_mass = kSolarMassKg;
+  double bh_mass = kDefaultBhMassKg;
 
-  double inner_radius = 5.0;
-  double outer_radius = 50.0;
+  double inner_radius = kDefaultInnerRadiusM;
+  double outer_radius = kDefaultGalaxyRadiusM;
   /** Galaxy disk: stars sampled uniformly in area between 0.05 * galaxy_radius and galaxy_radius (m). */
-  double galaxy_radius = 50.0;
+  double galaxy_radius = kDefaultGalaxyRadiusM;
 
   double dt = 0.01;
   int n_steps = 50000;
   int snapshot_every = 50;
 
-  double softening = 1.0;
+  double softening = kDefaultSofteningM;
   bool enable_star_star_gravity = true;
 
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
@@ -260,11 +273,13 @@ struct Config {
   std::string render_overlay_mode = "none";
 
   // Validation-only
-  double validation_two_body_radius = 20.0;
+  double validation_two_body_radius = kDefaultValidationTwoBodyRadiusM;
   double validation_two_body_speed_ratio = 1.0;
   bool validation_symmetric_include_bh = true;
-  double validation_symmetric_separation = 30.0;
-  double validation_symmetric_speed = 4.0;
+  /** Half-separation along x (|x| of each star); full separation = 2 * this [m]. ~0.5 AU default. */
+  double validation_symmetric_separation = 7.48e10;
+  /** Tangential speed scale [m/s] (~30 km/s for AU-scale equal-mass binary order). */
+  double validation_symmetric_speed = 3.0e4;
   int validation_small_n = 5;
   int validation_n_steps = 5000;
   int validation_snapshot_every = 5;

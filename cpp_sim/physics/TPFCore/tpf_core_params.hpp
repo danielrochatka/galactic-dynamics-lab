@@ -20,22 +20,25 @@
 
 #include <string>
 
+#include "../../config.hpp"
+
 namespace galaxy {
 namespace tpfcore {
 
 struct TPFCoreParams {
   /* --- Simulator context (passed through for dynamics/output) --- */
   std::string output_dir;
-  double softening = 1.0;
-  double bh_mass = 1000.0;
-  double star_mass = 0.05;
+  double softening = kDefaultSofteningM;
+  double bh_mass = kDefaultBhMassKg;
+  double star_mass = kSolarMassKg;
   bool enable_star_star_gravity = true;
 
   /* --- Numerical regularization (eps for Phi; not theory) --- */
   double tpfcore_source_softening = 0.0;   /**< If > 0, use this as eps; else use global softening. */
-  double effective_source_softening = 1.0; /**< Resolved: tpfcore_source_softening > 0 ? that : softening. */
+  double effective_source_softening = kDefaultSofteningM; /**< Resolved: tpfcore_source_softening > 0 ? that : softening. */
 
   /* --- Inspection / calibration (probe geometry and dump flags) --- */
+  /** Defaults keep v11_weak_field_correspondence earth_moon_line_of_centers valid (max < D ~ 3.84e8 m). */
   double tpfcore_probe_radius_min = 1.0;
   double tpfcore_probe_radius_max = 50.0;
   int tpfcore_probe_samples = 100;
@@ -46,7 +49,7 @@ struct TPFCoreParams {
   bool tpfcore_dump_readout_debug = true;
 
   /* --- Validation geometry --- */
-  double validation_symmetric_separation = 30.0;
+  double validation_symmetric_separation = 7.48e10;
 };
 
 }  // namespace tpfcore

@@ -1,6 +1,6 @@
 """
 Configuration parameters for the 2D galaxy N-body simulation.
-All values use normalized units.
+Masses and lengths use SI (kg, m) with astronomical-scale defaults (solar masses, kpc-order disk).
 
 Local overrides: if configs/my.local.cfg or any configs/local/*.cfg exists,
 it is loaded after defaults and applied to SimulationConfig. Keys match
@@ -25,6 +25,13 @@ VALIDATION_MODES = (
 # Project root (directory containing config.py)
 _PROJECT_ROOT = Path(__file__).resolve().parent
 
+# SI defaults (match cpp_sim/config.hpp): one solar mass; ~10^6 M_sun SMBH; ~10 kpc disk scale.
+SOLAR_MASS_KG = 1.98847e30
+DEFAULT_BH_MASS_KG = 1.0e6 * SOLAR_MASS_KG
+_DEFAULT_GALAXY_RADIUS_M = 3.0e20
+_DEFAULT_INNER_RADIUS_M = 3.0e19
+_DEFAULT_SOFTENING_M = 1.0e16
+
 # Paths to check for local config (relative to project root)
 CONFIG_SEARCH_PATHS = [
     _PROJECT_ROOT / "configs" / "my.local.cfg",
@@ -42,14 +49,14 @@ class SimulationConfig:
 
     # Star distribution
     n_stars: int = 1000
-    star_mass: float = 0.5
+    star_mass: float = SOLAR_MASS_KG
 
     # Central black hole (fixed at origin)
-    bh_mass: float = 1000.0
+    bh_mass: float = DEFAULT_BH_MASS_KG
 
-    # Disk geometry
-    inner_radius: float = 5.0
-    outer_radius: float = 50.0
+    # Disk geometry (meters; ~1 kpc inner, ~10 kpc outer)
+    inner_radius: float = _DEFAULT_INNER_RADIUS_M
+    outer_radius: float = _DEFAULT_GALAXY_RADIUS_M
 
     # Integration
     dt: float = 0.01
@@ -57,7 +64,7 @@ class SimulationConfig:
     snapshot_every: int = 10
 
     # Physics
-    softening: float = 1.0
+    softening: float = _DEFAULT_SOFTENING_M
     enable_star_star_gravity: bool = True  # False = stars feel only central BH
 
     # Initial conditions
@@ -74,14 +81,14 @@ class SimulationConfig:
     render_initial_final: bool = True  # Static initial/final scatter plots
 
     # Diagnostics
-    diagnostic_cutoff_radius: float = 50.0  # Fraction of stars beyond this radius (diagnostic 5)
+    diagnostic_cutoff_radius: float = _DEFAULT_GALAXY_RADIUS_M
 
     # Validation mode parameters
-    validation_two_body_radius: float = 20.0
+    validation_two_body_radius: float = 5.0e18  # ~0.5 pc (works with default SMBH masses)
     validation_two_body_speed_ratio: float = 1.0  # 1.0 = circular, <1 or >1 = elliptical
     validation_symmetric_include_bh: bool = True
-    validation_symmetric_separation: float = 30.0  # distance of each star from origin along x
-    validation_symmetric_speed: float = 4.0  # tangential speed (y) for each star
+    validation_symmetric_separation: float = 7.48e10  # half-separation along x; full sep = 2x (~1 AU)
+    validation_symmetric_speed: float = 3.0e4  # ~30 km/s (order of AU-scale binary)
     validation_small_n: int = 5  # n=3..10 for small_n_conservation
     validation_n_steps: int = 5000
     validation_snapshot_every: int = 5
