@@ -19,10 +19,9 @@ from display_units import (
     scale_angular_momentum_display,
     scale_angular_momentum_origin_display,
     scale_energy_display,
-    series_display_for_galaxy_diagnostics,
-    series_display_for_two_body,
-    series_display_generic_validation,
-    spatial_display_for_xy_plot,
+    series_display_resolved_for_bulk,
+    series_display_resolved_for_two_body,
+    spatial_display_from_run_info,
 )
 
 # SI gravitational constant (matches cpp_sim/init_conditions.cpp)
@@ -515,8 +514,11 @@ def plot_bh_orbit_validation_extras(
     t = diag["time"]
     sep = np.asarray(diag["pair_separation"], dtype=np.float64)
     mins_i, maxs_i = _local_extrema_indices(sep)
-    series = series_display_for_two_body(
-        "bh_orbit_validation", max_distance_m=float(np.max(sep)) if sep.size else 1.0
+    max_sep = float(np.max(sep)) if sep.size else 1.0
+    series = series_display_resolved_for_two_body(
+        "bh_orbit_validation",
+        max_distance_m=max_sep,
+        run_info=run_info,
     )
 
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -531,7 +533,9 @@ def plot_bh_orbit_validation_extras(
     ys_a = np.array(ys, dtype=np.float64)
     r_arr = np.hypot(xs_a, ys_a)
     half_extent = float(np.nanmax(r_arr)) * 1.2 if r_arr.size else 1.0
-    spatial: SpatialDisplay = spatial_display_for_xy_plot("bh_orbit_validation", half_extent)
+    spatial: SpatialDisplay = spatial_display_from_run_info(
+        "bh_orbit_validation", half_extent, run_info
+    )
     xf = spatial.factor
     u = spatial.unit
     ax.plot(xs_a * xf, ys_a * xf, "-", color="steelblue", lw=1.2, label="Star path (lab frame)")
@@ -557,7 +561,7 @@ def plot_bh_orbit_validation_extras(
 
     r_max = float(np.nanmax(r_arr)) if r_arr.size else 1.0
     zoom = max(r_max * 1.25, 1.0)
-    spatial_z = spatial_display_for_xy_plot("bh_orbit_validation", zoom)
+    spatial_z = spatial_display_from_run_info("bh_orbit_validation", zoom, run_info)
     xfz = spatial_z.factor
     uz = spatial_z.unit
     fig, ax = plt.subplots(figsize=(7, 7))
@@ -611,27 +615,6 @@ def plot_bh_orbit_validation_extras(
     plt.close(fig)
 
 
-def _series_for_bulk_diagnostics(
-    simulation_mode: str,
-    two_body_secondary: bool,
-    diagnostics: dict[str, np.ndarray],
-    cutoff_radius: float,
-) -> SeriesDisplay:
-    max_r = max(
-        float(np.max(diagnostics["median_r"])),
-        float(np.max(diagnostics["mean_r"])),
-        float(np.max(diagnostics["std_r"])),
-        float(np.max(diagnostics["max_r"])),
-        float(cutoff_radius),
-    )
-    max_t = float(np.max(diagnostics["time"]))
-    if two_body_secondary and simulation_mode == "earth_moon_benchmark":
-        return series_display_for_two_body("earth_moon_benchmark", max_distance_m=max_r)
-    if simulation_mode == "galaxy":
-        return series_display_for_galaxy_diagnostics(max_r, max_t)
-    return series_display_generic_validation(max_r)
-
-
 def plot_and_save_all(
     diagnostics: dict[str, np.ndarray],
     output_dir: Path,
@@ -641,6 +624,7 @@ def plot_and_save_all(
     context_label: str = "",
     simulation_mode: str = "galaxy",
     two_body_secondary: bool = False,
+    run_info: dict | None = None,
 ) -> None:
     """
     Save one PNG per diagnostic in output_dir (one point per snapshot, time = simulation time).
@@ -654,8 +638,12 @@ def plot_and_save_all(
         else ""
     )
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
-    series = _series_for_bulk_diagnostics(
-        simulation_mode, two_body_secondary, diagnostics, cutoff_radius
+    series = series_display_resolved_for_bulk(
+        simulation_mode,
+        two_body_secondary,
+        diagnostics,
+        cutoff_radius,
+        run_info,
     )
     disp_note = "Axes use display units; CSV remains SI."
     t = diagnostics["time"]

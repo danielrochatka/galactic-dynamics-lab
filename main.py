@@ -163,6 +163,7 @@ def main() -> None:
             progress_interval=50,
             spatial_display=sd_render,
             simulation_mode="galaxy",
+            max_time_s=max(float(s.time) for s in snapshots) if snapshots else None,
         )
         if not success:
             print("  Animation save failed (install ffmpeg or Pillow)")

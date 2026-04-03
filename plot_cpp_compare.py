@@ -13,7 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
+from display_units import spatial_display_from_run_info
 from framing import SquareViewport, global_viewport_from_snapshots
+from plot_cpp_run import simulation_mode_name_from_run_info
 from render_overlay import build_overlay_spec, draw_galaxy_render_overlay, resolve_overlay_mode
 
 
@@ -136,6 +138,7 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float) -> N
             run_info=side.run_info,
             step=int(snap.step),
             time_s=float(snap.time),
+            simulation_mode=simulation_mode_name_from_run_info(side.run_info),
         )
 
 
@@ -162,6 +165,10 @@ def render_compare(
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
     shared_vp = calculate_compare_smart_viewport(left_snaps, right_snaps, fallback)
+    for side in (left, right):
+        m = simulation_mode_name_from_run_info(side.run_info)
+        sd = spatial_display_from_run_info(m, float(shared_vp.half_axis), side.run_info)
+        side.overlay_spec["display_spatial_unit"] = sd.unit
     print(
         f"Compare smart framing: center=({shared_vp.center_x:.6g}, {shared_vp.center_y:.6g}) m, "
         f"half_axis={shared_vp.half_axis:.6g} m"

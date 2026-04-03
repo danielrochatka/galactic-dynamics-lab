@@ -384,6 +384,50 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     }
     throw std::runtime_error("render_overlay_mode must be none, minimal, or audit_full");
   }
+  if (key == "display_distance_unit") {
+    std::string lo = trim(val);
+    for (char& c : lo) {
+      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    if (lo == "auto" || lo == "m" || lo == "km" || lo == "au" || lo == "ly" || lo == "pc" || lo == "kpc") {
+      config.display_distance_unit = lo;
+      return true;
+    }
+    throw std::runtime_error(
+        "display_distance_unit must be auto, m, km, AU, ly, pc, or kpc");
+  }
+  if (key == "display_time_unit") {
+    std::string lo = trim(val);
+    for (char& c : lo) {
+      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    if (lo == "auto" || lo == "s" || lo == "min" || lo == "hr" || lo == "day" || lo == "yr" ||
+        lo == "kyr" || lo == "myr") {
+      config.display_time_unit = lo;
+      return true;
+    }
+    throw std::runtime_error(
+        "display_time_unit must be auto, s, min, hr, day, yr, kyr, or Myr");
+  }
+  if (key == "display_velocity_unit") {
+    std::string lo = trim(val);
+    for (char& c : lo) {
+      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    if (lo == "auto" || lo == "m/s" || lo == "km/s") {
+      config.display_velocity_unit = lo;
+      return true;
+    }
+    throw std::runtime_error("display_velocity_unit must be auto, m/s, or km/s");
+  }
+  if (key == "display_units_in_overlay") {
+    config.display_units_in_overlay = parse_bool(val);
+    return true;
+  }
+  if (key == "display_show_unit_reference") {
+    config.display_show_unit_reference = parse_bool(val);
+    return true;
+  }
   if (key == "tpf_gdd_coupling") {
     config.tpf_vdsg_coupling = std::stod(val);
     return true;

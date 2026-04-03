@@ -66,7 +66,10 @@ from diagnostics import (
     save_two_body_timeseries_csv,
     write_two_body_diagnostics_readme,
 )
-from display_units import series_display_for_two_body, spatial_display_for_xy_plot
+from display_units import (
+    series_display_resolved_for_two_body,
+    spatial_display_from_run_info,
+)
 from plot_rotation_curve import (
     load_run_info,
     newtonian_m_bh_from_run_info,
@@ -583,14 +586,6 @@ def main() -> None:
         use_animation_dynamic_zoom = plot_animation_dynamic_zoom_from_run_info(run_info)
 
     overlay_mode = resolve_overlay_mode(run_info, args.render_overlay_mode)
-    overlay_spec = build_overlay_spec(run_dir, run_info)
-    overlay_kw = {}
-    if overlay_mode != "none":
-        overlay_kw = {
-            "overlay_mode": overlay_mode,
-            "overlay_spec": overlay_spec,
-            "run_info": run_info,
-        }
 
     initial = snapshots[0]
     final = snapshots[-1]
@@ -609,7 +604,16 @@ def main() -> None:
     render_radius_initial = global_viewport
     render_radius_final = global_viewport
     spatial_half_axis_m = float(global_viewport.half_axis)
-    spatial_display = spatial_display_for_xy_plot(mode_name, spatial_half_axis_m)
+    spatial_display = spatial_display_from_run_info(mode_name, spatial_half_axis_m, run_info)
+    overlay_spec = build_overlay_spec(run_dir, run_info)
+    overlay_spec["display_spatial_unit"] = spatial_display.unit
+    overlay_kw: dict[str, object] = {}
+    if overlay_mode != "none":
+        overlay_kw = {
+            "overlay_mode": overlay_mode,
+            "overlay_spec": overlay_spec,
+            "run_info": run_info,
+        }
     print(
         f"  Smart framing (simulation_mode={mode_name}): center=({global_viewport.center_x:.6g}, "
         f"{global_viewport.center_y:.6g}) m, half_axis={spatial_half_axis_m:.6g} m "
@@ -643,6 +647,7 @@ def main() -> None:
         overlay_step=initial.step,
         overlay_time=float(initial.time),
         spatial_display=spatial_display,
+        simulation_mode=mode_name,
         **overlay_kw,
     )
     write_compat_alias(initial_mode_aware, initial_legacy)
@@ -656,6 +661,7 @@ def main() -> None:
         overlay_step=final.step,
         overlay_time=float(final.time),
         spatial_display=spatial_display,
+        simulation_mode=mode_name,
         **overlay_kw,
     )
     write_compat_alias(final_mode_aware, final_legacy)
@@ -693,6 +699,7 @@ def main() -> None:
                 x_max=x_max_rc,
                 scatter_label=scatter_lbl,
                 provenance_label=rc_prov_s,
+                run_info=run_info,
             )
             write_compat_alias(
                 run_dir / mode_aware_name(mode_label, physics_label, "primary", "rotation_curve", "final", "png"),
@@ -755,6 +762,7 @@ def main() -> None:
             spatial_display=spatial_display,
             simulation_mode=mode_name,
             mutable_frame_index=anim_mutable_idx,
+            max_time_s=max(float(s.time) for s in snapshots) if snapshots else None,
             **overlay_kw,
         )
         if ok:
@@ -798,7 +806,11 @@ def main() -> None:
                     float(np.max(pair_diag["pair_separation"])),
                     float(np.max(pair_diag["center_of_mass_radius"])),
                 )
-                pair_series = series_display_for_two_body(mode_name, max_distance_m=max_pair_d)
+                pair_series = series_display_resolved_for_two_body(
+                    mode_name,
+                    max_distance_m=max_pair_d,
+                    run_info=run_info,
+                )
                 if mode_name == "bh_orbit_validation":
                     vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
                     vdsg_f = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
@@ -814,7 +826,13 @@ def main() -> None:
                         series=pair_series,
                     )
                     plot_bh_orbit_validation_extras(
-                        snapshots, pair_diag, run_dir, physics_pkg, vdsg_f, context_label=title_context
+                        snapshots,
+                        pair_diag,
+                        run_dir,
+                        physics_pkg,
+                        vdsg_f,
+                        context_label=title_context,
+                        run_info=run_info,
                     )
                 else:
                     plot_two_body_pair_diagnostics(
@@ -891,6 +909,7 @@ def main() -> None:
                 context_label=title_context,
                 simulation_mode=mode_name,
                 two_body_secondary=True,
+                run_info=run_info,
             )
             secondary_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",
@@ -921,6 +940,7 @@ def main() -> None:
                 context_label=title_context,
                 simulation_mode=mode_name,
                 two_body_secondary=False,
+                run_info=run_info,
             )
             galaxy_diag_aliases = {
                 "diagnostic_median_radius.png": "median_radius_origin",

@@ -171,6 +171,7 @@ def save_static_plot(
     overlay_step: int = 0,
     overlay_time: float = 0.0,
     spatial_display: Optional[SpatialDisplay] = None,
+    simulation_mode: str = "galaxy",
 ) -> None:
     """Save a single static scatter plot. Positions remain SI; axes use display units when provided."""
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
@@ -203,6 +204,7 @@ def save_static_plot(
             run_info=run_info,
             step=overlay_step,
             time_s=overlay_time,
+            simulation_mode=simulation_mode,
         )
 
     fig.tight_layout()
@@ -223,6 +225,7 @@ def create_animation(
     spatial_display: Optional[SpatialDisplay] = None,
     simulation_mode: str = "galaxy",
     mutable_frame_index: Optional[dict[str, int]] = None,
+    max_time_s: Optional[float] = None,
 ) -> bool:
     """
     Create animation (MP4 or GIF) from snapshots.
@@ -234,6 +237,9 @@ def create_animation(
         return False
 
     n_frames = len(snapshots)
+    max_t_anim = max_time_s
+    if max_t_anim is None:
+        max_t_anim = max(float(s.time) for s in snapshots)
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="black")
     ax.set_facecolor("black")
     ax.tick_params(colors="gray")
@@ -254,7 +260,12 @@ def create_animation(
             velocities=vel,
             spatial_display=spatial_display,
         )
-        tc = format_animation_time_caption(float(snap.time), simulation_mode)
+        tc = format_animation_time_caption(
+            float(snap.time),
+            simulation_mode,
+            run_info=run_info,
+            max_time_s=max_t_anim,
+        )
         ax.set_title(f"Step {snap.step}  |  {tc}", color="white")
         if (
             overlay_mode != "none"
@@ -270,6 +281,7 @@ def create_animation(
                 run_info=run_info,
                 step=int(snap.step),
                 time_s=float(snap.time),
+                simulation_mode=simulation_mode,
             )
         if progress_interval and (frame_idx % progress_interval == 0 or frame_idx == n_frames - 1):
             pct = 100 * (frame_idx + 1) / n_frames

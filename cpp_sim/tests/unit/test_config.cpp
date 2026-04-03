@@ -14,6 +14,11 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
   CHECK(c.render_overlay_mode == "none");
+  CHECK(c.display_distance_unit == "auto");
+  CHECK(c.display_time_unit == "auto");
+  CHECK(c.display_velocity_unit == "auto");
+  CHECK(c.display_units_in_overlay == true);
+  CHECK(c.display_show_unit_reference == true);
 }
 
 TEST_CASE("physics_package_compare parsing") {
@@ -40,6 +45,24 @@ TEST_CASE("plot diagnostics cutoff parsing") {
   Config c;
   CHECK(apply_config_kv("diagnostic_cutoff_radius", "123.5", c));
   CHECK(c.diagnostic_cutoff_radius == doctest::Approx(123.5));
+}
+
+TEST_CASE("display unit config keys") {
+  Config c;
+  CHECK(apply_config_kv("display_distance_unit", "AU", c));
+  CHECK(c.display_distance_unit == "au");
+  CHECK(apply_config_kv("display_distance_unit", "kpc", c));
+  CHECK(c.display_distance_unit == "kpc");
+  CHECK(apply_config_kv("display_time_unit", "Myr", c));
+  CHECK(c.display_time_unit == "myr");
+  CHECK(apply_config_kv("display_time_unit", "day", c));
+  CHECK(c.display_time_unit == "day");
+  CHECK(apply_config_kv("display_velocity_unit", "km/s", c));
+  CHECK(c.display_velocity_unit == "km/s");
+  CHECK(apply_config_kv("display_units_in_overlay", "0", c));
+  CHECK(c.display_units_in_overlay == false);
+  CHECK(apply_config_kv("display_show_unit_reference", "false", c));
+  CHECK(c.display_show_unit_reference == false);
 }
 
 TEST_CASE("galaxy init keys") {

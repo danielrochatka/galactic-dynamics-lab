@@ -272,6 +272,18 @@ struct Config {
    */
   std::string render_overlay_mode = "none";
 
+  /**
+   * Post-process display units (plot_cpp_run / render only). Simulation and snapshot CSV stay SI.
+   * distance: auto | m | km | AU | ly | pc | kpc
+   * time: auto | s | min | hr | day | yr | kyr | Myr
+   * velocity: auto | m/s | km/s
+   */
+  std::string display_distance_unit = "auto";
+  std::string display_time_unit = "auto";
+  std::string display_velocity_unit = "auto";
+  bool display_units_in_overlay = true;
+  bool display_show_unit_reference = true;
+
   // Validation-only
   double validation_two_body_radius = kDefaultValidationTwoBodyRadiusM;
   double validation_two_body_speed_ratio = 1.0;

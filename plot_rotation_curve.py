@@ -247,6 +247,7 @@ def save_rotation_curve_png(
     newtonian_label: str | None = None,
     filter_scatter_by_xmax: bool = True,
     provenance_label: str | None = None,
+    run_info: dict[str, str | int | float] | None = None,
 ) -> None:
     """
     Scatter r vs v and overlay Newtonian v = sqrt(G*M_bh/r). Arrays need not be pre-sorted.
@@ -287,7 +288,7 @@ def save_rotation_curve_png(
     if newtonian_label is None:
         newtonian_label = f"Newtonian √(GM_bh/r), M_bh={M_bh:.6g} kg (κ-independent)"
 
-    rf, vf, xl, yl = rotation_curve_display(x_max)
+    rf, vf, xl, yl = rotation_curve_display(x_max, run_info)
     r_plot_d = r_plot * rf
     v_plot_d = v_plot * vf
     r_line_d = r_line * rf
@@ -398,6 +399,7 @@ def main() -> None:
         x_max=x_lim,
         scatter_label=lbl,
         filter_scatter_by_xmax=not args.no_filter_scatter,
+        run_info=run_info,
     )
     print(f"Loaded: {csv_path}")
     print(f"Newtonian overlay mass: {M_bh:g} kg (source={m_source})")

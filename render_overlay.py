@@ -212,6 +212,13 @@ def build_overlay_spec(
         "git_tag": _pick_s(mf, ri, "git_tag", ""),
         "git_dirty": _pick_boolish(mf, ri, "git_dirty", False),
         "code_version_label": _pick_s(mf, ri, "code_version_label", "unknown"),
+        "display_distance_unit": _pick_s(mf, ri, "display_distance_unit", "auto"),
+        "display_time_unit": _pick_s(mf, ri, "display_time_unit", "auto"),
+        "display_velocity_unit": _pick_s(mf, ri, "display_velocity_unit", "auto"),
+        "display_units_in_overlay": _pick_boolish(mf, ri, "display_units_in_overlay", True),
+        "display_show_unit_reference": _pick_boolish(
+            mf, ri, "display_show_unit_reference", True
+        ),
     }
     return spec
 
@@ -280,14 +287,30 @@ def draw_galaxy_render_overlay(
     run_info: dict[str, Any],
     step: int,
     time_s: float,
+    simulation_mode: str = "galaxy",
 ) -> None:
     if mode == "none":
         return
+
+    from display_units import (
+        display_overlay_time_caption,
+        display_prefs_from_run_info,
+        display_unit_reference_lines,
+    )
 
     vdsg = float(spec.get("tpf_vdsg_coupling") or 0.0)
     coup = f"{vdsg:.6g}" if spec.get("physics_package") == "TPFCore" else "N/A"
     ntot = int(spec.get("n_steps_total") or 0)
     step_str = f"{step} / {ntot}" if ntot > 0 else str(step)
+
+    prefs = display_prefs_from_run_info(run_info)
+    spatial_u = str(spec.get("display_spatial_unit", "?"))
+    dist_u = prefs.distance if prefs.distance != "auto" else spatial_u
+    time_u = prefs.time if prefs.time != "auto" else "auto"
+    vel_u = prefs.velocity if prefs.velocity != "auto" else "auto"
+    t_disp = display_overlay_time_caption(
+        time_s, run_info, simulation_mode=simulation_mode
+    )
 
     lines_min = [
         f"Run ID: {spec.get('run_id', '?')}",
@@ -300,11 +323,20 @@ def draw_galaxy_render_overlay(
         f"Stars: {spec.get('n_stars', '?')}",
         f"BH mass: {float(spec.get('bh_mass') or 0):.6g}",
         f"Step: {step_str}",
-        f"t = {time_s:.6g}",
+        t_disp,
     ]
+    if prefs.units_in_overlay:
+        lines_min.append(
+            f"Plot axes: distance={dist_u}; time={time_u}; velocity={vel_u} "
+            f"(see title/caption; CSV remains SI)"
+        )
+    if prefs.show_unit_reference:
+        lines_min.extend(
+            display_unit_reference_lines(run_info, spatial_unit=spatial_u)
+        )
 
     if mode == "minimal":
-        text = "\n".join(lines_min[:10])
+        text = "\n".join(lines_min)
         fontsize = 7
     elif mode == "audit_full":
         extra = [
