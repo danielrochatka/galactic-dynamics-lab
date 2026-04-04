@@ -31,10 +31,10 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 
 The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`** (computed in **`render_audit.cpp`**):
 
-- **`active_dynamics_branch`** — **Readout identity** for dynamics: **`TPF_readout_acceleration:<mode>`** when **`tpfcore_enable_provisional_readout`** is on (independent of **`tpf_vdsg_coupling`**). If provisional readout is off, dynamics are disabled for TPFCore acceleration.
-- **`active_metrics_branch`** — Identity of the **configured readout** label (e.g. `tpfcore_readout:derived_tpf_radial_readout`).
+- **`active_dynamics_branch`** — runtime branch identity (`direct_tpf` canonical low-order truncation path vs `legacy_readout` provisional path).
+- **`active_metrics_branch`** — matching metrics branch identity for that runtime route.
 
-**Integrator accelerations** are **baseline readout + VDSG modifier (zero if λ = 0) + global shunt**. **`acceleration_code_path`** lists the full pipeline including **`apply_global_accel_magnitude_shunt`**.
+**Integrator accelerations** depend on routing: canonical **`direct_tpf`** currently maps to the validated low-order v11 weak-field/static truncation helper (DeltaC omitted; VDSG/readout/shunt/cooling rejected), while **`legacy_readout`** uses baseline readout + optional VDSG + optional global shunt.
 
 ---
 
@@ -54,7 +54,7 @@ Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SC
 - **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
 - **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-**`compute_accelerations`** always adds the VDSG modifier vector (zeros if λ = 0). The optional global **`|a|` shunt** (velocity cap) is **off by default** (`tpf_global_accel_shunt_enable = false`) so λ = 0 remains a clean readout baseline; enable it explicitly for stabilization experiments.
+In **`legacy_readout`**, **`compute_accelerations`** adds the VDSG modifier vector (zeros if λ = 0) and can apply optional global **`|a|` shunt** (off by default). In canonical **`direct_tpf`**, those exploratory/stabilizer knobs are rejected.
 
 ---
 
