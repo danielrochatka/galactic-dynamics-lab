@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+if [[ -z "${CPP_SIM_ROOT:-}" ]]; then
+  export CPP_SIM_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+fi
+source "$CPP_SIM_ROOT/tests/integration/_env.sh"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 ./galaxy_sim galaxy --output_dir="$OUT" --physics_package=TPFCore \

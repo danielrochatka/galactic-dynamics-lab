@@ -17,7 +17,16 @@ This repository separates implementation checks from scientific interpretation. 
 - **Physics packages:** `cpp_sim/physics/<Name>/tests/{unit,integration,regression}/`
 - **Python:** `python_tests/{unit,integration}/` (manifests, overlays, loaders — not `tests/` at repo root, to avoid confusion with C++)
 
-New physics packages can add their own `tests/` trees; `cpp_sim/Makefile` picks up `tests/unit/*.cpp` and `tests/regression/*.cpp` under `cpp_sim/tests/` and `physics/**/tests/**` via wildcards + `find`.
+New physics packages can add their own `tests/` trees; root commands remain the single entrypoint. `cpp_sim/Makefile` auto-discovers doctest sources from `cpp_sim/tests/{unit,regression}` plus `cpp_sim/physics/*/tests/{unit,regression}` via wildcards + `find`, and `cpp_sim/tests/run_integration.sh` auto-discovers shell scripts from both `cpp_sim/tests/integration` and `cpp_sim/physics/*/tests/integration`.
+
+
+## Test ownership / location policy
+
+- Package-owned behavior belongs under `cpp_sim/physics/<Package>/tests/` (unit/integration/regression).
+- Root C++ tests in `cpp_sim/tests/` are reserved for app-level behavior: config parsing, package registry/dispatch, CLI/main behavior, cross-package workflows, and generic infrastructure.
+- For TPFCore specifically, routing/closure labels, TPF-specific manifests/audit labels, and TPF-specific smoke/regression checks should live under `cpp_sim/physics/TPFCore/tests/`.
+
+Classification rule: if removing one package makes a test meaningless, that test belongs in that package.
 
 ## Frameworks
 
