@@ -20,7 +20,7 @@ struct CoolingAuditInfo {
   double first_saved_snapshot_time = 0.0;
 };
 
-// Write run_info.txt with key config (dt, n_steps, softening, etc.) and run summary.
+// Write run_info.txt audit artifact with explicit configured-vs-effective sections.
 // n_particles: actual particle count (if < 0, use config.n_stars).
 // run_config_path, package_defaults_path: if non-empty, written for reproducibility.
 // galaxy_init_audit: if non-null and valid, writes resolved galaxy IC block (galaxy mode).
@@ -32,6 +32,8 @@ void write_run_info(const std::string& output_dir,
                     int n_particles = -1,
                     const std::string& run_config_path = "",
                     const std::string& package_defaults_path = "",
+                    const Config* configured_config = nullptr,
+                    const ResolvedScenario* effective_runtime = nullptr,
                     const GalaxyInitAudit* galaxy_init_audit = nullptr,
                     const CoolingAuditInfo* cooling_audit = nullptr,
                     const AccelPipelineStats* tpf_pipeline = nullptr);

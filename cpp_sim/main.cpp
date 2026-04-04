@@ -761,7 +761,8 @@ int main(int argc, char** argv) {
       break;
   }
 
-  galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(config);
+  const galaxy::Config configured_after_layering = config;
+  galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(configured_after_layering);
   config = resolved.config;
   galaxy::State state = resolved.initial_state;
   int n_steps = resolved.effective_n_steps;
@@ -957,6 +958,7 @@ int main(int argc, char** argv) {
           if (side_cfg.save_run_info) {
             galaxy::write_run_info(side_cfg.output_dir, side_cfg, n_steps, static_cast<int>(side_snaps.size()),
                                    state.n(), run_config_path, side_defaults_path,
+                                   nullptr, nullptr,
                                    &galaxy::last_galaxy_init_audit(), &cooling_audit, tpf_pipeline_stats);
             galaxy::write_render_manifest(side_cfg.output_dir, side_cfg, n_steps,
                                           static_cast<int>(side_snaps.size()), state.n(),
@@ -1100,6 +1102,8 @@ int main(int argc, char** argv) {
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
                              run_config_path, package_defaults_path,
+                             &configured_after_layering,
+                             &resolved,
                              config.simulation_mode == galaxy::SimulationMode::galaxy
                                  ? &galaxy::last_galaxy_init_audit()
                                  : nullptr,

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <iomanip>
 
 namespace galaxy {
 
@@ -578,6 +579,111 @@ std::string find_package_defaults_path(const std::string& package_name) {
   const std::string path = "physics/" + package_name + "/defaults.cfg";
   if (file_exists(path)) return path;
   return "";
+}
+
+std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Config& config) {
+  auto b = [](bool v) { return v ? std::string("1") : std::string("0"); };
+  auto i = [](int v) { return std::to_string(v); };
+  auto u = [](unsigned v) { return std::to_string(v); };
+  auto d = [](double v) {
+    std::ostringstream os;
+    os << std::setprecision(17) << v;
+    return os.str();
+  };
+  std::vector<std::pair<std::string, std::string>> kv;
+  kv.reserve(80);
+  kv.emplace_back("simulation_mode", mode_to_string(config.simulation_mode));
+  kv.emplace_back("n_stars", i(config.n_stars));
+  kv.emplace_back("star_mass", d(config.star_mass));
+  kv.emplace_back("bh_mass", d(config.bh_mass));
+  kv.emplace_back("inner_radius", d(config.inner_radius));
+  kv.emplace_back("outer_radius", d(config.outer_radius));
+  kv.emplace_back("galaxy_radius", d(config.galaxy_radius));
+  kv.emplace_back("dt", d(config.dt));
+  kv.emplace_back("n_steps", i(config.n_steps));
+  kv.emplace_back("snapshot_every", i(config.snapshot_every));
+  kv.emplace_back("softening", d(config.softening));
+  kv.emplace_back("enable_star_star_gravity", b(config.enable_star_star_gravity));
+  kv.emplace_back("physics_package", config.physics_package);
+  kv.emplace_back("physics_package_compare", config.physics_package_compare);
+  kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
+  kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
+  kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
+  kv.emplace_back("v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
+  kv.emplace_back("v11_em_mass_earth_kg", d(config.v11_em_mass_earth_kg));
+  kv.emplace_back("v11_em_mass_moon_kg", d(config.v11_em_mass_moon_kg));
+  kv.emplace_back("v11_em_mean_distance_m", d(config.v11_em_mean_distance_m));
+  kv.emplace_back("v11_em_sidereal_period_s", d(config.v11_em_sidereal_period_s));
+  kv.emplace_back("v11_em_calib_surface_radius_m", d(config.v11_em_calib_surface_radius_m));
+  kv.emplace_back("v11_em_calib_surface_g_m_s2", d(config.v11_em_calib_surface_g_m_s2));
+  kv.emplace_back("tpfcore_enable_provisional_readout", b(config.tpfcore_enable_provisional_readout));
+  kv.emplace_back("tpfcore_readout_mode", config.tpfcore_readout_mode);
+  kv.emplace_back("tpfcore_readout_scale", d(config.tpfcore_readout_scale));
+  kv.emplace_back("tpfcore_theta_tt_scale", d(config.tpfcore_theta_tt_scale));
+  kv.emplace_back("tpfcore_theta_tr_scale", d(config.tpfcore_theta_tr_scale));
+  kv.emplace_back("tpf_kappa", d(config.tpf_kappa));
+  kv.emplace_back("tpf_vdsg_coupling", d(config.tpf_vdsg_coupling));
+  kv.emplace_back("tpf_vdsg_mass_baseline_kg", d(config.tpf_vdsg_mass_baseline_kg));
+  kv.emplace_back("tpf_global_accel_shunt_enable", b(config.tpf_global_accel_shunt_enable));
+  kv.emplace_back("tpf_global_accel_shunt_fraction", d(config.tpf_global_accel_shunt_fraction));
+  kv.emplace_back("tpf_accel_pipeline_diagnostics_csv", b(config.tpf_accel_pipeline_diagnostics_csv));
+  kv.emplace_back("tpf_poisson_bins", i(config.tpf_poisson_bins));
+  kv.emplace_back("tpf_poisson_max_radius", d(config.tpf_poisson_max_radius));
+  kv.emplace_back("tpf_cooling_fraction", d(config.tpf_cooling_fraction));
+  kv.emplace_back("tpfcore_dump_readout_debug", b(config.tpfcore_dump_readout_debug));
+  kv.emplace_back("tpfcore_live_orbit_force_audit", b(config.tpfcore_live_orbit_force_audit));
+  kv.emplace_back("tpfcore_probe_radius_min", d(config.tpfcore_probe_radius_min));
+  kv.emplace_back("tpfcore_probe_radius_max", d(config.tpfcore_probe_radius_max));
+  kv.emplace_back("tpfcore_probe_samples", i(config.tpfcore_probe_samples));
+  kv.emplace_back("tpfcore_dump_invariant_profile", b(config.tpfcore_dump_invariant_profile));
+  kv.emplace_back("tpfcore_dump_theta_profile", b(config.tpfcore_dump_theta_profile));
+  kv.emplace_back("tpfcore_source_softening", d(config.tpfcore_source_softening));
+  kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
+  kv.emplace_back("galaxy_init_template", config.galaxy_init_template);
+  kv.emplace_back("galaxy_init_seed", u(config.galaxy_init_seed));
+  kv.emplace_back("galaxy_init_position_noise", d(config.galaxy_init_position_noise));
+  kv.emplace_back("galaxy_init_velocity_angle_noise", d(config.galaxy_init_velocity_angle_noise));
+  kv.emplace_back("galaxy_init_velocity_magnitude_noise", d(config.galaxy_init_velocity_magnitude_noise));
+  kv.emplace_back("galaxy_init_clumpiness", d(config.galaxy_init_clumpiness));
+  kv.emplace_back("galaxy_init_num_clumps", i(config.galaxy_init_num_clumps));
+  kv.emplace_back("galaxy_init_clump_radius_fraction", d(config.galaxy_init_clump_radius_fraction));
+  kv.emplace_back("galaxy_init_m2_amplitude", d(config.galaxy_init_m2_amplitude));
+  kv.emplace_back("galaxy_init_m3_amplitude", d(config.galaxy_init_m3_amplitude));
+  kv.emplace_back("galaxy_init_bar_amplitude", d(config.galaxy_init_bar_amplitude));
+  kv.emplace_back("galaxy_init_bar_axis_ratio", d(config.galaxy_init_bar_axis_ratio));
+  kv.emplace_back("galaxy_init_spiral_amplitude", d(config.galaxy_init_spiral_amplitude));
+  kv.emplace_back("galaxy_init_spiral_winding", d(config.galaxy_init_spiral_winding));
+  kv.emplace_back("galaxy_init_spiral_phase", d(config.galaxy_init_spiral_phase));
+  kv.emplace_back("galaxy_init_master_chaos", d(config.galaxy_init_master_chaos));
+  kv.emplace_back("velocity_noise", d(config.velocity_noise));
+  kv.emplace_back("initial_velocity_scale", d(config.initial_velocity_scale));
+  kv.emplace_back("save_snapshots", b(config.save_snapshots));
+  kv.emplace_back("save_run_info", b(config.save_run_info));
+  kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));
+  kv.emplace_back("plot_skip_initial_steps", i(config.plot_skip_initial_steps));
+  kv.emplace_back("plot_skip_initial_snapshots", i(config.plot_skip_initial_snapshots));
+  kv.emplace_back("diagnostic_cutoff_radius", d(config.diagnostic_cutoff_radius));
+  kv.emplace_back("render_overlay_mode", config.render_overlay_mode);
+  kv.emplace_back("display_distance_unit", config.display_distance_unit);
+  kv.emplace_back("display_time_unit", config.display_time_unit);
+  kv.emplace_back("display_velocity_unit", config.display_velocity_unit);
+  kv.emplace_back("display_units_in_overlay", b(config.display_units_in_overlay));
+  kv.emplace_back("display_show_unit_reference", b(config.display_show_unit_reference));
+  kv.emplace_back("validation_two_body_radius", d(config.validation_two_body_radius));
+  kv.emplace_back("validation_two_body_speed_ratio", d(config.validation_two_body_speed_ratio));
+  kv.emplace_back("validation_earth_mass", d(config.validation_earth_mass));
+  kv.emplace_back("validation_moon_mass", d(config.validation_moon_mass));
+  kv.emplace_back("validation_earth_moon_distance", d(config.validation_earth_moon_distance));
+  kv.emplace_back("validation_moon_tangential_speed", d(config.validation_moon_tangential_speed));
+  kv.emplace_back("validation_symmetric_include_bh", b(config.validation_symmetric_include_bh));
+  kv.emplace_back("validation_symmetric_separation", d(config.validation_symmetric_separation));
+  kv.emplace_back("validation_symmetric_speed", d(config.validation_symmetric_speed));
+  kv.emplace_back("validation_small_n", i(config.validation_small_n));
+  kv.emplace_back("validation_n_steps", i(config.validation_n_steps));
+  kv.emplace_back("validation_snapshot_every", i(config.validation_snapshot_every));
+  kv.emplace_back("output_dir", config.output_dir);
+  kv.emplace_back("run_id", config.run_id);
+  return kv;
 }
 
 }  // namespace galaxy
