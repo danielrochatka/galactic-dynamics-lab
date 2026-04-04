@@ -9,7 +9,7 @@ then produces the same kinds of plots as the Python pipeline:
   - optional MP4/GIF animation
   - optional diagnostic time-series plots
   - **bh_orbit_validation**: primary pair diagnostics plus `bh_orbit_trajectory_xy.png`, `bh_orbit_trajectory_xy_zoom.png`,
-    `bh_orbit_separation_extrema.png` (footnotes distinguish Newtonian baseline vs TPFCore legacy_readout experimental; VDSG status from run_info)
+    `bh_orbit_separation_extrema.png` (footnotes include package and coupling labels from run_info)
 
 Animation viewport: default **smart framing** — one square viewport from **x/y quantile bounds**
   over all plotted particles (all snapshots), plus the origin (BH marker), margin, and a square
@@ -764,7 +764,7 @@ def main() -> None:
             print(
                 f"Saved: {run_dir / mode_aware_name(mode_label, physics_label, 'primary', 'rotation_curve', 'final', 'png')} "
                 f"(Keplerian overlay M_bh={M_bh_rc:g} kg; x_max={x_max_rc:g} m; "
-                "red curve is κ-independent — only blue scatter changes with TPF)"
+                "red curve is κ-independent; blue scatter varies with configured package parameters)"
             )
         except Exception as exc:
             print(f"Warning: could not write rotation_curve.png: {exc}")
@@ -952,8 +952,8 @@ def main() -> None:
                     print(
                         "  bh_orbit_validation extras: bh_orbit_trajectory_xy.png, "
                         "bh_orbit_trajectory_xy_zoom.png, bh_orbit_separation_extrema.png "
-                        "(footnotes: Newtonian baseline vs TPFCore legacy_readout experimental; VDSG off baseline; "
-                        "not paper mode; not direct_tpf)"
+                        "(footnotes: package and coupling labels from run_info; "
+                        "configuration labels only)"
                     )
                 print(
                     f"  Final pair separation: {float(pair_diag['pair_separation'][-1]):.6g} m; "

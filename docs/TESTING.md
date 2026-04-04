@@ -1,6 +1,6 @@
 # Testing
 
-This repository separates **implementation checks** from **physical claims**. The automated suite verifies math consistency, config parsing, branch labeling, manifests, reproducibility, and small end-to-end runs. It does **not** prove that TPF is “physically true” in nature.
+This repository separates implementation checks from scientific interpretation. The automated suite verifies math consistency, config parsing, branch labeling, manifests, reproducibility, and small end-to-end runs.
 
 ## Layers
 
@@ -43,5 +43,5 @@ Integration scripts set **`GALAXY_RUN_CONFIG`** to `configs/smoke_test.cfg` so r
 ## Honesty
 
 - Passing tests means the **code behaves as encoded** under the stated assumptions.
-- Failing tests mean **regression or inconsistency**, not “the universe disproved TPF.”
-- Do not cite this suite as evidence of cosmological or phenomenological truth.
+- Failing tests mean regression or inconsistency in the implemented code path.
+- Treat test results as software verification only.

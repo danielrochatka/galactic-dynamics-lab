@@ -1,8 +1,8 @@
 """
 Audit overlays for galaxy scatter renders (plot_cpp_run / render.py).
 
-Branch labels mirror cpp_sim/render_audit.cpp logic for consistency when run_info
-omits explicit keys (older runs).
+TPF-related branch formatting in this file is temporary compatibility glue driven by
+run_info/render_manifest keys until package-specific presentation logic is fully localized.
 """
 
 from __future__ import annotations
@@ -143,7 +143,7 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
     else:
         acc = (
             base
-            + " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)"
+            + " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF)"
         )
     return dyn, met, acc
 
