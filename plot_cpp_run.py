@@ -122,11 +122,11 @@ _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
 def simulation_mode_name_from_run_info(run_info: dict[str, str | int | float]) -> str:
     """
     Resolved simulation mode name from run_info.txt.
-    The file may list simulation_mode twice (string then int); the last line wins (typically int).
+    Prefer effective_simulation_mode, then configured_simulation_mode, then legacy simulation_mode.
     """
     if not run_info:
         return "galaxy"
-    raw = run_info.get("simulation_mode")
+    raw = _run_info_effective_value(run_info, "simulation_mode")
     if isinstance(raw, int):
         return _SIMULATION_MODE_INT_TO_NAME.get(raw, "galaxy")
     if isinstance(raw, str) and raw.strip():
@@ -145,16 +145,16 @@ def physics_label_from_run_info(
 ) -> str:
     if mode_name == "tpf_v11_weak_field_correspondence":
         return "paper_mode"
-    pkg = str(run_info.get("physics_package", "Newtonian") or "Newtonian")
+    pkg = str(_run_info_effective_value(run_info, "physics_package", "Newtonian") or "Newtonian")
     if pkg == "Newtonian":
         return "newtonian"
     if pkg != "TPFCore":
         return _slug(pkg)
-    dyn = str(run_info.get("tpf_dynamics_mode", "legacy_readout") or "legacy_readout")
+    dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "legacy_readout") or "legacy_readout")
     if dyn == "direct_tpf":
         return "tpfcore_direct_tpf"
-    readout = str(run_info.get("tpfcore_readout_mode", "legacy_readout") or "legacy_readout")
-    vdsg_raw = run_info.get("tpf_vdsg_coupling", 0.0)
+    readout = str(_run_info_configured_value(run_info, "tpfcore_readout_mode", "legacy_readout") or "legacy_readout")
+    vdsg_raw = _run_info_configured_value(run_info, "tpf_vdsg_coupling", 0.0)
     vdsg = float(vdsg_raw) if isinstance(vdsg_raw, (int, float)) else 0.0
     vdsg_lbl = "vdsg_off" if vdsg == 0.0 else "vdsg_on"
     return f"tpfcore_{_slug(readout)}_{vdsg_lbl}"
@@ -312,11 +312,11 @@ def resolve_diagnostic_cutoff_radius(
             raise SystemExit("--diagnostic-cutoff-radius must be > 0")
         return float(cli_cutoff_radius), "cli(--diagnostic-cutoff-radius)"
 
-    raw_cfg = run_info.get("diagnostic_cutoff_radius")
+    raw_cfg = _run_info_configured_value(run_info, "diagnostic_cutoff_radius")
     if isinstance(raw_cfg, (int, float)) and np.isfinite(raw_cfg) and float(raw_cfg) > 0:
         return float(raw_cfg), "run_info(diagnostic_cutoff_radius)"
 
-    raw_gr = run_info.get("galaxy_radius")
+    raw_gr = _run_info_configured_value(run_info, "galaxy_radius")
     if isinstance(raw_gr, (int, float)) and np.isfinite(raw_gr) and float(raw_gr) > 0:
         return float(raw_gr), "run_info(galaxy_radius)"
 
@@ -387,7 +387,7 @@ def resolve_galaxy_radius_meters(
     (then CLI fallback) instead.
     """
     mode = simulation_mode_name_from_run_info(run_info)
-    raw = run_info.get("galaxy_radius")
+    raw = _run_info_configured_value(run_info, "galaxy_radius")
     if (
         mode == "galaxy"
         and isinstance(raw, (int, float))
@@ -459,6 +459,70 @@ def _run_info_bool(run_info: dict[str, str | int | float], key: str, default: bo
     return default
 
 
+def _run_info_configured_value(
+    run_info: dict[str, str | int | float],
+    key: str,
+    default: str | int | float | None = None,
+) -> str | int | float | None:
+    """Configured setting precedence: configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    cfg_key = f"configured_{key}"
+    if cfg_key in run_info:
+        return run_info[cfg_key]
+    if key in run_info:
+        return run_info[key]
+    return default
+
+
+def _run_info_effective_value(
+    run_info: dict[str, str | int | float],
+    key: str,
+    default: str | int | float | None = None,
+) -> str | int | float | None:
+    """Effective runtime precedence: effective_<key> then configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    eff_key = f"effective_{key}"
+    if eff_key in run_info:
+        return run_info[eff_key]
+    cfg = _run_info_configured_value(run_info, key, None)
+    if cfg is not None:
+        return cfg
+    return default
+
+
+def _run_info_effective_float(
+    run_info: dict[str, str | int | float], key: str, default: float = 0.0
+) -> float:
+    raw = _run_info_effective_value(run_info, key, default)
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    try:
+        return float(str(raw))
+    except Exception:
+        return float(default)
+
+
+def _run_info_configured_bool(
+    run_info: dict[str, str | int | float], key: str, default: bool = False
+) -> bool:
+    raw = _run_info_configured_value(run_info, key, None)
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return int(raw) != 0
+    if isinstance(raw, str):
+        s = raw.strip().lower()
+        if s in ("1", "true", "yes", "on"):
+            return True
+        if s in ("0", "false", "no", "off"):
+            return False
+    return default
+
+
 def should_draw_central_bh_marker(
     run_info: dict[str, str | int | float],
     mode_name: str,
@@ -467,13 +531,13 @@ def should_draw_central_bh_marker(
     Render BH/origin marker only when semantically part of the run interpretation.
     Prefer suppressing ambiguous marker for non-BH runs.
     """
-    bh_mass = _run_info_float(run_info, "bh_mass", 0.0)
+    bh_mass = _run_info_effective_float(run_info, "bh_mass", 0.0)
     if bh_mass <= 0.0:
         return False
     if mode_name in ("earth_moon_benchmark", "two_body_orbit"):
         return False
     if mode_name == "symmetric_pair":
-        return _run_info_bool(run_info, "validation_symmetric_include_bh", default=True)
+        return _run_info_configured_bool(run_info, "validation_symmetric_include_bh", default=True)
     return mode_name in ("galaxy", "bh_orbit_validation")
 
 
@@ -610,7 +674,9 @@ def main() -> None:
         f"last step/time={snapshots[-1].step}/{float(snapshots[-1].time):g}"
     )
     if run_info:
-        print(f"  n_steps: {run_info.get('n_steps', '?')}, dt: {run_info.get('dt', '?')}")
+        n_steps = _run_info_effective_value(run_info, "n_steps", "?")
+        dt = _run_info_effective_value(run_info, "dt", "?")
+        print(f"  n_steps: {n_steps}, dt: {dt}")
     cooling_active, cooling_steps, first_saved_step, first_saved_time = resolve_cooling_audit_flags(
         run_info, snapshots
     )
@@ -901,10 +967,9 @@ def main() -> None:
             run_info, cli_cutoff_radius=args.diagnostic_cutoff_radius
         )
         print(f"Diagnostics cutoff radius: {cutoff:g} m (source={cutoff_source})")
-        physics_pkg = str(run_info.get("physics_package", "") or "Newtonian")
+        physics_pkg = str(_run_info_effective_value(run_info, "physics_package", "") or "Newtonian")
         if mode_name in ("earth_moon_benchmark", "bh_orbit_validation"):
-            bh_m = run_info.get("bh_mass", 0.0)
-            bh_m_f = float(bh_m) if isinstance(bh_m, (int, float)) else 0.0
+            bh_m_f = _run_info_effective_float(run_info, "bh_mass", 0.0)
             try:
                 pair_diag = compute_two_body_pair_diagnostics(
                     snapshots, masses, mode_name, bh_m_f
