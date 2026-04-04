@@ -358,6 +358,63 @@ void write_run_info(const std::string& output_dir,
   }
 }
 
+void write_resolved_scenario_artifacts(const std::string& output_dir,
+                                       const ResolvedScenario& resolved) {
+  {
+    std::ofstream txt(output_dir + "/resolved_scenario.txt");
+    if (txt) {
+      txt << "simulation_mode\t" << resolved.mode_label << "\n";
+      txt << "initializer_used\t" << resolved.initializer_used << "\n";
+      txt << "physics_package\t" << resolved.config.physics_package << "\n";
+      txt << "tpf_dynamics_mode\t" << resolved.config.tpf_dynamics_mode << "\n";
+      txt << "effective_bh_mass\t" << resolved.config.bh_mass << "\n";
+      txt << "effective_enable_star_star_gravity\t" << (resolved.config.enable_star_star_gravity ? 1 : 0) << "\n";
+      txt << "effective_dt\t" << resolved.config.dt << "\n";
+      txt << "effective_n_steps\t" << resolved.effective_n_steps << "\n";
+      txt << "effective_snapshot_every\t" << resolved.effective_snapshot_every << "\n";
+      txt << "effective_softening\t" << resolved.config.softening << "\n";
+      txt << "n_particles\t" << resolved.initial_state.n() << "\n";
+      for (int i = 0; i < resolved.initial_state.n(); ++i) {
+        txt << "particle_" << i << "_mass\t" << resolved.initial_state.mass[i] << "\n";
+        txt << "particle_" << i << "_x\t" << resolved.initial_state.x[i] << "\n";
+        txt << "particle_" << i << "_y\t" << resolved.initial_state.y[i] << "\n";
+        txt << "particle_" << i << "_vx\t" << resolved.initial_state.vx[i] << "\n";
+        txt << "particle_" << i << "_vy\t" << resolved.initial_state.vy[i] << "\n";
+      }
+    }
+  }
+
+  std::ofstream js(output_dir + "/resolved_scenario.json");
+  if (!js) return;
+  js << std::setprecision(17);
+  js << "{\n";
+  js << "  \"simulation_mode\": \"" << resolved.mode_label << "\",\n";
+  js << "  \"initializer_used\": \"" << resolved.initializer_used << "\",\n";
+  js << "  \"physics_package\": \"" << resolved.config.physics_package << "\",\n";
+  js << "  \"tpf_dynamics_mode\": \"" << resolved.config.tpf_dynamics_mode << "\",\n";
+  js << "  \"effective\": {\n";
+  js << "    \"bh_mass\": " << resolved.config.bh_mass << ",\n";
+  js << "    \"enable_star_star_gravity\": " << (resolved.config.enable_star_star_gravity ? "true" : "false") << ",\n";
+  js << "    \"dt\": " << resolved.config.dt << ",\n";
+  js << "    \"n_steps\": " << resolved.effective_n_steps << ",\n";
+  js << "    \"snapshot_every\": " << resolved.effective_snapshot_every << ",\n";
+  js << "    \"softening\": " << resolved.config.softening << "\n";
+  js << "  },\n";
+  js << "  \"initial_state\": [\n";
+  for (int i = 0; i < resolved.initial_state.n(); ++i) {
+    js << "    {\"index\": " << i
+       << ", \"mass\": " << resolved.initial_state.mass[i]
+       << ", \"x\": " << resolved.initial_state.x[i]
+       << ", \"y\": " << resolved.initial_state.y[i]
+       << ", \"vx\": " << resolved.initial_state.vx[i]
+       << ", \"vy\": " << resolved.initial_state.vy[i] << "}";
+    if (i + 1 < resolved.initial_state.n()) js << ",";
+    js << "\n";
+  }
+  js << "  ]\n";
+  js << "}\n";
+}
+
 void write_snapshots(const std::string& output_dir,
                      const std::vector<Snapshot>& snapshots) {
   /* Decimal precision: default ostringstream uses 6 significant digits in scientific format, which

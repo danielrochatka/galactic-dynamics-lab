@@ -3,6 +3,7 @@
 **Reference:** *Gravitational Energy Reframed: A Transformational Physics Framework Approach* (author’s v11 PDF, dated March 6, 2026 in the document). This file is a **scope contract** for what this repo implements vs what is **explicit** manuscript structure vs **closure / ledger / simulator** layers. It is **not** a substitute for the PDF: **narrative claims about what the manuscript “says” or “defers” must be checked against the v11 PDF** unless they are grounded in this file or in code comments that already cite behavior.
 
 **Ground truth:** **current C++ behavior** (see `TPFCorePackage::compute_accelerations`, `provisional_readout.cpp`, `derived_tpf_radial.*`). Where this document summarizes a manuscript equation, **verify numbering and text in the PDF** if you need a publication citation.
+Run-level effective IC/mode conditions are resolved by `cpp_sim/resolved_scenario.cpp` and emitted to `resolved_scenario.txt/json`; this scope file does not define scenario defaults.
 
 Re-verify after any edit to `provisional_readout.cpp`, `derived_tpf_radial.*`, or `tpf_core_package.cpp`.
 

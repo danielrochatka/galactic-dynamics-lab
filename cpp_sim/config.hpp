@@ -20,6 +20,11 @@ constexpr double kDefaultInnerRadiusM = 3.0e19;
 constexpr double kDefaultSofteningM = 1.0e16;
 /** Default BH-orbit validation radius [m] ~0.5 pc (works with kDefaultBhMassKg circular speeds). */
 constexpr double kDefaultValidationTwoBodyRadiusM = 5.0e18;
+/** Earth–Moon benchmark defaults (SI). */
+constexpr double kDefaultEarthMassKg = 5.972e24;
+constexpr double kDefaultMoonMassKg = 7.348e22;
+constexpr double kDefaultEarthMoonDistanceM = 3.844e8;
+constexpr double kDefaultMoonTangentialSpeedMps = 1022.0;
 
 // Simulation mode: see config.py VALIDATION_MODES (Python) + "galaxy" + TPFCore inspection modes
 enum class SimulationMode {
@@ -299,6 +304,10 @@ struct Config {
   // Validation-only
   double validation_two_body_radius = kDefaultValidationTwoBodyRadiusM;
   double validation_two_body_speed_ratio = 1.0;
+  double validation_earth_mass = kDefaultEarthMassKg;
+  double validation_moon_mass = kDefaultMoonMassKg;
+  double validation_earth_moon_distance = kDefaultEarthMoonDistanceM;
+  double validation_moon_tangential_speed = kDefaultMoonTangentialSpeedMps;
   bool validation_symmetric_include_bh = true;
   /** Half-separation along x (|x| of each star); full separation = 2 * this [m]. ~0.5 AU default. */
   double validation_symmetric_separation = 7.48e10;

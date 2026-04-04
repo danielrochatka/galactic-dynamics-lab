@@ -69,7 +69,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 - **`tpf_global_accel_shunt_enable`**, **`tpf_global_accel_shunt_fraction`**, **`tpf_accel_pipeline_diagnostics_csv`**
 - Inspection: **`tpfcore_probe_radius_*`**, **`tpfcore_dump_*`**, **`tpfcore_source_softening`**
 
-**Simulation-wide** keys (galaxy ICs, softening, `n_stars`, etc.) belong to the **application** config, not this file alone — see **[../../README.md](../../README.md)**.
+**Simulation-wide** keys (galaxy ICs, validation scenario ICs, softening, `n_stars`, etc.) belong to the **application** config + scenario resolver (`cpp_sim/scenario_defaults.cpp`, `cpp_sim/resolved_scenario.cpp`), not this file alone — see **[../../README.md](../../README.md)**.
 
 ---
 

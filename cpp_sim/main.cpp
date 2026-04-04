@@ -5,6 +5,7 @@
 #include "git_provenance.hpp"
 #include "init_conditions.hpp"
 #include "render_audit.hpp"
+#include "resolved_scenario.hpp"
 #include "output.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
@@ -325,6 +326,10 @@ int main(int argc, char** argv) {
     std::cerr << "Failed to create output dir " << config.output_dir << "\n";
     return 1;
   }
+  auto write_resolved_artifacts = [](const galaxy::Config& cfg) {
+    galaxy::ResolvedScenario r = galaxy::resolve_scenario(cfg);
+    galaxy::write_resolved_scenario_artifacts(cfg.output_dir, r);
+  };
 
   std::cout << "Galaxy N-body (C++)\n";
 
@@ -344,6 +349,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -361,6 +367,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -455,6 +462,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -479,6 +487,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -502,6 +511,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -517,6 +527,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -676,6 +687,7 @@ int main(int argc, char** argv) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
+    write_resolved_artifacts(config);
     return 0;
   }
 
@@ -730,13 +742,9 @@ int main(int argc, char** argv) {
     }
     galaxy::write_render_manifest(config.output_dir, config, 0, 0, 0, nullptr);
     std::cout << "Wrote " << config.output_dir << "/render_manifest.json, render_manifest.txt\n";
+    write_resolved_artifacts(config);
     return 0;
   }
-
-  galaxy::State state;
-  int n_steps = config.n_steps;
-  int snapshot_every = config.snapshot_every;
-  double bh_mass = config.bh_mass;
 
   switch (config.simulation_mode) {
     case galaxy::SimulationMode::tpf_single_source_inspect:
@@ -749,68 +757,51 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_v11_weak_field_correspondence:
       std::cerr << "Internal error: inspection/utility/sweep/calibration/audit modes should have returned earlier.\n";
       return 1;
-    case galaxy::SimulationMode::galaxy: {
-      galaxy::init_galaxy_disk(config, state);
-      galaxy::sync_config_galaxy_init_from_last_audit(config);
-      galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
-                                            galaxy::last_galaxy_init_audit());
-      std::cout << "Galaxy IC: template=" << galaxy::last_galaxy_init_audit().template_name
-                << ", seed=" << galaxy::last_galaxy_init_audit().seed;
-      if (galaxy::last_galaxy_init_audit().used_new_state_noise)
-        std::cout << ", noise=new (pos/angle/mag)";
-      else if (galaxy::last_galaxy_init_audit().used_legacy_velocity_noise)
-        std::cout << ", noise=legacy velocity_noise";
-      else
-        std::cout << ", noise=none";
-      std::cout << "\n";
-      std::cout << "Wrote " << config.output_dir << "/galaxy_init_diagnostics.txt\n";
-      if (!config.save_snapshots)
-        std::cout << "Wrote " << config.output_dir << "/galaxy_init_snapshot.csv (snapshots disabled)\n";
-      std::cout << "Running galaxy: n_stars=" << config.n_stars
-                << ", n_steps=" << n_steps
-                << ", dt=" << config.dt
-                << ", sim_time=" << (n_steps * config.dt) << "\n";
+    default:
       break;
-    }
-    case galaxy::SimulationMode::two_body_orbit:
-    case galaxy::SimulationMode::earth_moon_benchmark: {
-      galaxy::init_two_body(config, state);
-      config.bh_mass = 0.0;
-      config.enable_star_star_gravity = true;
-      n_steps = config.validation_n_steps;
-      snapshot_every = config.validation_snapshot_every;
-      std::cout << "Earth–Moon benchmark (SI), n=" << state.n()
-                << " (pairwise gravity; bh_mass cleared for this mode)\n";
-      break;
-    }
-    case galaxy::SimulationMode::bh_orbit_validation: {
-      galaxy::init_two_body_star_around_bh(config, state);
-      config.enable_star_star_gravity = false;
-      n_steps = config.validation_n_steps;
-      snapshot_every = config.validation_snapshot_every;
-      std::cout << "BH orbit validation: n=" << state.n() << " star, r0=" << config.validation_two_body_radius
-                << " m, speed_ratio=" << config.validation_two_body_speed_ratio
-                << " (star–star gravity off; central mass from bh_mass)\n";
-      break;
-    }
-    case galaxy::SimulationMode::symmetric_pair: {
-      galaxy::init_symmetric_pair(config, state);
-      if (!config.validation_symmetric_include_bh) bh_mass = 0.0;
-      config.bh_mass = bh_mass;  // so run_simulation uses it
-      n_steps = config.validation_n_steps;
-      snapshot_every = config.validation_snapshot_every;
-      std::cout << "Symmetric pair: a=" << config.validation_symmetric_separation
-                << " include_bh=" << config.validation_symmetric_include_bh << "\n";
-      break;
-    }
-    case galaxy::SimulationMode::small_n_conservation: {
-      galaxy::init_small_n(config, state);
-      config.n_stars = state.n();
-      n_steps = config.validation_n_steps;
-      snapshot_every = config.validation_snapshot_every;
-      std::cout << "Small-N: n=" << state.n() << "\n";
-      break;
-    }
+  }
+
+  galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(config);
+  config = resolved.config;
+  galaxy::State state = resolved.initial_state;
+  int n_steps = resolved.effective_n_steps;
+  int snapshot_every = resolved.effective_snapshot_every;
+
+  if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
+    galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
+                                          galaxy::last_galaxy_init_audit());
+    std::cout << "Galaxy IC: template=" << galaxy::last_galaxy_init_audit().template_name
+              << ", seed=" << galaxy::last_galaxy_init_audit().seed;
+    if (galaxy::last_galaxy_init_audit().used_new_state_noise)
+      std::cout << ", noise=new (pos/angle/mag)";
+    else if (galaxy::last_galaxy_init_audit().used_legacy_velocity_noise)
+      std::cout << ", noise=legacy velocity_noise";
+    else
+      std::cout << ", noise=none";
+    std::cout << "\n";
+    std::cout << "Wrote " << config.output_dir << "/galaxy_init_diagnostics.txt\n";
+    if (!config.save_snapshots)
+      std::cout << "Wrote " << config.output_dir << "/galaxy_init_snapshot.csv (snapshots disabled)\n";
+    std::cout << "Running galaxy: n_stars=" << config.n_stars
+              << ", n_steps=" << n_steps
+              << ", dt=" << config.dt
+              << ", sim_time=" << (n_steps * config.dt) << "\n";
+  } else if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
+             config.simulation_mode == galaxy::SimulationMode::earth_moon_benchmark) {
+    std::cout << "Earth–Moon benchmark (SI), n=" << state.n()
+              << " (pairwise gravity; bh_mass cleared by scenario resolver)\n";
+  } else if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation) {
+    std::cout << "BH orbit validation: n=" << state.n() << " star, r0=" << config.validation_two_body_radius
+              << " m, speed_ratio=" << config.validation_two_body_speed_ratio
+              << " (star–star gravity off by scenario resolver)\n";
+  } else if (config.simulation_mode == galaxy::SimulationMode::symmetric_pair) {
+    std::cout << "Symmetric pair: a=" << config.validation_symmetric_separation
+              << " include_bh=" << config.validation_symmetric_include_bh << "\n";
+  } else if (config.simulation_mode == galaxy::SimulationMode::small_n_conservation) {
+    std::cout << "Small-N: n=" << state.n() << "\n";
+  }
+
+  switch (config.simulation_mode) {
     case galaxy::SimulationMode::timestep_convergence: {
       // Run two_body at dt, dt/2, dt/4 (same total time)
       double total_time = config.validation_n_steps * config.dt;
@@ -846,9 +837,14 @@ int main(int argc, char** argv) {
       summary.close();
       std::cout << "Wrote " << config.output_dir << "/validation_timestep_convergence.txt\n";
       std::cout << "Output directory: " << config.output_dir << "\n";
+      write_resolved_artifacts(config);
       return 0;
     }
+    default:
+      break;
   }
+
+  write_resolved_artifacts(config);
 
   const bool compare_mode_requested =
       (config.simulation_mode == galaxy::SimulationMode::galaxy &&
@@ -968,6 +964,7 @@ int main(int argc, char** argv) {
           }
           if (side_cfg.save_snapshots)
             galaxy::write_snapshots(side_cfg.output_dir, side_snaps);
+          write_resolved_artifacts(side_cfg);
           galaxy::write_galaxy_init_diagnostics(side_cfg.output_dir, state, side_cfg,
                                                 galaxy::last_galaxy_init_audit());
         };

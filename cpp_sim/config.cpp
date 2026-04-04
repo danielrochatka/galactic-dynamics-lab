@@ -443,6 +443,22 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.validation_two_body_speed_ratio = std::stod(val);
     return true;
   }
+  if (key == "validation_earth_mass") {
+    config.validation_earth_mass = std::stod(val);
+    return true;
+  }
+  if (key == "validation_moon_mass") {
+    config.validation_moon_mass = std::stod(val);
+    return true;
+  }
+  if (key == "validation_earth_moon_distance") {
+    config.validation_earth_moon_distance = std::stod(val);
+    return true;
+  }
+  if (key == "validation_moon_tangential_speed") {
+    config.validation_moon_tangential_speed = std::stod(val);
+    return true;
+  }
   if (key == "validation_symmetric_include_bh") {
     config.validation_symmetric_include_bh = parse_bool(val);
     return true;
