@@ -28,4 +28,8 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf is canonical low-order tru
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
         "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
+  CHECK(galaxy::compute_acceleration_code_path(c) ==
+        "TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
+        "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
+        "VDSG/readout/shunt/cooling rejected)");
 }

@@ -1,7 +1,9 @@
 /**
  * TPFCore package implementation.
  * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
- * Integrator accelerations: readout baseline + optional VDSG modifier + global |a| shunt — see compute_accelerations.
+ * Integrator accelerations are route-dependent (see compute_accelerations):
+ * - direct_tpf / v11_weak_field_truncation: paper-backed low-order static/quasi-static weak-field helper.
+ * - legacy_readout: readout baseline + optional VDSG modifier + optional global |a| shunt.
  */
 
 #include "tpf_core_package.hpp"
