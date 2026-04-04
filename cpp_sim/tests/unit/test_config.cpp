@@ -90,6 +90,14 @@ TEST_CASE("tpfcore_closure_kappa key maps to closure ledger coefficient") {
   CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
 }
 
+TEST_CASE("tpf_dynamics_mode accepts weak_field_correspondence and alpha key") {
+  Config c;
+  CHECK(apply_config_kv("tpf_dynamics_mode", "weak_field_correspondence", c));
+  CHECK(c.tpf_dynamics_mode == "weak_field_correspondence");
+  CHECK(apply_config_kv("tpf_weak_field_correspondence_alpha_si", "-6.0e-11", c));
+  CHECK(c.tpf_weak_field_correspondence_alpha_si == doctest::Approx(-6.0e-11));
+}
+
 TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
   Config c;
   CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));

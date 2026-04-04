@@ -30,6 +30,17 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_direct_MISSING_not_implemented");
 }
 
+TEST_CASE("compute_active_dynamics_branch: weak_field_correspondence dynamics") {
+  Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "weak_field_correspondence";
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "TPF_v11_weak_field_correspondence_dynamics_limited_static_quasistatic");
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "v11_weak_field_correspondence_dynamics_metrics_limited_scope");
+  CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
+}
+
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
   Config c;
   c.physics_package = "TPFCore";

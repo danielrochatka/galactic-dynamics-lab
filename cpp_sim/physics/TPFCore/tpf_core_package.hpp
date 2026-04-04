@@ -38,6 +38,7 @@ class TPFCorePackage : public PhysicsPackage {
 
   /**
    * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
+   * weak_field_correspondence: paper-backed weak-field scalar correspondence dynamics (static/quasi-static limit).
    * direct_tpf: compute_direct_tpf_accelerations (not implemented yet — throws); nonzero tpf_vdsg_coupling errors.
    */
   void compute_accelerations(const State& state,
@@ -128,10 +129,12 @@ class TPFCorePackage : public PhysicsPackage {
   double theta_tt_scale_;
   double theta_tr_scale_;
   double source_softening_;
+  double weak_field_correspondence_alpha_si_;
   double vdsg_coupling_;
   /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
   double vdsg_mass_baseline_resolved_kg_;
   double simulation_dt_;
+  double cooling_fraction_;
   bool shunt_enable_;
   double shunt_fraction_;
   bool pipeline_diagnostics_csv_;
@@ -152,6 +155,12 @@ class TPFCorePackage : public PhysicsPackage {
                                         bool star_star,
                                         std::vector<double>& ax,
                                         std::vector<double>& ay) const;
+  void compute_weak_field_correspondence_accelerations(const State& state,
+                                                       double bh_mass,
+                                                       double softening,
+                                                       bool star_star,
+                                                       std::vector<double>& ax,
+                                                       std::vector<double>& ay) const;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

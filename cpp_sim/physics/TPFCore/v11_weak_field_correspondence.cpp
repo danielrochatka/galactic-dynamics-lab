@@ -412,4 +412,47 @@ void run_v11_weak_field_correspondence_audit(const Config& config, const std::st
   run_axis_monopole_audit(config, output_dir);
 }
 
+void compute_v11_weak_field_correspondence_accelerations(const State& state,
+                                                         double bh_mass,
+                                                         double softening,
+                                                         bool star_star,
+                                                         double alpha_si,
+                                                         std::vector<double>& ax,
+                                                         std::vector<double>& ay) {
+  const int n = state.n();
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+  if (!(std::isfinite(alpha_si))) {
+    throw std::runtime_error("weak_field_correspondence dynamics requires finite alpha");
+  }
+  const double eps_sq = softening * softening;
+
+  if (bh_mass > 0.0) {
+    for (int i = 0; i < n; ++i) {
+      const double dx = state.x[i];
+      const double dy = state.y[i];
+      const double r2 = dx * dx + dy * dy + eps_sq;
+      const double r = std::sqrt(r2);
+      const double inv_r3 = (r > 1e-300) ? (1.0 / (r2 * r)) : 0.0;
+      ax[i] += alpha_si * bh_mass * dx * inv_r3;
+      ay[i] += alpha_si * bh_mass * dy * inv_r3;
+    }
+  }
+
+  if (star_star) {
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        if (i == j) continue;
+        const double dx = state.x[i] - state.x[j];
+        const double dy = state.y[i] - state.y[j];
+        const double r2 = dx * dx + dy * dy + eps_sq;
+        const double r = std::sqrt(r2);
+        const double inv_r3 = (r > 1e-300) ? (1.0 / (r2 * r)) : 0.0;
+        ax[i] += alpha_si * state.mass[j] * dx * inv_r3;
+        ay[i] += alpha_si * state.mass[j] * dy * inv_r3;
+      }
+    }
+  }
+}
+
 }  // namespace galaxy

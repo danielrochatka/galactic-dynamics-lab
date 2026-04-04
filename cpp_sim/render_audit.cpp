@@ -84,6 +84,9 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
+  if (config.tpf_dynamics_mode == "weak_field_correspondence") {
+    return "TPF_v11_weak_field_correspondence_dynamics_limited_static_quasistatic";
+  }
   if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct_MISSING_not_implemented";
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
@@ -102,6 +105,8 @@ std::string compute_active_metrics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
+    if (config.tpf_dynamics_mode == "weak_field_correspondence")
+      return "v11_weak_field_correspondence_dynamics_metrics_limited_scope";
     if (config.tpf_dynamics_mode == "direct_tpf") {
       if (config.tpfcore_enable_provisional_readout)
         return "tpfcore_readout:" + config.tpfcore_readout_mode +
@@ -121,6 +126,10 @@ std::string compute_acceleration_code_path(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
+  if (config.tpf_dynamics_mode == "weak_field_correspondence") {
+    return "TPFCorePackage::compute_weak_field_correspondence_accelerations (v11 Eq.42-44 correspondence scalar; "
+           "no VDSG/readout/shunt/cooling)";
+  }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::string s =
         "TPFCorePackage::compute_direct_tpf_accelerations (direct_tpf path; not implemented yet)";
@@ -157,7 +166,8 @@ void write_render_manifest(const std::string& output_dir,
   const GitProvenance gp = resolve_git_provenance();
   const bool cooling_on =
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
-       config.simulation_mode == SimulationMode::galaxy);
+       config.simulation_mode == SimulationMode::galaxy &&
+       config.tpf_dynamics_mode != "weak_field_correspondence");
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
