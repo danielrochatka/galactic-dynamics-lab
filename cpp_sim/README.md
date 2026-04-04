@@ -49,12 +49,14 @@ Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `
 | Layer | Location |
 |-------|----------|
 | Built-in defaults | `config.hpp` (`Config`). |
+| Scenario defaults by mode | `scenario_defaults.cpp` (applied by `resolve_scenario`). |
 | Package defaults | **`physics/<Package>/defaults.cfg`** only (e.g. `physics/TPFCore/defaults.cfg`). |
 | Run config | **Repository root `configs/`** only — e.g. `../configs/my.local.cfg` when cwd is `cpp_sim/`. **Not** `cpp_sim/configs/`. |
 
-**Precedence:** built-in → package defaults → root run config → CLI (`simulation_mode` and `--key=value`).
+**Precedence:** built-in → package defaults → root run config/CLI keys (config values) → scenario resolution by mode (`resolve_scenario`) for effective IC + mode controls.
 
 Startup prints **Run config selected**, **Loaded package defaults**, and a **Resolved config** summary. The same resolved block appears at the top of **`run_info.txt`**.
+Each run also writes **`resolved_scenario.txt`** and **`resolved_scenario.json`** with the effective mode, initializer, particle IC, and effective `bh_mass` / force toggles / timestep counters used.
 
 ### Physics packages
 

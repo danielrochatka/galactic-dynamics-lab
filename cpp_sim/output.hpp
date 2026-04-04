@@ -2,6 +2,7 @@
 #define GALAXY_OUTPUT_HPP
 
 #include "config.hpp"
+#include "resolved_scenario.hpp"
 #include "types.hpp"
 #include <vector>
 #include <string>
@@ -38,6 +39,9 @@ void write_run_info(const std::string& output_dir,
 // Write each snapshot to output_dir/snapshot_<step>.csv (columns: i,x,y,vx,vy,mass).
 void write_snapshots(const std::string& output_dir,
                      const std::vector<Snapshot>& snapshots);
+
+void write_resolved_scenario_artifacts(const std::string& output_dir,
+                                       const ResolvedScenario& resolved);
 
 }  // namespace galaxy
 
