@@ -22,7 +22,7 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code:** readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then **`apply_global_accel_magnitude_shunt`** (always). Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
+| **Closure (acceleration)** | **Current code is route-dependent:** canonical **`direct_tpf`** (and compatibility **`v11_weak_field_truncation`**) call the low-order weak-field/static helper; **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
 | **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). **VDSG** contributes an additive SI excess on top of that baseline, not a replacement readout. |
 
 ---

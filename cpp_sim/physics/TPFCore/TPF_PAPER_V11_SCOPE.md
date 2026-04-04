@@ -104,7 +104,7 @@ This repo does **not** embed the full manuscript. The following are **not** sett
 
 ## What you can say in a methods section (safe, code-grounded)
 
-- The simulator evaluates **Θ** and **I** from a **stated provisional potential ansatz**, applies **readout closures** for the acceleration baseline, **optionally adds** the **VDSG velocity modifier**, and integrates with **Verlet**.
+- The simulator evaluates **Θ** and **I** from a **stated provisional potential ansatz** and integrates with **Verlet**. Acceleration routing is explicit: canonical **`direct_tpf`** currently executes the low-order weak-field/static correspondence helper; **`legacy_readout`** applies readout closures and may add the **VDSG** velocity modifier.
 - **Invariant I** from **`compute_invariant_I`** (same combination as manuscript **Eq. (3)** in this repo’s implementation) feeds the **κ–ledger** shell model (**Tier 2 closure**). **Verify equation numbers against the PDF** in a paper.
 - **∆C_μν** and full **C_μν** dynamics are **not** implemented as expanded weak-field physics in this codebase.
 
