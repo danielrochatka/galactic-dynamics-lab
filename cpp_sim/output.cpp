@@ -17,6 +17,8 @@ void write_run_info(const std::string& output_dir,
                     int n_particles,
                     const std::string& run_config_path,
                     const std::string& package_defaults_path,
+                    const Config* configured_config,
+                    const ResolvedScenario* effective_runtime,
                     const GalaxyInitAudit* galaxy_init_audit,
                     const CoolingAuditInfo* cooling_audit,
                     const AccelPipelineStats* tpf_pipeline) {
@@ -28,30 +30,38 @@ void write_run_info(const std::string& output_dir,
   const GitProvenance gp = resolve_git_provenance();
 
   int n_star = (n_particles >= 0) ? n_particles : config.n_stars;
+  const Config& configured = configured_config ? *configured_config : config;
+  const ResolvedScenario owned_effective = effective_runtime ? ResolvedScenario{} : resolve_scenario(configured);
+  const ResolvedScenario& effective = effective_runtime ? *effective_runtime : owned_effective;
 
-  /* Resolved config banner at top so it is obvious what was used */
-  f << "=== Resolved config (built-in < package defaults < run config < CLI) ===\n";
+  f << "=== Layered config provenance ===\n";
   f << "run_config\t" << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   f << "package_defaults\t" << (package_defaults_path.empty() ? "(none)" : package_defaults_path) << "\n";
-  f << "physics_package\t" << config.physics_package << "\n";
-  f << "physics_package_compare\t" << config.physics_package_compare << "\n";
-  f << "simulation_mode\t" << mode_to_string(config.simulation_mode) << "\n";
-  f << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
+  f << "layering_order\tbuilt-in < package defaults < run config < CLI\n";
+  f << "=== End layered config provenance ===\n\n";
+
+  f << "=== Configured values (post-layering, pre-resolution) ===\n";
+  for (const auto& kv : serialize_config_kv(configured))
+    f << "configured_" << kv.first << "\t" << kv.second << "\n";
+  f << "=== End configured values ===\n\n";
+
+  f << "=== Effective resolved runtime ===\n";
+  for (const auto& kv : serialize_effective_runtime_kv(effective))
+    f << kv.first << "\t" << kv.second << "\n";
+  f << "effective_n_steps_done\t" << n_steps_done << "\n";
+  f << "effective_number_of_snapshots\t" << n_snapshots << "\n";
+  f << "=== End effective resolved runtime ===\n\n";
+
+  f << "=== Branch / physics / diagnostics metadata ===\n";
   f << "artifact_naming_convention\t<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>\n";
   f << "artifact_label_scope_primary\tprimary=main interpretation outputs (mode-dependent)\n";
   f << "artifact_label_scope_secondary\tsecondary=lab/origin radial diagnostics where applicable\n";
-  f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
-  f << "display_distance_unit\t" << config.display_distance_unit << "\n";
-  f << "display_time_unit\t" << config.display_time_unit << "\n";
-  f << "display_velocity_unit\t" << config.display_velocity_unit << "\n";
-  f << "display_units_in_overlay\t" << (config.display_units_in_overlay ? 1 : 0) << "\n";
-  f << "display_show_unit_reference\t" << (config.display_show_unit_reference ? 1 : 0) << "\n";
   f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
   f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
   f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
   f << "output_dir\t" << output_dir << "\n";
   f << "n_stars\t" << n_star << "\n";
-  f << "bh_mass\t" << config.bh_mass << "\n";
+  f << "=== End branch / physics / diagnostics metadata ===\n\n";
   if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
     f << "galaxy_init_template\t" << config.galaxy_init_template << "\n";
     f << "galaxy_init_seed\t" << config.galaxy_init_seed << "\n";
@@ -136,7 +146,7 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
     f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
   }
-  f << "=== End resolved config ===\n\n";
+  f << "=== End branch / physics / diagnostics metadata supplements ===\n\n";
 
   f << "=== Code provenance (git) ===\n";
   f << "git_commit_full\t" << gp.git_commit_full << "\n";
@@ -175,29 +185,6 @@ void write_run_info(const std::string& output_dir,
     }
   }
 
-  f << "dt\t" << config.dt << "\n";
-  f << "n_steps\t" << n_steps_done << "\n";
-  f << "snapshot_every\t" << config.snapshot_every << "\n";
-  f << "softening\t" << config.softening << "\n";
-  f << "star_mass\t" << config.star_mass << "\n";
-  f << "bh_mass\t" << config.bh_mass << "\n";
-  f << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
-  f << "galaxy_radius\t" << config.galaxy_radius << "\n";
-  f << "plot_animation_dynamic_zoom\t" << (config.plot_animation_dynamic_zoom ? 1 : 0) << "\n";
-  f << "plot_skip_initial_steps\t" << config.plot_skip_initial_steps << "\n";
-  f << "plot_skip_initial_snapshots\t" << config.plot_skip_initial_snapshots << "\n";
-  f << "diagnostic_cutoff_radius\t" << config.diagnostic_cutoff_radius << "\n";
-  f << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
-  f << "display_distance_unit\t" << config.display_distance_unit << "\n";
-  f << "display_time_unit\t" << config.display_time_unit << "\n";
-  f << "display_velocity_unit\t" << config.display_velocity_unit << "\n";
-  f << "display_units_in_overlay\t" << (config.display_units_in_overlay ? 1 : 0) << "\n";
-  f << "display_show_unit_reference\t" << (config.display_show_unit_reference ? 1 : 0) << "\n";
-  f << "active_dynamics_branch\t" << compute_active_dynamics_branch(config) << "\n";
-  f << "active_metrics_branch\t" << compute_active_metrics_branch(config) << "\n";
-  f << "acceleration_code_path\t" << compute_acceleration_code_path(config) << "\n";
-  f << "total_simulated_time\t" << (n_steps_done * config.dt) << "\n";
-  f << "number_of_snapshots\t" << n_snapshots << "\n";
   if (config.simulation_mode == SimulationMode::earth_moon_benchmark ||
       config.simulation_mode == SimulationMode::bh_orbit_validation ||
       config.simulation_mode == SimulationMode::two_body_orbit) {
@@ -235,9 +222,6 @@ void write_run_info(const std::string& output_dir,
     f << "=== End TPF acceleration pipeline ===\n";
   }
   f << "n_stars\t" << n_star << "\n";
-  f << "simulation_mode\t" << static_cast<int>(config.simulation_mode) << "\n";
-  f << "physics_package\t" << config.physics_package << "\n";
-  f << "physics_package_compare\t" << config.physics_package_compare << "\n";
   if (config.physics_package == "TPFCore") {
     double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
     if (config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {

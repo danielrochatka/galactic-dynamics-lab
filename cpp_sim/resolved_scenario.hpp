@@ -4,6 +4,8 @@
 #include "config.hpp"
 #include "types.hpp"
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace galaxy {
 
@@ -20,6 +22,7 @@ struct ResolvedScenario {
 };
 
 ResolvedScenario resolve_scenario(const Config& input);
+std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(const ResolvedScenario& resolved);
 
 }  // namespace galaxy
 

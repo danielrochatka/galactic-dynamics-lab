@@ -3,6 +3,8 @@
 #include "galaxy_init.hpp"
 #include "init_conditions.hpp"
 #include "scenario_defaults.hpp"
+#include <iomanip>
+#include <sstream>
 
 namespace galaxy {
 
@@ -106,6 +108,33 @@ ResolvedScenario resolve_scenario(const Config& input) {
   r.effective_total_sim_time = r.config.dt * static_cast<double>(r.effective_n_steps);
 
   return r;
+}
+
+std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(const ResolvedScenario& resolved) {
+  auto b = [](bool v) { return v ? std::string("1") : std::string("0"); };
+  auto i = [](int v) { return std::to_string(v); };
+  auto d = [](double v) {
+    std::ostringstream os;
+    os << std::setprecision(17) << v;
+    return os.str();
+  };
+  std::vector<std::pair<std::string, std::string>> kv;
+  kv.reserve(16);
+  kv.emplace_back("effective_simulation_mode", resolved.mode_label);
+  kv.emplace_back("effective_initializer_used", resolved.initializer_used);
+  kv.emplace_back("effective_physics_package", resolved.config.physics_package);
+  kv.emplace_back("effective_tpf_dynamics_mode", resolved.config.tpf_dynamics_mode);
+  kv.emplace_back("effective_dt", d(resolved.config.dt));
+  kv.emplace_back("effective_n_steps", i(resolved.effective_n_steps));
+  kv.emplace_back("effective_snapshot_every", i(resolved.effective_snapshot_every));
+  kv.emplace_back("effective_total_sim_time", d(resolved.effective_total_sim_time));
+  kv.emplace_back("effective_softening", d(resolved.config.softening));
+  kv.emplace_back("effective_bh_mass", d(resolved.config.bh_mass));
+  kv.emplace_back("effective_enable_star_star_gravity", b(resolved.config.enable_star_star_gravity));
+  kv.emplace_back("effective_particle_count", i(resolved.initial_state.n()));
+  kv.emplace_back("effective_timing_policy", resolved.timing_policy);
+  kv.emplace_back("effective_softening_policy", resolved.softening_policy);
+  return kv;
 }
 
 }  // namespace galaxy

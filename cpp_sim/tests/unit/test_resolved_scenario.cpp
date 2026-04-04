@@ -136,3 +136,57 @@ TEST_CASE("resolved scenario artifact writer outputs expected keys") {
   CHECK(js.find("\"softening\": 0") != std::string::npos);
   CHECK(js.find("\"timing\": \"earth_moon_hourly_step_60d_horizon\"") != std::string::npos);
 }
+
+TEST_CASE("run_info audit includes configured and effective sections and resolved consistency") {
+  {
+    galaxy::Config configured;
+    configured.output_dir = "outputs/test_run_info_earth_moon";
+    configured.simulation_mode = galaxy::SimulationMode::earth_moon_benchmark;
+    configured.snapshot_every = 50;
+    configured.validation_snapshot_every = 10;
+    configured.validation_n_steps = 111;
+    configured.physics_package = "Newtonian";
+    auto resolved = galaxy::resolve_scenario(configured);
+
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 3, resolved.initial_state.n(),
+                           "configs/my.local.cfg", "physics/Newtonian/defaults.cfg", &configured, &resolved);
+    galaxy::write_resolved_scenario_artifacts(configured.output_dir, resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    const std::string resolved_txt = slurp(configured.output_dir + "/resolved_scenario.txt");
+
+    CHECK(run_info.find("=== Configured values (post-layering, pre-resolution) ===") != std::string::npos);
+    CHECK(run_info.find("=== Effective resolved runtime ===") != std::string::npos);
+    CHECK(run_info.find("configured_snapshot_every\t50") != std::string::npos);
+    CHECK(run_info.find("configured_validation_snapshot_every\t10") != std::string::npos);
+    CHECK(run_info.find("configured_validation_n_steps\t111") != std::string::npos);
+    CHECK(run_info.find("effective_snapshot_every\t10") != std::string::npos);
+    CHECK(run_info.find("effective_n_steps\t111") != std::string::npos);
+    CHECK(run_info.find("effective_initializer_used\tinit_two_body") != std::string::npos);
+    CHECK(run_info.find("effective_particle_count\t2") != std::string::npos);
+    CHECK(run_info.find("configured_display_distance_unit\tauto") != std::string::npos);
+    CHECK(run_info.find("configured_tpfcore_readout_mode\ttensor_radial_projection") != std::string::npos);
+    CHECK(resolved_txt.find("effective_snapshot_every\t10") != std::string::npos);
+    CHECK(resolved_txt.find("effective_n_steps\t111") != std::string::npos);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "outputs/test_run_info_bh_orbit";
+    configured.simulation_mode = galaxy::SimulationMode::bh_orbit_validation;
+    configured.validation_n_steps = 321;
+    configured.validation_snapshot_every = 9;
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 5, resolved.initial_state.n(),
+                           "configs/my.local.cfg", "physics/Newtonian/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("configured_simulation_mode\tbh_orbit_validation") != std::string::npos);
+    CHECK(run_info.find("configured_validation_n_steps\t321") != std::string::npos);
+    CHECK(run_info.find("configured_validation_snapshot_every\t9") != std::string::npos);
+    CHECK(run_info.find("effective_snapshot_every\t9") != std::string::npos);
+    CHECK(run_info.find("effective_initializer_used\tinit_two_body_star_around_bh") != std::string::npos);
+  }
+}

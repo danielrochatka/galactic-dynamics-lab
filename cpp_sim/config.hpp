@@ -2,6 +2,8 @@
 #define GALAXY_CONFIG_HPP
 
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace galaxy {
 
@@ -74,6 +76,9 @@ bool check_run_config_canonical(const std::string& run_config_path);
 
 // Find package defaults path for given package name. Returns path if exists, else empty.
 std::string find_package_defaults_path(const std::string& package_name);
+
+/** Serialize all Config fields into stable key/value text pairs (enum values emitted as canonical strings). */
+std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Config& config);
 
 struct Config {
   SimulationMode simulation_mode = SimulationMode::galaxy;
