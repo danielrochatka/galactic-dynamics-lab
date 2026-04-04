@@ -38,7 +38,7 @@ class TPFCorePackage : public PhysicsPackage {
 
   /**
    * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
-   * weak_field_correspondence: paper-backed weak-field scalar correspondence dynamics (static/quasi-static limit).
+   * v11_weak_field_truncation: paper-backed weak-field scalar correspondence truncation (static/quasi-static limit).
    * direct_tpf: compute_direct_tpf_accelerations (not implemented yet — throws); nonzero tpf_vdsg_coupling errors.
    */
   void compute_accelerations(const State& state,
@@ -155,7 +155,7 @@ class TPFCorePackage : public PhysicsPackage {
                                         bool star_star,
                                         std::vector<double>& ax,
                                         std::vector<double>& ay) const;
-  void compute_weak_field_correspondence_accelerations(const State& state,
+  void compute_v11_weak_field_truncation_accelerations(const State& state,
                                                        double bh_mass,
                                                        double softening,
                                                        bool star_star,

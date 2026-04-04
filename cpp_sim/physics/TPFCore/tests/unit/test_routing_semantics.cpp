@@ -291,9 +291,9 @@ TEST_CASE("derived-radial readout acceleration equals radial_acceleration_scalar
   CHECK(ay == doctest::Approx(expected_ay));
 }
 
-TEST_CASE("weak_field_correspondence dynamics: one-source acceleration matches alpha*M/r^2 radial law") {
+TEST_CASE("v11_weak_field_truncation dynamics: one-source acceleration matches alpha*M/r^2 radial law") {
   galaxy::Config c;
-  c.tpf_dynamics_mode = "weak_field_correspondence";
+  c.tpf_dynamics_mode = "v11_weak_field_truncation";
   c.tpf_weak_field_correspondence_alpha_si = -2.0;
   c.tpfcore_enable_provisional_readout = false;
   c.tpf_vdsg_coupling = 0.0;
@@ -315,9 +315,9 @@ TEST_CASE("weak_field_correspondence dynamics: one-source acceleration matches a
   CHECK(ay[0] == doctest::Approx(coeff * 4.0));
 }
 
-TEST_CASE("weak_field_correspondence dynamics: pair superposition reproduces Newtonian-like symmetry for alpha=-G") {
+TEST_CASE("v11_weak_field_truncation dynamics: pair superposition reproduces Newtonian-like symmetry for alpha=-G") {
   galaxy::Config c;
-  c.tpf_dynamics_mode = "weak_field_correspondence";
+  c.tpf_dynamics_mode = "v11_weak_field_truncation";
   c.tpf_weak_field_correspondence_alpha_si = -galaxy::tpfcore::TPF_G_SI;
   c.tpfcore_enable_provisional_readout = false;
   c.tpf_vdsg_coupling = 0.0;
@@ -339,13 +339,13 @@ TEST_CASE("weak_field_correspondence dynamics: pair superposition reproduces New
   CHECK(ay[1] == doctest::Approx(0.0));
 }
 
-TEST_CASE("weak_field_correspondence dynamics rejects exploratory/provisional/stabilizer knobs") {
+TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/stabilizer knobs") {
   galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 1.0);
   std::vector<double> ax, ay;
 
   auto make_base = []() {
     galaxy::Config c;
-    c.tpf_dynamics_mode = "weak_field_correspondence";
+    c.tpf_dynamics_mode = "v11_weak_field_truncation";
     c.tpfcore_enable_provisional_readout = false;
     c.tpf_vdsg_coupling = 0.0;
     c.tpf_cooling_fraction = 0.0;

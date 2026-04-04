@@ -100,7 +100,7 @@ struct Config {
   /**
    * TPFCore only: how dynamical accelerations are produced.
    * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
-   * - weak_field_correspondence: paper v11 weak-field correspondence dynamics (Eq. 42-44 superposition scalar), static/quasi-static limit only.
+   * - v11_weak_field_truncation: paper v11 weak-field correspondence truncation (Eq. 42-44 superposition scalar), static/quasi-static limit only.
    * - direct_tpf: future direct TPF dynamics path (not implemented yet); does not use the provisional-readout gate; VDSG must be 0.
    */
   std::string tpf_dynamics_mode = "legacy_readout";
