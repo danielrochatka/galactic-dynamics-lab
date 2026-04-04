@@ -66,7 +66,7 @@ Re-verify after any edit to `provisional_readout.cpp`, `derived_tpf_radial.*`, o
 | `tensor_radial_projection` (+ `_negated`) | `apply_tensor_radial_closure` | **Θ·r̂**-style superposed contribution. |
 | `experimental_radial_r_scaling` | `apply_experimental_radial_r_scaling_closure` | Radial closure from **−θ_rr × r** scaling. |
 
-**`TPFCorePackage::compute_accelerations`** always runs readout baseline, then **`accumulate_vdsg_velocity_modifier`** (empty if λ = 0), then **`apply_global_accel_magnitude_shunt`** (stderr notice once).
+**`TPFCorePackage::compute_accelerations`** routing is mode-dependent: canonical **`direct_tpf`** maps to the v11 weak-field/static low-order truncation helper (DeltaC omitted; VDSG/readout/shunt/cooling rejected), while **`legacy_readout`** runs readout baseline, optional **`accumulate_vdsg_velocity_modifier`**, then optional **`apply_global_accel_magnitude_shunt`**.
 
 ---
 

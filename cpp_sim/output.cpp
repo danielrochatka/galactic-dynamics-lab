@@ -116,6 +116,8 @@ void write_run_info(const std::string& output_dir,
         f << "tpf_truncation_status\tv11_weak_field_static_quasistatic_low_order_sector\n";
         f << "tpf_higher_order_status\tDeltaC_omitted\n";
         f << "tpf_extension_status\tVDSG_off_required\n";
+        f << "tpf_provisional_readout_status\toff_required\n";
+        f << "tpf_readout_closure_knobs_status\trejected_on_direct_tpf\n";
         f << "tpf_stabilizer_status\tshunt_off_and_cooling_off_required\n";
       }
       f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";

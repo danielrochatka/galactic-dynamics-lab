@@ -93,7 +93,8 @@ std::string compute_active_dynamics_branch(const Config& config) {
     return "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic";
   }
   if (config.tpf_dynamics_mode == "direct_tpf")
-    return "TPF_direct_tpf_core_using_v11_weak_field_static_truncation_DeltaC_omitted_VDSG_off";
+    return "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+           "VDSG_off_provisional_readout_off_shunt_off_cooling_off";
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCore_PROVISIONAL_legacy_readout_DISABLED (provisional_readout off)";
@@ -114,7 +115,8 @@ std::string compute_active_metrics_branch(const Config& config) {
     if (tpf_v11_weak_field_truncation_active(config))
       return "v11_weak_field_truncation_dynamics_metrics_limited_scope";
     if (config.tpf_dynamics_mode == "direct_tpf") {
-      return "direct_tpf_metrics_v11_weak_field_static_truncation_only_DeltaC_omitted_VDSG_off";
+      return "direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+             "VDSG_off_provisional_readout_off_shunt_off_cooling_off";
     }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
@@ -221,14 +223,24 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "acceleration_code_path", acc);
     if (config.physics_package == "TPFCore" &&
         config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
-      json_kv(jf, first, "tpf_core_law_mode", "direct_tpf_unified_core");
+      const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
+      const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
+      json_kv(jf, first, "tpf_core_law_mode",
+              is_direct ? "direct_tpf_canonical_entry"
+                        : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"));
       json_kv(jf, first, "tpf_truncation_mode",
-              tpf_v11_weak_field_truncation_active(config) ? "v11_weak_field_truncation" : "none");
-      json_kv(jf, first, "tpf_extension_mode", tpf_vdsg_active_for_audit(config) ? "vdsg" : "none");
-      json_kv(jf, first, "tpf_stabilizer_mode",
-              (config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                  ? "shunt_or_cooling_configured"
+              (is_direct || is_v11_alias)
+                  ? "v11_weak_field_static_quasistatic_low_order_truncation_DeltaC_omitted"
                   : "none");
+      json_kv(jf, first, "tpf_extension_mode",
+              (is_direct || is_v11_alias) ? "none_vdsg_rejected"
+                                          : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
+      json_kv(jf, first, "tpf_stabilizer_mode",
+              (is_direct || is_v11_alias)
+                  ? "none_shunt_and_cooling_rejected"
+                  : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                         ? "shunt_or_cooling_configured"
+                         : "none"));
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
     json_kv_num(jf, first, "tpfcore_closure_kappa", config.tpf_kappa);
@@ -293,14 +305,27 @@ void write_render_manifest(const std::string& output_dir,
     tf << "acceleration_code_path\t" << acc << "\n";
     if (config.physics_package == "TPFCore" &&
         config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
-      tf << "tpf_core_law_mode\tdirect_tpf_unified_core\n";
+      const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
+      const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
+      tf << "tpf_core_law_mode\t"
+         << (is_direct ? "direct_tpf_canonical_entry"
+                       : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"))
+         << "\n";
       tf << "tpf_truncation_mode\t"
-         << (tpf_v11_weak_field_truncation_active(config) ? "v11_weak_field_truncation" : "none") << "\n";
-      tf << "tpf_extension_mode\t" << (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none") << "\n";
-      tf << "tpf_stabilizer_mode\t"
-         << ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                 ? "shunt_or_cooling_configured"
+         << ((is_direct || is_v11_alias)
+                 ? "v11_weak_field_static_quasistatic_low_order_truncation_DeltaC_omitted"
                  : "none")
+         << "\n";
+      tf << "tpf_extension_mode\t"
+         << ((is_direct || is_v11_alias) ? "none_vdsg_rejected"
+                                         : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
+         << "\n";
+      tf << "tpf_stabilizer_mode\t"
+         << ((is_direct || is_v11_alias)
+                 ? "none_shunt_and_cooling_rejected"
+                 : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                        ? "shunt_or_cooling_configured"
+                        : "none"))
          << "\n";
     }
     tf << "physics_package\t" << config.physics_package << "\n";
