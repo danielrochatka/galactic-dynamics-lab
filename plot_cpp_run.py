@@ -12,7 +12,7 @@ then produces the same kinds of plots as the Python pipeline:
     `bh_orbit_separation_extrema.png` (footnotes include package and coupling labels from run_info)
 
 Animation viewport: default **smart framing** — one square viewport from **x/y quantile bounds**
-  over all plotted particles (all snapshots), plus the origin (BH marker), margin, and a square
+  over all plotted particles (all snapshots), plus optional origin marker (BH-present runs only), margin, and a square
   half-axis (see `framing.global_viewport_from_snapshots`). Same rule for **galaxy** and non-galaxy
   modes; no median-radius proxy.
   Set **`plot_animation_dynamic_zoom = true`** (or **`--dynamic-zoom`**) for **windowed** geometric
@@ -432,6 +432,51 @@ def plot_animation_dynamic_zoom_from_run_info(
     return False
 
 
+def _run_info_float(run_info: dict[str, str | int | float], key: str, default: float = 0.0) -> float:
+    raw = run_info.get(key, default)
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    try:
+        return float(str(raw))
+    except Exception:
+        return float(default)
+
+
+def _run_info_bool(run_info: dict[str, str | int | float], key: str, default: bool = False) -> bool:
+    raw = run_info.get(key)
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return int(raw) != 0
+    if isinstance(raw, str):
+        s = raw.strip().lower()
+        if s in ("1", "true", "yes", "on"):
+            return True
+        if s in ("0", "false", "no", "off"):
+            return False
+    return default
+
+
+def should_draw_central_bh_marker(
+    run_info: dict[str, str | int | float],
+    mode_name: str,
+) -> bool:
+    """
+    Render BH/origin marker only when semantically part of the run interpretation.
+    Prefer suppressing ambiguous marker for non-BH runs.
+    """
+    bh_mass = _run_info_float(run_info, "bh_mass", 0.0)
+    if bh_mass <= 0.0:
+        return False
+    if mode_name in ("earth_moon_benchmark", "two_body_orbit"):
+        return False
+    if mode_name == "symmetric_pair":
+        return _run_info_bool(run_info, "validation_symmetric_include_bh", default=True)
+    return mode_name in ("galaxy", "bh_orbit_validation")
+
+
 def get_masses_from_snapshots(snapshots: list[Snapshot], run_dir: Path) -> np.ndarray:
     """Read masses from the first snapshot CSV (mass column)."""
     if not snapshots:
@@ -604,10 +649,11 @@ def main() -> None:
     mode_label = "tpf_v11_correspondence" if mode_name == "tpf_v11_weak_field_correspondence" else mode_name
     physics_label = physics_label_from_run_info(run_info, mode_name)
     title_context = f"{mode_label} / {physics_label}"
+    show_bh_marker = should_draw_central_bh_marker(run_info, mode_name)
 
     global_viewport = global_viewport_from_snapshots(
         snapshots,
-        extra_xy=_BH_MARKER_XY,
+        extra_xy=_BH_MARKER_XY if show_bh_marker else None,
         trim_fraction=_SMART_FRAMING_TRIM,
         margin=_SMART_FRAMING_MARGIN,
         fallback_half_axis=fallback_radius,
@@ -672,8 +718,10 @@ def main() -> None:
     print(
         f"  Smart framing (simulation_mode={mode_name}): center=({global_viewport.center_x:.6g}, "
         f"{global_viewport.center_y:.6g}) m, half_axis={spatial_half_axis_m:.6g} m "
-        f"(geometric quantile trim={_SMART_FRAMING_TRIM:g}, margin={_SMART_FRAMING_MARGIN:g}, origin in cloud)"
+        f"(geometric quantile trim={_SMART_FRAMING_TRIM:g}, margin={_SMART_FRAMING_MARGIN:g}, "
+        f"origin_in_cloud={show_bh_marker})"
     )
+    print(f"  Central BH marker: {'shown' if show_bh_marker else 'hidden'}")
 
     burn_in_plotting = skip_initial_steps > 0 or skip_initial_snapshots > 0
     # Initial and final scatter plots
@@ -701,6 +749,7 @@ def main() -> None:
         velocities=initial.velocities,
         overlay_step=initial.step,
         overlay_time=float(initial.time),
+        show_bh_marker=show_bh_marker,
         spatial_display=spatial_display,
         unit_reference_text=unit_reference_text,
         **overlay_kw,
@@ -715,6 +764,7 @@ def main() -> None:
         velocities=final.velocities,
         overlay_step=final.step,
         overlay_time=float(final.time),
+        show_bh_marker=show_bh_marker,
         spatial_display=spatial_display,
         unit_reference_text=unit_reference_text,
         **overlay_kw,
@@ -788,7 +838,7 @@ def main() -> None:
                 )
                 raw = global_viewport_from_snapshots(
                     win,
-                    extra_xy=_BH_MARKER_XY,
+                    extra_xy=_BH_MARKER_XY if show_bh_marker else None,
                     trim_fraction=_SMART_FRAMING_TRIM,
                     margin=_SMART_FRAMING_MARGIN,
                     fallback_half_axis=fallback_radius,
@@ -821,6 +871,7 @@ def main() -> None:
             active_time_unit=series_preview.time_unit,
             unit_reference_text=unit_reference_text,
             mutable_frame_index=anim_mutable_idx,
+            show_bh_marker=show_bh_marker,
             **overlay_kw,
         )
         if ok:

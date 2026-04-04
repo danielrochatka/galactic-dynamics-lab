@@ -62,13 +62,14 @@ def scatter_frame(
     ax: plt.Axes,
     positions: np.ndarray,
     bh_position: tuple[float, float] = (0.0, 0.0),
+    show_bh_marker: bool = True,
     render_radius: ViewportSpec = 150.0,
     velocities: Optional[np.ndarray] = None,
     star_size: float = 2.0,
     bh_size: float = 80.0,
     spatial_display: Optional[SpatialDisplay] = None,
 ) -> None:
-    """Draw one frame: black hole + stars. Positions are SI (m); axes use display units when set."""
+    """Draw one frame: stars, and optionally central BH marker. Positions are SI (m)."""
     ax.clear()
     vp = _resolve_square_viewport(render_radius, positions, velocities)
     sd = spatial_display if spatial_display is not None else SpatialDisplay(1.0, "m")
@@ -88,17 +89,18 @@ def scatter_frame(
         alpha=0.8,
         rasterized=True,
     )
-    # Black hole
-    ax.scatter(
-        [bh_position[0] * f],
-        [bh_position[1] * f],
-        s=bh_size,
-        c="yellow",
-        marker="*",
-        edgecolors="orange",
-        linewidths=0.5,
-        zorder=10,
-    )
+    if show_bh_marker:
+        # Central BH/origin marker (only for BH-present interpretations).
+        ax.scatter(
+            [bh_position[0] * f],
+            [bh_position[1] * f],
+            s=bh_size,
+            c="yellow",
+            marker="*",
+            edgecolors="orange",
+            linewidths=0.5,
+            zorder=10,
+        )
     apply_suppress_tick_offset(ax)
 
 
@@ -170,6 +172,7 @@ def save_static_plot(
     run_info: Optional[dict[str, Any]] = None,
     overlay_step: int = 0,
     overlay_time: float = 0.0,
+    show_bh_marker: bool = True,
     spatial_display: Optional[SpatialDisplay] = None,
     unit_reference_text: str | None = None,
 ) -> None:
@@ -185,6 +188,7 @@ def save_static_plot(
     scatter_frame(
         ax,
         positions,
+        show_bh_marker=show_bh_marker,
         render_radius=render_radius,
         velocities=velocities,
         spatial_display=spatial_display,
@@ -239,6 +243,7 @@ def create_animation(
     active_time_unit: str | None = None,
     unit_reference_text: str | None = None,
     mutable_frame_index: Optional[dict[str, int]] = None,
+    show_bh_marker: bool = True,
 ) -> bool:
     """
     Create animation (MP4 or GIF) from snapshots.
@@ -266,6 +271,7 @@ def create_animation(
         scatter_frame(
             ax,
             snap.positions,
+            show_bh_marker=show_bh_marker,
             render_radius=render_radius,
             velocities=vel,
             spatial_display=spatial_display,
