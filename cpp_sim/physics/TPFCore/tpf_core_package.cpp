@@ -296,14 +296,7 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
                                                       bool star_star,
                                                       std::vector<double>& ax,
                                                       std::vector<double>& ay) const {
-  (void)state;
-  (void)bh_mass;
-  (void)softening;
-  (void)star_star;
-  (void)ax;
-  (void)ay;
-  throw std::runtime_error(
-      "direct_tpf selected but compute_direct_tpf_accelerations is not implemented yet");
+  compute_v11_weak_field_truncation_accelerations(state, bh_mass, softening, star_star, ax, ay);
 }
 
 void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State& state,
@@ -325,8 +318,30 @@ void TPFCorePackage::compute_accelerations(const State& state,
   if (tpf_dynamics_mode_ == "direct_tpf") {
     if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf is incompatible with nonzero tpf_vdsg_coupling (VDSG is not wired to the "
-          "direct TPF dynamics path yet). Set tpf_vdsg_coupling = 0.");
+          "tpf_dynamics_mode=direct_tpf rejects nonzero tpf_vdsg_coupling "
+          "(canonical direct_tpf currently runs the v11 weak-field/static truncation sector with VDSG off).");
+    }
+    if (provisional_readout_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
+          "(canonical direct_tpf path currently uses the v11 weak-field/static truncation sector only).");
+    }
+    if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
+        theta_tr_scale_ != 1.0) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf rejects readout closure knobs "
+          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale) "
+          "on the current paper-facing low-order truncation route.");
+    }
+    if (shunt_enable_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf rejects tpf_global_accel_shunt_enable=true "
+          "(global |a| shunt is outside the current paper-facing low-order truncation route).");
+    }
+    if (cooling_fraction_ > 0.0) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf rejects positive tpf_cooling_fraction "
+          "(cooling is a numerical stabilizer outside the current paper-facing low-order truncation route).");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
     return;

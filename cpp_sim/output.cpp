@@ -111,6 +111,13 @@ void write_run_info(const std::string& output_dir,
            "artifacts; not used for particle accelerations in this mode\n";
     } else {
       f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+      if (config.tpf_dynamics_mode == "direct_tpf") {
+        f << "tpf_core_law_mode\tdirect_tpf\n";
+        f << "tpf_truncation_status\tv11_weak_field_static_quasistatic_low_order_sector\n";
+        f << "tpf_higher_order_status\tDeltaC_omitted\n";
+        f << "tpf_extension_status\tVDSG_off_required\n";
+        f << "tpf_stabilizer_status\tshunt_off_and_cooling_off_required\n";
+      }
       f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
       f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
     }
@@ -155,7 +162,8 @@ void write_run_info(const std::string& output_dir,
       f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs v11_weak_field_truncation vs direct_tpf); "
            "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
            "v11_weak_field_truncation is the static/quasi-static Eq.42-44 correspondence truncation; "
-           "direct_tpf does not use the legacy readout gate (stub throws until implemented)\n";
+           "direct_tpf is canonical paper-facing entry and currently executes the same static/quasi-static Eq.42-44 "
+           "low-order correspondence truncation (DeltaC omitted; VDSG/readout/stabilizers rejected)\n";
       f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
            "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
            "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "

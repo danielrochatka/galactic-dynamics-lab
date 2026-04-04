@@ -92,7 +92,8 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic";
   }
-  if (config.tpf_dynamics_mode == "direct_tpf") return "TPF_direct_MISSING_not_implemented";
+  if (config.tpf_dynamics_mode == "direct_tpf")
+    return "TPF_direct_tpf_core_using_v11_weak_field_static_truncation_DeltaC_omitted_VDSG_off";
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCore_PROVISIONAL_legacy_readout_DISABLED (provisional_readout off)";
@@ -113,10 +114,7 @@ std::string compute_active_metrics_branch(const Config& config) {
     if (tpf_v11_weak_field_truncation_active(config))
       return "v11_weak_field_truncation_dynamics_metrics_limited_scope";
     if (config.tpf_dynamics_mode == "direct_tpf") {
-      if (config.tpfcore_enable_provisional_readout)
-        return "tpfcore_readout:" + config.tpfcore_readout_mode +
-               " (metrics/diagnostics only; dynamics=TPF_direct)";
-      return "TPFCore_metrics_n/a (direct_tpf; provisional readout off)";
+      return "direct_tpf_metrics_v11_weak_field_static_truncation_only_DeltaC_omitted_VDSG_off";
     }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
@@ -136,11 +134,9 @@ std::string compute_acceleration_code_path(const Config& config) {
            "no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    std::string s =
-        "TPFCorePackage::compute_direct_tpf_accelerations (direct_tpf path; not implemented yet)";
-    if (config.tpf_global_accel_shunt_enable)
-      s += "; global |a| shunt is configured but not applied until the direct path is implemented";
-    return s;
+    return "TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
+           "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
+           "VDSG/readout/shunt/cooling rejected)";
   }
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";

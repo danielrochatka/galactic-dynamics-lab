@@ -11,8 +11,8 @@
  * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
  *
  * Dynamics routing: tpf_dynamics_mode legacy_readout uses provisional readout (+ optional VDSG); that path
- * requires tpfcore_enable_provisional_readout. direct_tpf calls compute_direct_tpf_accelerations (stub until
- * implemented); VDSG must be zero on that path.
+ * requires tpfcore_enable_provisional_readout. direct_tpf is the canonical paper-facing entry and currently
+ * executes the v11 weak-field/static low-order correspondence truncation helper; VDSG must be zero on that path.
  * When tpf_vdsg_coupling != 0 on legacy_readout, ax, ay include the VDSG additive modifier on top of readout baseline.
  * When VDSG is off on legacy_readout, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
  * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
@@ -39,7 +39,8 @@ class TPFCorePackage : public PhysicsPackage {
   /**
    * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
    * v11_weak_field_truncation: paper-backed weak-field scalar correspondence truncation (static/quasi-static limit).
-   * direct_tpf: compute_direct_tpf_accelerations (not implemented yet — throws); nonzero tpf_vdsg_coupling errors.
+   * direct_tpf: canonical paper-facing route; currently executes the same weak-field/static truncation helper with
+   * strict guardrails (no VDSG, no provisional readout closures, no shunt, no cooling).
    */
   void compute_accelerations(const State& state,
                             double bh_mass,
