@@ -290,3 +290,91 @@ TEST_CASE("derived-radial readout acceleration equals radial_acceleration_scalar
   CHECK(ax == doctest::Approx(expected_ax));
   CHECK(ay == doctest::Approx(expected_ay));
 }
+
+TEST_CASE("weak_field_correspondence dynamics: one-source acceleration matches alpha*M/r^2 radial law") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "weak_field_correspondence";
+  c.tpf_weak_field_correspondence_alpha_si = -2.0;
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s = one_body_state(3.0, 4.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+  const double bh_mass = 5.0;
+  p.compute_accelerations(s, bh_mass, /*softening=*/0.0, /*star_star=*/false, ax, ay);
+
+  REQUIRE(ax.size() == 1);
+  const double r = 5.0;
+  const double coeff = c.tpf_weak_field_correspondence_alpha_si * bh_mass / (r * r * r);
+  CHECK(ax[0] == doctest::Approx(coeff * 3.0));
+  CHECK(ay[0] == doctest::Approx(coeff * 4.0));
+}
+
+TEST_CASE("weak_field_correspondence dynamics: pair superposition reproduces Newtonian-like symmetry for alpha=-G") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "weak_field_correspondence";
+  c.tpf_weak_field_correspondence_alpha_si = -galaxy::tpfcore::TPF_G_SI;
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = -1.0; s.y[0] = 0.0; s.mass[0] = 10.0; s.vx[0] = s.vy[0] = 0.0;
+  s.x[1] =  1.0; s.y[1] = 0.0; s.mass[1] = 10.0; s.vx[1] = s.vy[1] = 0.0;
+  std::vector<double> ax, ay;
+  p.compute_accelerations(s, /*bh_mass=*/0.0, /*softening=*/0.0, /*star_star=*/true, ax, ay);
+  REQUIRE(ax.size() == 2);
+  CHECK(ax[0] == doctest::Approx(-ax[1]).epsilon(1e-12));
+  CHECK(ay[0] == doctest::Approx(0.0));
+  CHECK(ay[1] == doctest::Approx(0.0));
+}
+
+TEST_CASE("weak_field_correspondence dynamics rejects exploratory/provisional/stabilizer knobs") {
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+
+  auto make_base = []() {
+    galaxy::Config c;
+    c.tpf_dynamics_mode = "weak_field_correspondence";
+    c.tpfcore_enable_provisional_readout = false;
+    c.tpf_vdsg_coupling = 0.0;
+    c.tpf_cooling_fraction = 0.0;
+    c.tpf_global_accel_shunt_enable = false;
+    return c;
+  };
+
+  {
+    auto c = make_base();
+    c.tpf_vdsg_coupling = 1e-9;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_enable_provisional_readout = true;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpf_global_accel_shunt_enable = true;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpf_cooling_fraction = 0.1;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+}

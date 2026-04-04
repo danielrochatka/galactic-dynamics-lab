@@ -14,6 +14,7 @@
 #include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
+#include "v11_weak_field_correspondence.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -55,9 +56,11 @@ TPFCorePackage::TPFCorePackage()
       theta_tt_scale_(1.0),
       theta_tr_scale_(1.0),
       source_softening_(0.0),
+      weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
       vdsg_coupling_(1.0e-20),
       vdsg_mass_baseline_resolved_kg_(0.0),
       simulation_dt_(0.01),
+      cooling_fraction_(0.2),
       shunt_enable_(false),
       shunt_fraction_(0.001),
       pipeline_diagnostics_csv_(true) {}
@@ -70,6 +73,7 @@ void TPFCorePackage::init_from_config(const Config& config) {
   theta_tt_scale_ = config.tpfcore_theta_tt_scale;
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
+  weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
   derived_poisson_cfg_.kappa = config.tpf_kappa;
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
   derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
@@ -78,6 +82,7 @@ void TPFCorePackage::init_from_config(const Config& config) {
   vdsg_mass_baseline_resolved_kg_ =
       (config.tpf_vdsg_mass_baseline_kg > 0.0) ? config.tpf_vdsg_mass_baseline_kg : config.star_mass;
   simulation_dt_ = config.dt;
+  cooling_fraction_ = config.tpf_cooling_fraction;
   shunt_enable_ = config.tpf_global_accel_shunt_enable;
   shunt_fraction_ = (config.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(config.tpf_global_accel_shunt_fraction))
                         ? config.tpf_global_accel_shunt_fraction
@@ -298,6 +303,16 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
       "direct_tpf selected but compute_direct_tpf_accelerations is not implemented yet");
 }
 
+void TPFCorePackage::compute_weak_field_correspondence_accelerations(const State& state,
+                                                                     double bh_mass,
+                                                                     double softening,
+                                                                     bool star_star,
+                                                                     std::vector<double>& ax,
+                                                                     std::vector<double>& ay) const {
+  compute_v11_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star,
+                                                      weak_field_correspondence_alpha_si_, ax, ay);
+}
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
@@ -311,6 +326,37 @@ void TPFCorePackage::compute_accelerations(const State& state,
           "direct TPF dynamics path yet). Set tpf_vdsg_coupling = 0.");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    return;
+  }
+  if (tpf_dynamics_mode_ == "weak_field_correspondence") {
+    if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=weak_field_correspondence rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
+          "not part of the paper-backed weak-field correspondence path).");
+    }
+    if (provisional_readout_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=weak_field_correspondence rejects tpfcore_enable_provisional_readout=true "
+          "(provisional readout closures are not used on this paper-backed path).");
+    }
+    if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
+        theta_tr_scale_ != 1.0) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=weak_field_correspondence rejects readout closure knobs "
+          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale).");
+    }
+    if (shunt_enable_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=weak_field_correspondence rejects tpf_global_accel_shunt_enable=true "
+          "(global |a| shunt is not part of the correspondence dynamics path).");
+    }
+    if (cooling_fraction_ > 0.0) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=weak_field_correspondence rejects positive tpf_cooling_fraction "
+          "(cooling is a numerical stabilizer outside the correspondence dynamics scope).");
+    }
+    compute_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    last_pipeline_ = AccelPipelineStats{};
     return;
   }
 
