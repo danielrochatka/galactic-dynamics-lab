@@ -378,3 +378,65 @@ TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/st
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
 }
+
+TEST_CASE("direct_tpf dynamics: canonical route executes low-order v11 weak-field helper") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "direct_tpf";
+  c.tpf_weak_field_correspondence_alpha_si = -2.0;
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s = one_body_state(3.0, 4.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/false, ax, ay);
+
+  REQUIRE(ax.size() == 1);
+  const double coeff = c.tpf_weak_field_correspondence_alpha_si * 5.0 / (5.0 * 5.0 * 5.0);
+  CHECK(ax[0] == doctest::Approx(coeff * 3.0));
+  CHECK(ay[0] == doctest::Approx(coeff * 4.0));
+}
+
+TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs") {
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+
+  auto make_base = []() {
+    galaxy::Config c;
+    c.tpf_dynamics_mode = "direct_tpf";
+    c.tpfcore_enable_provisional_readout = false;
+    c.tpf_vdsg_coupling = 0.0;
+    c.tpf_cooling_fraction = 0.0;
+    c.tpf_global_accel_shunt_enable = false;
+    return c;
+  };
+
+  {
+    auto c = make_base();
+    c.tpf_vdsg_coupling = 1e-9;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_enable_provisional_readout = true;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpf_global_accel_shunt_enable = true;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpf_cooling_fraction = 0.1;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+}

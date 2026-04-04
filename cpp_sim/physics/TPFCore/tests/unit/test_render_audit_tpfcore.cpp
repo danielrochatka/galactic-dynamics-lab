@@ -21,7 +21,10 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   Config c;
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
-  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_direct_MISSING_not_implemented");
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "TPF_direct_tpf_core_using_v11_weak_field_static_truncation_DeltaC_omitted_VDSG_off");
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "direct_tpf_metrics_v11_weak_field_static_truncation_only_DeltaC_omitted_VDSG_off");
 }
 
 TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") {
@@ -89,14 +92,10 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field correspondence audit m
   CHECK(galaxy::compute_acceleration_code_path(c).find("audit-only") != std::string::npos);
 }
 
-TEST_CASE("compute_acceleration_code_path: direct_tpf stub") {
+TEST_CASE("compute_acceleration_code_path: direct_tpf canonical low-order truncation route") {
   Config c;
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
-  CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_direct_tpf_accelerations (direct_tpf path; not implemented yet)");
-  c.tpf_global_accel_shunt_enable = true;
-  CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_direct_tpf_accelerations (direct_tpf path; not implemented yet)"
-        "; global |a| shunt is configured but not applied until the direct path is implemented");
+  CHECK(galaxy::compute_acceleration_code_path(c).find("compute_v11_weak_field_truncation_accelerations") !=
+        std::string::npos);
 }
