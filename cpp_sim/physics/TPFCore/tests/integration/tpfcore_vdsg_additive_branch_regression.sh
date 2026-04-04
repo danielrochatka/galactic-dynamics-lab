@@ -4,7 +4,7 @@
 # acceleration_code_path string is unchanged (same pipeline; VDSG is additive on legacy_readout).
 set -euo pipefail
 if [[ -z "${CPP_SIM_ROOT:-}" ]]; then
-  export CPP_SIM_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+  export CPP_SIM_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 fi
 source "$CPP_SIM_ROOT/tests/integration/_env.sh"
 OUT0=$(mktemp -d)
