@@ -12,6 +12,8 @@ void apply_mode_defaults(Config& c, const Config& user_cfg) {
   const Config engine_defaults;
   const ModeScenarioDefaults d = scenario_defaults_for_mode(c.simulation_mode);
   if (!d.applies) return;
+  if (user_cfg.dt == engine_defaults.dt) c.dt = d.dt;
+  if (user_cfg.softening == engine_defaults.softening) c.softening = d.softening;
   if (user_cfg.bh_mass == engine_defaults.bh_mass) c.bh_mass = d.bh_mass;
   if (user_cfg.enable_star_star_gravity == engine_defaults.enable_star_star_gravity) c.enable_star_star_gravity = d.enable_star_star_gravity;
   if (user_cfg.validation_n_steps == engine_defaults.validation_n_steps) c.validation_n_steps = d.n_steps;
@@ -50,6 +52,9 @@ ResolvedScenario resolve_scenario(const Config& input) {
   r.config = input;
   apply_mode_defaults(r.config, input);
   r.mode_label = mode_to_string(r.config.simulation_mode);
+  const ModeScenarioDefaults mode_defaults = scenario_defaults_for_mode(r.config.simulation_mode);
+  r.timing_policy = mode_defaults.timing_policy;
+  r.softening_policy = mode_defaults.softening_policy;
 
   switch (r.config.simulation_mode) {
     case SimulationMode::galaxy:
@@ -86,12 +91,19 @@ ResolvedScenario resolve_scenario(const Config& input) {
       r.effective_n_steps = r.config.validation_n_steps;
       r.effective_snapshot_every = r.config.validation_snapshot_every;
       break;
+    case SimulationMode::timestep_convergence:
+      init_two_body_star_around_bh(r.config, r.initial_state);
+      r.initializer_used = "init_two_body_star_around_bh";
+      r.effective_n_steps = r.config.validation_n_steps;
+      r.effective_snapshot_every = r.config.validation_snapshot_every;
+      break;
     default:
       r.initializer_used = "not_applicable";
       r.effective_n_steps = r.config.n_steps;
       r.effective_snapshot_every = r.config.snapshot_every;
       break;
   }
+  r.effective_total_sim_time = r.config.dt * static_cast<double>(r.effective_n_steps);
 
   return r;
 }

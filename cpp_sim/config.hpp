@@ -18,7 +18,7 @@ constexpr double kDefaultGalaxyRadiusM = 3.0e20;
 constexpr double kDefaultInnerRadiusM = 3.0e19;
 /** Default Plummer-style softening [m] ~330 AU (numerical at galaxy scale). */
 constexpr double kDefaultSofteningM = 1.0e16;
-/** Default BH-orbit validation radius [m] ~0.5 pc (works with kDefaultBhMassKg circular speeds). */
+/** Generic engine default validation radius [m] (mode defaults may override with benchmark-specific values). */
 constexpr double kDefaultValidationTwoBodyRadiusM = 5.0e18;
 /** Earth–Moon benchmark defaults (SI). */
 constexpr double kDefaultEarthMassKg = 5.972e24;
@@ -91,7 +91,7 @@ struct Config {
   int n_steps = 50000;
   int snapshot_every = 50;
 
-  double softening = kDefaultSofteningM;
+  double softening = 0.0;
   bool enable_star_star_gravity = true;
 
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
