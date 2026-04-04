@@ -146,8 +146,7 @@ def compute_two_body_pair_diagnostics(
     - Relative vectors: r_rel = r1 - r0 (two masses) or star position vs fixed BH at origin (n=1).
     - COM position R_com is computed in the lab frame from particle masses (and M_bh at origin for bh mode).
     - relative_Lz: z-component of total angular momentum about COM (same in lab as in COM frame for L_tot).
-    - newtonian_specific_energy: point-mass Newtonian formula in SI; for TPF runs this is a *post-hoc Newtonian
-      equivalent*, not a conserved quantity of the TPF integrator.
+    - newtonian_specific_energy: point-mass Newtonian formula in SI for post-processing output.
 
     Returns dict with numpy arrays plus key "variant" in {"two_mass", "star_bh"}.
     """
@@ -240,8 +239,7 @@ def compute_two_body_pair_diagnostics(
 
 
 def write_two_body_diagnostics_readme(output_dir: Path, mode: str, physics_package: str) -> None:
-    """Short text file: frames, formulas, Newtonian vs TPF caveat."""
-    tpf = physics_package.strip() == "TPFCore"
+    """Short text file: frames and formulas for two-body diagnostics output."""
     lines = [
         "Two-body primary diagnostics (pair / COM frame)",
         "==============================================",
@@ -262,18 +260,11 @@ def write_two_body_diagnostics_readme(output_dir: Path, mode: str, physics_packa
         "    bh_orbit:   0.5*|v_star|^2 - G*M_bh/|r_star|  (per unit star mass; SI).",
         "    Uses point-mass Newtonian U; simulator softening is NOT subtracted here.",
     ]
-    if tpf:
-        lines += [
-            "",
-            "TPFCore: the plotted energy is a Newtonian post-processing equivalent only.",
-            "It is NOT claimed equal to a TPF Hamiltonian or conserved TPF scalar.",
-        ]
     if mode == "bh_orbit_validation":
         lines += [
             "",
             "bh_orbit_validation extras (plot_cpp_run.py): bh_orbit_trajectory_xy.png, bh_orbit_trajectory_xy_zoom.png,",
-            "bh_orbit_separation_extrema.png — experimental visuals; footnotes state Newtonian baseline vs TPFCore legacy_readout,",
-            "VDSG coupling from run_info, and that this is not paper correspondence mode and not direct_tpf.",
+            "bh_orbit_separation_extrema.png — additional validation visual.",
         ]
     (output_dir / "two_body_diagnostics_README.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -398,11 +389,7 @@ def plot_two_body_pair_diagnostics(
 ) -> None:
     """Primary PNG set for two-body modes (display units from `series`; data arrays remain SI in memory)."""
     suf = (" " + title_suffix.strip()) if title_suffix.strip() else ""
-    tpf_note = (
-        "Newtonian equivalent only for TPFCore — not a TPF conserved scalar."
-        if physics_package.strip() == "TPFCore"
-        else None
-    )
+    tpf_note = None
     t = diag["time"]
     ctx = (context_label.strip() + " — ") if context_label.strip() else ""
     disp_note = "Axes use display units; CSV remains SI."
@@ -466,20 +453,18 @@ def plot_two_body_pair_diagnostics(
 
 
 def bh_orbit_validation_plot_footnote(physics_package: str, tpf_vdsg_coupling: float) -> str:
-    """Honest labels for experimental bh_orbit_validation postprocess (not paper / not direct_tpf)."""
+    """Labels for bh_orbit_validation postprocess based on package and coupling keys."""
     pkg = physics_package.strip()
     vdsg = float(tpf_vdsg_coupling)
     vdsg_part = (
-        "VDSG off (tpf_vdsg_coupling = 0) — baseline for legacy_readout compare."
+        "tpf_vdsg_coupling = 0"
         if vdsg == 0.0
-        else f"tpf_vdsg_coupling = {vdsg:g} (nonzero; not the recommended clean baseline)."
+        else f"tpf_vdsg_coupling = {vdsg:g}"
     )
     if pkg == "Newtonian":
-        return f"Newtonian baseline · {vdsg_part} Not paper correspondence mode."
+        return f"Newtonian package · {vdsg_part}"
     if pkg == "TPFCore":
-        return (
-            f"TPFCore legacy_readout experimental · not direct_tpf · not paper mode · {vdsg_part}"
-        )
+        return f"TPFCore package · {vdsg_part}"
     return f"{physics_package} · {vdsg_part}"
 
 
