@@ -7,10 +7,14 @@ namespace galaxy {
 
 struct ModeScenarioDefaults {
   bool applies = false;
+  double dt = 0.0;
+  double softening = 0.0;
   double bh_mass = 0.0;
   bool enable_star_star_gravity = true;
   int n_steps = 0;
   int snapshot_every = 1;
+  const char* timing_policy = "";
+  const char* softening_policy = "";
 
   double validation_two_body_radius = 0.0;
   double validation_two_body_speed_ratio = 1.0;

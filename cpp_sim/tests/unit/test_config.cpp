@@ -19,6 +19,7 @@ TEST_CASE("config defaults") {
   CHECK(c.display_velocity_unit == "auto");
   CHECK(c.display_units_in_overlay == true);
   CHECK(c.display_show_unit_reference == true);
+  CHECK(c.softening == doctest::Approx(0.0));
 }
 
 TEST_CASE("physics_package_compare parsing") {

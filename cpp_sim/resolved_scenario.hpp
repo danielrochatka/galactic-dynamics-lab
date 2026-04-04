@@ -14,6 +14,9 @@ struct ResolvedScenario {
   std::string mode_label;
   int effective_n_steps = 0;
   int effective_snapshot_every = 1;
+  double effective_total_sim_time = 0.0;
+  std::string timing_policy;
+  std::string softening_policy;
 };
 
 ResolvedScenario resolve_scenario(const Config& input);

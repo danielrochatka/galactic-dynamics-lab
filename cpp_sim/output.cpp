@@ -371,8 +371,11 @@ void write_resolved_scenario_artifacts(const std::string& output_dir,
       txt << "effective_enable_star_star_gravity\t" << (resolved.config.enable_star_star_gravity ? 1 : 0) << "\n";
       txt << "effective_dt\t" << resolved.config.dt << "\n";
       txt << "effective_n_steps\t" << resolved.effective_n_steps << "\n";
+      txt << "effective_total_sim_time\t" << resolved.effective_total_sim_time << "\n";
       txt << "effective_snapshot_every\t" << resolved.effective_snapshot_every << "\n";
       txt << "effective_softening\t" << resolved.config.softening << "\n";
+      txt << "timing_policy\t" << resolved.timing_policy << "\n";
+      txt << "softening_policy\t" << resolved.softening_policy << "\n";
       txt << "n_particles\t" << resolved.initial_state.n() << "\n";
       for (int i = 0; i < resolved.initial_state.n(); ++i) {
         txt << "particle_" << i << "_mass\t" << resolved.initial_state.mass[i] << "\n";
@@ -397,8 +400,13 @@ void write_resolved_scenario_artifacts(const std::string& output_dir,
   js << "    \"enable_star_star_gravity\": " << (resolved.config.enable_star_star_gravity ? "true" : "false") << ",\n";
   js << "    \"dt\": " << resolved.config.dt << ",\n";
   js << "    \"n_steps\": " << resolved.effective_n_steps << ",\n";
+  js << "    \"total_sim_time\": " << resolved.effective_total_sim_time << ",\n";
   js << "    \"snapshot_every\": " << resolved.effective_snapshot_every << ",\n";
   js << "    \"softening\": " << resolved.config.softening << "\n";
+  js << "  },\n";
+  js << "  \"policies\": {\n";
+  js << "    \"timing\": \"" << resolved.timing_policy << "\",\n";
+  js << "    \"softening\": \"" << resolved.softening_policy << "\"\n";
   js << "  },\n";
   js << "  \"initial_state\": [\n";
   for (int i = 0; i < resolved.initial_state.n(); ++i) {
