@@ -67,6 +67,9 @@ TPFCorePackage::TPFCorePackage()
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
+  if (tpf_dynamics_mode_ == "weak_field_correspondence") {
+    tpf_dynamics_mode_ = "v11_weak_field_truncation";
+  }
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
   readout_scale_ = config.tpfcore_readout_scale;
@@ -303,7 +306,7 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
       "direct_tpf selected but compute_direct_tpf_accelerations is not implemented yet");
 }
 
-void TPFCorePackage::compute_weak_field_correspondence_accelerations(const State& state,
+void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State& state,
                                                                      double bh_mass,
                                                                      double softening,
                                                                      bool star_star,
@@ -328,34 +331,34 @@ void TPFCorePackage::compute_accelerations(const State& state,
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
     return;
   }
-  if (tpf_dynamics_mode_ == "weak_field_correspondence") {
+  if (tpf_dynamics_mode_ == "v11_weak_field_truncation") {
     if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=weak_field_correspondence rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
-          "not part of the paper-backed weak-field correspondence path).");
+          "tpf_dynamics_mode=v11_weak_field_truncation rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
+          "not part of the paper-backed weak-field truncation path).");
     }
     if (provisional_readout_) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=weak_field_correspondence rejects tpfcore_enable_provisional_readout=true "
+          "tpf_dynamics_mode=v11_weak_field_truncation rejects tpfcore_enable_provisional_readout=true "
           "(provisional readout closures are not used on this paper-backed path).");
     }
     if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
         theta_tr_scale_ != 1.0) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=weak_field_correspondence rejects readout closure knobs "
+          "tpf_dynamics_mode=v11_weak_field_truncation rejects readout closure knobs "
           "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale).");
     }
     if (shunt_enable_) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=weak_field_correspondence rejects tpf_global_accel_shunt_enable=true "
+          "tpf_dynamics_mode=v11_weak_field_truncation rejects tpf_global_accel_shunt_enable=true "
           "(global |a| shunt is not part of the correspondence dynamics path).");
     }
     if (cooling_fraction_ > 0.0) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=weak_field_correspondence rejects positive tpf_cooling_fraction "
+          "tpf_dynamics_mode=v11_weak_field_truncation rejects positive tpf_cooling_fraction "
           "(cooling is a numerical stabilizer outside the correspondence dynamics scope).");
     }
-    compute_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    compute_v11_weak_field_truncation_accelerations(state, bh_mass, softening, star_star, ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
   }

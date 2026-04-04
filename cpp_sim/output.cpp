@@ -152,8 +152,10 @@ void write_run_info(const std::string& output_dir,
       f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
       f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
       f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-      f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs direct_tpf); legacy_readout uses "
-           "tpfcore_enable_provisional_readout as gate; direct_tpf does not use that gate (stub throws until implemented)\n";
+      f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs v11_weak_field_truncation vs direct_tpf); "
+           "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
+           "v11_weak_field_truncation is the static/quasi-static Eq.42-44 correspondence truncation; "
+           "direct_tpf does not use the legacy readout gate (stub throws until implemented)\n";
       f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
            "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
            "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "
