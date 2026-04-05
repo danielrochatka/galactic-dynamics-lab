@@ -974,8 +974,7 @@ int main(int argc, char** argv) {
         };
 
     const bool compare_parallel_enabled =
-        galaxy::should_run_compare_parallel(config.compare_parallel, compare_mode_requested,
-                                            compare_same_package,
+        galaxy::should_run_compare_parallel(compare_mode_requested, compare_same_package,
 #ifdef _WIN32
                                             false
 #else
@@ -991,7 +990,7 @@ int main(int argc, char** argv) {
 
     if (compare_parallel_enabled) {
 #ifdef _WIN32
-      std::cerr << "compare_parallel requested but process parallel compare is unavailable on this platform; using sequential mode.\n";
+      std::cerr << "Process-parallel compare is unavailable on this platform; using sequential mode.\n";
       if (run_compare_side("left", left_cfg) != 0) return 1;
       if (run_compare_side("right", right_cfg) != 0) return 1;
 #else
@@ -1052,9 +1051,6 @@ int main(int argc, char** argv) {
       }
 #endif
     } else {
-      if (config.compare_parallel) {
-        std::cout << "compare_parallel requested but unavailable; falling back to sequential compare.\n";
-      }
       if (run_compare_side("left", left_cfg) != 0) return 1;
       if (run_compare_side("right", right_cfg) != 0) return 1;
     }

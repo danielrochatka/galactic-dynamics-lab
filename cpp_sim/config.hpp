@@ -106,8 +106,6 @@ struct Config {
    * Empty => single-package run (default). Non-empty + different from physics_package => compare mode.
    */
   std::string physics_package_compare = "";
-  /** Compare mode orchestration: run left/right legs concurrently as separate processes (POSIX only). */
-  bool compare_parallel = false;
 
   /**
    * TPFCore only: how dynamical accelerations are produced.
