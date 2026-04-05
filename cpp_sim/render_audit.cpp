@@ -324,8 +324,8 @@ void write_render_manifest(const std::string& output_dir,
                  : "none")
          << "\n";
       tf << "tpf_extension_mode\t"
-         << ((is_direct || is_v11_alias) ? "none_vdsg_rejected"
-                                         : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
+         << (is_v11_alias ? "none_vdsg_rejected"
+                          : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
          << "\n";
       tf << "tpf_stabilizer_mode\t"
          << ((is_direct || is_v11_alias)

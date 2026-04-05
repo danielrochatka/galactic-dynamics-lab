@@ -1,8 +1,27 @@
 #include "config.hpp"
 #include "doctest.h"
 #include "render_audit.hpp"
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 using galaxy::Config;
+
+namespace {
+
+std::string slurp_file(const std::string& path) {
+  std::ifstream in(path.c_str());
+  std::ostringstream buf;
+  buf << in.rdbuf();
+  return buf.str();
+}
+
+}  // namespace
 
 TEST_CASE("compute_active_dynamics_branch: Newtonian") {
   Config c;
@@ -45,4 +64,35 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
         "TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
         "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
         "readout/shunt/cooling rejected) + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)");
+}
+
+TEST_CASE("write_render_manifest TXT tpf_extension_mode semantics align with JSON semantics") {
+  char dir_template[] = "/tmp/render_audit_txt_ext_mode_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::galaxy;
+  c.tpf_dynamics_mode = "direct_tpf";
+  c.tpf_vdsg_coupling = 0.0;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  CHECK(txt.find("tpf_extension_mode\tnone\n") != std::string::npos);
+
+  c.tpf_vdsg_coupling = 1e-12;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  txt = slurp_file(out_dir + "/render_manifest.txt");
+  CHECK(txt.find("tpf_extension_mode\tvdsg\n") != std::string::npos);
+
+  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_vdsg_coupling = 1e-12;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  txt = slurp_file(out_dir + "/render_manifest.txt");
+  CHECK(txt.find("tpf_extension_mode\tnone_vdsg_rejected\n") != std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
 }
