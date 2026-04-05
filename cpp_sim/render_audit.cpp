@@ -90,7 +90,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic";
+    return "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_") +
@@ -115,7 +115,7 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
     if (tpf_v11_weak_field_truncation_active(config))
-      return "v11_weak_field_truncation_dynamics_metrics_limited_scope";
+      return "v11_weak_field_truncation_metrics_weak_field_correspondence_helper_alpha_si_path";
     if (config.tpf_dynamics_mode == "direct_tpf") {
       return std::string("direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_") +
              (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
@@ -135,13 +135,13 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (v11 Eq.42-44 correspondence scalar truncation; "
-           "no VDSG/readout/shunt/cooling)";
+    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (v11 Eq.42-44 weak-field correspondence helper; "
+           "alpha_si correspondence path; no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; DeltaC omitted; "
-                       "no weak_field_correspondence alpha helper; readout/shunt/cooling rejected)")
+                       "(tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; "
+                       "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
                   : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
@@ -235,9 +235,11 @@ void write_render_manifest(const std::string& output_dir,
               is_direct ? "direct_tpf_canonical_entry"
                         : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"));
       json_kv(jf, first, "tpf_truncation_mode",
-              (is_direct || is_v11_alias)
-                  ? "v11_weak_field_static_quasistatic_low_order_truncation_DeltaC_omitted"
-                  : "none");
+              is_direct
+                  ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                  : (is_v11_alias
+                         ? "v11_weak_field_correspondence_helper_alpha_si_path"
+                         : "none"));
       json_kv(jf, first, "tpf_extension_mode",
               is_v11_alias ? "none_vdsg_rejected"
                            : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
@@ -318,9 +320,11 @@ void write_render_manifest(const std::string& output_dir,
                        : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"))
          << "\n";
       tf << "tpf_truncation_mode\t"
-         << ((is_direct || is_v11_alias)
-                 ? "v11_weak_field_static_quasistatic_low_order_truncation_DeltaC_omitted"
-                 : "none")
+         << (is_direct
+                 ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                 : (is_v11_alias
+                        ? "v11_weak_field_correspondence_helper_alpha_si_path"
+                        : "none"))
          << "\n";
       tf << "tpf_extension_mode\t"
          << (is_v11_alias ? "none_vdsg_rejected"

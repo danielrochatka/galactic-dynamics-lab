@@ -2,8 +2,9 @@
  * TPFCore package implementation.
  * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
  * Integrator accelerations are route-dependent (see compute_accelerations):
- * - direct_tpf / v11_weak_field_truncation: paper-backed low-order static/quasi-static weak-field helper.
- *   direct_tpf may optionally add the exploratory VDSG modifier on top of that baseline.
+ * - direct_tpf: tensor principal-part route with Theta/I/kappa baseline; DeltaC omitted in current implementation scope;
+ *   optional additive VDSG extension on top of that baseline.
+ * - v11_weak_field_truncation: weak-field correspondence helper path using tpf_weak_field_correspondence_alpha_si.
  * - legacy_readout: readout baseline + optional VDSG modifier + optional global |a| shunt.
  */
 
@@ -369,24 +370,24 @@ void TPFCorePackage::compute_accelerations(const State& state,
     if (provisional_readout_) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
-          "(canonical direct_tpf path currently uses the v11 weak-field/static truncation sector only).");
+          "(direct_tpf is the tensor principal-part route with Theta/I/kappa baseline; DeltaC omitted in current implementation scope).");
     }
     if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
         theta_tr_scale_ != 1.0) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects readout closure knobs "
           "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale) "
-          "on the current paper-facing low-order truncation route.");
+          "on the direct_tpf tensor principal-part route (Theta/I/kappa baseline; DeltaC omitted in current implementation scope).");
     }
     if (shunt_enable_) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects tpf_global_accel_shunt_enable=true "
-          "(global |a| shunt is outside the current paper-facing low-order truncation route).");
+          "(global |a| shunt is outside the direct_tpf tensor principal-part route with Theta/I/kappa baseline.)");
     }
     if (cooling_fraction_ > 0.0) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects positive tpf_cooling_fraction "
-          "(cooling is a numerical stabilizer outside the current paper-facing low-order truncation route).");
+          "(cooling is a numerical stabilizer outside the direct_tpf tensor principal-part route with Theta/I/kappa baseline.)");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
     apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
@@ -429,7 +430,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
     throw std::runtime_error(
         "TPFCore legacy_readout dynamics require provisional readout. "
         "Set tpfcore_enable_provisional_readout = true for legacy_readout, or set tpf_dynamics_mode = direct_tpf "
-        "for the canonical paper-facing low-order truncation path, use Newtonian for dynamics, or run inspection modes (tpf_single_source_inspect, "
+        "for the canonical direct_tpf tensor principal-part path, use Newtonian for dynamics, or run inspection modes (tpf_single_source_inspect, "
         "tpf_symmetric_pair_inspect).");
   }
 

@@ -42,9 +42,9 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") 
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "v11_weak_field_truncation";
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic");
+        "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "v11_weak_field_truncation_dynamics_metrics_limited_scope");
+        "v11_weak_field_truncation_metrics_weak_field_correspondence_helper_alpha_si_path");
   CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
 }
 
@@ -53,7 +53,7 @@ TEST_CASE("compute_active_dynamics_branch: legacy weak_field_correspondence stri
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "weak_field_correspondence";
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic");
+        "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path");
 }
 
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
@@ -102,7 +102,7 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field correspondence audit m
   CHECK(galaxy::compute_acceleration_code_path(c).find("audit-only") != std::string::npos);
 }
 
-TEST_CASE("compute_acceleration_code_path: direct_tpf canonical low-order truncation route") {
+TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part route") {
   Config c;
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
