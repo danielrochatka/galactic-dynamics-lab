@@ -9,6 +9,7 @@ TEST_CASE("config defaults") {
   CHECK(c.simulation_mode == galaxy::SimulationMode::galaxy);
   CHECK(c.physics_package == "Newtonian");
   CHECK(c.physics_package_compare == "");
+  CHECK(c.compare_parallel == false);
   CHECK(c.tpf_vdsg_coupling == doctest::Approx(1.0e-20));
   CHECK(c.tpf_global_accel_shunt_enable == false);
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
@@ -26,6 +27,12 @@ TEST_CASE("physics_package_compare parsing") {
   Config c;
   CHECK(apply_config_kv("physics_package_compare", "Newtonian", c));
   CHECK(c.physics_package_compare == "Newtonian");
+}
+
+TEST_CASE("compare_parallel parsing") {
+  Config c;
+  CHECK(apply_config_kv("compare_parallel", "true", c));
+  CHECK(c.compare_parallel == true);
 }
 
 TEST_CASE("legacy alias tpf_gdd_coupling maps to tpf_vdsg_coupling") {

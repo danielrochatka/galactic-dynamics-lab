@@ -1,5 +1,6 @@
 #include "accel_pipeline_stats.hpp"
 #include "config.hpp"
+#include "compare_orchestration.hpp"
 #include "force_compare.hpp"
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
@@ -24,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <cstdint>
+#include <cstdio>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -32,6 +34,7 @@
 #define IS_STDOUT_TERMINAL() (_isatty(_fileno(stdout)) != 0)
 #else
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #define MKDIR(path, mode) mkdir(path, mode)
 #define IS_STDOUT_TERMINAL() (isatty(STDOUT_FILENO) != 0)
@@ -879,46 +882,19 @@ int main(int argc, char** argv) {
     right_cfg.physics_package = config.physics_package_compare;
     right_cfg.physics_package_compare.clear();
 
-    galaxy::PhysicsPackage* left_physics = galaxy::get_physics_package(left_cfg.physics_package);
-    galaxy::PhysicsPackage* right_physics = galaxy::get_physics_package(right_cfg.physics_package);
-    if (!left_physics || !right_physics) {
+    galaxy::PhysicsPackage* left_physics_probe = galaxy::get_physics_package(left_cfg.physics_package);
+    galaxy::PhysicsPackage* right_physics_probe = galaxy::get_physics_package(right_cfg.physics_package);
+    if (!left_physics_probe || !right_physics_probe) {
       std::cerr << "Compare mode failed: unknown package(s): left=" << left_cfg.physics_package
                 << ", right=" << right_cfg.physics_package << "\n";
       return 1;
     }
-    left_physics->init_from_config(left_cfg);
-    right_physics->init_from_config(right_cfg);
 
-    galaxy::State left_state = state;
-    galaxy::State right_state = state;
     const std::string ic_hash = state_fingerprint_hex(state);
 
     std::cout << "Compare mode: left=" << left_cfg.physics_package
               << "  right=" << right_cfg.physics_package << "\n";
     std::cout << "Shared IC fingerprint (fnv1a64): " << ic_hash << "\n";
-
-    int compare_progress_interval = 0;
-    auto compare_start_wall = std::chrono::steady_clock::now();
-    if (n_steps > 0) {
-      compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
-      std::cout << "Running compare simulations (" << n_steps << " steps each).\n" << std::flush;
-    }
-    const bool compare_progress_to_terminal = IS_STDOUT_TERMINAL();
-    galaxy::ProgressCallback left_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_to_terminal, "left");
-    std::cout << "Left simulation (" << left_cfg.physics_package << ")...\n" << std::flush;
-    auto left_snapshots =
-        galaxy::run_simulation(left_cfg, left_state, left_physics, n_steps, snapshot_every, left_progress,
-                               compare_progress_interval);
-    if (compare_progress_to_terminal && n_steps > 0) std::cout << "\n";
-
-    galaxy::ProgressCallback right_progress =
-        make_galaxy_step_progress_callback(compare_start_wall, compare_progress_to_terminal, "right");
-    std::cout << "Right simulation (" << right_cfg.physics_package << ")...\n" << std::flush;
-    auto right_snapshots =
-        galaxy::run_simulation(right_cfg, right_state, right_physics, n_steps, snapshot_every, right_progress,
-                               compare_progress_interval);
-    if (n_steps > 0) std::cout << "\n";
 
     auto write_side_outputs =
         [&](const galaxy::Config& side_cfg,
@@ -970,11 +946,118 @@ int main(int argc, char** argv) {
           galaxy::write_galaxy_init_diagnostics(side_cfg.output_dir, state, side_cfg,
                                                 galaxy::last_galaxy_init_audit());
         };
+    auto run_compare_side =
+        [&](const char* side_tag, const galaxy::Config& side_cfg) -> int {
+          galaxy::PhysicsPackage* side_physics = galaxy::get_physics_package(side_cfg.physics_package);
+          if (!side_physics) {
+            std::cerr << "Compare mode failed in " << side_tag << " side: unknown package "
+                      << side_cfg.physics_package << "\n";
+            return 2;
+          }
+          side_physics->init_from_config(side_cfg);
+          galaxy::State side_state = state;
+          int compare_progress_interval = 0;
+          if (n_steps > 0) {
+            compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
+          }
+          const bool progress_to_terminal = IS_STDOUT_TERMINAL();
+          auto start_wall = std::chrono::steady_clock::now();
+          galaxy::ProgressCallback side_progress =
+              make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag);
+          auto side_snapshots = galaxy::run_simulation(side_cfg, side_state, side_physics,
+                                                       n_steps, snapshot_every, side_progress,
+                                                       compare_progress_interval);
+          if (progress_to_terminal && n_steps > 0) std::cout << "\n";
+          write_side_outputs(side_cfg, side_physics, side_snapshots,
+                             galaxy::find_package_defaults_path(side_cfg.physics_package));
+          return 0;
+        };
 
-    write_side_outputs(left_cfg, left_physics, left_snapshots,
-                       galaxy::find_package_defaults_path(left_cfg.physics_package));
-    write_side_outputs(right_cfg, right_physics, right_snapshots,
-                       galaxy::find_package_defaults_path(right_cfg.physics_package));
+    const bool compare_parallel_enabled =
+        galaxy::should_run_compare_parallel(config.compare_parallel, compare_mode_requested,
+                                            compare_same_package,
+#ifdef _WIN32
+                                            false
+#else
+                                            true
+#endif
+        );
+
+    if (n_steps > 0) {
+      std::cout << "Running compare simulations (" << n_steps << " steps each)."
+                << (compare_parallel_enabled ? " [parallel process mode]\n" : " [sequential mode]\n")
+                << std::flush;
+    }
+
+    if (compare_parallel_enabled) {
+#ifdef _WIN32
+      std::cerr << "compare_parallel requested but process parallel compare is unavailable on this platform; using sequential mode.\n";
+      if (run_compare_side("left", left_cfg) != 0) return 1;
+      if (run_compare_side("right", right_cfg) != 0) return 1;
+#else
+      const std::string left_log = compare_parent_dir + "/left_run.log";
+      const std::string right_log = compare_parent_dir + "/right_run.log";
+      std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+
+      pid_t left_pid = fork();
+      if (left_pid == 0) {
+        FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
+        FILE* le = std::freopen(left_log.c_str(), "a", stderr);
+        if (!lf || !le) _exit(90);
+        const int rc = run_compare_side("left", left_cfg);
+        _exit(rc);
+      }
+      if (left_pid < 0) {
+        std::perror("fork(left)");
+        return 1;
+      }
+
+      pid_t right_pid = fork();
+      if (right_pid == 0) {
+        FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
+        FILE* re = std::freopen(right_log.c_str(), "a", stderr);
+        if (!rf || !re) _exit(91);
+        const int rc = run_compare_side("right", right_cfg);
+        _exit(rc);
+      }
+      if (right_pid < 0) {
+        std::perror("fork(right)");
+        int left_status = 0;
+        (void)waitpid(left_pid, &left_status, 0);
+        return 1;
+      }
+
+      std::cout << "Started compare children: left pid=" << static_cast<long>(left_pid)
+                << ", right pid=" << static_cast<long>(right_pid) << "\n";
+      int left_status = 0;
+      int right_status = 0;
+      if (waitpid(left_pid, &left_status, 0) < 0) {
+        std::perror("waitpid(left)");
+        return 1;
+      }
+      if (waitpid(right_pid, &right_status, 0) < 0) {
+        std::perror("waitpid(right)");
+        return 1;
+      }
+
+      std::string left_err;
+      std::string right_err;
+      const bool left_ok = galaxy::child_exit_ok(left_status, "left", &left_err);
+      const bool right_ok = galaxy::child_exit_ok(right_status, "right", &right_err);
+      if (!left_ok || !right_ok) {
+        if (!left_ok) std::cerr << "Compare parallel failure: " << left_err << "\n";
+        if (!right_ok) std::cerr << "Compare parallel failure: " << right_err << "\n";
+        std::cerr << "Compare run failed; manifests/plot skipped.\n";
+        return 1;
+      }
+#endif
+    } else {
+      if (config.compare_parallel) {
+        std::cout << "compare_parallel requested but unavailable; falling back to sequential compare.\n";
+      }
+      if (run_compare_side("left", left_cfg) != 0) return 1;
+      if (run_compare_side("right", right_cfg) != 0) return 1;
+    }
 
     const galaxy::GitProvenance gp = galaxy::resolve_git_provenance();
     {

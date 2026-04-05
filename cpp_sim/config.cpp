@@ -149,6 +149,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.physics_package_compare = trim(val);
     return true;
   }
+  if (key == "compare_parallel") {
+    config.compare_parallel = parse_bool(val);
+    return true;
+  }
   if (key == "tpfcore_enable_provisional_readout") {
     config.tpfcore_enable_provisional_readout = parse_bool(val);
     return true;
@@ -606,6 +610,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("enable_star_star_gravity", b(config.enable_star_star_gravity));
   kv.emplace_back("physics_package", config.physics_package);
   kv.emplace_back("physics_package_compare", config.physics_package_compare);
+  kv.emplace_back("compare_parallel", b(config.compare_parallel));
   kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
   kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
   kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
