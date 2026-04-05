@@ -132,6 +132,8 @@ class TPFCorePackage : public PhysicsPackage {
   double theta_tt_scale_;
   double theta_tr_scale_;
   double source_softening_;
+  /** Internal paper-baseline coupling used by direct_tpf tensor principal-part route. */
+  double kappa_;
   double weak_field_correspondence_alpha_si_;
   double vdsg_coupling_;
   /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
@@ -142,6 +144,7 @@ class TPFCorePackage : public PhysicsPackage {
   double shunt_fraction_;
   bool pipeline_diagnostics_csv_;
   mutable AccelPipelineStats last_pipeline_;
+  /** Legacy derived-radial closure ledger configuration (still fed from flat config keys). */
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 
   void eval_accel_pipeline(const State& state,

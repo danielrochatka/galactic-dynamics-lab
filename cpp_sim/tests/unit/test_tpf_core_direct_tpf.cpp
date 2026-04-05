@@ -160,3 +160,19 @@ TEST_CASE("direct_tpf VDSG contribution is additive and converges continuously t
     CHECK(day_large == doctest::Approx(2.0 * day_small).epsilon(1e-6));
   }
 }
+
+TEST_CASE("direct_tpf responds linearly to config tpf_kappa mapping") {
+  const galaxy::State s = sample_state();
+  const double bh_mass = 2.0e30;
+
+  std::vector<double> ax_a, ay_a, ax_b, ay_b;
+  galaxy::TPFCorePackage p_a = make_package("direct_tpf", -6.67430e-11, 1.3e4, 0.0);
+  galaxy::TPFCorePackage p_b = make_package("direct_tpf", -6.67430e-11, 2.6e4, 0.0);
+  run_accel(p_a, s, bh_mass, true, ax_a, ay_a);
+  run_accel(p_b, s, bh_mass, true, ax_b, ay_b);
+
+  for (int i = 0; i < s.n(); ++i) {
+    CHECK(ax_b[i] == doctest::Approx(2.0 * ax_a[i]).epsilon(1e-12));
+    CHECK(ay_b[i] == doctest::Approx(2.0 * ay_a[i]).epsilon(1e-12));
+  }
+}

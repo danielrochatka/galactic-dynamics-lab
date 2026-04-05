@@ -60,6 +60,7 @@ TPFCorePackage::TPFCorePackage()
       theta_tt_scale_(1.0),
       theta_tr_scale_(1.0),
       source_softening_(0.0),
+      kappa_(1.0e32),
       weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
       vdsg_coupling_(1.0e-20),
       vdsg_mass_baseline_resolved_kg_(0.0),
@@ -81,7 +82,8 @@ void TPFCorePackage::init_from_config(const Config& config) {
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
   weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
-  derived_poisson_cfg_.kappa = config.tpf_kappa;
+  kappa_ = config.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
+  derived_poisson_cfg_.kappa = config.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
   derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
   derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
@@ -304,7 +306,7 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  const double kappa = derived_poisson_cfg_.kappa;
+  const double kappa = kappa_;
   const double lambda = tpfcore::LAMBDA_4D;
 
   for (int i = 0; i < n; ++i) {
@@ -460,7 +462,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
     }
     std::cerr << std::scientific << std::setprecision(16);
     std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
-    std::cerr << "tpf_kappa = " << derived_poisson_cfg_.kappa << "\n";
+    std::cerr << "tpf_kappa (external config key; mapped to internal direct_tpf kappa) = " << kappa_ << "\n";
     std::cerr << "tpfcore_readout_mode = " << readout_mode_ << "\n";
     std::cerr << "VDSG mass normalization (PROVISIONAL / exploratory heuristic): "
                  "lambda_eff = lambda * log10(max(M_ref,eps_kg)) / log10(max(M_src,eps_kg)); "
