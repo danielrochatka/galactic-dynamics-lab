@@ -13,7 +13,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor -MMD -MP
 
 # Library objects (everything except main.cpp) — linked into galaxy_tests
-LIB_SRCS = config.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
+LIB_SRCS = config.cpp compare_orchestration.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
 	physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp \
 	physics/TPFCore/derived_tpf_radial.cpp physics/TPFCore/provisional_readout.cpp \
 	physics/TPFCore/tpf_core_package.cpp physics/TPFCore/v11_weak_field_correspondence.cpp \
