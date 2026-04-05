@@ -93,8 +93,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
     return "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string(
-               "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_") +
+    return std::string("TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_") +
            (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
            "_provisional_readout_off_shunt_off_cooling_off";
   }
@@ -118,7 +117,7 @@ std::string compute_active_metrics_branch(const Config& config) {
     if (tpf_v11_weak_field_truncation_active(config))
       return "v11_weak_field_truncation_dynamics_metrics_limited_scope";
     if (config.tpf_dynamics_mode == "direct_tpf") {
-      return std::string("direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_") +
+      return std::string("direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_") +
              (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
              "_provisional_readout_off_shunt_off_cooling_off";
     }
@@ -140,12 +139,12 @@ std::string compute_acceleration_code_path(const Config& config) {
            "no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string("TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
-                       "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
-                       "readout/shunt/cooling rejected)")
+    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
+                       "(field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; DeltaC omitted; "
+                       "no weak_field_correspondence alpha helper; readout/shunt/cooling rejected)")
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
-                  : std::string(" + accumulate_vdsg_velocity_modifier skipped (tpf_vdsg_coupling == 0)"));
+                  : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
   }
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";
