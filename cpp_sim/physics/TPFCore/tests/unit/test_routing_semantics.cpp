@@ -379,7 +379,7 @@ TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/st
   }
 }
 
-TEST_CASE("direct_tpf dynamics: canonical route executes low-order v11 weak-field helper") {
+TEST_CASE("direct_tpf dynamics: tensor principal-part path is independent of correspondence alpha") {
   galaxy::Config c;
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_weak_field_correspondence_alpha_si = -2.0;
@@ -388,17 +388,22 @@ TEST_CASE("direct_tpf dynamics: canonical route executes low-order v11 weak-fiel
   c.tpf_cooling_fraction = 0.0;
   c.tpf_global_accel_shunt_enable = false;
 
-  galaxy::TPFCorePackage p;
-  p.init_from_config(c);
+  galaxy::Config c2 = c;
+  c2.tpf_weak_field_correspondence_alpha_si = -7.0;
+  galaxy::TPFCorePackage p1;
+  galaxy::TPFCorePackage p2;
+  p1.init_from_config(c);
+  p2.init_from_config(c2);
 
   galaxy::State s = one_body_state(3.0, 4.0, 0.0, 0.0, 1.0);
-  std::vector<double> ax, ay;
-  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/false, ax, ay);
+  std::vector<double> ax1, ay1, ax2, ay2;
+  p1.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/false, ax1, ay1);
+  p2.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/false, ax2, ay2);
 
-  REQUIRE(ax.size() == 1);
-  const double coeff = c.tpf_weak_field_correspondence_alpha_si * 5.0 / (5.0 * 5.0 * 5.0);
-  CHECK(ax[0] == doctest::Approx(coeff * 3.0));
-  CHECK(ay[0] == doctest::Approx(coeff * 4.0));
+  REQUIRE(ax1.size() == 1);
+  REQUIRE(ax2.size() == 1);
+  CHECK(ax1[0] == doctest::Approx(ax2[0]));
+  CHECK(ay1[0] == doctest::Approx(ay2[0]));
 }
 
 TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs") {
@@ -441,7 +446,7 @@ TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs"
   }
 }
 
-TEST_CASE("direct_tpf vdsg=0 matches v11 weak-field truncation baseline for fixed state") {
+TEST_CASE("direct_tpf vdsg=0 no longer aliases v11 weak-field truncation baseline") {
   galaxy::State s = one_body_state(6.0, -8.0, 1200.0, -900.0, 1.0);
   const double bh_mass = 12.0;
   const double softening = 0.1;
@@ -469,8 +474,8 @@ TEST_CASE("direct_tpf vdsg=0 matches v11 weak-field truncation baseline for fixe
 
   REQUIRE(ax_direct.size() == 1);
   REQUIRE(ax_v11.size() == 1);
-  CHECK(ax_direct[0] == doctest::Approx(ax_v11[0]));
-  CHECK(ay_direct[0] == doctest::Approx(ay_v11[0]));
+  CHECK(ax_direct[0] != doctest::Approx(ax_v11[0]));
+  CHECK(ay_direct[0] != doctest::Approx(ay_v11[0]));
 }
 
 TEST_CASE("direct_tpf allows nonzero VDSG as additive extension") {
@@ -484,9 +489,10 @@ TEST_CASE("direct_tpf allows nonzero VDSG as additive extension") {
   c0.tpf_vdsg_coupling = 0.0;
   c0.tpf_cooling_fraction = 0.0;
   c0.tpf_global_accel_shunt_enable = false;
+  c0.tpf_kappa = 0.0;
 
   galaxy::Config c1 = c0;
-  c1.tpf_vdsg_coupling = 0.05;
+  c1.tpf_vdsg_coupling = 1.0e5;
 
   galaxy::TPFCorePackage p0;
   galaxy::TPFCorePackage p1;

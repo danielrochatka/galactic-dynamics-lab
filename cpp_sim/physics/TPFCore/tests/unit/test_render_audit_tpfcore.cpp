@@ -23,17 +23,17 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
         "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
         "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
         "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
+        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
         "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
 }
 
@@ -107,9 +107,10 @@ TEST_CASE("compute_acceleration_code_path: direct_tpf canonical low-order trunca
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
-  CHECK(galaxy::compute_acceleration_code_path(c).find("compute_v11_weak_field_truncation_accelerations") !=
+  CHECK(galaxy::compute_acceleration_code_path(c).find("field_evaluation -> Theta3D -> principal_Cij -> tensor_projection") !=
         std::string::npos);
-  CHECK(galaxy::compute_acceleration_code_path(c).find("tpf_vdsg_coupling == 0") != std::string::npos);
+  CHECK(galaxy::compute_acceleration_code_path(c).find("compute_v11_weak_field_truncation_accelerations") ==
+        std::string::npos);
   c.tpf_vdsg_coupling = 1e-10;
   CHECK(galaxy::compute_acceleration_code_path(c).find("optional additive VDSG extension") != std::string::npos);
 }

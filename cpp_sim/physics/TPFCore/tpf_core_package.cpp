@@ -299,7 +299,39 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
                                                       bool star_star,
                                                       std::vector<double>& ax,
                                                       std::vector<double>& ay) const {
-  compute_v11_weak_field_truncation_accelerations(state, bh_mass, softening, star_star, ax, ay);
+  const int n = state.n();
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  const double kappa = derived_poisson_cfg_.kappa;
+  const double lambda = tpfcore::LAMBDA_4D;
+
+  for (int i = 0; i < n; ++i) {
+    const tpfcore::FieldAtPoint field =
+        tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
+    const tpfcore::Theta3D& theta = field.theta;
+    const double theta_trace = theta.trace();
+    const double invariant_I = tpfcore::compute_invariant_I(theta);
+
+    const double c_xx = kappa * (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
+                                 lambda * theta_trace * theta.xx - 0.5 * invariant_I);
+    const double c_xy = kappa * (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
+                                 lambda * theta_trace * theta.xy);
+    const double c_yy = kappa * (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
+                                 lambda * theta_trace * theta.yy - 0.5 * invariant_I);
+    const double c_zz = kappa * (theta.xz * theta.xz + theta.yz * theta.yz + theta.zz * theta.zz -
+                                 lambda * theta_trace * theta.zz - 0.5 * invariant_I);
+    (void)c_zz;
+
+    const double x = state.x[i];
+    const double y = state.y[i];
+    const double r_eff = std::sqrt(x * x + y * y + eps * eps);
+    const double rhat_x = (r_eff > 0.0) ? (x / r_eff) : 0.0;
+    const double rhat_y = (r_eff > 0.0) ? (y / r_eff) : 0.0;
+
+    ax[i] = c_xx * rhat_x + c_xy * rhat_y;
+    ay[i] = c_xy * rhat_x + c_yy * rhat_y;
+  }
 }
 
 void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State& state,
@@ -357,9 +389,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
           "(cooling is a numerical stabilizer outside the current paper-facing low-order truncation route).");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
-    if (vdsg_coupling_ != 0.0) {
-      apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
-    }
+    apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
   }
