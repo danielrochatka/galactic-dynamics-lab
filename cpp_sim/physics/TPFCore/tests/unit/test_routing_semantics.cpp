@@ -419,7 +419,7 @@ TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs"
     auto c = make_base();
     c.tpf_vdsg_coupling = 1e-9;
     galaxy::TPFCorePackage p; p.init_from_config(c);
-    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+    CHECK_NOTHROW(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
   {
     auto c = make_base();
@@ -439,4 +439,65 @@ TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs"
     galaxy::TPFCorePackage p; p.init_from_config(c);
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
+}
+
+TEST_CASE("direct_tpf vdsg=0 matches v11 weak-field truncation baseline for fixed state") {
+  galaxy::State s = one_body_state(6.0, -8.0, 1200.0, -900.0, 1.0);
+  const double bh_mass = 12.0;
+  const double softening = 0.1;
+  const bool star_star = false;
+
+  galaxy::Config c_direct;
+  c_direct.tpf_dynamics_mode = "direct_tpf";
+  c_direct.tpfcore_enable_provisional_readout = false;
+  c_direct.tpf_vdsg_coupling = 0.0;
+  c_direct.tpf_cooling_fraction = 0.0;
+  c_direct.tpf_global_accel_shunt_enable = false;
+  c_direct.tpf_weak_field_correspondence_alpha_si = -3.0;
+
+  galaxy::Config c_v11 = c_direct;
+  c_v11.tpf_dynamics_mode = "v11_weak_field_truncation";
+
+  galaxy::TPFCorePackage p_direct;
+  galaxy::TPFCorePackage p_v11;
+  p_direct.init_from_config(c_direct);
+  p_v11.init_from_config(c_v11);
+
+  std::vector<double> ax_direct, ay_direct, ax_v11, ay_v11;
+  p_direct.compute_accelerations(s, bh_mass, softening, star_star, ax_direct, ay_direct);
+  p_v11.compute_accelerations(s, bh_mass, softening, star_star, ax_v11, ay_v11);
+
+  REQUIRE(ax_direct.size() == 1);
+  REQUIRE(ax_v11.size() == 1);
+  CHECK(ax_direct[0] == doctest::Approx(ax_v11[0]));
+  CHECK(ay_direct[0] == doctest::Approx(ay_v11[0]));
+}
+
+TEST_CASE("direct_tpf allows nonzero VDSG as additive extension") {
+  galaxy::State s = one_body_state(10.0, 0.0, 0.0, 9000.0, 2.0);
+  const double bh_mass = 25.0;
+  const double softening = 0.2;
+
+  galaxy::Config c0;
+  c0.tpf_dynamics_mode = "direct_tpf";
+  c0.tpfcore_enable_provisional_readout = false;
+  c0.tpf_vdsg_coupling = 0.0;
+  c0.tpf_cooling_fraction = 0.0;
+  c0.tpf_global_accel_shunt_enable = false;
+
+  galaxy::Config c1 = c0;
+  c1.tpf_vdsg_coupling = 0.05;
+
+  galaxy::TPFCorePackage p0;
+  galaxy::TPFCorePackage p1;
+  p0.init_from_config(c0);
+  p1.init_from_config(c1);
+
+  std::vector<double> ax0, ay0, ax1, ay1;
+  CHECK_NOTHROW(p0.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax0, ay0));
+  CHECK_NOTHROW(p1.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax1, ay1));
+
+  REQUIRE(ax0.size() == 1);
+  REQUIRE(ax1.size() == 1);
+  CHECK(std::fabs(ax1[0] - ax0[0]) > 0.0);
 }

@@ -92,9 +92,12 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "TPF_v11_weak_field_truncation_dynamics_limited_static_quasistatic";
   }
-  if (config.tpf_dynamics_mode == "direct_tpf")
-    return "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
-           "VDSG_off_provisional_readout_off_shunt_off_cooling_off";
+  if (config.tpf_dynamics_mode == "direct_tpf") {
+    return std::string(
+               "TPF_direct_tpf_canonical_entry_using_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_") +
+           (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
+           "_provisional_readout_off_shunt_off_cooling_off";
+  }
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCore_PROVISIONAL_legacy_readout_DISABLED (provisional_readout off)";
@@ -115,8 +118,9 @@ std::string compute_active_metrics_branch(const Config& config) {
     if (tpf_v11_weak_field_truncation_active(config))
       return "v11_weak_field_truncation_dynamics_metrics_limited_scope";
     if (config.tpf_dynamics_mode == "direct_tpf") {
-      return "direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_"
-             "VDSG_off_provisional_readout_off_shunt_off_cooling_off";
+      return std::string("direct_tpf_metrics_v11_low_order_static_quasistatic_truncation_DeltaC_omitted_") +
+             (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
+             "_provisional_readout_off_shunt_off_cooling_off";
     }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
@@ -136,9 +140,12 @@ std::string compute_acceleration_code_path(const Config& config) {
            "no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    return "TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
-           "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
-           "VDSG/readout/shunt/cooling rejected)";
+    return std::string("TPFCorePackage::compute_direct_tpf_accelerations (canonical direct_tpf route currently mapped to "
+                       "compute_v11_weak_field_truncation_accelerations; static/quasi-static low-order sector; DeltaC omitted; "
+                       "readout/shunt/cooling rejected)")
+           + (tpf_vdsg_active_for_audit(config)
+                  ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
+                  : std::string(" + accumulate_vdsg_velocity_modifier skipped (tpf_vdsg_coupling == 0)"));
   }
   if (!config.tpfcore_enable_provisional_readout)
     return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";
@@ -233,8 +240,8 @@ void write_render_manifest(const std::string& output_dir,
                   ? "v11_weak_field_static_quasistatic_low_order_truncation_DeltaC_omitted"
                   : "none");
       json_kv(jf, first, "tpf_extension_mode",
-              (is_direct || is_v11_alias) ? "none_vdsg_rejected"
-                                          : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
+              is_v11_alias ? "none_vdsg_rejected"
+                           : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
       json_kv(jf, first, "tpf_stabilizer_mode",
               (is_direct || is_v11_alias)
                   ? "none_shunt_and_cooling_rejected"
