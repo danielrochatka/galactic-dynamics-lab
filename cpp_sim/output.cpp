@@ -175,7 +175,7 @@ void write_run_info(const std::string& output_dir,
            "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
            "v11_weak_field_truncation is the Eq.42-44 weak-field correspondence helper (alpha_si correspondence path); "
            "direct_tpf is canonical paper-facing tensor principal-part route "
-           "(field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; DeltaC omitted; additive VDSG extension)\n";
+           "(field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; DeltaC omitted; additive VDSG extension)\n";
       f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
            "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
            "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "

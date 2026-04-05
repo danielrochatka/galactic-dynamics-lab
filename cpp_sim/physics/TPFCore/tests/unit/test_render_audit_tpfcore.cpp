@@ -107,7 +107,7 @@ TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part rout
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
-  CHECK(galaxy::compute_acceleration_code_path(c).find("field_evaluation -> Theta3D -> principal_Cij -> tensor_projection") !=
+  CHECK(galaxy::compute_acceleration_code_path(c).find("field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout") !=
         std::string::npos);
   CHECK(galaxy::compute_acceleration_code_path(c).find("compute_v11_weak_field_truncation_accelerations") ==
         std::string::npos);

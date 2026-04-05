@@ -144,7 +144,7 @@ std::string compute_acceleration_code_path(const Config& config) {
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; "
+                       "(tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
                        "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
