@@ -996,13 +996,20 @@ int main(int argc, char** argv) {
 #else
       const std::string left_log = compare_parent_dir + "/left_run.log";
       const std::string right_log = compare_parent_dir + "/right_run.log";
-      std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
+      if (show_live_compare_progress) {
+        std::cout << "Parallel compare enabled; streaming child progress to terminal.\n";
+      } else {
+        std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      }
 
       pid_t left_pid = fork();
       if (left_pid == 0) {
-        FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
-        FILE* le = std::freopen(left_log.c_str(), "a", stderr);
-        if (!lf || !le) _exit(90);
+        if (!show_live_compare_progress) {
+          FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
+          FILE* le = std::freopen(left_log.c_str(), "a", stderr);
+          if (!lf || !le) _exit(90);
+        }
         const int rc = run_compare_side("left", left_cfg);
         _exit(rc);
       }
@@ -1013,9 +1020,11 @@ int main(int argc, char** argv) {
 
       pid_t right_pid = fork();
       if (right_pid == 0) {
-        FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
-        FILE* re = std::freopen(right_log.c_str(), "a", stderr);
-        if (!rf || !re) _exit(91);
+        if (!show_live_compare_progress) {
+          FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
+          FILE* re = std::freopen(right_log.c_str(), "a", stderr);
+          if (!rf || !re) _exit(91);
+        }
         const int rc = run_compare_side("right", right_cfg);
         _exit(rc);
       }
