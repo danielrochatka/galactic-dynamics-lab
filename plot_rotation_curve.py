@@ -43,6 +43,48 @@ ROTATION_CURVE_X_FALLBACK_MAX = 2.0e20
 DEFAULT_X_MAX = ROTATION_CURVE_X_FALLBACK_MAX
 
 
+def _run_info_configured_value(
+    run_info: dict[str, str | int | float],
+    key: str,
+    default: str | int | float | None = None,
+) -> str | int | float | None:
+    """Configured setting precedence: configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    cfg_key = f"configured_{key}"
+    if cfg_key in run_info:
+        return run_info[cfg_key]
+    if key in run_info:
+        return run_info[key]
+    return default
+
+
+def _run_info_effective_value(
+    run_info: dict[str, str | int | float],
+    key: str,
+    default: str | int | float | None = None,
+) -> str | int | float | None:
+    """Effective runtime precedence: effective_<key> then configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    eff_key = f"effective_{key}"
+    if eff_key in run_info:
+        return run_info[eff_key]
+    cfg = _run_info_configured_value(run_info, key, None)
+    if cfg is not None:
+        return cfg
+    return default
+
+
+def _resolve_display_unit_preferences(
+    run_info: dict[str, str | int | float],
+) -> tuple[str, str]:
+    """Resolve preferred display units from run_info with effective/configured/legacy precedence."""
+    distance = str(_run_info_effective_value(run_info, "display_distance_unit", "auto") or "auto")
+    velocity = str(_run_info_effective_value(run_info, "display_velocity_unit", "auto") or "auto")
+    return distance, velocity
+
+
 def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
     """Parse run_info.txt (tab-separated key, value) into a dict."""
     path = Path(run_dir) / "run_info.txt"
@@ -78,9 +120,7 @@ def load_run_info(run_dir: Path) -> dict[str, str | int | float]:
 
 def newtonian_m_bh_from_run_info(run_info: dict[str, str | int | float]) -> float:
     """Central mass for Keplerian overlay; matches simulation bh_mass when available."""
-    if not run_info:
-        return float(NEWTONIAN_REFERENCE_M_BH)
-    m = run_info.get("bh_mass")
+    m = _run_info_effective_value(run_info, "bh_mass")
     if isinstance(m, (int, float)) and float(m) > 0:
         return float(m)
     return float(NEWTONIAN_REFERENCE_M_BH)
@@ -94,15 +134,15 @@ def resolve_newtonian_overlay_mass(
     Resolve Newtonian overlay mass source for CLI usage.
     Precedence:
       1) explicit --M-bh
-      2) run_info bh_mass when present and positive
+      2) run_info effective/configured/legacy bh_mass when present and positive
       3) fallback benchmark NEWTONIAN_REFERENCE_M_BH (explicitly reported)
     Returns: (mass_kg, source_label, is_fallback_benchmark).
     """
     if cli_m_bh is not None:
         return float(cli_m_bh), "cli(--M-bh)", False
-    m = run_info.get("bh_mass") if run_info else None
+    m = _run_info_effective_value(run_info, "bh_mass")
     if isinstance(m, (int, float)) and float(m) > 0:
-        return float(m), "run_info(bh_mass)", False
+        return float(m), "run_info(effective/configured/legacy bh_mass)", False
     return float(NEWTONIAN_REFERENCE_M_BH), "fallback_benchmark(NEWTONIAN_REFERENCE_M_BH)", True
 
 
@@ -115,14 +155,14 @@ def rotation_curve_x_max(
     Falls back to ROTATION_CURVE_X_FALLBACK_MAX (2e20 m) when galaxy_radius is missing.
     """
     _ = r_data  # kept for API compatibility with callers; x extent comes from run_info only
-    gr = run_info.get("galaxy_radius") if run_info else None
+    gr = _run_info_effective_value(run_info, "galaxy_radius")
     if isinstance(gr, (int, float)) and float(gr) > 0:
         return 2.0 * float(gr)
     return float(ROTATION_CURVE_X_FALLBACK_MAX)
 
 
 def scatter_label_from_run_info(run_info: dict[str, str | int | float]) -> str:
-    pkg = run_info.get("physics_package", "")
+    pkg = _run_info_effective_value(run_info, "physics_package", "")
     if isinstance(pkg, str) and pkg == "TPFCore":
         return "Simulated stars (TPFCore)"
     if isinstance(pkg, str) and pkg:
@@ -395,6 +435,7 @@ def main() -> None:
     M_bh, m_source, used_fallback_mass = resolve_newtonian_overlay_mass(run_info, args.M_bh)
     x_lim = rotation_curve_x_max(run_info, r)
     lbl = scatter_label_from_run_info(run_info)
+    preferred_distance_unit, preferred_velocity_unit = _resolve_display_unit_preferences(run_info)
     save_rotation_curve_png(
         r,
         v,
@@ -404,8 +445,8 @@ def main() -> None:
         x_max=x_lim,
         scatter_label=lbl,
         filter_scatter_by_xmax=not args.no_filter_scatter,
-        preferred_distance_unit=str(run_info.get("display_distance_unit", "auto") or "auto"),
-        preferred_velocity_unit=str(run_info.get("display_velocity_unit", "auto") or "auto"),
+        preferred_distance_unit=preferred_distance_unit,
+        preferred_velocity_unit=preferred_velocity_unit,
     )
     print(f"Loaded: {csv_path}")
     print(f"Newtonian overlay mass: {M_bh:g} kg (source={m_source})")
