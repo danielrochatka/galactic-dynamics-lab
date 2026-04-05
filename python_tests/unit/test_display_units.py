@@ -16,7 +16,21 @@ class TestAnimationTimeCaptionUnits(unittest.TestCase):
 
     def test_explicit_forced_unit_remains_respected(self) -> None:
         c = format_animation_time_caption(7200.0, "galaxy", preferred_time_unit="hr")
-        self.assertEqual(c, "t = 2 hr")
+        self.assertEqual(c, "t = 2.00 hr")
+
+    def test_animation_time_caption_uses_fixed_two_decimal_precision(self) -> None:
+        self.assertEqual(
+            format_animation_time_caption(30.0, "galaxy", active_time_unit="day"),
+            "t = 0.00 day",
+        )
+        self.assertEqual(
+            format_animation_time_caption(86400.0, "galaxy", active_time_unit="day"),
+            "t = 1.00 day",
+        )
+        self.assertEqual(
+            format_animation_time_caption(1.2345 * 86400.0, "galaxy", active_time_unit="day"),
+            "t = 1.23 day",
+        )
 
     def test_active_time_unit_overrides_auto_resolution(self) -> None:
         c = format_animation_time_caption(

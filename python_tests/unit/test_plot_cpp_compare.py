@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import importlib.util
 from pathlib import Path
+from unittest.mock import patch
 
 # Repo root (parent of python_tests/)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +86,92 @@ def _write_run_info_new_schema(run_dir: Path, pkg: str, *, dyn: str = "direct_tp
 
 
 class TestPlotCppCompare(unittest.TestCase):
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_render_compare_animation_writes_only_canonical_mp4(self) -> None:
+        class DummyAnim:
+            def save(self, path: str, **kwargs) -> None:
+                Path(path).write_bytes(b"video")
+
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info_new_schema(left, "TPFCore")
+            _write_run_info_new_schema(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            compare_run_id = "r_anim_mp4"
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": compare_run_id, "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+
+            with patch("matplotlib.animation.FuncAnimation", return_value=DummyAnim()):
+                render_compare(parent, no_animation=False, overlay_mode="none")
+
+            canonical_mp4 = parent / _mode_aware_compare_name(
+                "animation",
+                {"effective_physics_package": "TPFCore", "effective_simulation_mode": "galaxy", "effective_tpf_dynamics_mode": "direct_tpf"},
+                {"effective_physics_package": "Newtonian", "effective_simulation_mode": "galaxy"},
+                ext="mp4",
+            )
+            self.assertTrue(canonical_mp4.exists())
+            self.assertFalse((parent / f"{compare_run_id}.mp4").exists())
+            self.assertFalse((parent / f"{compare_run_id}.gif").exists())
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_render_compare_animation_gif_fallback_writes_only_canonical_gif(self) -> None:
+        class DummyAnim:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def save(self, path: str, **kwargs) -> None:
+                self.calls += 1
+                if self.calls == 1:
+                    raise RuntimeError("ffmpeg unavailable")
+                Path(path).write_bytes(b"gif")
+
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info_new_schema(left, "TPFCore")
+            _write_run_info_new_schema(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            compare_run_id = "r_anim_gif"
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": compare_run_id, "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+
+            with patch("matplotlib.animation.FuncAnimation", return_value=DummyAnim()):
+                render_compare(parent, no_animation=False, overlay_mode="none")
+
+            canonical_gif = parent / _mode_aware_compare_name(
+                "animation",
+                {"effective_physics_package": "TPFCore", "effective_simulation_mode": "galaxy", "effective_tpf_dynamics_mode": "direct_tpf"},
+                {"effective_physics_package": "Newtonian", "effective_simulation_mode": "galaxy"},
+                ext="gif",
+            )
+            self.assertTrue(canonical_gif.exists())
+            self.assertFalse((parent / f"{compare_run_id}.mp4").exists())
+            self.assertFalse((parent / f"{compare_run_id}.gif").exists())
+
     def test_resolve_side_run_dir_cpp_sim_relative_manifest(self) -> None:
         """Manifest stores paths relative to cpp_sim; compare_parent is .../outputs/RUN."""
         with tempfile.TemporaryDirectory() as td:

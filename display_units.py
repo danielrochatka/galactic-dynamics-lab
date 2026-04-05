@@ -337,4 +337,4 @@ def format_animation_time_caption(
         tf, tu = _time_from_unit(str(active_time_unit))
     else:
         tf, tu = _resolve_time_unit(preferred_time_unit, t)
-    return f"t = {t * tf:.6g} {tu}"
+    return f"t = {t * tf:.2f} {tu}"
