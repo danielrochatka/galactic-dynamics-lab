@@ -316,14 +316,20 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
     const double theta_trace = theta.trace();
     const double invariant_I = tpfcore::compute_invariant_I(theta);
 
-    const double c_xx = kappa * (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
-                                 lambda * theta_trace * theta.xx - 0.5 * invariant_I);
-    const double c_xy = kappa * (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
-                                 lambda * theta_trace * theta.xy);
-    const double c_yy = kappa * (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
-                                 lambda * theta_trace * theta.yy - 0.5 * invariant_I);
+    const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
+                         lambda * theta_trace * theta.xx - 0.5 * invariant_I);
+    const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
+                         lambda * theta_trace * theta.xy);
+    const double b_yy = (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
+                         lambda * theta_trace * theta.yy - 0.5 * invariant_I);
+    const double c_xx = kappa * b_xx;
+    const double c_xy = kappa * b_xy;
+    const double c_yy = kappa * b_yy;
     const double c_zz = kappa * (theta.xz * theta.xz + theta.yz * theta.yz + theta.zz * theta.zz -
                                  lambda * theta_trace * theta.zz - 0.5 * invariant_I);
+    (void)c_xx;
+    (void)c_xy;
+    (void)c_yy;
     (void)c_zz;
 
     const double xi_x = field.xi.x;
@@ -336,9 +342,11 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
     }
     const double u_x = xi_x / xi_norm;
     const double u_y = xi_y / xi_norm;
+    const double ax_raw = -(b_xx * u_x + b_xy * u_y);
+    const double ay_raw = -(b_xy * u_x + b_yy * u_y);
 
-    ax[i] = -(c_xx * u_x + c_xy * u_y);
-    ay[i] = -(c_xy * u_x + c_yy * u_y);
+    ax[i] = kappa * ax_raw;
+    ay[i] = kappa * ay_raw;
   }
 }
 
@@ -1490,23 +1498,116 @@ void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& s
 void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapshots,
                                              const Config& config,
                                              const std::string& output_dir) const {
-  if (!provisional_readout_ || snapshots.empty()) return;
-  if (config.simulation_mode != SimulationMode::bh_orbit_validation) return;
-  if (snapshots[0].state.n() != 1) return;
+  if (snapshots.empty()) return;
+  if (config.tpf_dynamics_mode != "direct_tpf") return;
 
   PhysicsPackage* newton = get_physics_package("Newtonian");
-  if (!newton) return;
+  if (!newton && config.simulation_mode == SimulationMode::bh_orbit_validation) return;
 
   tpfcore::TPFCoreParams params = build_params(config, output_dir);
   double softening = params.softening;
   double bh_mass = params.bh_mass;
   bool star_star = params.enable_star_star_gravity;
-  double eps2 = softening * softening;
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  const double eps2 = softening * softening;
+  const double lambda = tpfcore::LAMBDA_4D;
+  const double kappa = kappa_;
 
   std::ofstream txt(params.output_dir + "/tpf_step0_orbit_audit.txt");
-  if (!txt) return;
+  std::ofstream raw_csv(params.output_dir + "/direct_tpf_step0_raw_accel_audit.csv");
+  std::ofstream summary(params.output_dir + "/direct_tpf_step0_raw_accel_summary.txt");
+  if (!raw_csv || !summary) return;
 
-  const State& s = snapshots[0].state;
+  raw_csv << "particle_index,x,y,mass,xi_x,xi_y,xi_norm,theta_xx,theta_xy,theta_yy,theta_trace,"
+          << "invariant_I,b_xx,b_xy,b_yy,ax_raw,ay_raw,kappa,ax,ay,ax_newton,ay_newton\n";
+  raw_csv << std::scientific << std::setprecision(16);
+  summary << std::scientific << std::setprecision(16);
+
+  const State& s0 = snapshots[0].state;
+  std::vector<double> ax_t, ay_t, ax_n, ay_n;
+  compute_accelerations(s0, bh_mass, softening, star_star, ax_t, ay_t);
+  if (newton) {
+    newton->compute_accelerations(s0, bh_mass, softening, star_star, ax_n, ay_n);
+  } else {
+    ax_n.assign(static_cast<size_t>(s0.n()), 0.0);
+    ay_n.assign(static_cast<size_t>(s0.n()), 0.0);
+  }
+
+  bool strong_kappa_mismatch = false;
+  for (int i = 0; i < s0.n(); ++i) {
+    const tpfcore::FieldAtPoint field =
+        tpfcore::evaluate_provisional_field_multi_source(s0, i, bh_mass, star_star, eps);
+    const tpfcore::Theta3D& theta = field.theta;
+    const double theta_trace = theta.trace();
+    const double invariant_I = tpfcore::compute_invariant_I(theta);
+    const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
+                         lambda * theta_trace * theta.xx - 0.5 * invariant_I);
+    const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
+                         lambda * theta_trace * theta.xy);
+    const double b_yy = (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
+                         lambda * theta_trace * theta.yy - 0.5 * invariant_I);
+    const double xi_x = field.xi.x;
+    const double xi_y = field.xi.y;
+    const double xi_norm = std::sqrt(xi_x * xi_x + xi_y * xi_y);
+    double ax_raw = 0.0;
+    double ay_raw = 0.0;
+    if (xi_norm > 1e-300) {
+      const double u_x = xi_x / xi_norm;
+      const double u_y = xi_y / xi_norm;
+      ax_raw = -(b_xx * u_x + b_xy * u_y);
+      ay_raw = -(b_xy * u_x + b_yy * u_y);
+    }
+
+    const double ax_from_raw = kappa * ax_raw;
+    const double ay_from_raw = kappa * ay_raw;
+    const double ax_newton = ax_n[static_cast<size_t>(i)];
+    const double ay_newton = ay_n[static_cast<size_t>(i)];
+    raw_csv << i << ',' << s0.x[i] << ',' << s0.y[i] << ',' << s0.mass[i] << ','
+            << xi_x << ',' << xi_y << ',' << xi_norm << ','
+            << theta.xx << ',' << theta.xy << ',' << theta.yy << ',' << theta_trace << ','
+            << invariant_I << ',' << b_xx << ',' << b_xy << ',' << b_yy << ','
+            << ax_raw << ',' << ay_raw << ',' << kappa << ','
+            << ax_from_raw << ',' << ay_from_raw << ','
+            << ax_newton << ',' << ay_newton << '\n';
+
+    const double mag_raw = std::hypot(ax_raw, ay_raw);
+    const double mag_a = std::hypot(ax_from_raw, ay_from_raw);
+    const double mag_newton = std::hypot(ax_newton, ay_newton);
+    const bool has_kx = std::abs(ax_raw) > 1e-300;
+    const bool has_ky = std::abs(ay_raw) > 1e-300;
+    const bool has_km = mag_raw > 1e-300;
+    const double kappa_x = has_kx ? (ax_newton / ax_raw) : 0.0;
+    const double kappa_y = has_ky ? (ay_newton / ay_raw) : 0.0;
+    const double kappa_mag = has_km ? (mag_newton / mag_raw) : 0.0;
+    summary << "particle " << i << ":\n";
+    summary << "  |a_raw| = " << mag_raw << "\n";
+    summary << "  |a| = " << mag_a << "\n";
+    summary << "  |a_newton| = " << mag_newton << "\n";
+    summary << "  implied_kappa_from_x = " << (has_kx ? std::to_string(kappa_x) : "undefined (ax_raw≈0)") << "\n";
+    summary << "  implied_kappa_from_y = " << (has_ky ? std::to_string(kappa_y) : "undefined (ay_raw≈0)") << "\n";
+    summary << "  implied_kappa_from_mag = " << (has_km ? std::to_string(kappa_mag) : "undefined (|a_raw|≈0)") << "\n";
+    if (has_kx && has_ky && std::abs(kappa_x - kappa_y) > 0.1 * std::max({std::abs(kappa_x), std::abs(kappa_y), 1.0})) {
+      summary << "  WARNING: implied kappa differs strongly between x and y components.\n";
+      strong_kappa_mismatch = true;
+    }
+    if (has_km && ((has_kx && std::abs(kappa_x - kappa_mag) > 0.1 * std::max({std::abs(kappa_x), std::abs(kappa_mag), 1.0})) ||
+                   (has_ky && std::abs(kappa_y - kappa_mag) > 0.1 * std::max({std::abs(kappa_y), std::abs(kappa_mag), 1.0})))) {
+      summary << "  WARNING: implied kappa magnitude ratio differs strongly from component ratios.\n";
+      strong_kappa_mismatch = true;
+    }
+    summary << "\n";
+  }
+  if (strong_kappa_mismatch) {
+    summary << "Overall: strong implied-kappa mismatch detected across particles/components.\n";
+  } else {
+    summary << "Overall: no strong implied-kappa mismatch detected by the 10% threshold.\n";
+  }
+
+  if (!txt) return;
+  if (config.simulation_mode != SimulationMode::bh_orbit_validation) return;
+  if (s0.n() != 1) return;
+
+  const State& s = s0;
   double x = s.x[0], y = s.y[0], vx = s.vx[0], vy = s.vy[0];
 
   double r2 = x * x + y * y + eps2;
@@ -1521,7 +1622,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   double v_radial = vx * rx + vy * ry;
   double v_tangential = x * vy - y * vx;
 
-  std::vector<double> ax_t(1), ay_t(1), ax_n(1), ay_n(1);
   compute_accelerations(s, bh_mass, softening, star_star, ax_t, ay_t);
   newton->compute_accelerations(s, bh_mass, softening, star_star, ax_n, ay_n);
 
@@ -1537,7 +1637,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   if (std::abs(a_rad_newton) > 1e-300)
     ratio_radial = std::abs(a_rad_tpf) / std::abs(a_rad_newton);
 
-  double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
   tpfcore::ReadoutDiagnostics diag;
   double ax_d = 0.0, ay_d = 0.0;
   tpfcore::TpfRadialGravityProfile step0_prof;

@@ -101,6 +101,44 @@ TEST_CASE("direct_tpf uses tensor principal-part formula and matches Theta/I/Cij
   }
 }
 
+TEST_CASE("direct_tpf acceleration equals kappa-scaled raw pre-kappa acceleration") {
+  const galaxy::State s = sample_state();
+  const double bh_mass = 2.0e30;
+  const double kappa = 2.5e4;
+  const double eps = 1.1e7;
+
+  galaxy::TPFCorePackage pkg = make_package("direct_tpf", -6.67430e-11, kappa, 0.0, eps);
+
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, bh_mass, true, ax, ay);
+
+  REQUIRE(ax.size() == static_cast<size_t>(s.n()));
+  REQUIRE(ay.size() == static_cast<size_t>(s.n()));
+
+  for (int i = 0; i < s.n(); ++i) {
+    const galaxy::tpfcore::FieldAtPoint field =
+        galaxy::tpfcore::evaluate_provisional_field_multi_source(s, i, bh_mass, true, eps);
+    const galaxy::tpfcore::Theta3D& theta = field.theta;
+    const double theta_trace = theta.trace();
+    const double I = galaxy::tpfcore::compute_invariant_I(theta);
+    const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
+                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xx - 0.5 * I);
+    const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
+                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xy);
+    const double b_yy = (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
+                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy - 0.5 * I);
+    const double xi_norm = std::sqrt(field.xi.x * field.xi.x + field.xi.y * field.xi.y);
+    REQUIRE(xi_norm > 1e-300);
+    const double ux = field.xi.x / xi_norm;
+    const double uy = field.xi.y / xi_norm;
+    const double ax_raw = -(b_xx * ux + b_xy * uy);
+    const double ay_raw = -(b_xy * ux + b_yy * uy);
+
+    CHECK(ax[i] == doctest::Approx(kappa * ax_raw));
+    CHECK(ay[i] == doctest::Approx(kappa * ay_raw));
+  }
+}
+
 TEST_CASE("direct_tpf Earth-Moon step-0 is attractive along x-axis") {
   galaxy::State s;
   s.resize(2);
