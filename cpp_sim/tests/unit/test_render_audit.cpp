@@ -50,7 +50,7 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
         "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_direct_tpf_accelerations (tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> "
-        "tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
+        "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
         "rejected) + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)");
 
   c.tpf_vdsg_coupling = 1e-12;
@@ -62,7 +62,7 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
         "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_direct_tpf_accelerations (tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> "
-        "tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
+        "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
         "rejected) + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)");
 }
 

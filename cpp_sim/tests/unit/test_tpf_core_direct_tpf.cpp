@@ -89,15 +89,119 @@ TEST_CASE("direct_tpf uses tensor principal-part formula and matches Theta/I/Cij
     const double c_yy = kappa * (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
                                  galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy - 0.5 * I);
 
-    const double r_eff = std::sqrt(s.x[i] * s.x[i] + s.y[i] * s.y[i] + eps * eps);
-    const double rx = s.x[i] / r_eff;
-    const double ry = s.y[i] / r_eff;
-    const double expected_ax = c_xx * rx + c_xy * ry;
-    const double expected_ay = c_xy * rx + c_yy * ry;
+    const double xi_norm = std::sqrt(field.xi.x * field.xi.x + field.xi.y * field.xi.y);
+    REQUIRE(xi_norm > 1e-300);
+    const double ux = field.xi.x / xi_norm;
+    const double uy = field.xi.y / xi_norm;
+    const double expected_ax = -(c_xx * ux + c_xy * uy);
+    const double expected_ay = -(c_xy * ux + c_yy * uy);
 
     CHECK(ax[i] == doctest::Approx(expected_ax));
     CHECK(ay[i] == doctest::Approx(expected_ay));
   }
+}
+
+TEST_CASE("direct_tpf Earth-Moon step-0 is attractive along x-axis") {
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = 0.0;             // Earth
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 0.0;
+  s.mass[0] = 5.97219e24;
+  s.x[1] = 3.844e8;         // Moon on +x
+  s.y[1] = 0.0;
+  s.vx[1] = 0.0;
+  s.vy[1] = 0.0;
+  s.mass[1] = 7.34767309e22;
+
+  galaxy::TPFCorePackage pkg = make_package("direct_tpf", -6.67430e-11, 2.0e4, 0.0, 1.0e7);
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, 0.0, true, ax, ay);
+
+  REQUIRE(ax.size() == 2);
+  CHECK(ax[0] > 0.0);
+  CHECK(ax[1] < 0.0);
+}
+
+TEST_CASE("direct_tpf gives nonzero origin response for off-origin source") {
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = 0.0;
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 0.0;
+  s.mass[0] = 1.0e20;
+  s.x[1] = 2.0e9;
+  s.y[1] = 0.0;
+  s.vx[1] = 0.0;
+  s.vy[1] = 0.0;
+  s.mass[1] = 8.0e20;
+
+  galaxy::TPFCorePackage pkg = make_package("direct_tpf", -6.67430e-11, 2.0e4, 0.0, 1.0e7);
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, 0.0, true, ax, ay);
+
+  CHECK(std::abs(ax[0]) > 1e-30);
+}
+
+TEST_CASE("direct_tpf symmetric equal masses are equal-and-opposite") {
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = -1.0e9;
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 0.0;
+  s.mass[0] = 5.0e20;
+  s.x[1] = 1.0e9;
+  s.y[1] = 0.0;
+  s.vx[1] = 0.0;
+  s.vy[1] = 0.0;
+  s.mass[1] = 5.0e20;
+
+  galaxy::TPFCorePackage pkg = make_package("direct_tpf", -6.67430e-11, 2.0e4, 0.0, 1.0e7);
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, 0.0, true, ax, ay);
+
+  CHECK(ax[0] > 0.0);
+  CHECK(ax[1] < 0.0);
+  CHECK(ax[0] == doctest::Approx(-ax[1]).epsilon(1e-12));
+  CHECK(ay[0] == doctest::Approx(-ay[1]).epsilon(1e-12));
+}
+
+TEST_CASE("direct_tpf translation invariance for two-body relative acceleration") {
+  galaxy::State s0;
+  s0.resize(2);
+  s0.x[0] = -4.0e8;
+  s0.y[0] = 1.5e8;
+  s0.vx[0] = 0.0;
+  s0.vy[0] = 0.0;
+  s0.mass[0] = 6.0e20;
+  s0.x[1] = 7.0e8;
+  s0.y[1] = -2.2e8;
+  s0.vx[1] = 0.0;
+  s0.vy[1] = 0.0;
+  s0.mass[1] = 4.0e20;
+
+  galaxy::State s1 = s0;
+  const double tx = 2.0e9;
+  const double ty = -3.0e9;
+  for (int i = 0; i < s1.n(); ++i) {
+    s1.x[i] += tx;
+    s1.y[i] += ty;
+  }
+
+  galaxy::TPFCorePackage pkg = make_package("direct_tpf", -6.67430e-11, 2.0e4, 0.0, 1.0e7);
+  std::vector<double> ax0, ay0, ax1, ay1;
+  run_accel(pkg, s0, 0.0, true, ax0, ay0);
+  run_accel(pkg, s1, 0.0, true, ax1, ay1);
+
+  const double rel0x = ax0[1] - ax0[0];
+  const double rel0y = ay0[1] - ay0[0];
+  const double rel1x = ax1[1] - ax1[0];
+  const double rel1y = ay1[1] - ay1[0];
+  CHECK(rel1x == doctest::Approx(rel0x).epsilon(1e-12));
+  CHECK(rel1y == doctest::Approx(rel0y).epsilon(1e-12));
 }
 
 TEST_CASE("direct_tpf is independent of correspondence alpha while v11_weak_field_truncation depends on alpha") {

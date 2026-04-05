@@ -326,14 +326,19 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
                                  lambda * theta_trace * theta.zz - 0.5 * invariant_I);
     (void)c_zz;
 
-    const double x = state.x[i];
-    const double y = state.y[i];
-    const double r_eff = std::sqrt(x * x + y * y + eps * eps);
-    const double rhat_x = (r_eff > 0.0) ? (x / r_eff) : 0.0;
-    const double rhat_y = (r_eff > 0.0) ? (y / r_eff) : 0.0;
+    const double xi_x = field.xi.x;
+    const double xi_y = field.xi.y;
+    const double xi_norm = std::sqrt(xi_x * xi_x + xi_y * xi_y);
+    if (xi_norm <= 1e-300) {
+      ax[i] = 0.0;
+      ay[i] = 0.0;
+      continue;
+    }
+    const double u_x = xi_x / xi_norm;
+    const double u_y = xi_y / xi_norm;
 
-    ax[i] = c_xx * rhat_x + c_xy * rhat_y;
-    ay[i] = c_xy * rhat_x + c_yy * rhat_y;
+    ax[i] = -(c_xx * u_x + c_xy * u_y);
+    ay[i] = -(c_xy * u_x + c_yy * u_y);
   }
 }
 
