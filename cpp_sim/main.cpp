@@ -974,8 +974,7 @@ int main(int argc, char** argv) {
         };
 
     const bool compare_parallel_enabled =
-        galaxy::should_run_compare_parallel(config.compare_parallel, compare_mode_requested,
-                                            compare_same_package,
+        galaxy::should_run_compare_parallel(compare_mode_requested, compare_same_package,
 #ifdef _WIN32
                                             false
 #else
@@ -991,19 +990,26 @@ int main(int argc, char** argv) {
 
     if (compare_parallel_enabled) {
 #ifdef _WIN32
-      std::cerr << "compare_parallel requested but process parallel compare is unavailable on this platform; using sequential mode.\n";
+      std::cerr << "Process-parallel compare is unavailable on this platform; using sequential mode.\n";
       if (run_compare_side("left", left_cfg) != 0) return 1;
       if (run_compare_side("right", right_cfg) != 0) return 1;
 #else
       const std::string left_log = compare_parent_dir + "/left_run.log";
       const std::string right_log = compare_parent_dir + "/right_run.log";
-      std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
+      if (show_live_compare_progress) {
+        std::cout << "Parallel compare enabled; streaming child progress to terminal.\n";
+      } else {
+        std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      }
 
       pid_t left_pid = fork();
       if (left_pid == 0) {
-        FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
-        FILE* le = std::freopen(left_log.c_str(), "a", stderr);
-        if (!lf || !le) _exit(90);
+        if (!show_live_compare_progress) {
+          FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
+          FILE* le = std::freopen(left_log.c_str(), "a", stderr);
+          if (!lf || !le) _exit(90);
+        }
         const int rc = run_compare_side("left", left_cfg);
         _exit(rc);
       }
@@ -1014,9 +1020,11 @@ int main(int argc, char** argv) {
 
       pid_t right_pid = fork();
       if (right_pid == 0) {
-        FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
-        FILE* re = std::freopen(right_log.c_str(), "a", stderr);
-        if (!rf || !re) _exit(91);
+        if (!show_live_compare_progress) {
+          FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
+          FILE* re = std::freopen(right_log.c_str(), "a", stderr);
+          if (!rf || !re) _exit(91);
+        }
         const int rc = run_compare_side("right", right_cfg);
         _exit(rc);
       }
@@ -1052,9 +1060,6 @@ int main(int argc, char** argv) {
       }
 #endif
     } else {
-      if (config.compare_parallel) {
-        std::cout << "compare_parallel requested but unavailable; falling back to sequential compare.\n";
-      }
       if (run_compare_side("left", left_cfg) != 0) return 1;
       if (run_compare_side("right", right_cfg) != 0) return 1;
     }
