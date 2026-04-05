@@ -36,7 +36,7 @@ From **`cpp_sim/`**:
 | `tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`, … | Package-specific **inspection** (require `physics_package = TPFCore`). |
 | `tpf_two_body_sweep`, `tpf_weak_field_calibration`, `tpf_newtonian_force_compare`, `tpf_bound_orbit_sweep`, `tpf_diagnostic_consistency_audit` | TPFCore **sweeps / calibration / diagnostics** (see binary help and `SimulationMode` in `config.hpp`). |
 
-Full mode list and errors for unknown modes are printed by the binary. For **TPFCore** particle integration: **`tpf_dynamics_mode=direct_tpf`** is the canonical paper-facing entry and currently executes the validated low-order static/quasi-static v11 truncation sector (with guardrails: **DeltaC omitted**, VDSG/readout/shunt/cooling rejected). **`legacy_readout`** remains available and requires **`tpfcore_enable_provisional_readout = true`**. Inspection and sweep modes have their own requirements — see the TPFCore package README.
+Full mode list and errors for unknown modes are printed by the binary. For **TPFCore** particle integration: **`tpf_dynamics_mode=direct_tpf`** is the tensor principal-part route (Theta/I/kappa baseline, **DeltaC omitted in current implementation scope**, optional additive VDSG extension, readout/shunt/cooling rejected). **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper path (uses `tpf_weak_field_correspondence_alpha_si`). **`legacy_readout`** remains available and requires **`tpfcore_enable_provisional_readout = true`**. Inspection and sweep modes have their own requirements — see the TPFCore package README.
 
 Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `YYYYMMDD_HHMMSS`).
 

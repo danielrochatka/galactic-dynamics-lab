@@ -48,7 +48,7 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") 
   CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
 }
 
-TEST_CASE("compute_active_dynamics_branch: legacy weak_field_correspondence string aliases to truncation labels") {
+TEST_CASE("compute_active_dynamics_branch: deprecated weak_field_correspondence alias resolves to correspondence helper labels") {
   Config c;
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "weak_field_correspondence";

@@ -171,7 +171,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
-    if (s == "weak_field_correspondence") s = "v11_weak_field_truncation";
+    if (s == "weak_field_correspondence") s = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
     if (s != "legacy_readout" && s != "v11_weak_field_truncation" && s != "direct_tpf") {
       throw std::runtime_error(
           "tpf_dynamics_mode must be legacy_readout, v11_weak_field_truncation, or direct_tpf, got: " + val);

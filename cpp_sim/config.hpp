@@ -111,14 +111,15 @@ struct Config {
    * TPFCore only: how dynamical accelerations are produced.
    * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
    * - v11_weak_field_truncation: paper v11 weak-field correspondence truncation (Eq. 42-44 superposition scalar), static/quasi-static limit only.
-   * - direct_tpf: canonical paper-facing entry; currently routes to the same v11 weak-field/static low-order truncation
-   *   helper with strict guardrails (DeltaC omitted, VDSG/readout/shunt/cooling rejected).
+   * - direct_tpf: tensor principal-part route (Theta/I/kappa baseline, DeltaC omitted in current implementation scope)
+   *   with strict non-readout/non-stabilizer guardrails and optional additive VDSG extension.
    */
   std::string tpf_dynamics_mode = "legacy_readout";
   /**
-   * TPFCore weak-field correspondence dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
-   * Default -G reproduces Newtonian-like attraction in the weak-field correspondence limit.
-   * This is distinct from closure-only tpf_kappa.
+   * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
+   * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
+   * Default -G reproduces Newtonian-like attraction in the weak-field correspondence helper limit.
+   * This is distinct from closure-only tpf_kappa and does not affect direct_tpf.
    */
   double tpf_weak_field_correspondence_alpha_si = -6.67430e-11;
 
