@@ -12,7 +12,8 @@
  *
  * Dynamics routing: tpf_dynamics_mode legacy_readout uses provisional readout (+ optional VDSG); that path
  * requires tpfcore_enable_provisional_readout. direct_tpf is the canonical paper-facing entry and currently
- * executes the v11 weak-field/static low-order correspondence truncation helper; VDSG must be zero on that path.
+ * executes the v11 weak-field/static low-order correspondence truncation helper; VDSG is an optional additive
+ * extension on top of that baseline.
  * When tpf_vdsg_coupling != 0 on legacy_readout, ax, ay include the VDSG additive modifier on top of readout baseline.
  * When VDSG is off on legacy_readout, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
  * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
@@ -40,7 +41,8 @@ class TPFCorePackage : public PhysicsPackage {
    * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
    * v11_weak_field_truncation: paper-backed weak-field scalar correspondence truncation (static/quasi-static limit).
    * direct_tpf: canonical paper-facing route; currently executes the same weak-field/static truncation helper with
-   * strict guardrails (no VDSG, no provisional readout closures, no shunt, no cooling).
+   * strict non-readout/non-stabilizer guardrails (no provisional readout closures, no shunt, no cooling), and
+   * optional additive VDSG via tpf_vdsg_coupling.
    */
   void compute_accelerations(const State& state,
                             double bh_mass,
@@ -162,6 +164,12 @@ class TPFCorePackage : public PhysicsPackage {
                                                        bool star_star,
                                                        std::vector<double>& ax,
                                                        std::vector<double>& ay) const;
+  void apply_vdsg_additive_extension(const State& state,
+                                     double bh_mass,
+                                     double softening,
+                                     bool star_star,
+                                     std::vector<double>& ax,
+                                     std::vector<double>& ay) const;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

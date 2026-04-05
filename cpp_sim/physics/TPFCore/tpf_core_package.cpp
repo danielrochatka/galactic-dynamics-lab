@@ -3,6 +3,7 @@
  * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
  * Integrator accelerations are route-dependent (see compute_accelerations):
  * - direct_tpf / v11_weak_field_truncation: paper-backed low-order static/quasi-static weak-field helper.
+ *   direct_tpf may optionally add the exploratory VDSG modifier on top of that baseline.
  * - legacy_readout: readout baseline + optional VDSG modifier + optional global |a| shunt.
  */
 
@@ -311,6 +312,21 @@ void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State
                                                       weak_field_correspondence_alpha_si_, ax, ay);
 }
 
+void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
+                                                   double bh_mass,
+                                                   double softening,
+                                                   bool star_star,
+                                                   std::vector<double>& ax,
+                                                   std::vector<double>& ay) const {
+  std::vector<double> dax, day;
+  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                    vdsg_mass_baseline_resolved_kg_, dax, day);
+  for (int i = 0; i < state.n(); ++i) {
+    ax[i] += dax[i];
+    ay[i] += day[i];
+  }
+}
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
@@ -318,11 +334,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
   if (tpf_dynamics_mode_ == "direct_tpf") {
-    if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects nonzero tpf_vdsg_coupling "
-          "(canonical direct_tpf currently runs the v11 weak-field/static truncation sector with VDSG off).");
-    }
     if (provisional_readout_) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
@@ -346,6 +357,10 @@ void TPFCorePackage::compute_accelerations(const State& state,
           "(cooling is a numerical stabilizer outside the current paper-facing low-order truncation route).");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    if (vdsg_coupling_ != 0.0) {
+      apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
+    }
+    last_pipeline_ = AccelPipelineStats{};
     return;
   }
   if (tpf_dynamics_mode_ == "v11_weak_field_truncation") {
