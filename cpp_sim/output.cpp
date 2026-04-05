@@ -123,7 +123,7 @@ void write_run_info(const std::string& output_dir,
       f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
       if (config.tpf_dynamics_mode == "direct_tpf") {
         f << "tpf_core_law_mode\tdirect_tpf\n";
-        f << "tpf_truncation_status\ttensor_principal_part_weak_static_sector\n";
+        f << "tpf_truncation_status\ttensor_principal_part_route_Theta_I_kappa_baseline\n";
         f << "tpf_higher_order_status\tDeltaC_omitted\n";
         f << "tpf_extension_status\tVDSG_additive_extension_continuous_in_coupling\n";
         f << "tpf_provisional_readout_status\toff_required\n";
@@ -173,7 +173,7 @@ void write_run_info(const std::string& output_dir,
       f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
       f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs v11_weak_field_truncation vs direct_tpf); "
            "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
-           "v11_weak_field_truncation is the static/quasi-static Eq.42-44 correspondence truncation; "
+           "v11_weak_field_truncation is the Eq.42-44 weak-field correspondence helper (alpha_si correspondence path); "
            "direct_tpf is canonical paper-facing tensor principal-part route "
            "(field_evaluation -> Theta3D -> principal_Cij -> tensor_projection; DeltaC omitted; additive VDSG extension)\n";
       f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
