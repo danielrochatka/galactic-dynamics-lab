@@ -91,7 +91,7 @@ TEST_CASE("tpfcore_closure_kappa key maps to closure ledger coefficient") {
   CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
 }
 
-TEST_CASE("tpf_dynamics_mode accepts v11_weak_field_truncation and legacy weak_field_correspondence alias") {
+TEST_CASE("tpf_dynamics_mode accepts v11_weak_field_truncation and deprecated weak_field_correspondence alias") {
   Config c;
   CHECK(apply_config_kv("tpf_dynamics_mode", "v11_weak_field_truncation", c));
   CHECK(c.tpf_dynamics_mode == "v11_weak_field_truncation");

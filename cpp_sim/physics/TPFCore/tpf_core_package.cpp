@@ -72,7 +72,7 @@ TPFCorePackage::TPFCorePackage()
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
   if (tpf_dynamics_mode_ == "weak_field_correspondence") {
-    tpf_dynamics_mode_ = "v11_weak_field_truncation";
+    tpf_dynamics_mode_ = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
   }
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;

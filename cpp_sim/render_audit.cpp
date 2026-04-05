@@ -76,6 +76,10 @@ bool tpf_v11_weak_field_truncation_active(const Config& config) {
          config.tpf_dynamics_mode == "weak_field_correspondence";
 }
 
+bool tpf_v11_weak_field_alias_requested(const Config& config) {
+  return config.tpf_dynamics_mode == "weak_field_correspondence";
+}
+
 }  // namespace
 
 std::string compute_active_dynamics_branch(const Config& config) {
@@ -232,13 +236,13 @@ void write_render_manifest(const std::string& output_dir,
       const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
       const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
       json_kv(jf, first, "tpf_core_law_mode",
-              is_direct ? "direct_tpf_canonical_entry"
-                        : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"));
+              is_direct ? "direct_tpf_tensor_principal_part"
+                        : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper" : "legacy_readout_provisional"));
       json_kv(jf, first, "tpf_truncation_mode",
               is_direct
                   ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
                   : (is_v11_alias
-                         ? "v11_weak_field_correspondence_helper_alpha_si_path"
+                         ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
                          : "none"));
       json_kv(jf, first, "tpf_extension_mode",
               is_v11_alias ? "none_vdsg_rejected"
@@ -249,6 +253,11 @@ void write_render_manifest(const std::string& output_dir,
                   : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
                          ? "shunt_or_cooling_configured"
                          : "none"));
+      if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
+        json_kv_bool(jf, first, "tpf_dynamics_mode_deprecated_alias_used", true);
+        json_kv(jf, first, "tpf_dynamics_mode_deprecated_alias_note",
+                "weak_field_correspondence is deprecated; resolves only to v11_weak_field_truncation correspondence helper path");
+      }
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
     json_kv_num(jf, first, "tpfcore_closure_kappa", config.tpf_kappa);
@@ -292,7 +301,8 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "code_version_label", gp.code_version_label);
     json_kv(jf, first, "config_key_aliases_note",
             "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling). "
-            "Legacy key tpf_kappa maps to tpfcore_closure_kappa; parser accepts both (canonical: tpfcore_closure_kappa).");
+            "Legacy key tpf_kappa maps to tpfcore_closure_kappa; parser accepts both (canonical: tpfcore_closure_kappa). "
+            "Deprecated dynamics value alias weak_field_correspondence maps only to v11_weak_field_truncation (correspondence helper path), never to direct_tpf.");
     jf << ",\n  \"config_key_aliases\": [\n";
     jf << "    {\"legacy\": \"tpf_gdd_coupling\", \"canonical\": \"tpf_vdsg_coupling\", "
           "\"accepted_in_config_parser\": true},\n";
@@ -316,14 +326,14 @@ void write_render_manifest(const std::string& output_dir,
       const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
       const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
       tf << "tpf_core_law_mode\t"
-         << (is_direct ? "direct_tpf_canonical_entry"
-                       : (is_v11_alias ? "v11_weak_field_truncation_compat_alias" : "legacy_readout_provisional"))
+         << (is_direct ? "direct_tpf_tensor_principal_part"
+                       : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper" : "legacy_readout_provisional"))
          << "\n";
       tf << "tpf_truncation_mode\t"
          << (is_direct
                  ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
                  : (is_v11_alias
-                        ? "v11_weak_field_correspondence_helper_alpha_si_path"
+                        ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
                         : "none"))
          << "\n";
       tf << "tpf_extension_mode\t"
@@ -337,6 +347,10 @@ void write_render_manifest(const std::string& output_dir,
                         ? "shunt_or_cooling_configured"
                         : "none"))
          << "\n";
+      if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
+        tf << "tpf_dynamics_mode_deprecated_alias_used\t1\n";
+        tf << "tpf_dynamics_mode_deprecated_alias_note\tweak_field_correspondence_is_deprecated_and_resolves_only_to_v11_weak_field_truncation_correspondence_helper_path\n";
+      }
     }
     tf << "physics_package\t" << config.physics_package << "\n";
     tf << "physics_package_compare\t" << config.physics_package_compare << "\n";
