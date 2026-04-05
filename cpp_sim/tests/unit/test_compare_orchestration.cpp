@@ -2,11 +2,10 @@
 #include "doctest.h"
 
 TEST_CASE("compare orchestration chooses process-parallel only when all gates are true") {
-  CHECK(galaxy::should_run_compare_parallel(true, true, false, true));
-  CHECK_FALSE(galaxy::should_run_compare_parallel(false, true, false, true));
-  CHECK_FALSE(galaxy::should_run_compare_parallel(true, false, false, true));
-  CHECK_FALSE(galaxy::should_run_compare_parallel(true, true, true, true));
-  CHECK_FALSE(galaxy::should_run_compare_parallel(true, true, false, false));
+  CHECK(galaxy::should_run_compare_parallel(true, false, true));
+  CHECK_FALSE(galaxy::should_run_compare_parallel(false, false, true));
+  CHECK_FALSE(galaxy::should_run_compare_parallel(true, true, true));
+  CHECK_FALSE(galaxy::should_run_compare_parallel(true, false, false));
 }
 
 #ifndef _WIN32

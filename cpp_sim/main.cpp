@@ -947,7 +947,7 @@ int main(int argc, char** argv) {
                                                 galaxy::last_galaxy_init_audit());
         };
     auto run_compare_side =
-        [&](const char* side_tag, const galaxy::Config& side_cfg) -> int {
+        [&](const char* side_tag, const galaxy::Config& side_cfg, bool force_line_progress) -> int {
           galaxy::PhysicsPackage* side_physics = galaxy::get_physics_package(side_cfg.physics_package);
           if (!side_physics) {
             std::cerr << "Compare mode failed in " << side_tag << " side: unknown package "
@@ -960,7 +960,7 @@ int main(int argc, char** argv) {
           if (n_steps > 0) {
             compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
           }
-          const bool progress_to_terminal = IS_STDOUT_TERMINAL();
+          const bool progress_to_terminal = IS_STDOUT_TERMINAL() && !force_line_progress;
           auto start_wall = std::chrono::steady_clock::now();
           galaxy::ProgressCallback side_progress =
               make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag);
@@ -974,8 +974,7 @@ int main(int argc, char** argv) {
         };
 
     const bool compare_parallel_enabled =
-        galaxy::should_run_compare_parallel(config.compare_parallel, compare_mode_requested,
-                                            compare_same_package,
+        galaxy::should_run_compare_parallel(compare_mode_requested, compare_same_package,
 #ifdef _WIN32
                                             false
 #else
@@ -991,20 +990,27 @@ int main(int argc, char** argv) {
 
     if (compare_parallel_enabled) {
 #ifdef _WIN32
-      std::cerr << "compare_parallel requested but process parallel compare is unavailable on this platform; using sequential mode.\n";
+      std::cerr << "Process-parallel compare is unavailable on this platform; using sequential mode.\n";
       if (run_compare_side("left", left_cfg) != 0) return 1;
       if (run_compare_side("right", right_cfg) != 0) return 1;
 #else
       const std::string left_log = compare_parent_dir + "/left_run.log";
       const std::string right_log = compare_parent_dir + "/right_run.log";
-      std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
+      if (show_live_compare_progress) {
+        std::cout << "Parallel compare enabled; streaming both child progress feeds to terminal.\n";
+      } else {
+        std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
+      }
 
       pid_t left_pid = fork();
       if (left_pid == 0) {
-        FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
-        FILE* le = std::freopen(left_log.c_str(), "a", stderr);
-        if (!lf || !le) _exit(90);
-        const int rc = run_compare_side("left", left_cfg);
+        if (!show_live_compare_progress) {
+          FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
+          FILE* le = std::freopen(left_log.c_str(), "a", stderr);
+          if (!lf || !le) _exit(90);
+        }
+        const int rc = run_compare_side("left", left_cfg, show_live_compare_progress);
         _exit(rc);
       }
       if (left_pid < 0) {
@@ -1014,10 +1020,12 @@ int main(int argc, char** argv) {
 
       pid_t right_pid = fork();
       if (right_pid == 0) {
-        FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
-        FILE* re = std::freopen(right_log.c_str(), "a", stderr);
-        if (!rf || !re) _exit(91);
-        const int rc = run_compare_side("right", right_cfg);
+        if (!show_live_compare_progress) {
+          FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
+          FILE* re = std::freopen(right_log.c_str(), "a", stderr);
+          if (!rf || !re) _exit(91);
+        }
+        const int rc = run_compare_side("right", right_cfg, show_live_compare_progress);
         _exit(rc);
       }
       if (right_pid < 0) {
@@ -1052,11 +1060,8 @@ int main(int argc, char** argv) {
       }
 #endif
     } else {
-      if (config.compare_parallel) {
-        std::cout << "compare_parallel requested but unavailable; falling back to sequential compare.\n";
-      }
-      if (run_compare_side("left", left_cfg) != 0) return 1;
-      if (run_compare_side("right", right_cfg) != 0) return 1;
+      if (run_compare_side("left", left_cfg, false) != 0) return 1;
+      if (run_compare_side("right", right_cfg, false) != 0) return 1;
     }
 
     const galaxy::GitProvenance gp = galaxy::resolve_git_provenance();
