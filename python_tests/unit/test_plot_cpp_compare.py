@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 from plot_cpp_compare import (
     resolve_compare_display_selection,
     _resolve_side_run_dir,
+    _mode_aware_compare_name,
     calculate_compare_smart_viewport,
     matched_steps_strict,
     render_compare,
@@ -54,6 +55,33 @@ def _write_run_info(run_dir: Path, pkg: str) -> None:
         + "\n",
         encoding="utf-8",
     )
+
+
+def _write_run_info_new_schema(run_dir: Path, pkg: str, *, dyn: str = "direct_tpf") -> None:
+    lines = [
+        f"configured_physics_package\t{pkg}",
+        f"effective_physics_package\t{pkg}",
+        "configured_simulation_mode\tgalaxy",
+        "effective_simulation_mode\tgalaxy",
+        "render_overlay_mode\tnone",
+        "code_version_label\ttest@abc1234",
+        "n_steps\t10",
+        "dt\t0.1",
+        "display_distance_unit\tauto",
+        "display_time_unit\tauto",
+        "display_velocity_unit\tauto",
+        "display_units_in_overlay\t1",
+        "display_show_unit_reference\t1",
+    ]
+    if pkg == "TPFCore":
+        lines.extend(
+            [
+                "configured_tpfcore_readout_mode\tlegacy_readout",
+                "configured_tpf_vdsg_coupling\t0.0",
+                f"effective_tpf_dynamics_mode\t{dyn}",
+            ]
+        )
+    (run_dir / "run_info.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 class TestPlotCppCompare(unittest.TestCase):
@@ -105,6 +133,86 @@ class TestPlotCppCompare(unittest.TestCase):
             render_compare(parent, no_animation=True, overlay_mode="none")
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_render_compare_new_schema_mode_aware_names_and_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info_new_schema(left, "TPFCore")
+            _write_run_info_new_schema(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": "r2", "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+
+            render_compare(parent, no_animation=True, overlay_mode="none")
+            expected_initial = _mode_aware_compare_name("initial", {"effective_physics_package": "TPFCore", "effective_simulation_mode": "galaxy", "effective_tpf_dynamics_mode": "direct_tpf"}, {"effective_physics_package": "Newtonian", "effective_simulation_mode": "galaxy"}, ext="png")
+            expected_final = _mode_aware_compare_name("final", {"effective_physics_package": "TPFCore", "effective_simulation_mode": "galaxy", "effective_tpf_dynamics_mode": "direct_tpf"}, {"effective_physics_package": "Newtonian", "effective_simulation_mode": "galaxy"}, ext="png")
+            self.assertTrue((parent / expected_initial).exists())
+            self.assertTrue((parent / expected_final).exists())
+            self.assertNotIn("?", expected_initial)
+            self.assertNotIn("?", expected_final)
+            self.assertTrue((parent / "galaxy_initial_compare.png").exists())
+            self.assertTrue((parent / "galaxy_final_compare.png").exists())
+
+    def test_mode_aware_compare_name_supports_legacy_run_info(self) -> None:
+        left = {"simulation_mode": "galaxy", "physics_package": "TPFCore", "tpf_dynamics_mode": "direct_tpf"}
+        right = {"simulation_mode": "galaxy", "physics_package": "Newtonian"}
+        name = _mode_aware_compare_name("initial", left, right, ext="png")
+        self.assertEqual(
+            name,
+            "galaxy_compare__tpfcore_direct_tpf_vs_newtonian__compare__initial_side_by_side.png",
+        )
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_render_compare_static_uses_first_and_last_step_indices(self) -> None:
+        import plot_cpp_compare
+
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info(left, "TPFCore")
+            _write_run_info(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": "r3", "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+            seen_steps: list[int] = []
+            original_draw = plot_cpp_compare._draw_panel
+
+            def _record_draw(ax, side, snap, viewport, *, spatial_display):
+                seen_steps.append(int(snap.step))
+                return original_draw(ax, side, snap, viewport, spatial_display=spatial_display)
+
+            try:
+                plot_cpp_compare._draw_panel = _record_draw
+                render_compare(parent, no_animation=True, overlay_mode="none")
+            finally:
+                plot_cpp_compare._draw_panel = original_draw
+            self.assertIn(0, seen_steps)
+            self.assertIn(10, seen_steps)
+            self.assertNotEqual(min(seen_steps), max(seen_steps))
 
     def test_compare_animation_does_not_use_ema_radius_smoothing(self) -> None:
         """EMA on shared radius lagged behind per-frame max(r_l,r_r) and clipped stars in video."""

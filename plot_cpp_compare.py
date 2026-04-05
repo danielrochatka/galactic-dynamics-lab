@@ -42,6 +42,68 @@ class CompareDisplaySelection:
     active_velocity_unit: str
 
 
+def _run_info_configured_value(run_info: dict, key: str, default=None):
+    """Configured setting precedence: configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    cfg_key = f"configured_{key}"
+    if cfg_key in run_info:
+        return run_info[cfg_key]
+    if key in run_info:
+        return run_info[key]
+    return default
+
+
+def _run_info_effective_value(run_info: dict, key: str, default=None):
+    """Effective runtime precedence: effective_<key> then configured_<key> then legacy <key>."""
+    if not run_info:
+        return default
+    eff_key = f"effective_{key}"
+    if eff_key in run_info:
+        return run_info[eff_key]
+    cfg = _run_info_configured_value(run_info, key, None)
+    if cfg is not None:
+        return cfg
+    return default
+
+
+def _slug(raw: str) -> str:
+    import re
+
+    s = re.sub(r"[^a-zA-Z0-9]+", "_", str(raw).strip().lower()).strip("_")
+    return s or "unknown"
+
+
+def _simulation_mode_name(run_info: dict) -> str:
+    from plot_cpp_run import simulation_mode_name_from_run_info
+
+    return simulation_mode_name_from_run_info(run_info)
+
+
+def _physics_label(run_info: dict) -> str:
+    from plot_cpp_run import physics_label_from_run_info
+
+    mode = _simulation_mode_name(run_info)
+    return physics_label_from_run_info(run_info, mode)
+
+
+def _panel_physics_text(run_info: dict) -> str:
+    pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip()
+    if not pkg:
+        return "?"
+    if pkg == "TPFCore":
+        dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
+        if dyn:
+            return f"{pkg} ({dyn})"
+    return pkg
+
+
+def _mode_aware_compare_name(stage: str, left_run_info: dict, right_run_info: dict, *, ext: str) -> str:
+    left_lbl = _slug(_physics_label(left_run_info))
+    right_lbl = _slug(_physics_label(right_run_info))
+    return f"galaxy_compare__{left_lbl}_vs_{right_lbl}__compare__{stage}_side_by_side.{ext}"
+
+
 def _load_compare_manifest(parent: Path) -> dict:
     p = parent / "compare_manifest.json"
     if not p.exists():
@@ -189,7 +251,7 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
         spatial_display=spatial_display,
     )
     ax.set_title(
-        f"{side.label} / {str(side.run_info.get('physics_package', '?')).lower()} / primary trajectory x-y",
+        f"{side.label} / {_panel_physics_text(side.run_info)} / primary trajectory x-y / step={int(snap.step)}",
         color="white",
         fontsize=11,
     )
@@ -252,6 +314,10 @@ def render_compare(
         f"half_axis={shared_vp.half_axis:.6g} m, display_distance_unit={shared_display.active_distance_unit}, "
         f"display_time_unit={shared_display.active_time_unit}, display_velocity_unit={shared_display.active_velocity_unit}"
     )
+    print(
+        f"Compare matched-step span: first_step={steps[0]}, last_step={steps[-1]}, "
+        f"shared_half_axis_m={shared_vp.half_axis:.6g}"
+    )
 
     def save_static(step_idx: int, out_name: str) -> None:
         ls = left_snaps[step_idx]
@@ -264,10 +330,12 @@ def render_compare(
                 s.set_color("gray")
         _draw_panel(axes[0], left, ls, shared_vp, spatial_display=spatial_display)
         _draw_panel(axes[1], right, rs, shared_vp, spatial_display=spatial_display)
+        step = int(steps[step_idx])
         fig.suptitle(
-            f"Compare {compare_run_id} | left={left.run_info.get('physics_package', '?')} "
-            f"| right={right.run_info.get('physics_package', '?')} "
-            f"| rev={left.run_info.get('code_version_label', 'unknown')} "
+            f"Compare {compare_run_id} | left={left_panel_label} "
+            f"| right={right_panel_label} "
+            f"| step={step} "
+            f"| rev={left_rev} "
             f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
@@ -289,16 +357,14 @@ def render_compare(
         fig.savefig(parent_dir / out_name, dpi=150, facecolor="black", edgecolor="none")
         plt.close(fig)
 
-    mode_aware_initial = (
-        f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
-        f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__initial_side_by_side.png"
-    )
-    mode_aware_final = (
-        f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
-        f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__final_side_by_side.png"
-    )
+    left_panel_label = _panel_physics_text(left.run_info)
+    right_panel_label = _panel_physics_text(right.run_info)
+    left_rev = str(_run_info_effective_value(left.run_info, "code_version_label", "unknown") or "unknown")
+    mode_aware_initial = _mode_aware_compare_name("initial", left.run_info, right.run_info, ext="png")
+    mode_aware_final = _mode_aware_compare_name("final", left.run_info, right.run_info, ext="png")
     save_static(0, mode_aware_initial)
     save_static(len(steps) - 1, mode_aware_final)
+    # Compatibility aliases: keep historical filenames as copies of the mode-aware primary artifacts.
     shutil.copy2(parent_dir / mode_aware_initial, parent_dir / "galaxy_initial_compare.png")
     shutil.copy2(parent_dir / mode_aware_final, parent_dir / "galaxy_final_compare.png")
 
@@ -336,8 +402,8 @@ def render_compare(
         )
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | {tc} "
-            f"| left={left.run_info.get('physics_package', '?')} "
-            f"| right={right.run_info.get('physics_package', '?')} "
+            f"| left={left_panel_label} "
+            f"| right={right_panel_label} "
             f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
@@ -346,15 +412,11 @@ def render_compare(
         return []
 
     anim = animation.FuncAnimation(fig, animate, frames=len(steps), interval=50, blit=False)
-    mode_aware_anim_mp4 = (
-        parent_dir
-        / f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
-          f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__animation_side_by_side.mp4"
+    mode_aware_anim_mp4 = parent_dir / _mode_aware_compare_name(
+        "animation", left.run_info, right.run_info, ext="mp4"
     )
-    mode_aware_anim_gif = (
-        parent_dir
-        / f"galaxy_compare__{str(left.run_info.get('physics_package', '?')).lower()}_vs_"
-          f"{str(right.run_info.get('physics_package', '?')).lower()}__compare__animation_side_by_side.gif"
+    mode_aware_anim_gif = parent_dir / _mode_aware_compare_name(
+        "animation", left.run_info, right.run_info, ext="gif"
     )
     out_mp4 = parent_dir / f"{compare_run_id}.mp4"
     out_gif = parent_dir / f"{compare_run_id}.gif"
