@@ -119,7 +119,8 @@ struct Config {
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
    * Default -G reproduces Newtonian-like attraction in the weak-field correspondence helper limit.
-   * This is distinct from closure-only tpf_kappa and does not affect direct_tpf.
+   * This is distinct from tpf_kappa (external key that maps to internal TPFCore kappa for direct_tpf and
+   * also feeds the derived-radial closure ledger path).
    */
   double tpf_weak_field_correspondence_alpha_si = -6.67430e-11;
 
@@ -162,9 +163,10 @@ struct Config {
   /** TPFCore derived-radial readout modes: theta_tr scale in diagnostics (not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
   /**
-   * TPFCore closure-only κ for derived radial ledger:
-   *   ρ_eff,closure ~ κ_closure * I
-   * This is a PROVISIONAL closure coefficient for the derived radial shell model, not the paper Eq. (10) κ.
+   * Legacy flat config key for TPFCore coupling:
+   * - external key name remains `tpf_kappa` for compatibility
+   * - maps to internal TPFCore `kappa` used by the direct_tpf tensor principal-part route (paper baseline)
+   * - the same incoming value also feeds derived-radial closure ledger knobs where configured
    * Default 1e32.
    */
   double tpf_kappa = 1.0e32;

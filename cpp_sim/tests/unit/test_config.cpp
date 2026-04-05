@@ -85,7 +85,15 @@ TEST_CASE("explicit tpf_vdsg_coupling still works") {
   CHECK(c.tpf_vdsg_coupling == doctest::Approx(1e-99));
 }
 
-TEST_CASE("tpfcore_closure_kappa key maps to closure ledger coefficient") {
+TEST_CASE("tpf_kappa key parses unchanged and closure alias remains supported") {
+  Config c;
+  CHECK(apply_config_kv("tpf_kappa", "7.5e11", c));
+  CHECK(c.tpf_kappa == doctest::Approx(7.5e11));
+  CHECK(apply_config_kv("tpfcore_closure_kappa", "4.5e12", c));
+  CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
+}
+
+TEST_CASE("tpfcore_closure_kappa key maps to same tpf_kappa storage") {
   Config c;
   CHECK(apply_config_kv("tpfcore_closure_kappa", "4.5e12", c));
   CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
