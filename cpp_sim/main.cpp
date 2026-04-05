@@ -91,7 +91,8 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
     double eta_sec =
         (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
     double pct = 100.0 * step / n_steps;
-    if (progress_to_terminal) {
+    const bool single_line_terminal_progress = progress_to_terminal && stage_tag.empty();
+    if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
       std::cout << "\r\033[2K[ ";
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
@@ -947,7 +948,7 @@ int main(int argc, char** argv) {
                                                 galaxy::last_galaxy_init_audit());
         };
     auto run_compare_side =
-        [&](const char* side_tag, const galaxy::Config& side_cfg, bool force_line_progress) -> int {
+        [&](const char* side_tag, const galaxy::Config& side_cfg) -> int {
           galaxy::PhysicsPackage* side_physics = galaxy::get_physics_package(side_cfg.physics_package);
           if (!side_physics) {
             std::cerr << "Compare mode failed in " << side_tag << " side: unknown package "
@@ -960,7 +961,7 @@ int main(int argc, char** argv) {
           if (n_steps > 0) {
             compare_progress_interval = std::max(1, std::min(1000, n_steps / 100));
           }
-          const bool progress_to_terminal = IS_STDOUT_TERMINAL() && !force_line_progress;
+          const bool progress_to_terminal = IS_STDOUT_TERMINAL();
           auto start_wall = std::chrono::steady_clock::now();
           galaxy::ProgressCallback side_progress =
               make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag);
@@ -998,7 +999,7 @@ int main(int argc, char** argv) {
       const std::string right_log = compare_parent_dir + "/right_run.log";
       const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
       if (show_live_compare_progress) {
-        std::cout << "Parallel compare enabled; streaming both child progress feeds to terminal.\n";
+        std::cout << "Parallel compare enabled; streaming child progress to terminal.\n";
       } else {
         std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
       }
@@ -1010,7 +1011,7 @@ int main(int argc, char** argv) {
           FILE* le = std::freopen(left_log.c_str(), "a", stderr);
           if (!lf || !le) _exit(90);
         }
-        const int rc = run_compare_side("left", left_cfg, show_live_compare_progress);
+        const int rc = run_compare_side("left", left_cfg);
         _exit(rc);
       }
       if (left_pid < 0) {
@@ -1025,7 +1026,7 @@ int main(int argc, char** argv) {
           FILE* re = std::freopen(right_log.c_str(), "a", stderr);
           if (!rf || !re) _exit(91);
         }
-        const int rc = run_compare_side("right", right_cfg, show_live_compare_progress);
+        const int rc = run_compare_side("right", right_cfg);
         _exit(rc);
       }
       if (right_pid < 0) {
@@ -1060,8 +1061,8 @@ int main(int argc, char** argv) {
       }
 #endif
     } else {
-      if (run_compare_side("left", left_cfg, false) != 0) return 1;
-      if (run_compare_side("right", right_cfg, false) != 0) return 1;
+      if (run_compare_side("left", left_cfg) != 0) return 1;
+      if (run_compare_side("right", right_cfg) != 0) return 1;
     }
 
     const galaxy::GitProvenance gp = galaxy::resolve_git_provenance();
