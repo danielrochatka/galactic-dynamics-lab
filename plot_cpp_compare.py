@@ -418,14 +418,10 @@ def render_compare(
     mode_aware_anim_gif = parent_dir / _mode_aware_compare_name(
         "animation", left.run_info, right.run_info, ext="gif"
     )
-    out_mp4 = parent_dir / f"{compare_run_id}.mp4"
-    out_gif = parent_dir / f"{compare_run_id}.gif"
     try:
         anim.save(str(mode_aware_anim_mp4), writer="ffmpeg", fps=20, dpi=100)
-        shutil.copy2(mode_aware_anim_mp4, out_mp4)
     except Exception:
         anim.save(str(mode_aware_anim_gif), writer="pillow", fps=15, dpi=100)
-        shutil.copy2(mode_aware_anim_gif, out_gif)
     plt.close(fig)
 
 
