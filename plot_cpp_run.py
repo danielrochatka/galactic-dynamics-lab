@@ -2,7 +2,7 @@
 """
 Post-process C++ galaxy simulation outputs and generate visualizations.
 
-Reads snapshot CSV files and run_info.txt from a cpp_sim run directory,
+Reads snapshot CSV files and run_info.txt from a engine run directory,
 then produces the same kinds of plots as the Python pipeline:
   - initial and final scatter plots (galaxy view)
   - rotation_curve.png (final snapshot vs Keplerian √(GM/r); M_bh from run_info when present)
@@ -25,14 +25,14 @@ early snapshots for plotting products (animation/PNGs/diagnostics). You can also
 
 Usage:
   python plot_cpp_run.py <run_dir> [--no-animation] [--no-diagnostics]
-  python plot_cpp_run.py cpp_sim/outputs/20260308_175421
+  python plot_cpp_run.py outputs/20260308_175421
 
 Outputs are written into the same run_dir (or run_dir/plots if you prefer;
   currently we write into run_dir to match "same run folder").
 
 Requires: numpy, matplotlib. Optional: ffmpeg or Pillow for animation.
 
-Galaxy runs: cpp_sim writes render_manifest.json and render_manifest.txt (with active_dynamics_branch,
+Galaxy runs: engine writes render_manifest.json and render_manifest.txt (with active_dynamics_branch,
 active_metrics_branch, acceleration_code_path). plot_cpp_run draws optional text overlay on galaxy_*.png
 and animation frames (run_info render_overlay_mode or --render-overlay-mode).
 """
@@ -98,7 +98,7 @@ class Snapshot:
     velocities: np.ndarray
 
 
-# Matches cpp_sim/config.hpp enum class SimulationMode (declaration order).
+# Matches engine/config.hpp enum class SimulationMode (declaration order).
 # Index 1 is two_body_orbit in C++; postprocess uses the same diagnostics as earth_moon_benchmark.
 _SIMULATION_MODE_INT_TO_NAME: dict[int, str] = {
     0: "galaxy",
@@ -415,7 +415,7 @@ def plot_animation_dynamic_zoom_from_run_info(
     run_info: dict[str, str | int | float],
 ) -> bool:
     """
-    Read plot_animation_dynamic_zoom from run_info (written by cpp_sim).
+    Read plot_animation_dynamic_zoom from run_info (written by engine).
     Default False if missing: fixed global geometric smart framing.
     """
     raw = run_info.get("plot_animation_dynamic_zoom")
@@ -567,7 +567,7 @@ def main() -> None:
     parser.add_argument(
         "run_dir",
         type=Path,
-        help="Path to the C++ run directory (e.g. cpp_sim/outputs/YYYYMMDD_HHMMSS)",
+        help="Path to the C++ run directory (e.g. outputs/YYYYMMDD_HHMMSS)",
     )
     parser.add_argument(
         "--no-animation",

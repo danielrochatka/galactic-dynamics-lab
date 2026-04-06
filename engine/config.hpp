@@ -28,7 +28,7 @@ constexpr double kDefaultMoonMassKg = 7.348e22;
 constexpr double kDefaultEarthMoonDistanceM = 3.844e8;
 constexpr double kDefaultMoonTangentialSpeedMps = 1022.0;
 
-// Simulation mode: see config.py VALIDATION_MODES (Python) + "galaxy" + TPFCore inspection modes
+// Simulation modes: galaxy + validation modes + TPFCore inspection/audit modes.
 enum class SimulationMode {
   galaxy,
   two_body_orbit,
@@ -83,7 +83,7 @@ std::vector<ConfigKeyOccurrence> scan_config_key_occurrences(
 // Find first existing run config path (root configs/ only). Returns empty if none found.
 std::string find_run_config_path();
 
-// If cpp_sim/configs/ exists: warn when using root configs, fail when run config was only there. Returns false to exit(1).
+// If engine/configs/ exists: warn when using root configs, fail when run config was only there. Returns false to exit(1).
 bool check_run_config_canonical(const std::string& run_config_path);
 
 // Find package defaults path for given package name. Returns path if exists, else empty.

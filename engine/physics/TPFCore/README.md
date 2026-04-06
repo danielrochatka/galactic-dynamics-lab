@@ -1,8 +1,8 @@
 # TPFCore physics package
 
-**TPFCore** is a **compiled physics package** inside the **Galactic Dynamics Lab** repository (`cpp_sim/physics/TPFCore/`). It implements the **primitive TPF field structure** from the manuscript (configuration displacement **Ξ**, gradient tensor **Θ**, scalar invariant **I**) on the simulation plane, plus **labeled experimental layers** for motion and diagnostics.
+**TPFCore** is a **compiled physics package** inside the **Galactic Dynamics Lab** repository (`engine/physics/TPFCore/`). It implements the **primitive TPF field structure** from the manuscript (configuration displacement **Ξ**, gradient tensor **Θ**, scalar invariant **I**) on the simulation plane, plus **labeled experimental layers** for motion and diagnostics.
 
-It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`cpp_sim`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
+It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
@@ -69,7 +69,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 - **`tpf_global_accel_shunt_enable`**, **`tpf_global_accel_shunt_fraction`**, **`tpf_accel_pipeline_diagnostics_csv`**
 - Inspection: **`tpfcore_probe_radius_*`**, **`tpfcore_dump_*`**, **`tpfcore_source_softening`**
 
-**Simulation-wide** keys (galaxy ICs, validation scenario ICs, softening, `n_stars`, etc.) belong to the **application** config + scenario resolver (`cpp_sim/scenario_defaults.cpp`, `cpp_sim/resolved_scenario.cpp`), not this file alone — see **[../../README.md](../../README.md)**.
+**Simulation-wide** keys (galaxy ICs, validation scenario ICs, softening, `n_stars`, etc.) belong to the **application** config + scenario resolver (`engine/scenario_defaults.cpp`, `engine/resolved_scenario.cpp`), not this file alone — see **[../../README.md](../../README.md)**.
 
 ---
 

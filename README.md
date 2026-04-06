@@ -1,30 +1,28 @@
 # Galactic Dynamics Lab
 
-**Galactic Dynamics Lab** is an experimental simulation and analysis environment for galactic dynamics, N-body systems, and pluggable physics packages.
+Galactic Dynamics Lab now has **one simulator runtime**: the native C++ engine in `engine/`.
 
-## What this repository is
+## Repository layout
 
-- **Unified framework** — One codebase hosts the simulation engine, package registry, configs, diagnostics, and plotting scripts.
-- **Pluggable physics** — The C++ engine supports multiple packages (for example `Newtonian` and `TPFCore`) through package dispatch.
-- **Simulation + analysis** — `cpp_sim/` provides the main C++ simulator; Python scripts handle post-processing and plotting.
+| Path | Purpose |
+|---|---|
+| `engine/` | Authoritative simulator runtime (build, stepping, package dispatch, manifests). |
+| `configs/` | Root-level run configuration files (authoritative run-config surface). |
+| `outputs/` | Root-level run outputs (authoritative output surface). |
+| `docs/` | Project documentation. |
+| `tools/` *(optional)* / root Python scripts | Plotting, diagnostics, analysis, and migration helpers. |
+| `python_tests/` | Python tests for tooling/post-processing. |
 
-## Repo map
+## Runtime model
 
-| Area | Role |
-|------|------|
-| **`cpp_sim/`** | C++ N-body engine, package registry, config parsing, outputs. |
-| **`cpp_sim/physics/Newtonian/`** | Baseline Newtonian package. |
-| **`cpp_sim/physics/TPFCore/`** | TPF package implementation and package-local documentation. |
-| **`configs/`** | Run configs used by the simulator. |
-| **`plot_cpp_run.py`** | Post-process C++ run directories into plots and animations. |
-| **Python (`main.py`, …)** | Reference Python tools, helpers, and diagnostics. |
+- There is no Python simulation runtime path in this repository anymore.
+- Physics runtime packages remain compiled C++ packages under `engine/physics/`.
+- Python is tooling-only: plotting, diagnostics, analysis, and tests.
 
 ## Quick start
 
-| Goal | Start here |
-|------|------------|
-| Build and run C++ simulator | [cpp_sim/README.md](cpp_sim/README.md) |
-| TPF package docs | [cpp_sim/physics/TPFCore/README.md](cpp_sim/physics/TPFCore/README.md) |
-| Example config keys | [configs/example.cfg](configs/example.cfg) |
+- Build/run engine: [`engine/README.md`](engine/README.md)
+- TPFCore package docs: [`engine/physics/TPFCore/README.md`](engine/physics/TPFCore/README.md)
+- Config examples: [`configs/example.cfg`](configs/example.cfg)
 
-For audit outputs, inspect `run_info.txt` and (when enabled) `render_manifest.json` in each run directory.
+For each run, inspect `run_info.txt` and (when enabled) `render_manifest.json` in the corresponding `outputs/<run_id>/` directory.

@@ -150,13 +150,13 @@ class TestPostprocessTruthfulness(unittest.TestCase):
             self.assertIn("first_saved_snapshot_step=100", out)
 
     def test_run_info_contains_explicit_cooling_fields(self) -> None:
-        cpp_dir = REPO_ROOT / "cpp_sim"
+        cpp_dir = REPO_ROOT / "engine"
         bin_path = cpp_dir / "galaxy_sim"
         if not bin_path.exists():
-            self.skipTest("requires built cpp_sim/galaxy_sim")
+            self.skipTest("requires built engine/galaxy_sim")
 
         run_id = "test_cooling_meta_py"
-        out_dir = f"outputs/{run_id}"
+        out_dir = f"../outputs/{run_id}"
         cmd = [
             str(bin_path),
             "galaxy",
