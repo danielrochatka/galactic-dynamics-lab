@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from framing import SquareViewport, global_viewport_from_snapshots
+from framing import SquareViewport
 from display_units import (
     DisplayUnitConfig,
     display_unit_config_from_run_info,
@@ -180,15 +180,54 @@ def _fallback_render_radius_m(run_info: dict) -> float:
 def calculate_compare_smart_viewport(
     left_snaps: list[object], right_snaps: list[object], fallback: float
 ) -> SquareViewport:
-    """One square viewport containing all particles from both sides (all matched frames) plus origin."""
-    combo = list(left_snaps) + list(right_snaps)
-    return global_viewport_from_snapshots(
-        combo,
-        extra_xy=np.array([[0.0, 0.0]], dtype=np.float64),
-        trim_fraction=0.01,
-        margin=1.15,
-        fallback_half_axis=float(max(1.0, fallback)),
-    )
+    """
+    Compare-only robust shared viewport over matched frames.
+
+    For each frame: pool left+right points (+origin), compute frame-wise median center and a robust
+    bulk radius (quantile of radii). Across frames: median center and quantile of per-frame radii.
+    """
+    FRAME_BULK_Q = 0.985
+    TIME_BULK_Q = 0.90
+    MARGIN = 1.10
+    fb = float(max(1.0, fallback))
+
+    frame_centers_x: list[float] = []
+    frame_centers_y: list[float] = []
+    frame_bulk_radii: list[float] = []
+
+    for left_snap, right_snap in zip(left_snaps, right_snaps):
+        left_xy = np.asarray(getattr(left_snap, "positions", []), dtype=np.float64).reshape(-1, 2)
+        right_xy = np.asarray(getattr(right_snap, "positions", []), dtype=np.float64).reshape(-1, 2)
+        pooled_xy = np.vstack(
+            [left_xy, right_xy, np.array([[0.0, 0.0]], dtype=np.float64)]
+        )
+        x = pooled_xy[:, 0]
+        y = pooled_xy[:, 1]
+        finite = np.isfinite(x) & np.isfinite(y)
+        if not np.any(finite):
+            continue
+        xf = x[finite]
+        yf = y[finite]
+        cx = float(np.median(xf))
+        cy = float(np.median(yf))
+        r = np.sqrt((xf - cx) ** 2 + (yf - cy) ** 2)
+        if r.size == 0:
+            continue
+        ri = float(np.quantile(r, FRAME_BULK_Q))
+        if np.isfinite(ri):
+            frame_centers_x.append(cx)
+            frame_centers_y.append(cy)
+            frame_bulk_radii.append(ri)
+
+    if not frame_bulk_radii:
+        return SquareViewport(0.0, 0.0, fb)
+
+    shared_cx = float(np.median(np.asarray(frame_centers_x, dtype=np.float64)))
+    shared_cy = float(np.median(np.asarray(frame_centers_y, dtype=np.float64)))
+    shared_half_axis = float(np.quantile(np.asarray(frame_bulk_radii, dtype=np.float64), TIME_BULK_Q)) * MARGIN
+    if not np.isfinite(shared_half_axis) or shared_half_axis <= 0.0:
+        shared_half_axis = fb
+    return SquareViewport(shared_cx, shared_cy, max(shared_half_axis, 1e-30))
 
 
 def _resolve_compare_preferred_unit(left: str, right: str) -> str:

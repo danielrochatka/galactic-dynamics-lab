@@ -325,6 +325,71 @@ class TestPlotCppCompare(unittest.TestCase):
         vp = calculate_compare_smart_viewport([snap_l], [snap_r], 150.0)
         self.assertGreater(vp.half_axis, 1e26)
 
+    def test_compare_smart_viewport_ignores_small_persistent_escapees(self) -> None:
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        rng = np.random.default_rng(7)
+        left_snaps = []
+        right_snaps = []
+        n = 1000
+        n_out = 5  # 0.5% per side; 1% pooled, below FRAME_BULK_Q tail
+        for step in range(12):
+            near_l = rng.normal(scale=10.0, size=(n - n_out, 2))
+            near_r = rng.normal(scale=10.0, size=(n - n_out, 2))
+            out_l = np.column_stack([np.full(n_out, 1.0e6), rng.normal(scale=100.0, size=n_out)])
+            out_r = np.column_stack([np.full(n_out, -1.0e6), rng.normal(scale=100.0, size=n_out)])
+            pos_l = np.vstack([near_l, out_l])
+            pos_r = np.vstack([near_r, out_r])
+            vel = np.zeros_like(pos_l)
+            left_snaps.append(Snapshot(step, float(step), pos_l, vel))
+            right_snaps.append(Snapshot(step, float(step), pos_r, vel))
+
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
+        self.assertLess(vp.half_axis, 1.0e4)
+
+    def test_compare_smart_viewport_expands_when_many_far_out(self) -> None:
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        rng = np.random.default_rng(8)
+        left_snaps = []
+        right_snaps = []
+        n = 1000
+        n_out = 250  # 25%
+        for step in range(10):
+            near = rng.normal(scale=10.0, size=(n - n_out, 2))
+            out_l = np.column_stack([np.full(n_out, 1.0e5), rng.normal(scale=100.0, size=n_out)])
+            out_r = np.column_stack([np.full(n_out, -1.0e5), rng.normal(scale=100.0, size=n_out)])
+            pos_l = np.vstack([near, out_l])
+            pos_r = np.vstack([near, out_r])
+            vel = np.zeros_like(pos_l)
+            left_snaps.append(Snapshot(step, float(step), pos_l, vel))
+            right_snaps.append(Snapshot(step, float(step), pos_r, vel))
+
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
+        self.assertGreater(vp.half_axis, 5.0e4)
+
+    def test_compare_smart_viewport_uses_both_panels_each_frame(self) -> None:
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        left_snaps = []
+        right_snaps = []
+        for step in range(6):
+            pos_l = np.column_stack([np.full(300, 1.0e4), np.zeros(300)])
+            pos_r = np.column_stack([np.full(300, -1.0e4), np.zeros(300)])
+            vel = np.zeros_like(pos_l)
+            left_snaps.append(Snapshot(step, float(step), pos_l, vel))
+            right_snaps.append(Snapshot(step, float(step), pos_r, vel))
+
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
+        self.assertAlmostEqual(vp.center_x, 0.0, places=6)
+        self.assertGreater(vp.half_axis, 9.0e3)
+
     def test_compare_display_selection_shared_distance_unit(self) -> None:
         left = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
         right = DisplayUnitConfig(distance_unit="auto", time_unit="day", velocity_unit="km/s")
