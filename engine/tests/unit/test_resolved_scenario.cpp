@@ -55,6 +55,7 @@ TEST_CASE("resolve bh_orbit_validation and symmetric_pair mode defaults") {
     galaxy::Config c;
     c.simulation_mode = galaxy::SimulationMode::symmetric_pair;
     c.validation_symmetric_include_bh = false;
+    c.explicit_overrides.validation_symmetric_include_bh = true;
     c.bh_mass = 42.0;
     auto r = galaxy::resolve_scenario(c);
     CHECK(r.initializer_used == "init_symmetric_pair");

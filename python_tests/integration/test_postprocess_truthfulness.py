@@ -83,7 +83,7 @@ class TestPostprocessTruthfulness(unittest.TestCase):
 
         m, src, fb = prc.resolve_newtonian_overlay_mass({"bh_mass": 42.0}, cli_m_bh=None)
         self.assertEqual(m, 42.0)
-        self.assertEqual(src, "run_info(bh_mass)")
+        self.assertEqual(src, "run_info(effective/configured/legacy bh_mass)")
         self.assertFalse(fb)
 
     def test_rotation_fallback_mass_prints_warning(self) -> None:

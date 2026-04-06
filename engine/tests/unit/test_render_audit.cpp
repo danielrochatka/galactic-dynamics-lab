@@ -43,25 +43,21 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
+        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
+        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_direct_tpf_accelerations (tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> "
+        "TPFCorePackage::compute_direct_tpf_accelerations (principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> "
         "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
         "rejected) + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)");
 
   c.tpf_vdsg_coupling = 1e-12;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
+        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
+        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
-        "TPFCorePackage::compute_direct_tpf_accelerations (tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> "
+        "TPFCorePackage::compute_direct_tpf_accelerations (principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> "
         "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
         "rejected) + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)");
 }
