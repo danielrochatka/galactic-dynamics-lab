@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Run all integration test scripts (app + physics packages). Sets CPP_SIM_ROOT for children.
+# Run all integration test scripts (app + physics packages). Sets ENGINE_ROOT for children.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export CPP_SIM_ROOT="$ROOT"
+export ENGINE_ROOT="$ROOT"
 # Deterministic baseline; overrides developer my.local.cfg when set in main.cpp.
 export GALAXY_RUN_CONFIG="$ROOT/../configs/smoke_test.cfg"
 cd "$ROOT"
 
 if [[ ! -x ./galaxy_sim ]]; then
-  echo "error: build galaxy_sim first (cd cpp_sim && make)" >&2
+  echo "error: build galaxy_sim first (cd engine && make)" >&2
   exit 1
 fi
 
@@ -25,7 +25,7 @@ if [[ ${#SCRIPTS[@]} -eq 0 ]]; then
   exit 0
 fi
 
-echo "=== cpp_sim integration (${#SCRIPTS[@]} script(s)) ==="
+echo "=== engine integration (${#SCRIPTS[@]} script(s)) ==="
 for s in "${SCRIPTS[@]}"; do
   echo "--- $s ---"
   bash "$s"

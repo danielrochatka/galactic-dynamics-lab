@@ -104,7 +104,7 @@ def make_output_dir(base: Path, name: str) -> Path:
     return out
 
 
-def run_sim(cpp_sim_dir: Path, output_dir: Path, physics_package: str, log_path: Path, scale: float | None = None) -> None:
+def run_sim(engine_dir: Path, output_dir: Path, physics_package: str, log_path: Path, scale: float | None = None) -> None:
     cmd = [
         "./galaxy_sim",
         "earth_moon_benchmark",
@@ -129,7 +129,7 @@ def run_sim(cpp_sim_dir: Path, output_dir: Path, physics_package: str, log_path:
                 f"--tpfcore_readout_scale={scale:.17e}",
             ]
         )
-    run_cmd(cmd, cwd=cpp_sim_dir, log_path=log_path)
+    run_cmd(cmd, cwd=engine_dir, log_path=log_path)
 
 
 def format_table(rows: Iterable[Metrics]) -> str:
@@ -156,14 +156,14 @@ def main() -> int:
     parser.add_argument("--max-refinements", type=int, default=3)
     parser.add_argument("--tol-width", type=float, default=2.0e-16)
     parser.add_argument("--improvement-eps", type=float, default=1.0e-7)
-    parser.add_argument("--outputs-root", default="cpp_sim/outputs")
+    parser.add_argument("--outputs-root", default="outputs")
     parser.add_argument("--session-name", default=None)
     parser.add_argument("--reuse-existing-reference", action="store_true", help="Reuse existing Newtonian reference if present.")
     parser.add_argument("--stop-when-interior", action="store_true", help="Continue refinements until best point is interior to current refinement bracket.")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent
-    cpp_sim_dir = repo_root / "cpp_sim"
+    engine_dir = repo_root / "engine"
     outputs_root = (repo_root / args.outputs_root).resolve()
     stamp = args.session_name or datetime.now(timezone.utc).strftime("calibration_%Y%m%dT%H%M%SZ")
     session_root = outputs_root / stamp
@@ -176,8 +176,8 @@ def main() -> int:
     if args.reuse_existing_reference and ref_csv.exists():
         pass
     else:
-        run_cmd(["make"], cwd=cpp_sim_dir, log_path=log_path)
-        run_sim(cpp_sim_dir, ref_out, "Newtonian", log_path=log_path)
+        run_cmd(["make"], cwd=engine_dir, log_path=log_path)
+        run_sim(engine_dir, ref_out, "Newtonian", log_path=log_path)
         ref_csv = ensure_diag_csv(ref_out, repo_root, log_path=log_path)
     ref = load_diag_csv(ref_csv)
 
@@ -209,7 +209,7 @@ def main() -> int:
         out.mkdir(parents=True, exist_ok=True)
         csv_path = out / "diagnostic_two_body_timeseries.csv"
         if not csv_path.exists():
-            run_sim(cpp_sim_dir, out, "TPFCore", log_path=log_path, scale=key)
+            run_sim(engine_dir, out, "TPFCore", log_path=log_path, scale=key)
             csv_path = ensure_diag_csv(out, repo_root, log_path=log_path)
         tpf = load_diag_csv(csv_path)
         final_sep_delta, rms_sep, rms_vel, lz_drift, e_drift, score = score_against_reference(tpf, ref)

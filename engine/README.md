@@ -1,4 +1,4 @@
-# cpp_sim — N-body simulation engine
+# engine — N-body simulation engine
 
 This directory is the **C++ simulation application** for **[Galactic Dynamics Lab](../README.md)** (the repository root): velocity Verlet, pluggable **physics packages**, layered configuration, and structured outputs. **Rendering** is not built into the binary; use **`plot_cpp_run.py`** from the repo root on a finished run directory.
 
@@ -9,7 +9,7 @@ This README describes the **engine** (build, config, outputs, plotting) and how 
 ## Build
 
 ```bash
-cd cpp_sim
+cd engine
 make
 ```
 
@@ -19,7 +19,7 @@ Requires C++11 (`g++` or `clang++`). No external libraries.
 
 ## Run
 
-From **`cpp_sim/`**:
+From **`engine/`**:
 
 ```bash
 ./galaxy_sim [simulation_mode]
@@ -38,7 +38,7 @@ From **`cpp_sim/`**:
 
 Full mode list and errors for unknown modes are printed by the binary. For **TPFCore** particle integration: **`tpf_dynamics_mode=direct_tpf`** is the tensor principal-part route (Theta/I/kappa baseline, **DeltaC omitted in current implementation scope**, optional additive VDSG extension, readout/shunt/cooling rejected). **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper path (uses `tpf_weak_field_correspondence_alpha_si`). **`legacy_readout`** remains available and requires **`tpfcore_enable_provisional_readout = true`**. Inspection and sweep modes have their own requirements — see the TPFCore package README.
 
-Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `YYYYMMDD_HHMMSS`).
+Outputs go under **root `outputs/`** (default from `engine/` cwd: `../outputs/<run_id>/`, where `run_id` is often `YYYYMMDD_HHMMSS`).
 
 ---
 
@@ -51,7 +51,7 @@ Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `
 | Built-in defaults | `config.hpp` (`Config`). |
 | Scenario defaults by mode | `scenario_defaults.cpp` (applied by `resolve_scenario`). |
 | Package defaults | **`physics/<Package>/defaults.cfg`** only (e.g. `physics/TPFCore/defaults.cfg`). |
-| Run config | **Repository root `configs/`** only — e.g. `../configs/my.local.cfg` when cwd is `cpp_sim/`. **Not** `cpp_sim/configs/`. |
+| Run config | **Repository root `configs/`** only — e.g. `../configs/my.local.cfg` when cwd is `engine/`. **Not** `engine/configs/`. |
 
 **Precedence:** built-in → package defaults → root run config/CLI keys (config values) → scenario resolution by mode (`resolve_scenario`) for effective IC + mode controls.
 
@@ -75,7 +75,7 @@ physics_package = Newtonian
 physics_package = TPFCore
 ```
 
-Adding a new package: implement **`physics/physics_package.hpp`**, register in **`registry.cpp`**, optional **`physics/<Name>/defaults.cfg`**. See **`physics/Template/`** for a stub.
+Adding a new package: implement **`physics/physics_package.hpp`**, add a self-registration block in the package translation unit via `register_physics_package_factory(...)`, and (optionally) provide **`physics/<Name>/defaults.cfg`**. See **`physics/Template/`** for a stub.
 
 ### Galaxy initialization (templates)
 
@@ -108,7 +108,7 @@ The binary **does not** draw PNG/MP4. After a run:
 
 ```bash
 # from repo root (use python3 or your venv’s python)
-python3 plot_cpp_run.py cpp_sim/outputs/<run_id>
+python3 plot_cpp_run.py outputs/<run_id>
 ```
 
 This produces mode-aware filenames using **`<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>`** (for example `bh_orbit_validation__newtonian__primary__pair_separation__timeseries.png`) and also keeps legacy aliases such as **`galaxy_initial.png`**, **`galaxy_final.png`**, optional **`galaxy.mp4`**, and **`rotation_curve.png`** for backward compatibility. It may honor **`render_overlay_mode`** from **`run_info`** (or **`--render-overlay-mode`**): **`none`** | **`minimal`** | **`audit_full`**. Overlays read **`run_info`** and **`render_manifest.json`** so plots show **dynamics vs metrics** and coupling without opening source.
@@ -142,18 +142,18 @@ Config keys:
 
 ---
 
-## Python reference vs C++
+## Python tooling scope
 
-The repo includes a **Python** simulator (`main.py`, …) for reference and validation. For comparable modes, results should agree within floating-point tolerance. **C++** is the path used for large galaxy runs and audit manifests.
+Python is tooling-only in this repository: plotting, diagnostics, rendering helpers, and tests. There is no Python simulator runtime path.
 
 ---
 
 ## Testing
 
-Automated tests (doctest, shell smoke scripts, Python `unittest`) live under `tests/` and `physics/*/tests/`; see **[../docs/TESTING.md](../docs/TESTING.md)**. From repo root: `./run_tests.sh`. From `cpp_sim/`: `make test`.
+Automated tests (doctest, shell smoke scripts, Python `unittest`) live under `tests/` and `physics/*/tests/`; see **[../docs/TESTING.md](../docs/TESTING.md)**. From repo root: `./run_tests.sh`. From `engine/`: `make test`.
 
 ---
 
-## Compare C++ vs Python (sanity)
+## Compare mode inside the engine
 
-Same `simulation_mode` and aligned parameters: compare final **`snapshot_*.csv`** and **`run_info`** fields. Run C++ from `cpp_sim/`; run Python from repo root per `main.py` / `config.py`.
+Use `physics_package` + `physics_package_compare` to run side-by-side native-package compares from the same C++ runtime and IC seed.

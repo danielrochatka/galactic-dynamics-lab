@@ -103,6 +103,18 @@ namespace {
 
 const double C_SI_LIGHT = 299792458.0;
 
+struct TPFCoreRegistrar {
+  TPFCoreRegistrar() {
+    register_physics_package_factory(
+        "TPFCore",
+        []() -> std::unique_ptr<PhysicsPackage> {
+          return std::unique_ptr<PhysicsPackage>(new TPFCorePackage());
+        });
+  }
+};
+
+TPFCoreRegistrar s_tpfcore_registrar;
+
 /** Cap total |a| to fraction * |v|/dt per star when enabled. Returns per-particle cap count. */
 unsigned apply_global_accel_magnitude_shunt(const State& state, double dt, bool enable, double fraction,
                                               std::vector<double>& ax, std::vector<double>& ay) {

@@ -4,12 +4,12 @@ Binary search for the largest stable tpf_vdsg_coupling in a bounded interval.
 
 Stable = 100%% of stars have r <= 2e20 m in snapshot at n_steps (default 5000).
 
-Requires: built galaxy_sim, run from repo root (or pass --cpp-sim). Uses your
+Requires: built galaxy_sim, run from repo root (or pass --engine). Uses your
 configs/my.local.cfg (TPFCore + provisional readout, etc.) plus CLI overrides.
 
 Example:
   python3 hunt_coupling.py
-  python3 hunt_coupling.py --cpp-sim /path/to/cpp_sim
+  python3 hunt_coupling.py --engine /path/to/engine
 """
 
 from __future__ import annotations
@@ -29,16 +29,16 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent
 
 
-def find_galaxy_sim(cpp_sim: Path) -> Path:
-    exe = cpp_sim / "galaxy_sim"
+def find_galaxy_sim(engine: Path) -> Path:
+    exe = engine / "galaxy_sim"
     if not exe.is_file():
-        raise FileNotFoundError(f"Missing {exe} (run make -C cpp_sim first)")
+        raise FileNotFoundError(f"Missing {exe} (run make -C engine first)")
     return exe
 
 
-def newest_snapshot_at_step(cpp_sim: Path, step: int) -> Path | None:
-    """Most recently modified snapshot_{step:05d}.csv under cpp_sim/outputs/."""
-    outs = cpp_sim / "outputs"
+def newest_snapshot_at_step(repo_root: Path, step: int) -> Path | None:
+    """Most recently modified snapshot_{step:05d}.csv under outputs/."""
+    outs = repo_root / "outputs"
     if not outs.is_dir():
         return None
     name = f"snapshot_{step:05d}.csv"
@@ -109,7 +109,8 @@ def snapshot_all_within_r(path: Path, r_max: float) -> tuple[bool, int, int, flo
 
 
 def run_once(
-    cpp_sim: Path,
+    repo_root: Path,
+    engine: Path,
     exe: Path,
     coupling: float,
     n_steps: int,
@@ -125,16 +126,16 @@ def run_once(
     ]
     proc = subprocess.run(
         cmd,
-        cwd=str(cpp_sim),
+        cwd=str(engine),
         capture_output=True,
         text=True,
     )
     if proc.returncode != 0:
         return False, f"galaxy_sim exit {proc.returncode}\n{proc.stderr[-2000:]}"
 
-    snap = newest_snapshot_at_step(cpp_sim, n_steps)
+    snap = newest_snapshot_at_step(repo_root, n_steps)
     if snap is None:
-        return False, f"No snapshot_{n_steps:05d}.csv under {cpp_sim / 'outputs'} (check snapshot_every divides n_steps)"
+        return False, f"No snapshot_{n_steps:05d}.csv under {repo_root / 'outputs'} (check snapshot_every divides n_steps)"
 
     ok, n_ok, n_tot, r_worst = snapshot_all_within_r(snap, R_ESCAPE_LIMIT)
     if not ok:
@@ -144,7 +145,7 @@ def run_once(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Binary search stable tpf_vdsg_coupling")
-    parser.add_argument("--cpp-sim", type=Path, default=repo_root() / "cpp_sim", help="Path to cpp_sim directory")
+    parser.add_argument("--engine", type=Path, default=repo_root() / "engine", help="Path to engine directory")
     parser.add_argument("--low", type=float, default=17000.0)
     parser.add_argument("--high", type=float, default=18500.0)
     parser.add_argument("--tol", type=float, default=5.0, help="Stop when high - low < this")
@@ -157,9 +158,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cpp_sim = args.cpp_sim.resolve()
+    engine = args.engine.resolve()
     try:
-        exe = find_galaxy_sim(cpp_sim)
+        exe = find_galaxy_sim(engine)
     except FileNotFoundError as e:
         print(e, file=sys.stderr)
         return 1
@@ -178,7 +179,8 @@ def main() -> int:
         return 1
 
     print(f"Checking low={low:g} (sanity)...")
-    ok_low, msg_low = run_once(cpp_sim, exe, low, n_steps, args.snapshot_every)
+    root = repo_root()
+    ok_low, msg_low = run_once(root, engine, exe, low, n_steps, args.snapshot_every)
     print(f"  {msg_low}")
     if not ok_low:
         print("Error: lower bound is not stable; widen range or fix physics.", file=sys.stderr)
@@ -190,7 +192,7 @@ def main() -> int:
     while high - low >= tol:
         mid = 0.5 * (low + high)
         print(f"Trying mid={mid:.6g} (bracket [{low:g}, {high:g}])...")
-        ok, msg = run_once(cpp_sim, exe, mid, n_steps, args.snapshot_every)
+        ok, msg = run_once(root, engine, exe, mid, n_steps, args.snapshot_every)
         print(f"  {msg}")
         if ok:
             best_stable = mid

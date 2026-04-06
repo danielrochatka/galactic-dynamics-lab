@@ -4,6 +4,18 @@
 namespace galaxy {
 namespace {
 constexpr double G_SI = 6.6743e-11;
+
+struct NewtonianRegistrar {
+  NewtonianRegistrar() {
+    register_physics_package_factory(
+        "Newtonian",
+        []() -> std::unique_ptr<PhysicsPackage> {
+          return std::unique_ptr<PhysicsPackage>(new NewtonianPackage());
+        });
+  }
+};
+
+NewtonianRegistrar s_newtonian_registrar;
 }
 
 void NewtonianPackage::compute_accelerations(const State& state,

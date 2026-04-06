@@ -9,6 +9,7 @@
 
 #include "../config.hpp"
 #include "../types.hpp"
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -70,6 +71,15 @@ PhysicsPackage* get_physics_package(const std::string& name);
 
 /** Returns true if the named package is available. */
 bool has_physics_package(const std::string& name);
+
+/** Factory function type used by the package registry. */
+using PhysicsPackageFactory = std::function<std::unique_ptr<PhysicsPackage>()>;
+
+/**
+ * Register a package factory under a stable package name.
+ * Returns false if name is empty, factory is null, or the name is already registered.
+ */
+bool register_physics_package_factory(const std::string& name, PhysicsPackageFactory factory);
 
 }  // namespace galaxy
 

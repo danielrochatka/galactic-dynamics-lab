@@ -3,10 +3,10 @@
 # TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:<mode>.
 # acceleration_code_path string is unchanged (same pipeline; VDSG is additive on legacy_readout).
 set -euo pipefail
-if [[ -z "${CPP_SIM_ROOT:-}" ]]; then
-  export CPP_SIM_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+if [[ -z "${ENGINE_ROOT:-}" ]]; then
+  export ENGINE_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 fi
-source "$CPP_SIM_ROOT/tests/integration/_env.sh"
+source "$ENGINE_ROOT/tests/integration/_env.sh"
 OUT0=$(mktemp -d)
 OUT1=$(mktemp -d)
 trap 'rm -rf "$OUT0" "$OUT1"' EXIT
