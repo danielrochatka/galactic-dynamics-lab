@@ -6,6 +6,7 @@ Render declared side-by-side compare outputs from a compare parent directory.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import shutil
 from dataclasses import dataclass
@@ -178,22 +179,28 @@ def _fallback_render_radius_m(run_info: dict) -> float:
 
 
 def calculate_compare_smart_viewport(
-    left_snaps: list[object], right_snaps: list[object], fallback: float
+    left_snaps: list[object],
+    right_snaps: list[object],
+    fallback: float,
+    *,
+    coverage: float = 0.95,
 ) -> SquareViewport:
     """
-    Compare-only robust shared viewport over matched frames.
+    Compare-only fixed shared viewport over matched frames.
 
-    For each frame: pool left+right points (+origin), compute frame-wise median center and a robust
-    bulk radius (quantile of radii). Across frames: median center and quantile of per-frame radii.
+    For each matched frame, pool left+right points (+origin), compute a minimum-area
+    axis-aligned rectangle containing the requested point fraction, convert it to a
+    square viewport, and apply a small fixed margin. The final compare viewport is
+    the union of those per-frame squares across time.
     """
-    FRAME_BULK_Q = 0.985
-    TIME_BULK_Q = 0.90
     MARGIN = 1.10
     fb = float(max(1.0, fallback))
+    cov = _validate_compare_coverage(coverage)
 
-    frame_centers_x: list[float] = []
-    frame_centers_y: list[float] = []
-    frame_bulk_radii: list[float] = []
+    union_xmin: float | None = None
+    union_xmax: float | None = None
+    union_ymin: float | None = None
+    union_ymax: float | None = None
 
     for left_snap, right_snap in zip(left_snaps, right_snaps):
         left_xy = np.asarray(getattr(left_snap, "positions", []), dtype=np.float64).reshape(-1, 2)
@@ -206,28 +213,110 @@ def calculate_compare_smart_viewport(
         finite = np.isfinite(x) & np.isfinite(y)
         if not np.any(finite):
             continue
-        xf = x[finite]
-        yf = y[finite]
-        cx = float(np.median(xf))
-        cy = float(np.median(yf))
-        r = np.sqrt((xf - cx) ** 2 + (yf - cy) ** 2)
-        if r.size == 0:
-            continue
-        ri = float(np.quantile(r, FRAME_BULK_Q))
-        if np.isfinite(ri):
-            frame_centers_x.append(cx)
-            frame_centers_y.append(cy)
-            frame_bulk_radii.append(ri)
+        points = np.column_stack([x[finite], y[finite]])
+        xmin, xmax, ymin, ymax = minimum_axis_aligned_box_covering_fraction(points, cov)
+        cx = 0.5 * (xmin + xmax)
+        cy = 0.5 * (ymin + ymax)
+        half_axis = 0.5 * max(xmax - xmin, ymax - ymin) * MARGIN
+        if not np.isfinite(half_axis) or half_axis <= 0.0:
+            half_axis = fb
+        sq_xmin = cx - half_axis
+        sq_xmax = cx + half_axis
+        sq_ymin = cy - half_axis
+        sq_ymax = cy + half_axis
+        union_xmin = sq_xmin if union_xmin is None else min(union_xmin, sq_xmin)
+        union_xmax = sq_xmax if union_xmax is None else max(union_xmax, sq_xmax)
+        union_ymin = sq_ymin if union_ymin is None else min(union_ymin, sq_ymin)
+        union_ymax = sq_ymax if union_ymax is None else max(union_ymax, sq_ymax)
 
-    if not frame_bulk_radii:
+    if union_xmin is None or union_xmax is None or union_ymin is None or union_ymax is None:
         return SquareViewport(0.0, 0.0, fb)
 
-    shared_cx = float(np.median(np.asarray(frame_centers_x, dtype=np.float64)))
-    shared_cy = float(np.median(np.asarray(frame_centers_y, dtype=np.float64)))
-    shared_half_axis = float(np.quantile(np.asarray(frame_bulk_radii, dtype=np.float64), TIME_BULK_Q)) * MARGIN
+    shared_cx = 0.5 * (union_xmin + union_xmax)
+    shared_cy = 0.5 * (union_ymin + union_ymax)
+    shared_half_axis = 0.5 * max(union_xmax - union_xmin, union_ymax - union_ymin)
     if not np.isfinite(shared_half_axis) or shared_half_axis <= 0.0:
         shared_half_axis = fb
     return SquareViewport(shared_cx, shared_cy, max(shared_half_axis, 1e-30))
+
+
+def _validate_compare_coverage(raw: object) -> float:
+    try:
+        cov = float(raw)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"plot_compare_smart_zoom_coverage must be numeric, got {raw!r}") from e
+    if not np.isfinite(cov):
+        raise ValueError("plot_compare_smart_zoom_coverage must be finite")
+    if cov <= 0.0 or cov > 1.0:
+        raise ValueError("plot_compare_smart_zoom_coverage must be in (0, 1]")
+    return cov
+
+
+def minimum_axis_aligned_box_covering_fraction(points_xy: np.ndarray, coverage: float) -> tuple[float, float, float, float]:
+    """
+    Return (xmin, xmax, ymin, ymax) for the minimum-area axis-aligned rectangle
+    that contains at least coverage * N points.
+    """
+    arr = np.asarray(points_xy, dtype=np.float64).reshape(-1, 2)
+    if arr.size == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+    finite = np.isfinite(arr[:, 0]) & np.isfinite(arr[:, 1])
+    pts = arr[finite]
+    if pts.shape[0] == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+
+    cov = _validate_compare_coverage(coverage)
+    n = int(pts.shape[0])
+    k = max(1, int(np.ceil(cov * n)))
+
+    x = pts[:, 0]
+    y = pts[:, 1]
+    order = np.argsort(x, kind="mergesort")
+    xs = x[order]
+    ys = y[order]
+
+    best_area = np.inf
+    best: tuple[float, float, float, float] | None = None
+    for i in range(n):
+        y_sorted_window: list[float] = []
+        for j in range(i, n):
+            bisect.insort(y_sorted_window, float(ys[j]))
+            m = j - i + 1
+            if m < k:
+                continue
+
+            x_min = float(xs[i])
+            x_max = float(xs[j])
+            width = x_max - x_min
+            best_y_span = np.inf
+            best_y_min = float(y_sorted_window[0])
+            best_y_max = float(y_sorted_window[-1])
+            for t in range(0, m - k + 1):
+                y_min = y_sorted_window[t]
+                y_max = y_sorted_window[t + k - 1]
+                y_span = y_max - y_min
+                if y_span < best_y_span:
+                    best_y_span = y_span
+                    best_y_min = float(y_min)
+                    best_y_max = float(y_max)
+            area = width * best_y_span
+            if area < best_area:
+                best_area = area
+                best = (x_min, x_max, best_y_min, best_y_max)
+
+    if best is not None:
+        return best
+
+    return (float(np.min(x)), float(np.max(x)), float(np.min(y)), float(np.max(y)))
+
+
+def _resolve_compare_coverage(left_run_info: dict, right_run_info: dict) -> float:
+    raw = _run_info_effective_value(left_run_info, "plot_compare_smart_zoom_coverage", None)
+    if raw is None:
+        raw = _run_info_effective_value(right_run_info, "plot_compare_smart_zoom_coverage", None)
+    if raw is None:
+        raw = 0.95
+    return _validate_compare_coverage(raw)
 
 
 def _resolve_compare_preferred_unit(left: str, right: str) -> str:
@@ -327,7 +416,10 @@ def render_compare(
     fb_l = _fallback_render_radius_m(left.run_info)
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
-    shared_vp = calculate_compare_smart_viewport(left_snaps, right_snaps, fallback)
+    compare_coverage = _resolve_compare_coverage(left.run_info, right.run_info)
+    shared_vp = calculate_compare_smart_viewport(
+        left_snaps, right_snaps, fallback, coverage=compare_coverage
+    )
     max_time_s = max(float(left_snaps[-1].time), float(right_snaps[-1].time))
     max_speed_m_s = max(
         float(np.max(np.linalg.norm(s.velocities, axis=1))) for s in (left_snaps + right_snaps)
@@ -350,7 +442,8 @@ def render_compare(
         side.overlay_spec["display_show_unit_reference"] = shared_display.config.show_unit_reference
     print(
         f"Compare smart framing: center=({shared_vp.center_x:.6g}, {shared_vp.center_y:.6g}) m, "
-        f"half_axis={shared_vp.half_axis:.6g} m, display_distance_unit={shared_display.active_distance_unit}, "
+        f"half_axis={shared_vp.half_axis:.6g} m, coverage={compare_coverage:.6g}, "
+        f"display_distance_unit={shared_display.active_distance_unit}, "
         f"display_time_unit={shared_display.active_time_unit}, display_velocity_unit={shared_display.active_velocity_unit}"
     )
     print(

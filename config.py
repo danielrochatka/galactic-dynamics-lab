@@ -79,6 +79,8 @@ class SimulationConfig:
     render_animation: bool = False  # Skip MP4/GIF to speed up test runs
     render_diagnostics: bool = True  # Diagnostic time-series and vr plots
     render_initial_final: bool = True  # Static initial/final scatter plots
+    # Compare-only smart framing: keep this fraction of pooled left+right stars per frame.
+    plot_compare_smart_zoom_coverage: float = 0.95
 
     # Diagnostics
     diagnostic_cutoff_radius: float = _DEFAULT_GALAXY_RADIUS_M
