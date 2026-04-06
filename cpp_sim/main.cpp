@@ -91,15 +91,33 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
     double eta_sec =
         (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
     double pct = 100.0 * step / n_steps;
-    const bool single_line_terminal_progress = progress_to_terminal && stage_tag.empty();
+    const bool compare_dual_line_mode =
+        (progress_to_terminal &&
+         std::getenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS") != nullptr &&
+         (stage_tag == "left" || stage_tag == "right"));
+    const bool single_line_terminal_progress = progress_to_terminal;
     if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
-      std::cout << "\r\033[2K[ ";
+      if (compare_dual_line_mode) {
+        if (stage_tag == "left")
+          std::cout << "\033[2A\r\033[2K[ ";
+        else
+          std::cout << "\033[1A\r\033[2K[ ";
+      } else {
+        std::cout << "\r\033[2K[ ";
+      }
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
                 << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
-                << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec)
-                << "    " << std::flush;
+                << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec);
+      if (compare_dual_line_mode) {
+        if (stage_tag == "left")
+          std::cout << "    \033[2B" << std::flush;
+        else
+          std::cout << "    \033[1B" << std::flush;
+      } else {
+        std::cout << "    " << std::flush;
+      }
     } else {
       std::cout << "[ ";
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
@@ -968,7 +986,9 @@ int main(int argc, char** argv) {
           auto side_snapshots = galaxy::run_simulation(side_cfg, side_state, side_physics,
                                                        n_steps, snapshot_every, side_progress,
                                                        compare_progress_interval);
-          if (progress_to_terminal && n_steps > 0) std::cout << "\n";
+          const bool compare_dual_line_mode_active =
+              (std::getenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS") != nullptr);
+          if (progress_to_terminal && n_steps > 0 && !compare_dual_line_mode_active) std::cout << "\n";
           write_side_outputs(side_cfg, side_physics, side_snapshots,
                              galaxy::find_package_defaults_path(side_cfg.physics_package));
           return 0;
@@ -1000,6 +1020,7 @@ int main(int argc, char** argv) {
       const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
       if (show_live_compare_progress) {
         std::cout << "Parallel compare enabled; streaming child progress to terminal.\n";
+        std::cout << "[ left  ... ]\n[ right ... ]\n";
       } else {
         std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
       }
@@ -1010,6 +1031,8 @@ int main(int argc, char** argv) {
           FILE* lf = std::freopen(left_log.c_str(), "w", stdout);
           FILE* le = std::freopen(left_log.c_str(), "a", stderr);
           if (!lf || !le) _exit(90);
+        } else {
+          setenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS", "1", 1);
         }
         const int rc = run_compare_side("left", left_cfg);
         _exit(rc);
@@ -1025,6 +1048,8 @@ int main(int argc, char** argv) {
           FILE* rf = std::freopen(right_log.c_str(), "w", stdout);
           FILE* re = std::freopen(right_log.c_str(), "a", stderr);
           if (!rf || !re) _exit(91);
+        } else {
+          setenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS", "1", 1);
         }
         const int rc = run_compare_side("right", right_cfg);
         _exit(rc);
@@ -1059,6 +1084,7 @@ int main(int argc, char** argv) {
         std::cerr << "Compare run failed; manifests/plot skipped.\n";
         return 1;
       }
+      if (show_live_compare_progress) std::cout << "\n";
 #endif
     } else {
       if (run_compare_side("left", left_cfg) != 0) return 1;
