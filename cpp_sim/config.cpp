@@ -107,6 +107,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "bh_mass") {
     config.bh_mass = std::stod(val);
+    config.explicit_overrides.bh_mass = true;
     return true;
   }
   if (key == "inner_radius") {
@@ -123,6 +124,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "dt") {
     config.dt = std::stod(val);
+    config.explicit_overrides.dt = true;
     return true;
   }
   if (key == "n_steps") {
@@ -135,10 +137,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "softening") {
     config.softening = std::stod(val);
+    config.explicit_overrides.softening = true;
     return true;
   }
   if (key == "enable_star_star_gravity") {
     config.enable_star_star_gravity = parse_bool(val);
+    config.explicit_overrides.enable_star_star_gravity = true;
     return true;
   }
   if (key == "physics_package") {
@@ -286,6 +290,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpfcore_source_softening") {
     config.tpfcore_source_softening = std::stod(val);
+    config.explicit_overrides.tpfcore_source_softening = true;
     return true;
   }
   if (key == "tpfcore_residual_step") {
@@ -438,50 +443,62 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "validation_two_body_radius") {
     config.validation_two_body_radius = std::stod(val);
+    config.explicit_overrides.validation_two_body_radius = true;
     return true;
   }
   if (key == "validation_two_body_speed_ratio") {
     config.validation_two_body_speed_ratio = std::stod(val);
+    config.explicit_overrides.validation_two_body_speed_ratio = true;
     return true;
   }
   if (key == "validation_earth_mass") {
     config.validation_earth_mass = std::stod(val);
+    config.explicit_overrides.validation_earth_mass = true;
     return true;
   }
   if (key == "validation_moon_mass") {
     config.validation_moon_mass = std::stod(val);
+    config.explicit_overrides.validation_moon_mass = true;
     return true;
   }
   if (key == "validation_earth_moon_distance") {
     config.validation_earth_moon_distance = std::stod(val);
+    config.explicit_overrides.validation_earth_moon_distance = true;
     return true;
   }
   if (key == "validation_moon_tangential_speed") {
     config.validation_moon_tangential_speed = std::stod(val);
+    config.explicit_overrides.validation_moon_tangential_speed = true;
     return true;
   }
   if (key == "validation_symmetric_include_bh") {
     config.validation_symmetric_include_bh = parse_bool(val);
+    config.explicit_overrides.validation_symmetric_include_bh = true;
     return true;
   }
   if (key == "validation_symmetric_separation") {
     config.validation_symmetric_separation = std::stod(val);
+    config.explicit_overrides.validation_symmetric_separation = true;
     return true;
   }
   if (key == "validation_symmetric_speed") {
     config.validation_symmetric_speed = std::stod(val);
+    config.explicit_overrides.validation_symmetric_speed = true;
     return true;
   }
   if (key == "validation_small_n") {
     config.validation_small_n = std::stoi(val);
+    config.explicit_overrides.validation_small_n = true;
     return true;
   }
   if (key == "validation_n_steps") {
     config.validation_n_steps = std::stoi(val);
+    config.explicit_overrides.validation_n_steps = true;
     return true;
   }
   if (key == "validation_snapshot_every") {
     config.validation_snapshot_every = std::stoi(val);
+    config.explicit_overrides.validation_snapshot_every = true;
     return true;
   }
   if (key == "output_dir") {

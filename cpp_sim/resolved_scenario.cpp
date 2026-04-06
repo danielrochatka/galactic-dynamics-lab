@@ -11,39 +11,38 @@ namespace galaxy {
 namespace {
 
 void apply_mode_defaults(Config& c, const Config& user_cfg) {
-  const Config engine_defaults;
   const ModeScenarioDefaults d = scenario_defaults_for_mode(c.simulation_mode);
   if (!d.applies) return;
-  if (user_cfg.dt == engine_defaults.dt) c.dt = d.dt;
-  if (user_cfg.softening == engine_defaults.softening) c.softening = d.softening;
-  if (user_cfg.bh_mass == engine_defaults.bh_mass) c.bh_mass = d.bh_mass;
-  if (user_cfg.enable_star_star_gravity == engine_defaults.enable_star_star_gravity) c.enable_star_star_gravity = d.enable_star_star_gravity;
-  if (user_cfg.validation_n_steps == engine_defaults.validation_n_steps) c.validation_n_steps = d.n_steps;
-  if (user_cfg.validation_snapshot_every == engine_defaults.validation_snapshot_every) c.validation_snapshot_every = d.snapshot_every;
+  if (!user_cfg.explicit_overrides.dt) c.dt = d.dt;
+  if (!user_cfg.explicit_overrides.softening) c.softening = d.softening;
+  if (!user_cfg.explicit_overrides.bh_mass) c.bh_mass = d.bh_mass;
+  if (!user_cfg.explicit_overrides.enable_star_star_gravity) c.enable_star_star_gravity = d.enable_star_star_gravity;
+  if (!user_cfg.explicit_overrides.validation_n_steps) c.validation_n_steps = d.n_steps;
+  if (!user_cfg.explicit_overrides.validation_snapshot_every) c.validation_snapshot_every = d.snapshot_every;
   if (d.validation_two_body_radius > 0.0 &&
-      user_cfg.validation_two_body_radius == engine_defaults.validation_two_body_radius)
+      !user_cfg.explicit_overrides.validation_two_body_radius)
     c.validation_two_body_radius = d.validation_two_body_radius;
-  if (user_cfg.validation_two_body_speed_ratio == engine_defaults.validation_two_body_speed_ratio)
+  if (!user_cfg.explicit_overrides.validation_two_body_speed_ratio)
     c.validation_two_body_speed_ratio = d.validation_two_body_speed_ratio;
-  if (user_cfg.validation_symmetric_include_bh == engine_defaults.validation_symmetric_include_bh)
+  if (!user_cfg.explicit_overrides.validation_symmetric_include_bh)
     c.validation_symmetric_include_bh = d.validation_symmetric_include_bh;
   if (d.validation_symmetric_separation > 0.0 &&
-      user_cfg.validation_symmetric_separation == engine_defaults.validation_symmetric_separation)
+      !user_cfg.explicit_overrides.validation_symmetric_separation)
     c.validation_symmetric_separation = d.validation_symmetric_separation;
   if (d.validation_symmetric_speed > 0.0 &&
-      user_cfg.validation_symmetric_speed == engine_defaults.validation_symmetric_speed)
+      !user_cfg.explicit_overrides.validation_symmetric_speed)
     c.validation_symmetric_speed = d.validation_symmetric_speed;
-  if (d.validation_small_n > 0 && user_cfg.validation_small_n == engine_defaults.validation_small_n)
+  if (d.validation_small_n > 0 && !user_cfg.explicit_overrides.validation_small_n)
     c.validation_small_n = d.validation_small_n;
-  if (d.validation_earth_mass > 0.0 && user_cfg.validation_earth_mass == engine_defaults.validation_earth_mass)
+  if (d.validation_earth_mass > 0.0 && !user_cfg.explicit_overrides.validation_earth_mass)
     c.validation_earth_mass = d.validation_earth_mass;
-  if (d.validation_moon_mass > 0.0 && user_cfg.validation_moon_mass == engine_defaults.validation_moon_mass)
+  if (d.validation_moon_mass > 0.0 && !user_cfg.explicit_overrides.validation_moon_mass)
     c.validation_moon_mass = d.validation_moon_mass;
   if (d.validation_earth_moon_distance > 0.0 &&
-      user_cfg.validation_earth_moon_distance == engine_defaults.validation_earth_moon_distance)
+      !user_cfg.explicit_overrides.validation_earth_moon_distance)
     c.validation_earth_moon_distance = d.validation_earth_moon_distance;
   if (d.validation_moon_tangential_speed > 0.0 &&
-      user_cfg.validation_moon_tangential_speed == engine_defaults.validation_moon_tangential_speed)
+      !user_cfg.explicit_overrides.validation_moon_tangential_speed)
     c.validation_moon_tangential_speed = d.validation_moon_tangential_speed;
 }
 

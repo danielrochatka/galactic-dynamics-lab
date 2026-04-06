@@ -96,6 +96,11 @@ TEST_CASE("user overrides survive scenario resolution") {
   c.bh_mass = 123.0;
   c.dt = 12.5;
   c.softening = 2.0;
+  c.explicit_overrides.validation_n_steps = true;
+  c.explicit_overrides.validation_snapshot_every = true;
+  c.explicit_overrides.bh_mass = true;
+  c.explicit_overrides.dt = true;
+  c.explicit_overrides.softening = true;
 
   auto r = galaxy::resolve_scenario(c);
   CHECK(r.config.bh_mass == doctest::Approx(123.0));
@@ -103,6 +108,17 @@ TEST_CASE("user overrides survive scenario resolution") {
   CHECK(r.config.softening == doctest::Approx(2.0));
   CHECK(r.effective_n_steps == 111);
   CHECK(r.effective_snapshot_every == 7);
+}
+
+TEST_CASE("galaxy explicit zero softening and source softening are preserved") {
+  galaxy::Config c;
+  c.simulation_mode = galaxy::SimulationMode::galaxy;
+  REQUIRE(galaxy::apply_config_kv("softening", "0", c));
+  REQUIRE(galaxy::apply_config_kv("tpfcore_source_softening", "0", c));
+
+  const auto r = galaxy::resolve_scenario(c);
+  CHECK(r.config.softening == doctest::Approx(0.0));
+  CHECK(r.config.tpfcore_source_softening == doctest::Approx(0.0));
 }
 
 TEST_CASE("resolved scenario artifact writer outputs expected keys") {
@@ -145,6 +161,8 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     configured.snapshot_every = 50;
     configured.validation_snapshot_every = 10;
     configured.validation_n_steps = 111;
+    configured.explicit_overrides.validation_snapshot_every = true;
+    configured.explicit_overrides.validation_n_steps = true;
     configured.physics_package = "Newtonian";
     auto resolved = galaxy::resolve_scenario(configured);
 
@@ -177,6 +195,8 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     configured.simulation_mode = galaxy::SimulationMode::bh_orbit_validation;
     configured.validation_n_steps = 321;
     configured.validation_snapshot_every = 9;
+    configured.explicit_overrides.validation_n_steps = true;
+    configured.explicit_overrides.validation_snapshot_every = true;
     auto resolved = galaxy::resolve_scenario(configured);
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
     (void)mk_ok;
