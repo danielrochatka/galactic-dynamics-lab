@@ -1,0 +1,3 @@
+engine/vendor/** linguist-vendored
+python_tests/** linguist-detectable=false
+docs/** linguist-detectable=false
