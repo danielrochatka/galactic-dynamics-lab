@@ -91,7 +91,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
     double eta_sec =
         (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
     double pct = 100.0 * step / n_steps;
-    const bool single_line_terminal_progress = progress_to_terminal && stage_tag.empty();
+    const bool single_line_terminal_progress = progress_to_terminal;
     if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
       std::cout << "\r\033[2K[ ";
