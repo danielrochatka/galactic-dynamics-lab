@@ -79,6 +79,12 @@ std::string format_elapsed(double sec) {
   return os.str();
 }
 
+bool compare_dual_line_progress_enabled(bool progress_to_terminal, const std::string& stage_tag) {
+  return progress_to_terminal &&
+         std::getenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS") != nullptr &&
+         (stage_tag == "left" || stage_tag == "right");
+}
+
 /** Galaxy step progress; stage_tag e.g. "left"/"right" in compare mode, empty for single run. */
 galaxy::ProgressCallback make_galaxy_step_progress_callback(
     std::chrono::steady_clock::time_point start_wall,
@@ -92,9 +98,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
         (step > 0 && step < n_steps) ? (elapsed_sec / step) * (n_steps - step) : 0.0;
     double pct = 100.0 * step / n_steps;
     const bool compare_dual_line_mode =
-        (progress_to_terminal &&
-         std::getenv("GALAXY_COMPARE_DUAL_LINE_PROGRESS") != nullptr &&
-         (stage_tag == "left" || stage_tag == "right"));
+        compare_dual_line_progress_enabled(progress_to_terminal, stage_tag);
     const bool single_line_terminal_progress = progress_to_terminal;
     if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
