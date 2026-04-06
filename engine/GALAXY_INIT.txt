@@ -1,4 +1,4 @@
-Galaxy initial conditions (cpp_sim, galaxy mode only)
+Galaxy initial conditions (engine, galaxy mode only)
 =====================================================
 
 Implementation: galaxy_init.cpp / galaxy_init.hpp

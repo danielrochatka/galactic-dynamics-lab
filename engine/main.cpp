@@ -202,6 +202,13 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
     galaxy::Config cfg_direct = config;
     cfg_direct.tpf_dynamics_mode = "direct_tpf";
     cfg_direct.tpfcore_enable_provisional_readout = false;
+    // direct_tpf truthfully rejects legacy/provisional readout closure knobs.
+    // Normalize the internal audit branch config so step-0 diagnostics can
+    // compute direct baseline + additive VDSG decomposition under valid inputs.
+    cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
+    cfg_direct.tpfcore_readout_scale = 1.0;
+    cfg_direct.tpfcore_theta_tt_scale = 1.0;
+    cfg_direct.tpfcore_theta_tr_scale = 1.0;
     cfg_direct.tpf_global_accel_shunt_enable = false;
     cfg_direct.tpf_cooling_fraction = 0.0;
     cfg_direct.tpf_vdsg_coupling = 0.0;
@@ -239,7 +246,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
 }  // namespace
 
 int main(int argc, char** argv) {
-  // 1. Find run config path (root configs/ only; cpp_sim/configs/ is not used)
+  // 1. Find run config path (root configs/ only; engine/configs/ is not used)
   std::string run_config_path = galaxy::find_run_config_path();
   if (!galaxy::check_run_config_canonical(run_config_path))
     return 1;
@@ -297,7 +304,7 @@ int main(int argc, char** argv) {
             << config.tpfcore_source_softening << "\n";
 
   config.run_id = run_id_from_time();
-  config.output_dir = "outputs/" + config.run_id;
+  config.output_dir = "../outputs/" + config.run_id;
 
   bool auto_plot = false;
   for (int i = 1; i < argc; ++i) {
@@ -984,7 +991,7 @@ int main(int argc, char** argv) {
     const std::string compare_parent_dir = config.output_dir;
     const std::string left_dir = compare_parent_dir + "/left_" + sanitize_label(config.physics_package);
     const std::string right_dir = compare_parent_dir + "/right_" + sanitize_label(config.physics_package_compare);
-    if (!ensure_dir("outputs") || !ensure_dir(compare_parent_dir) ||
+    if (!ensure_dir("../outputs") || !ensure_dir(compare_parent_dir) ||
         !ensure_dir(left_dir) || !ensure_dir(right_dir)) {
       std::cerr << "Failed to create compare output directories under " << compare_parent_dir << "\n";
       return 1;
@@ -1239,7 +1246,7 @@ int main(int argc, char** argv) {
 
     if (auto_plot) {
       std::cout << "Rendering compare figures (plot_cpp_compare.py)...\n" << std::flush;
-      // Run from cpp_sim cwd: script lives at repo_root/plot_cpp_compare.py
+      // Run from engine cwd: script lives at repo_root/plot_cpp_compare.py
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
@@ -1254,8 +1261,8 @@ int main(int argc, char** argv) {
     } else {
       std::cout
           << "\nCompare side-by-side PNGs/animation were not generated (run without --plot).\n"
-          << "From the cpp_sim directory:\n  python3 ../plot_cpp_compare.py " << compare_parent_dir << "\n"
-          << "From the repository root:\n  python3 plot_cpp_compare.py cpp_sim/" << compare_parent_dir << "\n"
+          << "From the engine directory:\n  python3 ../plot_cpp_compare.py " << compare_parent_dir << "\n"
+          << "From the repository root:\n  python3 plot_cpp_compare.py " << compare_parent_dir << "\n"
           << "Or re-run with --plot to render automatically.\n";
     }
     return 0;
@@ -1382,7 +1389,7 @@ int main(int argc, char** argv) {
     std::cout.flush();
     std::cerr.flush();
     std::cout << "Simulation complete. Rendering animation..." << std::endl;
-    std::string cmd = "cd .. && ./dev/bin/python plot_cpp_run.py cpp_sim/" + output_dir;
+    std::string cmd = "cd .. && ./dev/bin/python plot_cpp_run.py " + output_dir;
     int ret = std::system(cmd.c_str());
     if (ret != 0) {
       std::cerr << "Warning: Python rendering script returned non-zero exit code." << std::endl;

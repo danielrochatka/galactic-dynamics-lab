@@ -7,7 +7,7 @@ with at least 10 stars (not peak surface density).
 
 Example:
   python analyze_coherence.py
-  python analyze_coherence.py --snapshot cpp_sim/outputs/run1/snapshot_20000.csv
+  python analyze_coherence.py --snapshot outputs/run1/snapshot_20000.csv
   # Default plot: <snapshot_dir>/coherence_plot.png unless --plot is given
 """
 
@@ -77,7 +77,7 @@ def main() -> int:
     parser.add_argument(
         "--snapshot",
         type=Path,
-        default=Path("cpp_sim/outputs/20260329_025714/snapshot_20000.csv"),
+        default=Path("outputs/20260329_025714/snapshot_20000.csv"),
         help="Path to snapshot_*.csv",
     )
     parser.add_argument(

@@ -8,16 +8,17 @@ __pycache__/
 
 # Local config overrides (keep examples tracked)
 configs/local/
-# Match *.local.cfg in any directory (root configs/ alone missed cpp_sim/configs/ historically)
+# Match *.local.cfg in any directory.
 **/*.local.cfg
 # Deprecated run-config location; do not commit (use repository root configs/ only)
-cpp_sim/configs/
+engine/configs/
 
-cpp_sim/*.o
-cpp_sim/*.d
-cpp_sim/galaxy_sim
-cpp_sim/galaxy_tests
-cpp_sim/tests/**/*.o
-cpp_sim/tests/**/*.d
-cpp_sim/physics/**/*.o
-cpp_sim/physics/**/*.d
+# Engine build artifacts
+engine/*.o
+engine/*.d
+engine/galaxy_sim
+engine/galaxy_tests
+engine/tests/**/*.o
+engine/tests/**/*.d
+engine/physics/**/*.o
+engine/physics/**/*.d

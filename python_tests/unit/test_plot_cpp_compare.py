@@ -172,11 +172,11 @@ class TestPlotCppCompare(unittest.TestCase):
             self.assertFalse((parent / f"{compare_run_id}.mp4").exists())
             self.assertFalse((parent / f"{compare_run_id}.gif").exists())
 
-    def test_resolve_side_run_dir_cpp_sim_relative_manifest(self) -> None:
-        """Manifest stores paths relative to cpp_sim; compare_parent is .../outputs/RUN."""
+    def test_resolve_side_run_dir_engine_relative_manifest(self) -> None:
+        """Manifest stores paths relative to engine; compare_parent is .../outputs/RUN."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            run = root / "cpp_sim" / "outputs" / "RUN1"
+            run = root / "engine" / "outputs" / "RUN1"
             (run / "left_X").mkdir(parents=True)
             m = "outputs/RUN1/left_X"
             got = _resolve_side_run_dir(m, run.resolve())

@@ -26,7 +26,7 @@ from display_units import (
     spatial_display_for_xy_plot,
 )
 
-# SI gravitational constant (matches cpp_sim/init_conditions.cpp)
+# SI gravitational constant (matches engine/init_conditions.cpp)
 G_SI = 6.6743e-11
 
 

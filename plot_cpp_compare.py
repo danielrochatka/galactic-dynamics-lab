@@ -114,10 +114,10 @@ def _load_compare_manifest(parent: Path) -> dict:
 
 def _resolve_side_run_dir(manifest_path_str: str, compare_parent: Path) -> Path:
     """
-    C++ writes left_dir/right_dir relative to cpp_sim cwd (e.g. outputs/RUN/left_TPFCore).
-    compare_parent is the resolved compare folder (.../cpp_sim/outputs/RUN).
+    C++ writes left_dir/right_dir relative to engine cwd (e.g. outputs/RUN/left_TPFCore).
+    compare_parent is the resolved compare folder (.../outputs/RUN).
     Resolving Path(manifest) against repo-root cwd breaks; prefer compare_parent / basename,
-    then cpp_sim / manifest path.
+    then engine / manifest path.
     """
     p = Path(manifest_path_str)
     if p.is_absolute():
@@ -125,9 +125,9 @@ def _resolve_side_run_dir(manifest_path_str: str, compare_parent: Path) -> Path:
     direct = compare_parent / p.name
     if direct.is_dir():
         return direct.resolve()
-    # Manifest path is relative to cpp_sim: outputs/RUN/left_*
-    cpp_sim = compare_parent.parent.parent
-    under_cpp = (cpp_sim / p).resolve()
+    # Manifest path is relative to engine: outputs/RUN/left_*
+    engine = compare_parent.parent.parent
+    under_cpp = (engine / p).resolve()
     if under_cpp.is_dir():
         return under_cpp
     cwd_rel = (Path.cwd() / p).resolve()
@@ -558,7 +558,7 @@ def render_compare(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Render side-by-side compare outputs for cpp_sim compare runs.")
+    ap = argparse.ArgumentParser(description="Render side-by-side compare outputs for engine compare runs.")
     ap.add_argument("compare_parent_dir", type=Path)
     ap.add_argument("--no-animation", action="store_true")
     ap.add_argument(

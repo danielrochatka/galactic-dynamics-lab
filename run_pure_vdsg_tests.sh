@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Three 6,000-star galaxy runs: Newtonian control, pure VDSG (no cooling), VDSG + cooling.
-# Requires: cpp_sim/galaxy_sim built; python3 + matplotlib + pandas + numpy for analyze_coherence.py
+# Requires: engine/galaxy_sim built; python3 + matplotlib + pandas + numpy for analyze_coherence.py
 #
 # Note: ACTIVE PHYSICS LEDGER (TPF branch auditor) prints to stderr only when physics_package=TPFCore.
 #       Run 1 uses Newtonian — there is no TPF ledger line (expected).
@@ -8,8 +8,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SIM="${ROOT}/cpp_sim/galaxy_sim"
-OUT_BASE="${ROOT}/cpp_sim/outputs/pure_vdsg_audit"
+SIM="${ROOT}/engine/galaxy_sim"
+OUT_BASE="${ROOT}/outputs/pure_vdsg_audit"
 LOG="${OUT_BASE}/run_pure_vdsg_tests.log"
 
 N_STARS=6000
@@ -17,7 +17,7 @@ N_STEPS="${N_STEPS:-50000}"
 SNAPSHOT_EVERY="${SNAPSHOT_EVERY:-500}"
 
 if [[ ! -x "$SIM" ]]; then
-  echo "error: build cpp_sim first: (cd cpp_sim && make)" >&2
+  echo "error: build engine first: (cd engine && make)" >&2
   exit 1
 fi
 
@@ -42,7 +42,7 @@ run_one() {
   echo "================================================================" | tee -a "$LOG"
   echo " $tag" | tee -a "$LOG"
   echo "================================================================" | tee -a "$LOG"
-  (cd "${ROOT}/cpp_sim" && ./galaxy_sim galaxy "$@") 2>&1 | tee -a "$LOG"
+  (cd "${ROOT}/engine" && ./galaxy_sim galaxy "$@") 2>&1 | tee -a "$LOG"
 }
 
 # Writes coherence_diagnostic.png inside the run directory (data containment).

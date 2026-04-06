@@ -2,7 +2,7 @@
 Regression: default 6-digit scientific text collapses ~10–30 m motion at Earth–Moon distance scales.
 
 The C++ snapshot writer used to rely on ostringstream defaults; that matched this failure mode.
-Full double round-trip formatting is required in snapshot_*.csv (see cpp_sim/output.cpp).
+Full double round-trip formatting is required in snapshot_*.csv (see engine/output.cpp).
 """
 
 from __future__ import annotations

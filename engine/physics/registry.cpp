@@ -1,7 +1,6 @@
 #include "physics_package.hpp"
-#include "Newtonian/newtonian.hpp"
-#include "TPFCore/tpf_core_package.hpp"
-#include <stdexcept>
+#include <map>
+#include <utility>
 
 namespace galaxy {
 
@@ -14,27 +13,47 @@ double compute_kinetic_energy(const State& state) {
 
 namespace {
 
-NewtonianPackage s_newtonian;
-TPFCorePackage s_tpfcore;
+std::map<std::string, PhysicsPackageFactory>& package_factories() {
+  static std::map<std::string, PhysicsPackageFactory> factories;
+  return factories;
+}
 
-PhysicsPackage* s_packages[] = {
-  &s_newtonian,
-  &s_tpfcore,
-};
-const int s_num_packages = sizeof(s_packages) / sizeof(s_packages[0]);
+std::map<std::string, std::unique_ptr<PhysicsPackage>>& package_instances() {
+  static std::map<std::string, std::unique_ptr<PhysicsPackage>> instances;
+  return instances;
+}
 
 }  // namespace
 
 PhysicsPackage* get_physics_package(const std::string& name) {
-  for (int i = 0; i < s_num_packages; ++i) {
-    if (name == s_packages[i]->name())
-      return s_packages[i];
-  }
-  return nullptr;
+  auto& instances = package_instances();
+  auto it = instances.find(name);
+  if (it != instances.end()) return it->second.get();
+
+  auto fit = package_factories().find(name);
+  if (fit == package_factories().end()) return nullptr;
+
+  std::unique_ptr<PhysicsPackage> pkg = fit->second();
+  if (!pkg) return nullptr;
+  const std::string canonical = pkg->name() ? std::string(pkg->name()) : std::string();
+  if (canonical.empty() || canonical != name) return nullptr;
+  PhysicsPackage* out = pkg.get();
+  instances.emplace(name, std::move(pkg));
+  return out;
 }
 
 bool has_physics_package(const std::string& name) {
-  return get_physics_package(name) != nullptr;
+  return package_factories().find(name) != package_factories().end();
+}
+
+bool register_physics_package_factory(const std::string& name, PhysicsPackageFactory factory) {
+  if (name.empty() || !factory) return false;
+  auto& factories = package_factories();
+  if (factories.find(name) != factories.end()) {
+    return false;
+  }
+  factories.emplace(name, std::move(factory));
+  return true;
 }
 
 }  // namespace galaxy

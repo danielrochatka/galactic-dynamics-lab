@@ -115,7 +115,7 @@ void try_run_v11_earth_moon_line_benchmark_pngs(const std::string& output_dir) {
     return;
   }
   std::cerr << "Note: PNG plots not generated (plot_v11_earth_moon_line_benchmark.py not found; run galaxy_sim "
-               "from cpp_sim/ or repo root).\n";
+               "from engine/ or repo root).\n";
 }
 
 /**

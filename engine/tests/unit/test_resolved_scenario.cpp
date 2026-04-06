@@ -55,6 +55,7 @@ TEST_CASE("resolve bh_orbit_validation and symmetric_pair mode defaults") {
     galaxy::Config c;
     c.simulation_mode = galaxy::SimulationMode::symmetric_pair;
     c.validation_symmetric_include_bh = false;
+    c.explicit_overrides.validation_symmetric_include_bh = true;
     c.bh_mass = 42.0;
     auto r = galaxy::resolve_scenario(c);
     CHECK(r.initializer_used == "init_symmetric_pair");
@@ -123,7 +124,7 @@ TEST_CASE("galaxy explicit zero softening and source softening are preserved") {
 
 TEST_CASE("resolved scenario artifact writer outputs expected keys") {
   galaxy::Config c;
-  c.output_dir = "outputs/test_resolved_scenario_artifact";
+  c.output_dir = "../outputs/test_resolved_scenario_artifact";
   c.simulation_mode = galaxy::SimulationMode::earth_moon_benchmark;
   c.physics_package = "Newtonian";
   galaxy::ResolvedScenario r = galaxy::resolve_scenario(c);
@@ -156,7 +157,7 @@ TEST_CASE("resolved scenario artifact writer outputs expected keys") {
 TEST_CASE("run_info audit includes configured and effective sections and resolved consistency") {
   {
     galaxy::Config configured;
-    configured.output_dir = "outputs/test_run_info_earth_moon";
+    configured.output_dir = "../outputs/test_run_info_earth_moon";
     configured.simulation_mode = galaxy::SimulationMode::earth_moon_benchmark;
     configured.snapshot_every = 50;
     configured.validation_snapshot_every = 10;
@@ -191,7 +192,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
 
   {
     galaxy::Config configured;
-    configured.output_dir = "outputs/test_run_info_bh_orbit";
+    configured.output_dir = "../outputs/test_run_info_bh_orbit";
     configured.simulation_mode = galaxy::SimulationMode::bh_orbit_validation;
     configured.validation_n_steps = 321;
     configured.validation_snapshot_every = 9;

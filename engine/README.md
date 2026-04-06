@@ -1,159 +1,117 @@
-# cpp_sim — N-body simulation engine
+# engine — C++ simulation runtime
 
-This directory is the **C++ simulation application** for **[Galactic Dynamics Lab](../README.md)** (the repository root): velocity Verlet, pluggable **physics packages**, layered configuration, and structured outputs. **Rendering** is not built into the binary; use **`plot_cpp_run.py`** from the repo root on a finished run directory.
+`engine/` contains the **authoritative simulation runtime** for Galactic Dynamics Lab: integrator, mode dispatch, package dispatch, config resolution, and structured run outputs.
 
-This README describes the **engine** (build, config, outputs, plotting) and how packages plug in. **TPFCore-specific theory** (Ξ, Θ, I, readout vs VDSG) lives in **[physics/TPFCore/README.md](physics/TPFCore/README.md)**.
+This is the only simulator runtime in the repository. Python is post-processing/tooling only.
 
----
+## What lives in `engine/`
+
+- `main.cpp`, `simulation.cpp`: runtime entrypoint and stepping loop.
+- `config.*`, `scenario_defaults.cpp`: config model and scenario resolution.
+- `physics/`: compiled runtime physics packages (for example, `Newtonian`, `TPFCore`).
+- `tests/`: C++ unit/regression/integration test harnesses.
 
 ## Build
 
+From repo root:
+
 ```bash
-cd cpp_sim
-make
+(cd engine && make)
 ```
 
-Requires C++11 (`g++` or `clang++`). No external libraries.
-
----
+Requires C++11 (`g++` or `clang++`).
 
 ## Run
 
-From **`cpp_sim/`**:
+From repo root:
 
 ```bash
-./galaxy_sim [simulation_mode]
+# default mode (galaxy)
+(cd engine && ./galaxy_sim)
+
+# explicit mode
+(cd engine && ./galaxy_sim earth_moon_benchmark)
+
+# mode + overrides
+(cd engine && ./galaxy_sim galaxy --num_particles=2000 --time_step=1e13)
 ```
 
-`simulation_mode` defaults to **`galaxy`** if omitted. CLI overrides **`simulation_mode`** after loading config. Additional overrides use **`--key=value`** (see startup banner for resolved config).
+Notes:
+- `simulation_mode` defaults to `galaxy` if omitted.
+- CLI `--key=value` overrides config values.
+- Unknown modes print the supported mode list.
 
-**Modes** (high level):
+### Compare mode (easy entry)
 
-| Mode | Purpose |
-|------|---------|
-| `galaxy` | Disk N-body (production morphology runs). |
-| `earth_moon_benchmark`, `bh_orbit_validation`, `symmetric_pair`, `small_n_conservation`, `timestep_convergence` | Validation / checks. (`two_body_orbit` is a deprecated alias for `earth_moon_benchmark` in C++.) |
-| `tpf_single_source_inspect`, `tpf_symmetric_pair_inspect`, … | Package-specific **inspection** (require `physics_package = TPFCore`). |
-| `tpf_two_body_sweep`, `tpf_weak_field_calibration`, `tpf_newtonian_force_compare`, `tpf_bound_orbit_sweep`, `tpf_diagnostic_consistency_audit` | TPFCore **sweeps / calibration / diagnostics** (see binary help and `SimulationMode` in `config.hpp`). |
-
-Full mode list and errors for unknown modes are printed by the binary. For **TPFCore** particle integration: **`tpf_dynamics_mode=direct_tpf`** is the tensor principal-part route (Theta/I/kappa baseline, **DeltaC omitted in current implementation scope**, optional additive VDSG extension, readout/shunt/cooling rejected). **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper path (uses `tpf_weak_field_correspondence_alpha_si`). **`legacy_readout`** remains available and requires **`tpfcore_enable_provisional_readout = true`**. Inspection and sweep modes have their own requirements — see the TPFCore package README.
-
-Outputs go under **`output_dir`** (default `outputs/<run_id>/`, `run_id` often `YYYYMMDD_HHMMSS`).
-
----
-
-## Configuration
-
-### Where files live
-
-| Layer | Location |
-|-------|----------|
-| Built-in defaults | `config.hpp` (`Config`). |
-| Scenario defaults by mode | `scenario_defaults.cpp` (applied by `resolve_scenario`). |
-| Package defaults | **`physics/<Package>/defaults.cfg`** only (e.g. `physics/TPFCore/defaults.cfg`). |
-| Run config | **Repository root `configs/`** only — e.g. `../configs/my.local.cfg` when cwd is `cpp_sim/`. **Not** `cpp_sim/configs/`. |
-
-**Precedence:** built-in → package defaults → root run config/CLI keys (config values) → scenario resolution by mode (`resolve_scenario`) for effective IC + mode controls.
-
-Startup prints **Run config selected**, **Loaded package defaults**, and a **Resolved config** summary. The same resolved block appears at the top of **`run_info.txt`**.
-Each run also writes **`resolved_scenario.txt`** and **`resolved_scenario.json`** with the effective mode, initializer, particle IC, and effective `bh_mass` / force toggles / timestep counters used.
-
-### Physics packages
-
-Dispatch is by name at runtime (see **`physics/registry.cpp`**).
-
-| Package | Role |
-|---------|------|
-| **Newtonian** | Default: BH at origin + optional star–star pairwise gravity with softening. |
-| **TPFCore** | Primitive TPF field structure + optional provisional readout / VDSG dynamics path. **Details:** [physics/TPFCore/README.md](physics/TPFCore/README.md). |
-
-Set in run config:
+Use package compare keys in your run config to run side-by-side package comparisons from the same C++ runtime/IC seed:
 
 ```ini
 physics_package = Newtonian
-# or
-physics_package = TPFCore
+physics_package_compare = TPFCore
 ```
 
-Adding a new package: implement **`physics/physics_package.hpp`**, register in **`registry.cpp`**, optional **`physics/<Name>/defaults.cfg`**. See **`physics/Template/`** for a stub.
+## Outputs
 
-### Galaxy initialization (templates)
+Runs write to root `outputs/<run_id>/` (when running from `engine/`, this resolves to `../outputs/<run_id>/`).
 
-**Galaxy mode** uses a **named template** plus optional noise and structured seeds (`galaxy_init_*` keys in `config.hpp`). Valid **`galaxy_init_template`** names match **`galaxy_init.hpp`**: `symmetric_disk`, `symmetric_disk_noisy`, `clumpy_disk`, `weak_m2`, `weak_m3`, `weak_bar`, `preformed_spiral`. Templates act as **presets**: when structured parameters are still at neutral defaults (e.g. zero amplitudes), the engine applies modest template-specific values so the visible IC matches the name; **explicit user values are never overwritten**. Resolved initialization (raw vs effective, template defaults applied, warnings) is logged in **`run_info.txt`** (galaxy init audit block) and **`galaxy_init_diagnostics.txt`**.
+Common files:
+- `run_info.txt` — resolved config + runtime branch labels.
+- `resolved_scenario.txt` / `resolved_scenario.json` — effective scenario after resolution.
+- `snapshot_*.csv` — particle snapshots.
+- `render_manifest.json` (mode/config dependent) — render-time audit payload.
 
-**RNG:** `galaxy_init_seed` controls reproducibility.
+## Config precedence
 
-This is **simulation-app** configuration, not TPF manuscript content; see parameter comments in **`config.hpp`**.
+Operational config surfaces:
+- Built-in defaults: `engine/config.hpp` (`Config`).
+- Package defaults: `engine/physics/<Package>/defaults.cfg`.
+- Run config files: root `configs/` (for example `configs/example.cfg`).
+- CLI overrides: `--key=value`.
+- Scenario resolution by mode: `resolve_scenario` in `scenario_defaults.cpp`.
 
----
+Effective precedence used at runtime:
+1. Built-in defaults
+2. Package defaults
+3. Run config + CLI overrides
+4. Scenario resolution (mode-aware effective IC/control values)
 
-## Outputs (dynamical runs)
+The resolved block is printed at startup and written to `run_info.txt`.
 
-Typical **`outputs/<run_id>/`** contents:
+## Plot a run
 
-| File | Content |
-|------|---------|
-| **`run_info.txt`** | Tab-separated resolved config, counters, **`active_dynamics_branch`**, **`active_metrics_branch`**, **`acceleration_code_path`**, TPF/IC keys when applicable. Use these branch fields together with config keys—do not infer dynamics from **`tpfcore_readout_mode`** alone when TPFCore VDSG may be active. |
-| **`render_manifest.json`** / **`render_manifest.txt`** | Full resolved audit for renders (galaxy mode when `save_run_info`): branches, coupling, cooling, IC parameters, aliases note. |
-| **`snapshot_*.csv`** | State: `# step,…,time,…` then `i,x,y,vx,vy,mass`. |
-| **`galaxy_init_diagnostics.txt`** | Initial radial / speed / L_z summaries (galaxy mode). |
-
-**TPFCore** dynamical runs may additionally write readout/regime/trajectory diagnostics when enabled (see TPFCore README).
-
----
-
-## Renders, overlays, and post-processing
-
-The binary **does not** draw PNG/MP4. After a run:
+The C++ binary does not render images/videos itself. Plot after the run from repo root:
 
 ```bash
-# from repo root (use python3 or your venv’s python)
-python3 plot_cpp_run.py cpp_sim/outputs/<run_id>
+python3 plot_cpp_run.py outputs/<run_id>
 ```
 
-This produces mode-aware filenames using **`<mode>__<physics>__<scope>__<quantity>__<stage>.<ext>`** (for example `bh_orbit_validation__newtonian__primary__pair_separation__timeseries.png`) and also keeps legacy aliases such as **`galaxy_initial.png`**, **`galaxy_final.png`**, optional **`galaxy.mp4`**, and **`rotation_curve.png`** for backward compatibility. It may honor **`render_overlay_mode`** from **`run_info`** (or **`--render-overlay-mode`**): **`none`** | **`minimal`** | **`audit_full`**. Overlays read **`run_info`** and **`render_manifest.json`** so plots show **dynamics vs metrics** and coupling without opening source.
+## Physics packages (high level)
 
-**`plot_animation_dynamic_zoom`**: default **off** — `plot_cpp_run.py` uses **fixed global smart framing** (quantile x/y bounds on all plotted particles plus the origin, square viewport, margin). Set **`true`** for **windowed** geometric framing with smoothed center and log(half-axis) per frame (see `plot_cpp_run.py` / `framing.py`).
-Burn-in plotting filter (does not modify raw snapshots): `plot_cpp_run.py --skip-initial-steps <step>` and/or `--skip-initial-snapshots <N>`, or set `plot_skip_initial_steps` / `plot_skip_initial_snapshots` in the run config (written to `run_info.txt`). CLI overrides config.
-Diagnostics cutoff for post-processing: set `diagnostic_cutoff_radius` in run config (written to `run_info.txt`) or pass `--diagnostic-cutoff-radius` to `plot_cpp_run.py`. No hardcoded physical cutoff is used.
+A physics package is a compiled C++ module selected at runtime by name (`physics/registry.cpp`).
 
-### Display units (postprocess only, SI internals preserved)
+Current built-in packages:
+- `Newtonian` (default orbital/gravity baseline)
+- `TPFCore` (TPF-based runtime package)
 
-Internal integration, physics, snapshot CSV numeric values, and run_info numeric physics values remain **SI**. Display units are a plotting/render concern driven by config keys written into `run_info.txt` and consumed by postprocess.
+To add a package: implement `physics/physics_package.hpp`, register a factory, and optionally provide `physics/<Name>/defaults.cfg`.
 
-Config keys:
+## TPFCore theory details
 
-- `display_distance_unit = auto | m | km | AU | ly | pc | kpc`
-- `display_time_unit = auto | s | min | hr | day | yr | kyr | Myr`
-- `display_velocity_unit = auto | m/s | km/s`
-- `display_units_in_overlay = true|false`
-- `display_show_unit_reference = true|false`
+This README keeps TPFCore details intentionally short. For Xi/Theta/I structure, readout/VDSG paths, and package-specific diagnostics, use:
 
-`auto` uses practical scale-based heuristics in the display layer (e.g., compact runs in m/km, solar-system scales in AU, galaxy scales in ly/pc/kpc; short runs in s/min/hr/day and long runs in yr/kyr/Myr). Explicit units force that display unit wherever the product shows converted values.
+- [`physics/TPFCore/README.md`](physics/TPFCore/README.md)
 
----
+## Testing from `engine/`
 
-## Application vs physics package
+```bash
+# all engine tests (doctest + integration scripts)
+(cd engine && make test)
 
-| Concern | Lives in |
-|---------|----------|
-| Integrator, snapshots, `run_info`, manifests, IC templates, registry | **This README / `config.hpp` / `main.cpp`** |
-| Ξ, Θ, I, λ, readout vs VDSG acceleration routing, paper alignment | **`physics/TPFCore/README.md`** |
+# doctest binary only
+(cd engine && make test_unit)
 
----
+# integration scripts only
+(cd engine && make test_integration)
+```
 
-## Python reference vs C++
-
-The repo includes a **Python** simulator (`main.py`, …) for reference and validation. For comparable modes, results should agree within floating-point tolerance. **C++** is the path used for large galaxy runs and audit manifests.
-
----
-
-## Testing
-
-Automated tests (doctest, shell smoke scripts, Python `unittest`) live under `tests/` and `physics/*/tests/`; see **[../docs/TESTING.md](../docs/TESTING.md)**. From repo root: `./run_tests.sh`. From `cpp_sim/`: `make test`.
-
----
-
-## Compare C++ vs Python (sanity)
-
-Same `simulation_mode` and aligned parameters: compare final **`snapshot_*.csv`** and **`run_info`** fields. Run C++ from `cpp_sim/`; run Python from repo root per `main.py` / `config.py`.
+For repository-wide testing guidance and Python test commands, see [`../docs/TESTING.md`](../docs/TESTING.md).

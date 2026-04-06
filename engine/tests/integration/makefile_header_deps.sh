@@ -3,7 +3,7 @@
 # Stale .o files across TUs caused undefined behavior (e.g. std::length_error / SIGSEGV in galaxy init).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Script lives in cpp_sim/tests/integration/ — Makefile is two levels up.
+# Script lives in engine/tests/integration/ — Makefile is two levels up.
 ROOT="$(cd "$HERE/../.." && pwd)"
 cd "$ROOT"
 make clean >/dev/null

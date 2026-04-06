@@ -16,7 +16,7 @@ galaxy_radius is missing, x_max falls back to 2e20 m.
 
 Usage:
   python plot_rotation_curve.py
-  python plot_rotation_curve.py cpp_sim/outputs/20260327_120000
+  python plot_rotation_curve.py outputs/20260327_120000
   python plot_rotation_curve.py --search-dir . --output rotation_curve.png
 """
 
@@ -191,7 +191,7 @@ def find_latest_csv(search_dir: Path) -> Path:
         return max(snapshot_files, key=lambda p: _step_from_stem(p.stem))
     raise FileNotFoundError(
         f"No output_*.csv or snapshot_*.csv under {search_dir}. "
-        "Pass --search-dir to your run folder (e.g. cpp_sim/outputs/...)."
+        "Pass --search-dir to your run folder (e.g. outputs/...)."
     )
 
 
