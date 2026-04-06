@@ -1024,7 +1024,9 @@ int main(int argc, char** argv) {
       const bool show_live_compare_progress = IS_STDOUT_TERMINAL();
       if (show_live_compare_progress) {
         std::cout << "Parallel compare enabled; streaming child progress to terminal.\n";
-        std::cout << "[ left  ... ]\n[ right ... ]\n";
+        // Reserve two terminal lines for dual-line in-place progress updates without
+        // showing placeholder labels.
+        std::cout << "\n\n";
       } else {
         std::cout << "Parallel compare enabled; child logs:\n  " << left_log << "\n  " << right_log << "\n";
       }
