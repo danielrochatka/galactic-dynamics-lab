@@ -192,14 +192,25 @@ int main(int argc, char** argv) {
 
   // 3. Layered load: built-in -> package defaults -> run config
   galaxy::Config config;
+  std::cout << "[startup_diag] run_config_path="
+            << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
+  std::cout << "[startup_diag] probe softening="
+            << (run_config_path.empty() ? "(none)" : galaxy::probe_config_key(run_config_path, "softening"))
+            << "\n";
+  std::cout << "[startup_diag] probe tpfcore_source_softening="
+            << (run_config_path.empty() ? "(none)"
+                                        : galaxy::probe_config_key(run_config_path, "tpfcore_source_softening"))
+            << "\n";
 
   std::string package_defaults_path = galaxy::find_package_defaults_path(physics_pkg);
   if (!package_defaults_path.empty()) {
     galaxy::load_config_file(package_defaults_path, config);
   }
+  std::cout << "[startup_diag] configured softening after package defaults: " << config.softening << "\n";
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
   }
+  std::cout << "[startup_diag] configured softening after run config: " << config.softening << "\n";
 
   config.run_id = run_id_from_time();
   config.output_dir = "outputs/" + config.run_id;
