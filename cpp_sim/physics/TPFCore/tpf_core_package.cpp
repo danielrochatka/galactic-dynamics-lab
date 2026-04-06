@@ -1,11 +1,11 @@
 /**
  * TPFCore package implementation.
- * Honest primitive TPF: Xi, Theta, I. 3D Hessian provisional ansatz on z = 0.
- * Integrator accelerations are route-dependent (see compute_accelerations):
- * - direct_tpf: tensor principal-part route with Theta/I/kappa baseline; DeltaC omitted in current implementation scope;
+ * Current implementation uses Xi, Theta, I from the source ansatz on z = 0.
+ * Integrator accelerations are mode-dependent (see compute_accelerations):
+ * - direct_tpf: principal-part implementation with Theta/I/kappa baseline; DeltaC omitted in current scope;
  *   optional additive VDSG extension on top of that baseline.
- * - v11_weak_field_truncation: weak-field correspondence helper path using tpf_weak_field_correspondence_alpha_si.
- * - legacy_readout: readout baseline + optional VDSG modifier + optional global |a| shunt.
+ * - v11_weak_field_truncation: correspondence implementation using tpf_weak_field_correspondence_alpha_si.
+ * - legacy_readout: provisional readout-based implementation + optional VDSG modifier + optional global |a| shunt.
  */
 
 #include "tpf_core_package.hpp"
@@ -147,18 +147,8 @@ inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, dou
 
 /**
  * VDSG velocity modifier (SI), additive on TPF readout baseline.
- *
- * Design (replaces radial Doppler (v_rel·r̂)/c):
- * 1) Why (v_rel·r̂)/c failed: for nearly circular orbits about the BH, v is mostly tangential, so v·r̂ ≈ 0 and
- *    the BH–star modifier vanished — no gradual coupling between orbital motion and the modifier, and no
- *    “moving mass” signal aligned with wake-like intuition (flow past the source, not only radial approach).
- * 2) New scalar: beta = |v_rel| / c (relative speed in the interaction, BH frame or pairwise). This is
- *    nonzero for circular motion (|v| > 0) and goes to 0 smoothly as speeds → 0, so λ_eff*beta → 0 as
- *    coupling or speeds → 0 (continuous Newtonian/baseline limit).
- * 3) Direction: excess remains along the Newtonian line (centripetal toward the source). The modifier is
- *    a_speed-dependent rescaling of that radial magnitude: doppler_scale = 1 + λ_eff * beta, contribution
- *    a_N * (doppler_scale - 1) = a_N * λ_eff * beta for small λ_eff*beta — interpretable as wake-like
- *    amplification tied to how fast matter moves in the interaction, not to radial vs tangential split alone.
+ * Current implementation uses beta = |v_rel| / c and doppler_scale = 1 + lambda_eff * beta.
+ * The additive contribution is a_newt * (doppler_scale - 1), applied along the Newtonian line.
  */
 void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, double softening,
                                          bool star_star, double vdsg_coupling,
@@ -385,24 +375,24 @@ void TPFCorePackage::compute_accelerations(const State& state,
     if (provisional_readout_) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
-          "(direct_tpf is the tensor principal-part route with Theta/I/kappa baseline; DeltaC omitted in current implementation scope).");
+          "(current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted).");
     }
     if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
         theta_tr_scale_ != 1.0) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects readout closure knobs "
-          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale) "
-          "on the direct_tpf tensor principal-part route (Theta/I/kappa baseline; DeltaC omitted in current implementation scope).");
+          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale). "
+          "Current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted.");
     }
     if (shunt_enable_) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects tpf_global_accel_shunt_enable=true "
-          "(global |a| shunt is outside the direct_tpf tensor principal-part route with Theta/I/kappa baseline.)");
+          "(direct_tpf does not apply global |a| shunt).");
     }
     if (cooling_fraction_ > 0.0) {
       throw std::runtime_error(
           "tpf_dynamics_mode=direct_tpf rejects positive tpf_cooling_fraction "
-          "(cooling is a numerical stabilizer outside the direct_tpf tensor principal-part route with Theta/I/kappa baseline.)");
+          "(direct_tpf does not apply cooling).");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
     apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);

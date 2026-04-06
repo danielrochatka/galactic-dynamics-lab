@@ -94,19 +94,22 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path";
+    return "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string("TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_") +
-           (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
-           "_provisional_readout_off_shunt_off_cooling_off";
+    std::ostringstream os;
+    os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
+       << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+    return os.str();
   }
   /* legacy_readout (default when key omitted) */
   if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCore_PROVISIONAL_legacy_readout_DISABLED (provisional_readout off)";
+    return "tpf_dynamics_mode=legacy_readout; provisional readout disabled";
   const std::string& mode = config.tpfcore_readout_mode;
-  if (tpf_vdsg_active_for_audit(config)) return "TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:" + mode;
-  return "TPF_PROVISIONAL_legacy_readout:" + mode;
+  std::ostringstream os;
+  os << "tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
+     << "; vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+  return os.str();
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
@@ -119,15 +122,16 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
     if (tpf_v11_weak_field_truncation_active(config))
-      return "v11_weak_field_truncation_metrics_weak_field_correspondence_helper_alpha_si_path";
+      return "v11 correspondence metrics; alpha_si";
     if (config.tpf_dynamics_mode == "direct_tpf") {
-      return std::string("direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_") +
-             (tpf_vdsg_active_for_audit(config) ? "VDSG_on" : "VDSG_off") +
-             "_provisional_readout_off_shunt_off_cooling_off";
+      std::ostringstream os;
+      os << "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling="
+         << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+      return os.str();
     }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
-    return "TPFCore_metrics_n/a (provisional_readout off)";
+    return "TPFCore metrics n/a (provisional readout off)";
   }
   return "unknown";
 }
@@ -139,12 +143,12 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (v11 Eq.42-44 weak-field correspondence helper; "
-           "alpha_si correspondence path; no VDSG/readout/shunt/cooling)";
+    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (Eq.42-44 correspondence implementation; "
+           "alpha_si path; no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(tensor principal-part route: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
+                       "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
                        "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
@@ -161,7 +165,7 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.tpf_global_accel_shunt_enable)
     tail += " + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)";
   else
-    tail += " (global |a| shunt OFF — clean readout+VDSG path without velocity cap)";
+    tail += " (global |a| shunt OFF)";
   return base + tail;
 }
 
