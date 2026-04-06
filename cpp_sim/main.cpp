@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <cstdint>
@@ -168,6 +169,71 @@ std::string state_fingerprint_hex(const galaxy::State& s) {
   std::ostringstream os;
   os << std::hex << std::setfill('0') << std::setw(16) << h;
   return os.str();
+}
+
+void write_galaxy_step0_accel_audit(const galaxy::Config& config,
+                                    galaxy::PhysicsPackage* physics,
+                                    const galaxy::State& state) {
+  if (config.simulation_mode != galaxy::SimulationMode::galaxy) return;
+  if (!physics) return;
+
+  std::ofstream csv(config.output_dir + "/galaxy_step0_accel_audit.csv");
+  if (!csv) return;
+  csv << std::scientific << std::setprecision(17);
+  csv << "particle_index,radius,vx0,vy0,"
+      << "ax_direct_tpf,ay_direct_tpf,ax_vdsg,ay_vdsg,"
+      << "ax_total,ay_total,ax_bh_only,ay_bh_only,ax_star_star_only,ay_star_star_only\n";
+
+  std::vector<double> ax_total, ay_total;
+  physics->compute_accelerations(state, config.bh_mass, config.softening, config.enable_star_star_gravity, ax_total, ay_total);
+
+  std::vector<double> ax_bh_only, ay_bh_only;
+  physics->compute_accelerations(state, config.bh_mass, config.softening, false, ax_bh_only, ay_bh_only);
+
+  std::vector<double> ax_star_only, ay_star_only;
+  physics->compute_accelerations(state, 0.0, config.softening, config.enable_star_star_gravity, ax_star_only, ay_star_only);
+
+  std::vector<double> ax_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ax_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+
+  if (config.physics_package == "TPFCore") {
+    galaxy::Config cfg_direct = config;
+    cfg_direct.tpf_dynamics_mode = "direct_tpf";
+    cfg_direct.tpfcore_enable_provisional_readout = false;
+    cfg_direct.tpf_global_accel_shunt_enable = false;
+    cfg_direct.tpf_cooling_fraction = 0.0;
+    cfg_direct.tpf_vdsg_coupling = 0.0;
+
+    galaxy::Config cfg_total = cfg_direct;
+    cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
+
+    galaxy::TPFCorePackage tpf_direct;
+    tpf_direct.init_from_config(cfg_direct);
+    tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
+                                     config.enable_star_star_gravity, ax_direct, ay_direct);
+
+    std::vector<double> ax_total_direct, ay_total_direct;
+    galaxy::TPFCorePackage tpf_total;
+    tpf_total.init_from_config(cfg_total);
+    tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
+                                    config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
+    for (int i = 0; i < state.n(); ++i) {
+      ax_vdsg[static_cast<size_t>(i)] = ax_total_direct[static_cast<size_t>(i)] - ax_direct[static_cast<size_t>(i)];
+      ay_vdsg[static_cast<size_t>(i)] = ay_total_direct[static_cast<size_t>(i)] - ay_direct[static_cast<size_t>(i)];
+    }
+  }
+
+  for (int i = 0; i < state.n(); ++i) {
+    const double radius = std::hypot(state.x[i], state.y[i]);
+    csv << i << ',' << radius << ',' << state.vx[i] << ',' << state.vy[i] << ','
+        << ax_direct[static_cast<size_t>(i)] << ',' << ay_direct[static_cast<size_t>(i)] << ','
+        << ax_vdsg[static_cast<size_t>(i)] << ',' << ay_vdsg[static_cast<size_t>(i)] << ','
+        << ax_total[static_cast<size_t>(i)] << ',' << ay_total[static_cast<size_t>(i)] << ','
+        << ax_bh_only[static_cast<size_t>(i)] << ',' << ay_bh_only[static_cast<size_t>(i)] << ','
+        << ax_star_only[static_cast<size_t>(i)] << ',' << ay_star_only[static_cast<size_t>(i)] << '\n';
+  }
 }
 
 }  // namespace
@@ -842,6 +908,8 @@ int main(int argc, char** argv) {
               << ", n_steps=" << n_steps
               << ", dt=" << config.dt
               << ", sim_time=" << (n_steps * config.dt) << "\n";
+    write_galaxy_step0_accel_audit(config, physics, state);
+    std::cout << "Wrote " << config.output_dir << "/galaxy_step0_accel_audit.csv\n";
   } else if (config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
              config.simulation_mode == galaxy::SimulationMode::earth_moon_benchmark) {
     std::cout << "Earth–Moon benchmark (SI), n=" << state.n()

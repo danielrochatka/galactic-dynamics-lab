@@ -93,6 +93,26 @@ std::string find_package_defaults_path(const std::string& package_name);
 std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Config& config);
 
 struct Config {
+  struct ExplicitOverrides {
+    bool dt = false;
+    bool softening = false;
+    bool bh_mass = false;
+    bool enable_star_star_gravity = false;
+    bool tpfcore_source_softening = false;
+    bool validation_two_body_radius = false;
+    bool validation_two_body_speed_ratio = false;
+    bool validation_earth_mass = false;
+    bool validation_moon_mass = false;
+    bool validation_earth_moon_distance = false;
+    bool validation_moon_tangential_speed = false;
+    bool validation_symmetric_include_bh = false;
+    bool validation_symmetric_separation = false;
+    bool validation_symmetric_speed = false;
+    bool validation_small_n = false;
+    bool validation_n_steps = false;
+    bool validation_snapshot_every = false;
+  } explicit_overrides;
+
   SimulationMode simulation_mode = SimulationMode::galaxy;
 
   int n_stars = 5000;
