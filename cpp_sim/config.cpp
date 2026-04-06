@@ -536,6 +536,29 @@ std::string probe_config_key(const std::string& path, const std::string& key) {
   return "";
 }
 
+std::vector<ConfigKeyOccurrence> scan_config_key_occurrences(const std::string& path, const std::string& key) {
+  std::vector<ConfigKeyOccurrence> out;
+  std::ifstream f(path);
+  if (!f) return out;
+
+  std::string line;
+  int line_num = 0;
+  while (std::getline(f, line)) {
+    ++line_num;
+    line = trim(line);
+    if (line.empty() || line[0] == '#') continue;
+    auto eq = line.find('=');
+    if (eq == std::string::npos) continue;
+    std::string k = trim(line.substr(0, eq));
+    if (k != key) continue;
+    ConfigKeyOccurrence occurrence;
+    occurrence.line_number = line_num;
+    occurrence.value = trim(line.substr(eq + 1));
+    out.push_back(occurrence);
+  }
+  return out;
+}
+
 // Root configs only: try repo-root configs/ (../configs when run from cpp_sim, configs when run from repo root).
 // We never use cpp_sim/configs/; if it exists we warn or fail (see check_run_config_canonical).
 std::string find_run_config_path() {

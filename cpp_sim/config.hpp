@@ -57,6 +57,12 @@ std::string mode_to_string(SimulationMode m);
 
 struct Config;
 
+/** One key occurrence found in a config file (in file order). */
+struct ConfigKeyOccurrence {
+  int line_number = 0;
+  std::string value;
+};
+
 // Load key=value pairs from a .cfg file into config. Returns true if file was read.
 // Throws on malformed values (invalid number, etc.). Unknown keys are skipped.
 bool load_config_file(const std::string& path, Config& config);
@@ -67,6 +73,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
 // Probe a config file for a single key. Returns value if found, else empty string.
 // Returns empty if file does not exist or key not found.
 std::string probe_config_key(const std::string& path, const std::string& key);
+
+// Scan a config file and return all occurrences of `key` in file order, with line numbers.
+// Returns empty if file does not exist or key is not present.
+std::vector<ConfigKeyOccurrence> scan_config_key_occurrences(
+    const std::string& path,
+    const std::string& key);
 
 // Find first existing run config path (root configs/ only). Returns empty if none found.
 std::string find_run_config_path();
