@@ -304,6 +304,8 @@ struct Config {
   bool save_run_info = true;
   /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
   bool plot_animation_dynamic_zoom = false;
+  /** plot_cpp_compare.py: per-frame pooled-star coverage fraction for fixed shared compare viewport. */
+  double plot_compare_smart_zoom_coverage = 0.95;
   /** plot_cpp_run.py: plotting-only burn-in filter: ignore snapshots with step < this value. Default 0 (no filtering). */
   int plot_skip_initial_steps = 0;
   /** plot_cpp_run.py: plotting-only burn-in filter: after step filtering, drop first N remaining snapshots. Default 0 (no filtering). */

@@ -385,6 +385,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.plot_animation_dynamic_zoom = parse_bool(val);
     return true;
   }
+  if (key == "plot_compare_smart_zoom_coverage") {
+    const double coverage = std::stod(val);
+    if (!(coverage > 0.0 && coverage <= 1.0)) {
+      throw std::runtime_error("plot_compare_smart_zoom_coverage must be in (0, 1], got: " + val);
+    }
+    config.plot_compare_smart_zoom_coverage = coverage;
+    return true;
+  }
   if (key == "plot_skip_initial_steps") {
     config.plot_skip_initial_steps = std::stoi(val);
     return true;
@@ -700,6 +708,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("save_snapshots", b(config.save_snapshots));
   kv.emplace_back("save_run_info", b(config.save_run_info));
   kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));
+  kv.emplace_back("plot_compare_smart_zoom_coverage", d(config.plot_compare_smart_zoom_coverage));
   kv.emplace_back("plot_skip_initial_steps", i(config.plot_skip_initial_steps));
   kv.emplace_back("plot_skip_initial_snapshots", i(config.plot_skip_initial_snapshots));
   kv.emplace_back("diagnostic_cutoff_radius", d(config.diagnostic_cutoff_radius));

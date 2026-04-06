@@ -333,8 +333,8 @@ class TestPlotCppCompare(unittest.TestCase):
         rng = np.random.default_rng(7)
         left_snaps = []
         right_snaps = []
-        n = 1000
-        n_out = 5  # 0.5% per side; 1% pooled, below FRAME_BULK_Q tail
+        n = 120
+        n_out = 3  # 2.5% pooled outliers across both panels at each frame
         for step in range(12):
             near_l = rng.normal(scale=10.0, size=(n - n_out, 2))
             near_r = rng.normal(scale=10.0, size=(n - n_out, 2))
@@ -346,8 +346,8 @@ class TestPlotCppCompare(unittest.TestCase):
             left_snaps.append(Snapshot(step, float(step), pos_l, vel))
             right_snaps.append(Snapshot(step, float(step), pos_r, vel))
 
-        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
-        self.assertLess(vp.half_axis, 1.0e4)
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
+        self.assertLess(vp.half_axis, 1.0e3)
 
     def test_compare_smart_viewport_expands_when_many_far_out(self) -> None:
         import numpy as np
@@ -357,8 +357,8 @@ class TestPlotCppCompare(unittest.TestCase):
         rng = np.random.default_rng(8)
         left_snaps = []
         right_snaps = []
-        n = 1000
-        n_out = 250  # 25%
+        n = 120
+        n_out = 45  # 37.5% per side
         for step in range(10):
             near = rng.normal(scale=10.0, size=(n - n_out, 2))
             out_l = np.column_stack([np.full(n_out, 1.0e5), rng.normal(scale=100.0, size=n_out)])
@@ -369,7 +369,7 @@ class TestPlotCppCompare(unittest.TestCase):
             left_snaps.append(Snapshot(step, float(step), pos_l, vel))
             right_snaps.append(Snapshot(step, float(step), pos_r, vel))
 
-        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
         self.assertGreater(vp.half_axis, 5.0e4)
 
     def test_compare_smart_viewport_uses_both_panels_each_frame(self) -> None:
@@ -386,9 +386,49 @@ class TestPlotCppCompare(unittest.TestCase):
             left_snaps.append(Snapshot(step, float(step), pos_l, vel))
             right_snaps.append(Snapshot(step, float(step), pos_r, vel))
 
-        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0)
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
         self.assertAlmostEqual(vp.center_x, 0.0, places=6)
         self.assertGreater(vp.half_axis, 9.0e3)
+
+    def test_compare_smart_viewport_is_fixed_shared_union_across_frames(self) -> None:
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        left_snaps = []
+        right_snaps = []
+        for step in range(4):
+            near_l = np.column_stack([np.full(50, 10.0 + step * 5.0), np.linspace(-3.0, 3.0, 50)])
+            near_r = np.column_stack([np.full(50, -10.0 - step * 5.0), np.linspace(-3.0, 3.0, 50)])
+            vel = np.zeros_like(near_l)
+            left_snaps.append(Snapshot(step, float(step), near_l, vel))
+            right_snaps.append(Snapshot(step, float(step), near_r, vel))
+
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
+        # Must include the most separated frame; single fixed shared viewport for full animation/static render.
+        self.assertGreater(vp.half_axis, 20.0)
+        self.assertAlmostEqual(vp.center_x, 0.0, places=6)
+
+    def test_compare_smart_viewport_coverage_knob_monotonic(self) -> None:
+        import numpy as np
+
+        from plot_cpp_run import Snapshot
+
+        rng = np.random.default_rng(123)
+        left_snaps = []
+        right_snaps = []
+        for step in range(3):
+            near = rng.normal(scale=10.0, size=(100, 2))
+            far = np.column_stack([np.full(10, 2.0e4), rng.normal(scale=50.0, size=10)])
+            pos_l = np.vstack([near, far])
+            pos_r = np.vstack([near, far])
+            vel = np.zeros_like(pos_l)
+            left_snaps.append(Snapshot(step, float(step), pos_l, vel))
+            right_snaps.append(Snapshot(step, float(step), pos_r, vel))
+
+        vp_95 = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
+        vp_90 = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.90)
+        self.assertLessEqual(vp_90.half_axis, vp_95.half_axis)
 
     def test_compare_display_selection_shared_distance_unit(self) -> None:
         left = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
