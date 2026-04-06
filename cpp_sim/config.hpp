@@ -110,30 +110,28 @@ struct Config {
   /**
    * TPFCore only: how dynamical accelerations are produced.
    * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
-   * - v11_weak_field_truncation: paper v11 weak-field correspondence truncation (Eq. 42-44 superposition scalar), static/quasi-static limit only.
-   * - direct_tpf: tensor principal-part route (Theta/I/kappa baseline, DeltaC omitted in current implementation scope)
-   *   with strict non-readout/non-stabilizer guardrails and optional additive VDSG extension.
+   * - v11_weak_field_truncation: correspondence truncation implementation (Eq. 42-44 scalar superposition) using alpha_si.
+   * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
    */
   std::string tpf_dynamics_mode = "legacy_readout";
   /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
-   * Default -G reproduces Newtonian-like attraction in the weak-field correspondence helper limit.
    * This is distinct from tpf_kappa (external key that maps to internal TPFCore kappa for direct_tpf and
-   * also feeds the derived-radial closure ledger path).
+   * also feeds derived-radial closure parameters where configured).
    */
   double tpf_weak_field_correspondence_alpha_si = -6.67430e-11;
 
   /**
-   * TPFCore audit/analysis layer (no substitute for dynamics).
-   * none (default) | v11_weak_field_correspondence — manuscript v11 static weak-field tensor correspondence only.
+   * TPFCore analysis/audit layer; does not replace dynamics.
+   * none (default) | v11_weak_field_correspondence — static correspondence tensor audit outputs.
    */
   std::string tpf_analysis_mode = "none";
 
   /**
-   * v11 weak-field correspondence audit only: which benchmark geometry to write.
-   * axis_monopole — existing +z axis tensor audit (default).
-   * earth_moon_line_of_centers — manuscript Sec. XI C–D line-of-centers φ / a (TPF correspondence vs Newtonian) CSV; no particle stepping.
+   * Static correspondence-audit geometry selector.
+   * axis_monopole — +z axis tensor audit (default).
+   * earth_moon_line_of_centers — Earth/Moon line-of-centers phi/acceleration CSV; no particle stepping.
    */
   std::string v11_weak_field_correspondence_benchmark = "axis_monopole";
   /** Paper Table II (v11): Earth mass (kg). */
@@ -152,39 +150,38 @@ struct Config {
   /** Target magnitude of surface acceleration (m/s²); paper uses ~9.81. */
   double v11_em_calib_surface_g_m_s2 = 9.81;
 
-  /** TPFCore only: gate for legacy_readout dynamics (required for that path; ignored for direct_tpf). VDSG may own ax, ay when tpf_vdsg_coupling != 0. Default false. */
+  /** TPFCore only: gate for legacy_readout dynamics (required for that path; ignored for direct_tpf). Nonzero VDSG can dominate final applied acceleration on legacy_readout. Default false. */
   bool tpfcore_enable_provisional_readout = false;
-  /** TPFCore configured readout mode string (see provisional_readout.cpp). May label metrics while VDSG supersedes ax, ay. */
+  /** TPFCore configured readout mode string (see provisional_readout.cpp). May appear in labels/metrics even when final acceleration includes other contributions. */
   std::string tpfcore_readout_mode = "tensor_radial_projection";
-  /** TPFCore readout: scale factor for magnitude. Was 0.2046442 (INVALIDATED by benchmark mismatch). Pending recalibration; default 1.0. */
+  /** TPFCore readout: magnitude scale factor. Default 1.0. */
   double tpfcore_readout_scale = 1.0;
   /** TPFCore derived-radial readout modes: theta_tt scale in diagnostics (derived closure; not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tt_scale = 1.0;
   /** TPFCore derived-radial readout modes: theta_tr scale in diagnostics (not added to ax, ay). Default 1.0. */
   double tpfcore_theta_tr_scale = 1.0;
   /**
-   * Legacy flat config key for TPFCore coupling:
-   * - external key name remains `tpf_kappa` for compatibility
-   * - maps to internal TPFCore `kappa` used by the direct_tpf tensor principal-part route (paper baseline)
-   * - the same incoming value also feeds derived-radial closure ledger knobs where configured
+   * External config key for TPFCore coupling:
+   * - external key name remains `tpf_kappa`
+   * - maps to internal TPFCore `kappa`
+   * - also feeds derived-radial closure parameters where configured
    * Default 1e32.
    */
   double tpf_kappa = 1.0e32;
   /**
-   * TPFCore VDSG: global strength λ in doppler_scale = 1 + λ_eff (v·r̂)/c per interaction.
-   * λ_eff is mass-normalized (see tpf_vdsg_mass_baseline_kg). Total acceleration still passes the
-   * 0.1% |v|/dt shunt after summing neighbors. Default tuned with TPF_G_SI.
+   * TPFCore VDSG coupling λ: additive per-interaction velocity modifier on top of baseline acceleration.
+   * Current implementation uses relative-speed scaling beta = |v_rel|/c with doppler_scale = 1 + λ_eff * beta.
+   * λ_eff is mass-normalized (see tpf_vdsg_mass_baseline_kg).
    */
   double tpf_vdsg_coupling = 1.0e-20;
   /**
    * VDSG mass baseline M_ref (kg) for log normalization: λ_eff = λ · log10(M_ref) / log10(M_source).
-   * If <= 0, uses star_mass at runtime (same units as simulation). Heuristic / provisional closure.
+   * If <= 0, uses star_mass at runtime (same units as simulation).
    */
   double tpf_vdsg_mass_baseline_kg = 0.0;
   /**
-   * TPFCore: optional global |a| cap after readout + VDSG (fraction of |v|/dt per particle).
-   * Default **false** so λ=0 runs are a clean readout baseline without this stabilization path.
-   * Enable explicitly when investigating numerical caps; not implied by tpf_vdsg_coupling.
+   * TPFCore: optional global |a| cap after acceleration assembly (fraction of |v|/dt per particle).
+   * Not implied by tpf_vdsg_coupling. Default false.
    */
   bool tpf_global_accel_shunt_enable = false;
   /** TPFCore: cap magnitude = tpf_global_accel_shunt_fraction * |v| / dt (when shunt enabled). Default 0.001 (0.1%). */
@@ -199,8 +196,8 @@ struct Config {
   /** TPFCore derived radial profile outer radius (m); <=0 uses galaxy_radius. */
   double tpf_poisson_max_radius = 0.0;
   /**
-   * TPFCore dynamical runs: fraction of n_steps in the artificial radial cooling phase (1% radial
-   * damping per step). Snapshots are not recorded during this phase. Ignored when physics_package != TPFCore.
+   * TPFCore dynamical runs: fraction of n_steps using startup radial damping (1% per step).
+   * Snapshots are not recorded during that interval. Ignored when physics_package != TPFCore.
    */
   double tpf_cooling_fraction = 0.2;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
@@ -222,14 +219,7 @@ struct Config {
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
 
-  /**
-   * Galaxy mode: named IC template (see galaxy_init.hpp). Each template selects structured density
-   * seeds (m2/m3/bar/spiral/clumps). When structured or noise parameters are still at their neutral
-   * built-in defaults (0.0, 1.0 axis ratio, etc.), apply_galaxy_init_template_defaults supplies
-   * modest template-specific values so the preset name matches visible structure. Explicit nonzero
-   * user settings are never overwritten. Random “chaos” uses galaxy_init_* noise keys and
-   * galaxy_init_master_chaos (noise-only scaler).
-   */
+  /** Galaxy mode template selector (see galaxy_init.hpp). May provide template defaults when related parameters remain neutral; explicit user-set values are not overwritten. Noise is controlled separately by galaxy_init_* noise keys and galaxy_init_master_chaos. */
   std::string galaxy_init_template = "symmetric_disk";
   /** mt19937 seed for galaxy placement and velocity perturbations (reproducible). Default 12345 matches legacy hardcoded seed. */
   unsigned galaxy_init_seed = 12345u;
@@ -272,8 +262,8 @@ struct Config {
   double galaxy_init_master_chaos = 1.0;
 
   /**
-   * Legacy isotropic Cartesian velocity noise (fraction of v_circ per component) when all new galaxy_init_* noises are zero.
-   * If any of position/angle/magnitude noise (after master_chaos) is > 0, new pipeline is used instead for velocities.
+   * Isotropic Cartesian velocity noise (fraction of v_circ per component) when all galaxy_init_* noise controls are zero.
+   * If any of position/angle/magnitude noise (after master_chaos) is > 0, those controls determine perturbations.
    */
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;

@@ -311,9 +311,9 @@ int main(int argc, char** argv) {
 
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
-    std::cout << "Physics: TPFCore (primitive TPF structure)\n";
-    std::cout << "  Provisional source ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi)\n";
-    std::cout << "  Parameter roles: lambda=1/4 (fixed theory) | eps (numerical regularization) | readout (provisional experimental)\n";
+    std::cout << "Physics: TPFCore\n";
+    std::cout << "  Source ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi)\n";
+    std::cout << "  Parameters: lambda=1/4 | eps=source softening | readout settings as configured\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
       std::cout << "  v11 audit: TPFCore acceleration routing not used (no legacy_readout / direct_tpf dynamics this run).\n";
     } else {
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
         std::cerr << "TPFCore legacy_readout does not support dynamical modes (galaxy, earth_moon_benchmark, "
                      "bh_orbit_validation, etc.) unless provisional readout is enabled.\n";
         std::cerr << "Set tpfcore_enable_provisional_readout = true, or use tpf_dynamics_mode = direct_tpf for the "
-                     "future direct path, or physics_package = Newtonian, or inspection modes: "
+                     "direct_tpf implementation, or physics_package = Newtonian, or inspection modes: "
                      "tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
         return 1;
       }
@@ -727,7 +727,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     if (config.tpf_vdsg_coupling != 0.0 || !std::isfinite(config.tpf_vdsg_coupling)) {
-      std::cerr << "v11 weak-field correspondence audit requires tpf_vdsg_coupling = 0 (VDSG is not in manuscript v11).\n";
+      std::cerr << "v11 correspondence audit requires tpf_vdsg_coupling = 0.\n";
       return 1;
     }
     const bool v11_em = (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers");
@@ -750,7 +750,7 @@ int main(int argc, char** argv) {
                    "tpfcore_probe_radius_max > tpfcore_probe_radius_min (positive z axis samples).\n";
       return 1;
     }
-    std::cout << "Audit mode: tpf_v11_weak_field_correspondence (manuscript v11 static weak-field correspondence only)\n";
+    std::cout << "Audit mode: tpf_v11_weak_field_correspondence (static correspondence audit only)\n";
     std::cout << "  Benchmark: " << config.v11_weak_field_correspondence_benchmark << "\n";
     std::cout << "  No particle integration; Delta C_mu_nu omitted; VDSG off.\n";
     galaxy::run_v11_weak_field_correspondence_audit(config, config.output_dir);
