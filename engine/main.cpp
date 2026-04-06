@@ -202,6 +202,13 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
     galaxy::Config cfg_direct = config;
     cfg_direct.tpf_dynamics_mode = "direct_tpf";
     cfg_direct.tpfcore_enable_provisional_readout = false;
+    // direct_tpf truthfully rejects legacy/provisional readout closure knobs.
+    // Normalize the internal audit branch config so step-0 diagnostics can
+    // compute direct baseline + additive VDSG decomposition under valid inputs.
+    cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
+    cfg_direct.tpfcore_readout_scale = 1.0;
+    cfg_direct.tpfcore_theta_tt_scale = 1.0;
+    cfg_direct.tpfcore_theta_tr_scale = 1.0;
     cfg_direct.tpf_global_accel_shunt_enable = false;
     cfg_direct.tpf_cooling_fraction = 0.0;
     cfg_direct.tpf_vdsg_coupling = 0.0;
