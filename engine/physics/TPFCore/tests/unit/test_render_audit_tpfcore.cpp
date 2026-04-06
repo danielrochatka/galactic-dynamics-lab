@@ -11,10 +11,11 @@ TEST_CASE("compute_active_dynamics_branch: TPF legacy_readout labels VDSG in bra
   c.tpfcore_enable_provisional_readout = true;
   c.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c.tpf_vdsg_coupling = 0.0;
-  CHECK(galaxy::compute_active_dynamics_branch(c) == "TPF_PROVISIONAL_legacy_readout:derived_tpf_radial_readout");
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_PROVISIONAL_legacy_readout_plus_EXPLORATORY_VDSG:derived_tpf_radial_readout");
+        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-20");
 }
 
 TEST_CASE("compute_active_dynamics_branch: TPF direct") {
@@ -23,18 +24,14 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
+        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_off_provisional_readout_off_shunt_off_cooling_off");
+        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_direct_tpf_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
+        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf_metrics_tensor_principal_part_DeltaC_omitted_"
-        "VDSG_on_provisional_readout_off_shunt_off_cooling_off");
+        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }
 
 TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") {
@@ -42,9 +39,9 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") 
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "v11_weak_field_truncation";
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path");
+        "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "v11_weak_field_truncation_metrics_weak_field_correspondence_helper_alpha_si_path");
+        "v11 correspondence metrics; alpha_si");
   CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
 }
 
@@ -53,7 +50,7 @@ TEST_CASE("compute_active_dynamics_branch: deprecated weak_field_correspondence 
   c.physics_package = "TPFCore";
   c.tpf_dynamics_mode = "weak_field_correspondence";
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "TPF_v11_weak_field_truncation_weak_field_correspondence_helper_alpha_si_path");
+        "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si");
 }
 
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
@@ -66,7 +63,7 @@ TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
   CHECK(galaxy::compute_active_metrics_branch(c) == "tpfcore_readout:derived_tpf_radial_readout");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile"
-        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)");
+        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF)");
 }
 
 TEST_CASE("compute_acceleration_code_path: same pipeline string when vdsg coupling is zero") {
@@ -78,7 +75,7 @@ TEST_CASE("compute_acceleration_code_path: same pipeline string when vdsg coupli
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_provisional_readout_acceleration (tensor_radial_projection)"
-        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF — clean readout+VDSG path without velocity cap)");
+        " + accumulate_vdsg_velocity_modifier (global |a| shunt OFF)");
 }
 
 TEST_CASE("compute_acceleration_code_path: includes shunt when explicitly enabled") {
