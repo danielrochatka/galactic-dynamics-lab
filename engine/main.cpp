@@ -421,7 +421,7 @@ int main(int argc, char** argv) {
     } else {
       std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
       if (tpf && tpf->provisional_readout_enabled()) {
-        std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [weak-field calibrated])";
+        std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [correspondence-calibrated])";
         if (config.tpfcore_readout_mode == "tr_coherence_readout")
           std::cout << " [exploratory t-r; theta_tt_scale=" << config.tpfcore_theta_tt_scale << ", theta_tr_scale=" << config.tpfcore_theta_tr_scale << "]";
         if (config.tpfcore_dump_readout_debug)

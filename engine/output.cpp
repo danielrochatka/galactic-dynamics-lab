@@ -244,7 +244,7 @@ void write_run_info(const std::string& output_dir,
       f << "v11_audit_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved config section above\n";
     }
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
-    f << "tpfcore_readout_scale_note\tweak-field calibrated effective scale (K_eff); not proof of final TPF dynamics\n";
+    f << "tpfcore_readout_scale_note\tcorrespondence-calibrated effective scale (K_eff); benchmark/readout mapping only, not proof of final TPF dynamics or full Eq. (10) validation\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
