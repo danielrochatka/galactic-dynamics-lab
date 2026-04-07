@@ -1,5 +1,5 @@
 /**
- * PROVISIONAL weak-field point-source: 3D Hessian of Phi = -m/R on z = 0,
+ * PROVISIONAL point-source correspondence ansatz: 3D Hessian of Phi = -m/R on z = 0,
  * R^2 = dx^2 + dy^2 + eps^2.
  */
 

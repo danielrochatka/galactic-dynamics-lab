@@ -4,7 +4,7 @@
 #include <cmath>
 
 /**
- * PROVISIONAL weak-field point-source ansatz for TPFCore.
+ * PROVISIONAL point-source ansatz for TPFCore (correspondence/source layer).
  *
  * True 3D scalar potential evaluated on the z = 0 simulation plane (source and
  * field point both at z = 0):
@@ -16,7 +16,7 @@
  *   Xi_i = partial_i Phi   (i = x, y; Xi_z = 0 on the plane)
  *   Theta_ij = Hess_ij(Phi)   (full symmetric 3x3; Theta_xz = Theta_yz = 0 on z = 0)
  *
- * The field-equation residual uses the full spatial divergence in 3D, including
+ * The Xi/Theta configuration-equation residual uses the full spatial divergence in 3D, including
  * partial_z Theta_{xz} and partial_z Theta_{yz} (nonzero as limits even when
  * Theta_xz = Theta_yz = 0 on the plane). For Phi = -m/R with R^2 = r^2 + eps^2,
  * the residual vanishes identically when eps = 0 away from the source; with
