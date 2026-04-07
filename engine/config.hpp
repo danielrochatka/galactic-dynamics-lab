@@ -250,6 +250,18 @@ struct Config {
   double tpfcore_source_softening = 0.0;
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
+  /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
+  bool tpf_xi_constraint_exterior_inspect = false;
+  /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */
+  int tpf_xi_constraint_grid_n = 65;
+  /** TPFCore inspection (single-source only): planar Xi exterior half-extent L for domain [-L, +L]. */
+  double tpf_xi_constraint_half_extent = 10.0;
+  /** TPFCore inspection (single-source only): inner excision/pinned radius for exterior solve. */
+  double tpf_xi_constraint_inner_radius = 0.5;
+  /** TPFCore inspection (single-source only): max iterations for experimental planar Xi solver. */
+  int tpf_xi_constraint_max_iters = 250;
+  /** TPFCore inspection (single-source only): convergence tolerance for experimental planar Xi solver. */
+  double tpf_xi_constraint_tol = 1e-8;
 
   /** Galaxy mode template selector (see galaxy_init.hpp). May provide template defaults when related parameters remain neutral; explicit user-set values are not overwritten. Noise is controlled separately by galaxy_init_* noise keys and galaxy_init_master_chaos. */
   std::string galaxy_init_template = "symmetric_disk";
