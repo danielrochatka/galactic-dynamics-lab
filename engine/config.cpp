@@ -297,6 +297,30 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_residual_step = std::stod(val);
     return true;
   }
+  if (key == "tpf_xi_constraint_exterior_inspect") {
+    config.tpf_xi_constraint_exterior_inspect = parse_bool(val);
+    return true;
+  }
+  if (key == "tpf_xi_constraint_grid_n") {
+    config.tpf_xi_constraint_grid_n = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_xi_constraint_half_extent") {
+    config.tpf_xi_constraint_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_xi_constraint_inner_radius") {
+    config.tpf_xi_constraint_inner_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_xi_constraint_max_iters") {
+    config.tpf_xi_constraint_max_iters = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_xi_constraint_tol") {
+    config.tpf_xi_constraint_tol = std::stod(val);
+    return true;
+  }
   if (key == "tpfcore_live_orbit_force_audit") {
     config.tpfcore_live_orbit_force_audit = parse_bool(val);
     return true;
@@ -688,6 +712,12 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpfcore_dump_theta_profile", b(config.tpfcore_dump_theta_profile));
   kv.emplace_back("tpfcore_source_softening", d(config.tpfcore_source_softening));
   kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
+  kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
+  kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
+  kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));
+  kv.emplace_back("tpf_xi_constraint_inner_radius", d(config.tpf_xi_constraint_inner_radius));
+  kv.emplace_back("tpf_xi_constraint_max_iters", i(config.tpf_xi_constraint_max_iters));
+  kv.emplace_back("tpf_xi_constraint_tol", d(config.tpf_xi_constraint_tol));
   kv.emplace_back("galaxy_init_template", config.galaxy_init_template);
   kv.emplace_back("galaxy_init_seed", u(config.galaxy_init_seed));
   kv.emplace_back("galaxy_init_position_noise", d(config.galaxy_init_position_noise));

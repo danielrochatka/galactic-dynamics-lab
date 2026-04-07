@@ -13,6 +13,12 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_global_accel_shunt_enable == false);
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
+  CHECK(c.tpf_xi_constraint_exterior_inspect == false);
+  CHECK(c.tpf_xi_constraint_grid_n == 65);
+  CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
+  CHECK(c.tpf_xi_constraint_inner_radius == doctest::Approx(0.5));
+  CHECK(c.tpf_xi_constraint_max_iters == 250);
+  CHECK(c.tpf_xi_constraint_tol == doctest::Approx(1e-8));
   CHECK(c.render_overlay_mode == "none");
   CHECK(c.display_distance_unit == "auto");
   CHECK(c.display_time_unit == "auto");
@@ -128,4 +134,20 @@ TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
   CHECK(c.v11_em_mean_distance_m == doctest::Approx(3.844e8));
   CHECK(apply_config_kv("v11_em_calib_surface_g_m_s2", "9.81", c));
   CHECK(c.v11_em_calib_surface_g_m_s2 == doctest::Approx(9.81));
+}
+
+TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
+  Config c;
+  CHECK(apply_config_kv("tpf_xi_constraint_exterior_inspect", "true", c));
+  CHECK(c.tpf_xi_constraint_exterior_inspect == true);
+  CHECK(apply_config_kv("tpf_xi_constraint_grid_n", "49", c));
+  CHECK(c.tpf_xi_constraint_grid_n == 49);
+  CHECK(apply_config_kv("tpf_xi_constraint_half_extent", "12.5", c));
+  CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(12.5));
+  CHECK(apply_config_kv("tpf_xi_constraint_inner_radius", "0.75", c));
+  CHECK(c.tpf_xi_constraint_inner_radius == doctest::Approx(0.75));
+  CHECK(apply_config_kv("tpf_xi_constraint_max_iters", "300", c));
+  CHECK(c.tpf_xi_constraint_max_iters == 300);
+  CHECK(apply_config_kv("tpf_xi_constraint_tol", "2e-7", c));
+  CHECK(c.tpf_xi_constraint_tol == doctest::Approx(2e-7));
 }

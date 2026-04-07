@@ -21,6 +21,7 @@
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
 #include "v11_weak_field_correspondence.hpp"
+#include "xi_constraint_exterior_solver.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -49,6 +50,12 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
   p.tpfcore_probe_samples = config.tpfcore_probe_samples;
   p.tpfcore_dump_theta_profile = config.tpfcore_dump_theta_profile;
   p.tpfcore_dump_invariant_profile = config.tpfcore_dump_invariant_profile;
+  p.tpf_xi_constraint_exterior_inspect = config.tpf_xi_constraint_exterior_inspect;
+  p.tpf_xi_constraint_grid_n = config.tpf_xi_constraint_grid_n;
+  p.tpf_xi_constraint_half_extent = config.tpf_xi_constraint_half_extent;
+  p.tpf_xi_constraint_inner_radius = config.tpf_xi_constraint_inner_radius;
+  p.tpf_xi_constraint_max_iters = config.tpf_xi_constraint_max_iters;
+  p.tpf_xi_constraint_tol = config.tpf_xi_constraint_tol;
   p.tpfcore_dump_readout_debug = config.tpfcore_dump_readout_debug;
   p.validation_symmetric_separation = config.validation_symmetric_separation;
   return p;
@@ -104,6 +111,64 @@ void TPFCorePackage::init_from_config(const Config& config) {
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
+
+struct XiConstraintExteriorStats {
+  size_t n_masked = 0;
+  size_t n_pinned = 0;
+  size_t n_free = 0;
+  double initial_max_residual_free = 0.0;
+  double final_max_residual_free = 0.0;
+  double initial_max_residual_nonmasked = 0.0;
+  double final_max_residual_nonmasked = 0.0;
+  double max_delta_xi_free = 0.0;
+  double mean_delta_xi_free = 0.0;
+};
+
+XiConstraintExteriorStats compute_xi_constraint_exterior_stats(
+    const tpfcore::XiConstraintExteriorParams& solve_params,
+    const tpfcore::XiConstraintExteriorSolveResult& solve_result) {
+  XiConstraintExteriorStats stats;
+  const tpfcore::PlanarXiGrid& g = solve_result.grid;
+  const std::vector<tpfcore::PlanarConstraintResidual2D> initial_residuals =
+      tpfcore::compute_planar_constraint_residual_field(tpfcore::initialize_planar_xi_grid_from_ansatz(solve_params));
+  double sum_delta_free = 0.0;
+
+  for (int j = 0; j < g.ny; ++j) {
+    for (int i = 0; i < g.nx; ++i) {
+      const int idx = g.index(i, j);
+      if (!g.is_exterior[idx]) {
+        ++stats.n_masked;
+        continue;
+      }
+
+      if (g.is_pinned[idx]) {
+        ++stats.n_pinned;
+      } else {
+        ++stats.n_free;
+      }
+
+      const double initial_norm = initial_residuals[idx].norm;
+      const double final_norm = solve_result.residuals[idx].norm;
+      stats.initial_max_residual_nonmasked = std::max(stats.initial_max_residual_nonmasked, initial_norm);
+      stats.final_max_residual_nonmasked = std::max(stats.final_max_residual_nonmasked, final_norm);
+
+      if (!g.is_pinned[idx]) {
+        stats.initial_max_residual_free = std::max(stats.initial_max_residual_free, initial_norm);
+        stats.final_max_residual_free = std::max(stats.final_max_residual_free, final_norm);
+        const tpfcore::Xi2D xi_ansatz =
+            tpfcore::provisional_point_source_field(0.0, 0.0, solve_params.source_mass, g.x_at(i), g.y_at(j), solve_params.softening).xi;
+        const double dmag = std::hypot(g.xi_x[idx] - xi_ansatz.x, g.xi_y[idx] - xi_ansatz.y);
+        stats.max_delta_xi_free = std::max(stats.max_delta_xi_free, dmag);
+        sum_delta_free += dmag;
+      }
+    }
+  }
+
+  if (stats.n_free > 0) {
+    stats.mean_delta_xi_free = sum_delta_free / static_cast<double>(stats.n_free);
+  }
+  return stats;
+}
 
 struct TPFCoreRegistrar {
   TPFCoreRegistrar() {
@@ -858,6 +923,90 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << (max_theta_xy_abs < 1e-10 ? " [OK]\n" : " [check]\n");
       f << "  theta_xx and theta_yy should differ (radial vs transverse): " << (theta_xx_vs_yy_differ ? "yes [OK]\n" : "no [check]\n");
       f << "  invariant_I should decay smoothly with radius\n";
+    }
+  }
+
+  if (params.tpf_xi_constraint_exterior_inspect) {
+    XiConstraintExteriorParams solve_params;
+    solve_params.n = params.tpf_xi_constraint_grid_n;
+    solve_params.L = params.tpf_xi_constraint_half_extent;
+    solve_params.r_inner = params.tpf_xi_constraint_inner_radius;
+    solve_params.source_mass = m;
+    solve_params.softening = eps;
+    solve_params.max_iterations = params.tpf_xi_constraint_max_iters;
+    solve_params.tolerance = params.tpf_xi_constraint_tol;
+
+    XiConstraintExteriorSolveResult solve_result = solve_xi_constraint_exterior(solve_params);
+    XiConstraintExteriorStats stats = compute_xi_constraint_exterior_stats(solve_params, solve_result);
+
+    std::ofstream grid_csv(params.output_dir + "/xi_constraint_exterior_grid.csv");
+    if (grid_csv) {
+      grid_csv << "x,y,is_masked,is_boundary_pinned,is_free_cell,xi_ansatz_x,xi_ansatz_y,xi_solved_x,xi_solved_y,delta_xi_x,delta_xi_y,residual_x,residual_y,residual_norm\n";
+      for (int j = 0; j < solve_result.grid.ny; ++j) {
+        for (int i = 0; i < solve_result.grid.nx; ++i) {
+          const int idx = solve_result.grid.index(i, j);
+          const double x = solve_result.grid.x_at(i);
+          const double y = solve_result.grid.y_at(j);
+          const bool is_masked = (solve_result.grid.is_exterior[idx] == 0);
+          const bool is_pinned = (solve_result.grid.is_exterior[idx] != 0) && (solve_result.grid.is_pinned[idx] != 0);
+          const bool is_free = (solve_result.grid.is_exterior[idx] != 0) && (solve_result.grid.is_pinned[idx] == 0);
+          const Xi2D xi_ansatz = provisional_point_source_field(0.0, 0.0, m, x, y, eps).xi;
+          const double xi_solved_x = solve_result.grid.xi_x[idx];
+          const double xi_solved_y = solve_result.grid.xi_y[idx];
+          const double delta_x = xi_solved_x - xi_ansatz.x;
+          const double delta_y = xi_solved_y - xi_ansatz.y;
+          const PlanarConstraintResidual2D res = solve_result.residuals[idx];
+          grid_csv << std::scientific << x << "," << y << ","
+                   << (is_masked ? 1 : 0) << "," << (is_pinned ? 1 : 0) << "," << (is_free ? 1 : 0) << ","
+                   << xi_ansatz.x << "," << xi_ansatz.y << "," << xi_solved_x << "," << xi_solved_y << ","
+                   << delta_x << "," << delta_y << "," << res.Rx << "," << res.Ry << "," << res.norm << "\n";
+        }
+      }
+    }
+
+    std::ofstream summary(params.output_dir + "/xi_constraint_exterior_summary.txt");
+    if (summary) {
+      summary << "TPFCore Xi constraint exterior inspection summary\n";
+      summary << "solver type: experimental planar Xi solve\n";
+      summary << "grid size: " << solve_params.n << " x " << solve_params.n << "\n";
+      summary << "half extent: " << std::scientific << solve_params.L << "\n";
+      summary << "inner radius: " << solve_params.r_inner << "\n";
+      summary << "iteration count: " << solve_result.iterations << "\n";
+      summary << "convergence reached: " << (solve_result.converged ? "yes" : "no") << "\n";
+      summary << "number of masked cells: " << stats.n_masked << "\n";
+      summary << "number of pinned cells: " << stats.n_pinned << "\n";
+      summary << "number of free cells: " << stats.n_free << "\n";
+      summary << "initial max residual norm over free cells: " << stats.initial_max_residual_free << "\n";
+      summary << "final max residual norm over free cells: " << stats.final_max_residual_free << "\n";
+      summary << "initial max residual norm over all non-masked cells: " << stats.initial_max_residual_nonmasked << "\n";
+      summary << "final max residual norm over all non-masked cells: " << stats.final_max_residual_nonmasked << "\n";
+      summary << "max |delta Xi| over free cells: " << stats.max_delta_xi_free << "\n";
+      summary << "mean |delta Xi| over free cells: " << stats.mean_delta_xi_free << "\n";
+      summary << "experimental planar configuration-equation exterior solve\n";
+      summary << "ansatz used as boundary data and initial guess\n";
+      summary << "ansatz boundary comparison\n";
+      summary << "free-cell residual is the headline metric in this report\n";
+      summary << "not full Eq. (10) validation\n";
+      summary << "no DeltaC included\n";
+      summary << "single-source only\n";
+    }
+
+    std::ofstream radial(params.output_dir + "/xi_constraint_exterior_radial_profile.csv");
+    if (radial) {
+      radial << "radius,xi_ansatz_mag,xi_solved_mag,delta_xi_mag\n";
+      for (int j = 0; j < solve_result.grid.ny; ++j) {
+        for (int i = 0; i < solve_result.grid.nx; ++i) {
+          const int idx = solve_result.grid.index(i, j);
+          if (!solve_result.grid.is_exterior[idx] || solve_result.grid.is_pinned[idx]) continue;
+          const double x = solve_result.grid.x_at(i);
+          const double y = solve_result.grid.y_at(j);
+          const Xi2D xi_ansatz = provisional_point_source_field(0.0, 0.0, m, x, y, eps).xi;
+          const double ansatz_mag = std::hypot(xi_ansatz.x, xi_ansatz.y);
+          const double solved_mag = std::hypot(solve_result.grid.xi_x[idx], solve_result.grid.xi_y[idx]);
+          radial << std::scientific << std::hypot(x, y) << "," << ansatz_mag << "," << solved_mag
+                 << "," << std::fabs(solved_mag - ansatz_mag) << "\n";
+        }
+      }
     }
   }
 }

@@ -44,6 +44,12 @@ struct TPFCoreParams {
   int tpfcore_probe_samples = 100;
   bool tpfcore_dump_theta_profile = true;
   bool tpfcore_dump_invariant_profile = true;
+  bool tpf_xi_constraint_exterior_inspect = false;
+  int tpf_xi_constraint_grid_n = 65;
+  double tpf_xi_constraint_half_extent = 10.0;
+  double tpf_xi_constraint_inner_radius = 0.5;
+  int tpf_xi_constraint_max_iters = 250;
+  double tpf_xi_constraint_tol = 1e-8;
 
   /* --- Provisional readout (experimental closure; not source-theory) --- */
   bool tpfcore_dump_readout_debug = true;
