@@ -444,6 +444,36 @@ TEST_CASE("direct_tpf dynamics rejects exploratory/provisional/stabilizer knobs"
     galaxy::TPFCorePackage p; p.init_from_config(c);
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
+  {
+    auto c = make_base();
+    c.tpfcore_readout_mode = "tensor_radial_projection_negated";
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_NOTHROW(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_readout_mode = "experimental_radial_r_scaling";
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_NOTHROW(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_readout_scale = 0.9;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_theta_tt_scale = 1.1;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+  {
+    auto c = make_base();
+    c.tpfcore_theta_tr_scale = 0.8;
+    galaxy::TPFCorePackage p; p.init_from_config(c);
+    CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
 }
 
 TEST_CASE("direct_tpf vdsg=0 no longer aliases v11 weak-field truncation baseline") {

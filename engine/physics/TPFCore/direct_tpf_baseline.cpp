@@ -69,10 +69,13 @@ DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const FieldAtPo
                                                                  double kappa,
                                                                  double lambda) {
   DirectTpfBaselineArtifacts artifacts{};
+  // Upstream boundary is explicit: direct_tpf baseline consumes the current provisional
+  // field ansatz output from evaluate_provisional_field_multi_source.
   artifacts.xi.xi = field.xi;
   artifacts.theta.theta = field.theta;
   artifacts.theta_trace = compute_theta_trace(artifacts.theta);
-  artifacts.invariant_I.value = field.invariant_I;
+  // Eq. (10)-mapped audit path source-of-truth is Theta -> I inside this helper.
+  artifacts.invariant_I = compute_invariant_I(artifacts.theta);
   artifacts.delta_c = compute_deltaC_placeholder_zero();
   artifacts.principal_cij = compute_principal_Cij_from_eq10_baseline(
       artifacts.theta, artifacts.theta_trace, artifacts.invariant_I, artifacts.delta_c, kappa, lambda);
