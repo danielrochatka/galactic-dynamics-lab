@@ -14,6 +14,7 @@
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
+#include "direct_tpf_baseline.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
@@ -314,41 +315,10 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
   for (int i = 0; i < n; ++i) {
     const tpfcore::FieldAtPoint field =
         tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
-    const tpfcore::Theta3D& theta = field.theta;
-    const double theta_trace = theta.trace();
-    const double invariant_I = tpfcore::compute_invariant_I(theta);
-
-    const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
-                         lambda * theta_trace * theta.xx - 0.5 * invariant_I);
-    const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
-                         lambda * theta_trace * theta.xy);
-    const double b_yy = (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
-                         lambda * theta_trace * theta.yy - 0.5 * invariant_I);
-    const double c_xx = kappa * b_xx;
-    const double c_xy = kappa * b_xy;
-    const double c_yy = kappa * b_yy;
-    const double c_zz = kappa * (theta.xz * theta.xz + theta.yz * theta.yz + theta.zz * theta.zz -
-                                 lambda * theta_trace * theta.zz - 0.5 * invariant_I);
-    (void)c_xx;
-    (void)c_xy;
-    (void)c_yy;
-    (void)c_zz;
-
-    const double xi_x = field.xi.x;
-    const double xi_y = field.xi.y;
-    const double xi_norm = std::sqrt(xi_x * xi_x + xi_y * xi_y);
-    if (xi_norm <= 1e-300) {
-      ax[i] = 0.0;
-      ay[i] = 0.0;
-      continue;
-    }
-    const double u_x = xi_x / xi_norm;
-    const double u_y = xi_y / xi_norm;
-    const double ax_raw = -(b_xx * u_x + b_xy * u_y);
-    const double ay_raw = -(b_xy * u_x + b_yy * u_y);
-
-    ax[i] = kappa * ax_raw;
-    ay[i] = kappa * ay_raw;
+    const tpfcore::DirectTpfBaselineAccelerationResult baseline =
+        tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
+    ax[i] = baseline.ax;
+    ay[i] = baseline.ay;
   }
 }
 
