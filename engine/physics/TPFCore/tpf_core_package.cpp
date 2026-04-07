@@ -1,6 +1,7 @@
 /**
  * TPFCore package implementation.
- * Current implementation uses Xi, Theta, I from the source ansatz on z = 0.
+ * Current implementation uses Xi and Theta from the provisional source ansatz on z = 0;
+ * in the direct_tpf baseline helper path, I is derived from Theta.
  * Integrator accelerations are mode-dependent (see compute_accelerations):
  * - direct_tpf: principal-part implementation with Theta/I/kappa baseline; DeltaC omitted in current scope;
  *   optional additive VDSG extension on top of that baseline.
@@ -671,7 +672,7 @@ void TPFCorePackage::run_weak_field_calibration(const Config& config, const std:
   std::ofstream txt(txt_path);
   if (txt) {
     const ModeResult& cur = results[current_idx];
-    txt << "TPFCore weak-field calibration (diagnostic / provisional)\n";
+    txt << "TPFCore correspondence calibration (diagnostic / provisional readout sector)\n";
     txt << "Newtonian benchmark: from Newtonian package (same path as simulator and force_compare).\n";
     txt << "Radial extraction: |a_rad| = |ax*rx + ay*ry| with r_eff = sqrt(r^2+eps^2), (rx,ry) = (r,0)/r_eff on x-axis.\n";
     txt << "Previous scalar formula M/(r^2+eps^2)^(3/2) was wrong by factor r; value 0.2046442 is INVALIDATED.\n\n";
@@ -690,13 +691,13 @@ void TPFCorePackage::run_weak_field_calibration(const Config& config, const std:
     txt << "--- Table ---\nradius\ta_tpf\ta_newton\tratio\n";
     for (size_t k = 0; k < cur.r_vals.size(); ++k)
       txt << std::scientific << cur.r_vals[k] << "\t" << cur.a_tpf_vals[k] << "\t" << a_newton_vals[k] << "\t" << cur.ratio_vals[k] << "\n";
-    txt << "\nSee tpf_weak_field_calibration_comparison.txt for both closure candidates.\n";
+    txt << "\nSee tpf_weak_field_calibration_comparison.txt for closure/correspondence comparison details.\n";
   }
 
   std::string comp_path = params.output_dir + "/tpf_weak_field_calibration_comparison.txt";
   std::ofstream comp(comp_path);
   if (comp) {
-    comp << "TPFCore weak-field calibration: comparison of closure candidates\n";
+    comp << "TPFCore correspondence calibration: comparison of closure candidates\n";
     comp << "Benchmark: Newtonian package, same radial extraction as simulator/force_compare.\n";
     comp << "Previous 0.2046442 was invalidated by benchmark formula mismatch (factor r).\n\n";
     comp << "--- Per-mode results ---\n\n";
@@ -707,23 +708,23 @@ void TPFCorePackage::run_weak_field_calibration(const Config& config, const std:
       comp << "  ratio min = " << res.ratio_min << ", max = " << res.ratio_max << ", spread = " << res.ratio_spread << "\n";
       comp << "  One constant sufficient: " << (res.one_constant_sufficient ? "yes" : "no") << "\n\n";
     }
-    comp << "--- Shape match verdict ---\n";
+    comp << "--- Correspondence-shape verdict ---\n";
     bool tr_ok = results[0].one_constant_sufficient;
     bool exp_ok = results[1].one_constant_sufficient;
     double spread_tr = results[0].ratio_spread;
     double spread_exp = results[1].ratio_spread;
     if (tr_ok && !exp_ok)
-      comp << "  tr_coherence_readout has better weak-field shape match (one constant sufficient; experimental_radial_r_scaling ratio varies more with r).\n";
+      comp << "  tr_coherence_readout has better correspondence/Newtonian shape match (one constant sufficient; experimental_radial_r_scaling ratio varies more with r).\n";
     else if (!tr_ok && exp_ok)
-      comp << "  experimental_radial_r_scaling has better weak-field shape match (one constant sufficient; tr_coherence_readout ratio varies more with r).\n";
+      comp << "  experimental_radial_r_scaling has better correspondence/Newtonian shape match (one constant sufficient; tr_coherence_readout ratio varies more with r).\n";
     else if (tr_ok && exp_ok)
       comp << "  Both closures have acceptable shape (one constant sufficient). Lower spread wins; spread tr=" << std::scientific << spread_tr << " exp=" << spread_exp << ".\n";
     else {
-      comp << "  Neither closure has one constant sufficient over the probe range; lower ratio spread is better shape match.\n";
+      comp << "  Neither closure has one constant sufficient over the probe range; lower ratio spread is better correspondence shape.\n";
       if (spread_tr < spread_exp)
-        comp << "  tr_coherence_readout is the better weak-field shape match (spread " << std::scientific << spread_tr << " < " << spread_exp << ").\n";
+        comp << "  tr_coherence_readout is the better correspondence/Newtonian shape match (spread " << std::scientific << spread_tr << " < " << spread_exp << ").\n";
       else if (spread_exp < spread_tr)
-        comp << "  experimental_radial_r_scaling is the better weak-field shape match (spread " << std::scientific << spread_exp << " < " << spread_tr << ").\n";
+        comp << "  experimental_radial_r_scaling is the better correspondence/Newtonian shape match (spread " << std::scientific << spread_exp << " < " << spread_tr << ").\n";
       else
         comp << "  Tied on spread.\n";
     }
@@ -835,7 +836,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "Source: (0,0), mass=" << m << "\n";
       f << "Probe: +x axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << "\n";
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
-      f << "Provisional weak-field point-source ansatz: yes\n";
+      f << "Provisional point-source ansatz: yes\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\n--- Regime diagnostics (reporting only; no equation change) ---\n";
       f << "  Field intensity (Theta Frobenius): max = " << std::scientific << max_theta_norm << "\n";
@@ -846,7 +847,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
       f << "  (Thresholds: low-intensity < " << tpfcore::THETA_NORM_LOW_MAX
         << ", transitional < " << tpfcore::THETA_NORM_TRANSITIONAL_MAX << ", else high-intensity; heuristic.)\n";
       f << "---\n";
-      f << "\nField-equation residual (full 3D spatial divergence; i=x,y,z; nu=x,y):\n";
+      f << "\nXi/Theta configuration-equation residual (full 3D spatial divergence; i=x,y,z; nu=x,y):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
       f << "  max|residual_y|=" << max_residual_y_abs << "\n";
       f << "  max residual_norm=" << max_residual_norm << "\n";
@@ -973,7 +974,7 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       f << "Source masses: " << m << " each\n";
       f << "Probe geometry: +x axis and +y axis, r in [" << r_min << ", " << r_max << "], n=" << n_samples << " per axis\n";
       f << "Source softening eps=" << eps << " (numerical regularization)\n";
-      f << "Provisional weak-field point-source ansatz: yes\n";
+      f << "Provisional point-source ansatz: yes\n";
       f << "Lambda: " << LAMBDA_4D << " (fixed, 4D)\n";
       f << "\n--- Regime diagnostics (reporting only; no equation change) ---\n";
       f << "  Field intensity (Theta Frobenius): max = " << std::scientific << max_theta_norm << "\n";
@@ -984,7 +985,7 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       f << "  (Thresholds: low-intensity < " << tpfcore::THETA_NORM_LOW_MAX
         << ", transitional < " << tpfcore::THETA_NORM_TRANSITIONAL_MAX << ", else high-intensity; heuristic.)\n";
       f << "---\n";
-      f << "\nField-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
+      f << "\nXi/Theta configuration-equation residual (R_nu = partial_i(Theta_i_nu - lambda*delta_i_nu*Theta)):\n";
       f << "  max|residual_x|=" << std::scientific << max_residual_x_abs << "\n";
       f << "  max|residual_y|=" << max_residual_y_abs << "\n";
       f << "  max residual_norm=" << max_residual_norm << "\n";
@@ -1688,11 +1689,11 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   bool inside_probe_range = (r >= r_min && r <= r_max);
   bool ratio_near_one = (ratio_radial >= 0.9 && ratio_radial <= 1.1);
   if (inside_probe_range && ratio_near_one)
-    txt << "This initial state sits inside the calibration sweet spot (r in [" << r_min << ", " << r_max << "], ratio_radial near 1).\n";
+    txt << "This initial state sits inside the correspondence-calibration sweet spot (r in [" << r_min << ", " << r_max << "], ratio_radial near 1).\n";
   else if (inside_probe_range)
-    txt << "This initial state is within the calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
+    txt << "This initial state is within the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
   else
-    txt << "This initial state is outside the calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
+    txt << "This initial state is outside the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
 }
 
 void TPFCorePackage::write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,

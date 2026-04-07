@@ -13,7 +13,7 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 - **Ξ** — displacement field from the potential ansatz (see `source_ansatz.*`).
 - **Θ_{μν} = ∇_μ Ξ_ν** — symmetric tensor; evaluated as **3D Hessian** of a softened Coulomb **Φ** on **z = 0** (field and sources in the plane; `Theta_xz = Theta_yz = 0` on slice).
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
-- **Field-equation residual** (inspection modes): weak-field configuration equation in the form used in code; analytic derivatives; **structural sanity check**, not proof of full nonlinear dynamics.
+- **Configuration-equation (Xi/Theta) residual** (inspection modes): evaluates `partial_i(Theta_i_nu - lambda delta_i_nu Theta)` in the form used in code; analytic derivatives; **structural sanity check** only, not validation of the full Eq. (10) field relation.
 
 ---
 
