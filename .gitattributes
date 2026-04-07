@@ -1,3 +1,11 @@
+# Exclude vendored C++ code in the engine folder
 engine/vendor/** linguist-vendored
-python_tests/** linguist-detectable=false
-docs/** linguist-detectable=false
+
+# Exclude Python tests from statistics
+python_tests/** linguist-vendored
+
+# Exclude documentation files from statistics
+docs/** linguist-documentation
+
+# Ensure all engine headers are counted as C++ (if misidentified)
+engine/**/*.hpp linguist-detectable=true
