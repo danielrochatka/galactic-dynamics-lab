@@ -21,6 +21,8 @@ From repo root:
 
 Requires C++11 (`g++` or `clang++`).
 
+Windows users should follow the WSL-focused setup guide: [`../docs/WINDOWS.md`](../docs/WINDOWS.md).
+
 ## Run
 
 From repo root:

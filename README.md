@@ -51,4 +51,5 @@ python3 plot_cpp_run.py outputs/<run_id>
 - Engine build/run/config details: [`engine/README.md`](engine/README.md)
 - TPFCore package theory + package-specific diagnostics: [`engine/physics/TPFCore/README.md`](engine/physics/TPFCore/README.md)
 - Testing layers and commands: [`docs/TESTING.md`](docs/TESTING.md)
+- Windows setup (WSL-recommended): [`docs/WINDOWS.md`](docs/WINDOWS.md)
 - Example run config: [`configs/example.cfg`](configs/example.cfg)
