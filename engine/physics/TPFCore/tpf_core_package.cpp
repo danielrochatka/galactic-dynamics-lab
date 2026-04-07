@@ -313,6 +313,8 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
   const double lambda = tpfcore::LAMBDA_4D;
 
   for (int i = 0; i < n; ++i) {
+    // Explicit upstream boundary: Eq. (10) direct_tpf principal-part baseline is applied
+    // over the current provisional field ansatz from evaluate_provisional_field_multi_source.
     const tpfcore::FieldAtPoint field =
         tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
     const tpfcore::DirectTpfBaselineAccelerationResult baseline =
@@ -359,12 +361,14 @@ void TPFCorePackage::compute_accelerations(const State& state,
           "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
           "(current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted).");
     }
-    if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
-        theta_tr_scale_ != 1.0) {
+    const bool has_non_neutral_readout_closure_knobs =
+        (readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 || theta_tr_scale_ != 1.0);
+    if (has_non_neutral_readout_closure_knobs) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects readout closure knobs "
-          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale). "
-          "Current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted.");
+          "tpf_dynamics_mode=direct_tpf rejects non-neutral provisional readout closure knobs "
+          "(tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale). "
+          "direct_tpf uses Xi_directed_tensor_readout internally and does not honor provisional readout closure knobs "
+          "(including tpfcore_readout_mode). Current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted.");
     }
     if (shunt_enable_) {
       throw std::runtime_error(

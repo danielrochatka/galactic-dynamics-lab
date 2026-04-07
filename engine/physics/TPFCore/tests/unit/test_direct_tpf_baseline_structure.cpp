@@ -23,7 +23,7 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 
 }  // namespace
 
-TEST_CASE("direct_tpf baseline helper builds invariant I prior to Xi readout") {
+TEST_CASE("direct_tpf baseline helper derives invariant I from Theta prior to Xi readout") {
   galaxy::State s = one_body_state(4.0, 3.0, 0.0, 0.0, 1.0);
   const galaxy::tpfcore::FieldAtPoint field =
       galaxy::tpfcore::evaluate_provisional_field_multi_source(s, 0, /*bh_mass=*/5.0, /*star_star=*/false, /*eps=*/0.1);
@@ -34,9 +34,9 @@ TEST_CASE("direct_tpf baseline helper builds invariant I prior to Xi readout") {
   const auto baseline = galaxy::tpfcore::compute_direct_tpf_baseline_acceleration(
       field, /*kappa=*/2.0, galaxy::tpfcore::LAMBDA_4D);
 
+  const auto derived_from_theta = galaxy::tpfcore::compute_invariant_I(artifacts.theta);
+  CHECK(artifacts.invariant_I.value == doctest::Approx(derived_from_theta.value));
   CHECK(artifacts.invariant_I.value == doctest::Approx(field.invariant_I));
-  CHECK(artifacts.invariant_I.value ==
-        doctest::Approx(galaxy::tpfcore::compute_invariant_I(artifacts.theta).value));
   CHECK(baseline.ax == doctest::Approx(readout.ax));
   CHECK(baseline.ay == doctest::Approx(readout.ay));
 }
