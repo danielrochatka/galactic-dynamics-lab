@@ -183,6 +183,15 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_dynamics_mode = s;
     return true;
   }
+  if (key == "tpf_direct_field_source") {
+    std::string s = trim(val);
+    if (s != "provisional_ansatz" && s != "xi_constraint_exterior_single_source") {
+      throw std::runtime_error(
+          "tpf_direct_field_source must be provisional_ansatz or xi_constraint_exterior_single_source, got: " + val);
+    }
+    config.tpf_direct_field_source = s;
+    return true;
+  }
   if (key == "tpf_weak_field_correspondence_alpha_si") {
     config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
     return true;
@@ -680,6 +689,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("physics_package", config.physics_package);
   kv.emplace_back("physics_package_compare", config.physics_package_compare);
   kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
+  kv.emplace_back("tpf_direct_field_source", config.tpf_direct_field_source);
   kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
   kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
   kv.emplace_back("v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);

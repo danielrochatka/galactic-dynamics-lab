@@ -3,6 +3,7 @@
 
 using galaxy::apply_config_kv;
 using galaxy::Config;
+using galaxy::serialize_config_kv;
 
 TEST_CASE("config defaults") {
   Config c;
@@ -150,4 +151,21 @@ TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
   CHECK(c.tpf_xi_constraint_max_iters == 300);
   CHECK(apply_config_kv("tpf_xi_constraint_tol", "2e-7", c));
   CHECK(c.tpf_xi_constraint_tol == doctest::Approx(2e-7));
+}
+
+TEST_CASE("tpf_direct_field_source parses and serializes") {
+  Config c;
+  CHECK(c.tpf_direct_field_source == "provisional_ansatz");
+  CHECK(apply_config_kv("tpf_direct_field_source", "xi_constraint_exterior_single_source", c));
+  CHECK(c.tpf_direct_field_source == "xi_constraint_exterior_single_source");
+
+  const auto kv = serialize_config_kv(c);
+  bool found = false;
+  for (const auto& p : kv) {
+    if (p.first == "tpf_direct_field_source") {
+      found = true;
+      CHECK(p.second == "xi_constraint_exterior_single_source");
+    }
+  }
+  CHECK(found);
 }

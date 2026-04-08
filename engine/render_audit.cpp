@@ -98,8 +98,14 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::ostringstream os;
-    os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
-       << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+    os << "tpf_dynamics_mode=direct_tpf; source=" << config.tpf_direct_field_source << "; ";
+    if (config.tpf_direct_field_source == "xi_constraint_exterior_single_source") {
+      os << "experimental planar single-source runtime Xi solve; unsymmetric planar Eq.(10)-style principal-part; "
+            "DeltaC omitted; not full Eq. (10); Xi-directed readout; ";
+    } else {
+      os << "Theta/I/kappa; DeltaC omitted; Xi-directed readout; ";
+    }
+    os << "vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
     return os.str();
   }
   /* legacy_readout (default when key omitted) */
@@ -125,7 +131,7 @@ std::string compute_active_metrics_branch(const Config& config) {
       return "v11 correspondence metrics; alpha_si";
     if (config.tpf_dynamics_mode == "direct_tpf") {
       std::ostringstream os;
-      os << "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling="
+      os << "direct_tpf metrics; source=" << config.tpf_direct_field_source << "; DeltaC omitted; vdsg_coupling="
          << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
       return os.str();
     }
@@ -147,9 +153,16 @@ std::string compute_acceleration_code_path(const Config& config) {
            "alpha_si path; no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
-                       "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
+    const std::string core =
+        (config.tpf_direct_field_source == "xi_constraint_exterior_single_source")
+            ? std::string("TPFCorePackage::compute_direct_tpf_accelerations "
+                          "(experimental planar single-source runtime Xi solve once-per-call -> bilinear Xi/unsym Theta sample -> "
+                          "planar unsymmetric Eq.(10)-style principal-part baseline; DeltaC omitted; not full Eq. (10); "
+                          "Xi-directed readout; no Theta3D helper)")
+            : std::string("TPFCorePackage::compute_direct_tpf_accelerations "
+                          "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
+                          "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)");
+    return core
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
                   : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));

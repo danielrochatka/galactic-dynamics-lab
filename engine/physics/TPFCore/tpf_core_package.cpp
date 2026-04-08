@@ -22,6 +22,7 @@
 #include "tpf_core_params.hpp"
 #include "v11_weak_field_correspondence.hpp"
 #include "xi_constraint_exterior_solver.hpp"
+#include "xi_constraint_runtime_field.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -63,6 +64,7 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
 
 TPFCorePackage::TPFCorePackage()
     : tpf_dynamics_mode_("legacy_readout"),
+      tpf_direct_field_source_("provisional_ansatz"),
       provisional_readout_(false),
       readout_mode_("tensor_radial_projection"),
       readout_scale_(1.0),
@@ -77,13 +79,19 @@ TPFCorePackage::TPFCorePackage()
       cooling_fraction_(0.2),
       shunt_enable_(false),
       shunt_fraction_(0.001),
-      pipeline_diagnostics_csv_(true) {}
+      pipeline_diagnostics_csv_(true),
+      xi_constraint_grid_n_(65),
+      xi_constraint_half_extent_(10.0),
+      xi_constraint_inner_radius_(0.5),
+      xi_constraint_max_iters_(250),
+      xi_constraint_tol_(1e-8) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
   if (tpf_dynamics_mode_ == "weak_field_correspondence") {
     tpf_dynamics_mode_ = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
   }
+  tpf_direct_field_source_ = config.tpf_direct_field_source;
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
   readout_scale_ = config.tpfcore_readout_scale;
@@ -106,6 +114,11 @@ void TPFCorePackage::init_from_config(const Config& config) {
                         ? config.tpf_global_accel_shunt_fraction
                         : 0.001;
   pipeline_diagnostics_csv_ = config.tpf_accel_pipeline_diagnostics_csv;
+  xi_constraint_grid_n_ = config.tpf_xi_constraint_grid_n;
+  xi_constraint_half_extent_ = config.tpf_xi_constraint_half_extent;
+  xi_constraint_inner_radius_ = config.tpf_xi_constraint_inner_radius;
+  xi_constraint_max_iters_ = config.tpf_xi_constraint_max_iters;
+  xi_constraint_tol_ = config.tpf_xi_constraint_tol;
 }
 
 namespace {
@@ -378,15 +391,69 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
   const double kappa = kappa_;
   const double lambda = tpfcore::LAMBDA_4D;
 
+  if (tpf_direct_field_source_ == "provisional_ansatz") {
+    for (int i = 0; i < n; ++i) {
+      // Explicit upstream boundary: Eq. (10) direct_tpf principal-part baseline is applied
+      // over the current provisional field ansatz from evaluate_provisional_field_multi_source.
+      const tpfcore::FieldAtPoint field =
+          tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
+      const tpfcore::DirectTpfBaselineAccelerationResult baseline =
+          tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
+      ax[i] = baseline.ax;
+      ay[i] = baseline.ay;
+    }
+    return;
+  }
+
+  if (tpf_direct_field_source_ != "xi_constraint_exterior_single_source") {
+    throw std::runtime_error("direct_tpf field source unknown: " + tpf_direct_field_source_);
+  }
+  if (star_star) {
+    throw std::runtime_error(
+        "tpf_direct_field_source=xi_constraint_exterior_single_source rejects star_star=true: "
+        "experimental planar single-source-only runtime Xi solve (DeltaC omitted; not full Eq. (10)).");
+  }
+  if (!(bh_mass > 0.0)) {
+    throw std::runtime_error(
+        "tpf_direct_field_source=xi_constraint_exterior_single_source requires bh_mass>0: "
+        "experimental planar single-source-only runtime Xi solve (DeltaC omitted; not full Eq. (10)).");
+  }
+
+  tpfcore::XiConstraintExteriorParams solve_params;
+  solve_params.n = xi_constraint_grid_n_;
+  solve_params.L = xi_constraint_half_extent_;
+  solve_params.r_inner = xi_constraint_inner_radius_;
+  solve_params.source_mass = bh_mass;
+  solve_params.softening = eps;
+  solve_params.max_iterations = xi_constraint_max_iters_;
+  solve_params.tolerance = xi_constraint_tol_;
+
   for (int i = 0; i < n; ++i) {
-    // Explicit upstream boundary: Eq. (10) direct_tpf principal-part baseline is applied
-    // over the current provisional field ansatz from evaluate_provisional_field_multi_source.
-    const tpfcore::FieldAtPoint field =
-        tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
-    const tpfcore::DirectTpfBaselineAccelerationResult baseline =
-        tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
-    ax[i] = baseline.ax;
-    ay[i] = baseline.ay;
+    const double x = state.x[i];
+    const double y = state.y[i];
+    if (x < -solve_params.L || x > solve_params.L || y < -solve_params.L || y > solve_params.L) {
+      throw std::runtime_error(
+          "tpf_direct_field_source=xi_constraint_exterior_single_source sample outside solver grid domain: "
+          "experimental planar single-source-only runtime Xi solve (DeltaC omitted; not full Eq. (10)).");
+    }
+    if (std::hypot(x, y) < solve_params.r_inner) {
+      throw std::runtime_error(
+          "tpf_direct_field_source=xi_constraint_exterior_single_source sample inside inner excision radius: "
+          "experimental planar single-source-only runtime Xi solve (DeltaC omitted; not full Eq. (10)).");
+    }
+  }
+
+  const tpfcore::XiConstraintExteriorSolveResult solved = tpfcore::solve_xi_constraint_exterior(solve_params);
+
+  for (int i = 0; i < n; ++i) {
+    const tpfcore::PlanarXiSample2D sample =
+        tpfcore::sample_planar_xi_runtime_field_bilinear(solved.grid, state.x[i], state.y[i]);
+    const tpfcore::PlanarEq10UnsymBaseline2D baseline =
+        tpfcore::compute_planar_eq10_unsym_baseline_2d(sample, kappa, lambda);
+    const tpfcore::PlanarEq10UnsymReadout2D readout =
+        tpfcore::compute_planar_eq10_unsym_readout_2d(sample, baseline, 1e-30);
+    ax[i] = readout.ax;
+    ay[i] = readout.ay;
   }
 }
 

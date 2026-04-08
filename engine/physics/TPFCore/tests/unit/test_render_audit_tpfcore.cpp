@@ -24,14 +24,14 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
+        "tpf_dynamics_mode=direct_tpf; source=provisional_ansatz; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
+        "direct_tpf metrics; source=provisional_ansatz; DeltaC omitted; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
+        "tpf_dynamics_mode=direct_tpf; source=provisional_ansatz; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
+        "direct_tpf metrics; source=provisional_ansatz; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }
 
 TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") {
@@ -110,4 +110,14 @@ TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part rout
         std::string::npos);
   c.tpf_vdsg_coupling = 1e-10;
   CHECK(galaxy::compute_acceleration_code_path(c).find("optional additive VDSG extension") != std::string::npos);
+}
+
+TEST_CASE("compute_active_dynamics_branch: direct_tpf experimental xi_constraint runtime source is labeled") {
+  Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+  c.tpf_direct_field_source = "xi_constraint_exterior_single_source";
+  const std::string dyn = galaxy::compute_active_dynamics_branch(c);
+  CHECK(dyn.find("experimental planar single-source runtime Xi solve") != std::string::npos);
+  CHECK(dyn.find("not full Eq. (10)") != std::string::npos);
 }

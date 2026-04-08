@@ -126,6 +126,7 @@ class TPFCorePackage : public PhysicsPackage {
 
  private:
   std::string tpf_dynamics_mode_;
+  std::string tpf_direct_field_source_;
   bool provisional_readout_;
   std::string readout_mode_;
   double readout_scale_;
@@ -146,6 +147,11 @@ class TPFCorePackage : public PhysicsPackage {
   mutable AccelPipelineStats last_pipeline_;
   /** Legacy derived-radial closure ledger configuration (still fed from flat config keys). */
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
+  int xi_constraint_grid_n_;
+  double xi_constraint_half_extent_;
+  double xi_constraint_inner_radius_;
+  int xi_constraint_max_iters_;
+  double xi_constraint_tol_;
 
   void eval_accel_pipeline(const State& state,
                            double bh_mass,

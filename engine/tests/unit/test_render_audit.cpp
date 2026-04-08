@@ -43,9 +43,9 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
+        "tpf_dynamics_mode=direct_tpf; source=provisional_ansatz; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
+        "direct_tpf metrics; source=provisional_ansatz; DeltaC omitted; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_direct_tpf_accelerations (principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> "
         "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "
@@ -53,9 +53,9 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
 
   c.tpf_vdsg_coupling = 1e-12;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-12");
+        "tpf_dynamics_mode=direct_tpf; source=provisional_ansatz; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-12");
+        "direct_tpf metrics; source=provisional_ansatz; DeltaC omitted; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
         "TPFCorePackage::compute_direct_tpf_accelerations (principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> "
         "Xi_directed_tensor_readout; Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling "

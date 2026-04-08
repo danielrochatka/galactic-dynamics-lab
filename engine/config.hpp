@@ -147,6 +147,12 @@ struct Config {
    */
   std::string tpf_dynamics_mode = "legacy_readout";
   /**
+   * TPFCore only: direct_tpf field source selector.
+   * - provisional_ansatz (default): current direct_tpf behavior (evaluate_provisional_field_multi_source baseline path).
+   * - xi_constraint_exterior_single_source: experimental planar single-source Xi-solved runtime source under direct_tpf.
+   */
+  std::string tpf_direct_field_source = "provisional_ansatz";
+  /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
    * This is distinct from tpf_kappa (external key that maps to internal TPFCore kappa for direct_tpf and
