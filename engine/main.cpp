@@ -200,11 +200,14 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
 
   if (config.physics_package == "TPFCore") {
     galaxy::Config cfg_direct = config;
+    // Step-0 decomposition audit branch:
+    //  1) force direct_tpf dynamics,
+    //  2) force tensor_radial_projection readout implementation,
+    //  3) zero VDSG for the direct/baseline branch,
+    //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
     cfg_direct.tpf_dynamics_mode = "direct_tpf";
     cfg_direct.tpfcore_enable_provisional_readout = false;
-    // direct_tpf truthfully rejects legacy/provisional readout closure knobs.
-    // Normalize the internal audit branch config so step-0 diagnostics can
-    // compute direct baseline + additive VDSG decomposition under valid inputs.
+    // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
     cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
     cfg_direct.tpfcore_readout_scale = 1.0;
     cfg_direct.tpfcore_theta_tt_scale = 1.0;
@@ -414,18 +417,23 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore\n";
-    std::cout << "  Source ansatz: 3D Phi=-M/R on z=0 (R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi)\n";
-    std::cout << "  Parameters: lambda=1/4 | eps=source softening | readout settings as configured\n";
+    std::cout << "  Source ansatz (planar implementation): z=0 readout using softened 3D Phi=-M/R "
+                 "(R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi) evaluated on the plane\n";
+    std::cout << "  Parameters: lambda=1/4 | eps=source softening | readout branch/settings as configured\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
-      std::cout << "  v11 audit: TPFCore acceleration routing not used (no legacy_readout / direct_tpf dynamics this run).\n";
+      std::cout << "  v11 correspondence audit only: does not run direct_tpf, does not use TPFCore particle "
+                   "acceleration routing, and evaluates correspondence formulas only.\n";
     } else {
-      std::cout << "  Provisional readout: " << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
+      std::cout << "  Legacy/provisional readout branch: "
+                << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
       if (tpf && tpf->provisional_readout_enabled()) {
         std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [correspondence-calibrated])";
         if (config.tpfcore_readout_mode == "tr_coherence_readout")
           std::cout << " [exploratory t-r; theta_tt_scale=" << config.tpfcore_theta_tt_scale << ", theta_tr_scale=" << config.tpfcore_theta_tr_scale << "]";
         if (config.tpfcore_dump_readout_debug)
           std::cout << " [readout debug CSV enabled]";
+      } else {
+        std::cout << " (direct_tpf readout implementation remains available via tpf_dynamics_mode=direct_tpf)";
       }
       std::cout << "\n";
     }

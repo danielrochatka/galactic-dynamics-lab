@@ -22,12 +22,12 @@ namespace {
 /** Paper v11: λ = 1/n in n = 4 dimensions (fixed; not tunable). */
 constexpr double kLambda4D = 0.25;
 
-/** Paper v11 weak-field calibration: κ = 16πG (SI); appears in Eq. (10) quadratic Θ·Θ term only. */
+/** Paper v11 weak-field calibration: κ = 16πG (SI); multiplies the full Eq. (10) principal bracket used below. */
 double v11_kappa_si() { return 16.0 * M_PI * tpfcore::TPF_G_SI; }
 
 /**
  * Softened monopole Φ = -G M / R with R = sqrt(z^2 + eps^2) on the +z axis (x=y=0).
- * Matches correspondence use of a static potential; eps is numerical regularization only (config softening).
+ * Correspondence benchmark/regularized ansatz only; eps is numerical regularization (config softening).
  */
 struct AxisPointMassPhi {
   double G;
@@ -70,7 +70,7 @@ struct AxisPointMassPhi {
     double r5 = r2 * r2 * r;
     return 3.0 * G * M_kg * eps_sq / r5;
   }
-  /** dΘ/dz on axis (analytic); used for Eq. (9) residual audit */
+  /** dΘ/dz on axis (analytic); used for Eq. (9) correspondence residual audit */
   double d_theta_trace_dz_on_axis(double z) const {
     double u = z * z + eps_sq;
     if (u < 1e-300) return 0.0;
@@ -212,7 +212,7 @@ void run_axis_monopole_audit(const Config& config, const std::string& output_dir
   txt << "=== TPF manuscript v11 — weak-field correspondence audit (NOT dynamics) ===\n\n";
   txt << "Scope: static weak-field sector only. This run does not implement direct TPF particle integration,\n";
   txt << "legacy provisional readout accelerations, geodesic motion, or Einstein equations.\n\n";
-  txt << "Benchmark: axis_monopole (this summary). Potential Phi (correspondence benchmark only; numerical softening eps = config softening):\n";
+  txt << "Benchmark: axis_monopole (this summary). Potential Phi (correspondence benchmark/regularized ansatz only; numerical softening eps = config softening):\n";
   txt << "  Phi(z) = -G*M / sqrt(z^2 + eps^2)  on the +z axis (point mass M = bh_mass at origin).\n";
   txt << "Paper construction (static, flat spatial background, Theta_{0mu} = 0):\n";
   txt << "  Xi_i = d_i Phi, Xi_0 = 0  =>  on axis Xi_z = dPhi/dz.\n";
@@ -237,7 +237,7 @@ void run_axis_monopole_audit(const Config& config, const std::string& output_dir
   txt << "  For smooth Phi with Theta_ij = d_i d_j Phi and Theta = nabla^2 Phi (static 4D trace), one has\n";
   txt << "    sum_i d_i Theta_ij - lambda d_j Theta = (1-lambda) d_j Theta  (algebraic identity for this ansatz).\n";
   txt << "  On the +z axis, symmetry gives Rx=Ry=0 and Rz=(1-lambda)*dTheta/dz with Theta=trace(Hessian Phi).\n";
-  txt << "  Interpretation: nonzero Rz does NOT mean 'TPF failure' — this benchmark Phi is a softened monopole\n";
+  txt << "  Interpretation: nonzero Rz does NOT mean 'standalone TPF failure' — this benchmark Phi is a softened monopole\n";
   txt << "  (numerical eps), not asserted to be an on-shell solution of the full TPF configuration problem.\n";
   txt << "  Exact harmonic exterior (nabla^2 Phi=0 everywhere): Theta=0 => all residuals vanish.\n";
   txt << "  With softening, Theta and dTheta/dz are generally nonzero near the regularization scale; residuals\n";
@@ -347,7 +347,7 @@ void run_earth_moon_line_correspondence_benchmark(const Config& config, const st
   bool wrote_gnu = false;
   if (gnu) {
     wrote_gnu = true;
-    gnu << "# Correspondence benchmark only — not direct TPF dynamics.\n";
+    gnu << "# Correspondence benchmark only — not direct_tpf, not particle dynamics, not GR completion.\n";
     gnu << "# Plots TPF weak-field correspondence (Eq. 45) vs benchmark Newtonian line-of-centers (Eq. 46).\n";
     gnu << "# Run from the output directory: gnuplot tpf_v11_earth_moon_line_correspondence_benchmark.gnu\n";
     gnu << "set datafile separator comma\n";
@@ -391,7 +391,7 @@ void run_earth_moon_line_correspondence_benchmark(const Config& config, const st
   txt << "Column semantics:\n";
   txt << "  a_tpf_correspondence_Eq45_m_s2 — correspondence benchmark from (44)-(45) only.\n";
   txt << "  a_newtonian_line_Eq46_m_s2 — standard rotating-frame line-of-centers from paper Eq. (46).\n";
-  txt << "  benchmark_difference_* — algebraic gap between those two benchmark constructions; NOT 'new physics'.\n\n";
+  txt << "  benchmark_difference_* — algebraic gap between those two benchmark constructions; NOT 'new physics' and not a direct_tpf mismatch diagnostic.\n\n";
   txt << "Artifacts:\n";
   txt << "  " << csv_path.str() << "\n";
   txt << "  " << meta_path.str() << " (annotation metadata for PNG plots; not used in field formulas)\n";
