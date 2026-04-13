@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore\n";
-    std::cout << "  Source ansatz (planar implementation): z=0 readout using softened 3D Phi=-M/R "
+    std::cout << "  Source ansatz (planar implementation): z=0 evaluation using softened 3D Phi=-M/R "
                  "(R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi) evaluated on the plane\n";
     std::cout << "  Parameters: lambda=1/4 | eps=source softening | readout branch/settings as configured\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
