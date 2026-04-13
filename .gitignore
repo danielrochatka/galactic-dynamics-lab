@@ -1,4 +1,5 @@
 outputs/
+notes/
 .venv/
 __pycache__/
 *.pyc
