@@ -10,13 +10,28 @@
 namespace galaxy {
 namespace tpfcore {
 
+CanonicalFieldObjects build_canonical_field_objects(const Xi2D& xi, const Theta3D& theta) {
+  CanonicalFieldObjects canonical{};
+  canonical.xi = xi;
+  canonical.theta = theta;
+  canonical.theta_trace = theta.trace();
+  canonical.invariant_I = compute_invariant_I(theta);
+  return canonical;
+}
+
+CanonicalFieldObjects as_canonical_field_objects(const FieldAtPoint& field) {
+  return build_canonical_field_objects(field.xi, field.theta);
+}
+
 FieldAtPoint evaluate_provisional_field_single_source(double xs, double ys, double m,
                                                       double x, double y, double eps) {
   PointSourceField pf = provisional_point_source_field(xs, ys, m, x, y, eps);
+  const CanonicalFieldObjects canonical = build_canonical_field_objects(pf.xi, pf.theta);
   FieldAtPoint out;
-  out.xi = pf.xi;
-  out.theta = pf.theta;
-  out.invariant_I = compute_invariant_I(pf.theta);
+  out.xi = canonical.xi;
+  out.theta = canonical.theta;
+  out.theta_trace = canonical.theta_trace;
+  out.invariant_I = canonical.invariant_I;
   out.has_residual = true;
   out.residual = provisional_point_source_residual(xs, ys, m, x, y, eps);
   return out;
@@ -31,6 +46,7 @@ FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
   FieldAtPoint out;
   out.xi.x = out.xi.y = 0.0;
   out.theta.xx = out.theta.xy = out.theta.xz = out.theta.yy = out.theta.yz = out.theta.zz = 0.0;
+  out.theta_trace = 0.0;
   out.has_residual = false;
   out.residual.x = out.residual.y = 0.0;
 
@@ -46,7 +62,9 @@ FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
     out.theta.zz += pf.theta.zz;
   });
 
-  out.invariant_I = compute_invariant_I(out.theta);
+  const CanonicalFieldObjects canonical = build_canonical_field_objects(out.xi, out.theta);
+  out.theta_trace = canonical.theta_trace;
+  out.invariant_I = canonical.invariant_I;
   return out;
 }
 
@@ -60,7 +78,9 @@ FieldAtPoint add_provisional_fields(const FieldAtPoint& a, const FieldAtPoint& b
   out.theta.yy = a.theta.yy + b.theta.yy;
   out.theta.yz = a.theta.yz + b.theta.yz;
   out.theta.zz = a.theta.zz + b.theta.zz;
-  out.invariant_I = compute_invariant_I(out.theta);
+  const CanonicalFieldObjects canonical = build_canonical_field_objects(out.xi, out.theta);
+  out.theta_trace = canonical.theta_trace;
+  out.invariant_I = canonical.invariant_I;
   out.has_residual = a.has_residual && b.has_residual;
   out.residual.x = a.has_residual && b.has_residual ? (a.residual.x + b.residual.x) : 0.0;
   out.residual.y = a.has_residual && b.has_residual ? (a.residual.y + b.residual.y) : 0.0;
