@@ -36,16 +36,16 @@ Eq10PrincipalCij compute_principal_Cij_from_eq10_baseline(const Eq10ThetaTensor&
   Eq10PrincipalCij principal_cij{};
   principal_cij.c_xx =
       kappa * (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
-               lambda * theta_trace.value * theta.xx - 0.5 * invariant_I.value + delta_c.xx);
+               lambda * theta_trace.value * theta.xx + 0.5 * invariant_I.value + delta_c.xx);
   principal_cij.c_xy =
       kappa * (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
                lambda * theta_trace.value * theta.xy + delta_c.xy);
   principal_cij.c_yy =
       kappa * (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
-               lambda * theta_trace.value * theta.yy - 0.5 * invariant_I.value + delta_c.yy);
+               lambda * theta_trace.value * theta.yy + 0.5 * invariant_I.value + delta_c.yy);
   principal_cij.c_zz =
       kappa * (theta.xz * theta.xz + theta.yz * theta.yz + theta.zz * theta.zz -
-               lambda * theta_trace.value * theta.zz - 0.5 * invariant_I.value + delta_c.zz);
+               lambda * theta_trace.value * theta.zz + 0.5 * invariant_I.value + delta_c.zz);
   return principal_cij;
 }
 

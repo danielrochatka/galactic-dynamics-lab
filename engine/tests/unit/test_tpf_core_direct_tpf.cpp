@@ -83,11 +83,11 @@ TEST_CASE("direct_tpf uses tensor principal-part formula and matches Theta/I/Cij
     const double I = galaxy::tpfcore::compute_invariant_I(theta);
 
     const double c_xx = kappa * (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
-                                 galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xx - 0.5 * I);
+                                 galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xx + 0.5 * I);
     const double c_xy = kappa * (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
                                  galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xy);
     const double c_yy = kappa * (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
-                                 galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy - 0.5 * I);
+                                 galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy + 0.5 * I);
 
     const double xi_norm = std::sqrt(field.xi.x * field.xi.x + field.xi.y * field.xi.y);
     REQUIRE(xi_norm > 1e-300);
@@ -122,11 +122,11 @@ TEST_CASE("direct_tpf acceleration equals kappa-scaled raw pre-kappa acceleratio
     const double theta_trace = theta.trace();
     const double I = galaxy::tpfcore::compute_invariant_I(theta);
     const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
-                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xx - 0.5 * I);
+                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xx + 0.5 * I);
     const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
                          galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.xy);
     const double b_yy = (theta.xy * theta.xy + theta.yy * theta.yy + theta.yz * theta.yz -
-                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy - 0.5 * I);
+                         galaxy::tpfcore::LAMBDA_4D * theta_trace * theta.yy + 0.5 * I);
     const double xi_norm = std::sqrt(field.xi.x * field.xi.x + field.xi.y * field.xi.y);
     REQUIRE(xi_norm > 1e-300);
     const double ux = field.xi.x / xi_norm;

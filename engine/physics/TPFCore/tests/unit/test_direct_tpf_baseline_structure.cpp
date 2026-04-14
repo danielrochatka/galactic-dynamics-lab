@@ -77,6 +77,18 @@ TEST_CASE("direct_tpf baseline acceleration remains independent of correspondenc
   CHECK(ay1[0] == doctest::Approx(ay2[0]));
 }
 
+TEST_CASE("direct_tpf one-source softened central response remains attractive") {
+  galaxy::State s = one_body_state(0.1, 0.0, 0.0, 0.0, 1.0);
+  const double bh_mass = 5.0;
+  const double softening = 0.1;
+  const auto field = galaxy::tpfcore::evaluate_provisional_field_multi_source(
+      s, 0, bh_mass, /*star_star=*/false, softening);
+  const auto baseline = galaxy::tpfcore::compute_direct_tpf_baseline_acceleration(
+      field, /*kappa=*/1.0, galaxy::tpfcore::LAMBDA_4D);
+  const double radial_dot = baseline.ax * s.x[0] + baseline.ay * s.y[0];
+  CHECK(radial_dot < 0.0);
+}
+
 TEST_CASE("direct_tpf applies VDSG after Eq10 baseline acceleration") {
   galaxy::Config c;
   c.tpf_dynamics_mode = "direct_tpf";
