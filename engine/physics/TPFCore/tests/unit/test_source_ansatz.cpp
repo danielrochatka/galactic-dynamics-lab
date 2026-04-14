@@ -42,6 +42,8 @@ TEST_CASE("single-source vs BH-only multi-source field match") {
   st.mass[0] = 1.0;
   auto single = evaluate_provisional_field_single_source(0.0, 0.0, M, st.x[0], st.y[0], eps);
   auto multi = evaluate_provisional_field_multi_source(st, 0, M, false, eps);
+  CHECK(single.theta_trace == doctest::Approx(single.theta.trace()));
+  CHECK(multi.theta_trace == doctest::Approx(multi.theta.trace()));
   CHECK(single.invariant_I == doctest::Approx(multi.invariant_I));
   CHECK(single.xi.x == doctest::Approx(multi.xi.x));
   CHECK(single.xi.y == doctest::Approx(multi.xi.y));

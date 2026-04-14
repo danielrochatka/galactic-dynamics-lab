@@ -821,7 +821,7 @@ void TPFCorePackage::run_single_source_inspect(const Config& config, const std::
     theta_xx_v.push_back(field.theta.xx);
     theta_xy_v.push_back(field.theta.xy);
     theta_yy_v.push_back(field.theta.yy);
-    theta_trace_v.push_back(field.theta.trace());
+    theta_trace_v.push_back(field.theta_trace);
     invariant_I_v.push_back(field.invariant_I);
     residual_x_v.push_back(field.residual.x);
     residual_y_v.push_back(field.residual.y);
@@ -1031,7 +1031,7 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
       theta_xx_v.push_back(field.theta.xx);
       theta_xy_v.push_back(field.theta.xy);
       theta_yy_v.push_back(field.theta.yy);
-      theta_trace_v.push_back(field.theta.trace());
+      theta_trace_v.push_back(field.theta_trace);
       invariant_I_v.push_back(field.invariant_I);
       residual_x_v.push_back(field.residual.x);
       residual_y_v.push_back(field.residual.y);
@@ -1642,8 +1642,8 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
     const tpfcore::FieldAtPoint field =
         tpfcore::evaluate_provisional_field_multi_source(s0, i, bh_mass, star_star, eps);
     const tpfcore::Theta3D& theta = field.theta;
-    const double theta_trace = theta.trace();
-    const double invariant_I = tpfcore::compute_invariant_I(theta);
+    const double theta_trace = field.theta_trace;
+    const double invariant_I = field.invariant_I;
     const double b_xx = (theta.xx * theta.xx + theta.xy * theta.xy + theta.xz * theta.xz -
                          lambda * theta_trace * theta.xx - 0.5 * invariant_I);
     const double b_xy = (theta.xx * theta.xy + theta.xy * theta.yy + theta.xz * theta.yz -
