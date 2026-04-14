@@ -1397,7 +1397,11 @@ int main(int argc, char** argv) {
     std::cout.flush();
     std::cerr.flush();
     std::cout << "Simulation complete. Rendering animation..." << std::endl;
-    std::string cmd = "cd .. && ./dev/bin/python plot_cpp_run.py " + output_dir;
+    // Run from engine cwd (same approach as compare renderer): script lives at repo_root/plot_cpp_run.py.
+    const std::string dev_py = "../dev/bin/python3";
+    const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+    const std::string py = dev_py_exists ? dev_py : "python3";
+    std::string cmd = py + " ../plot_cpp_run.py " + output_dir;
     int ret = std::system(cmd.c_str());
     if (ret != 0) {
       std::cerr << "Warning: Python rendering script returned non-zero exit code." << std::endl;
