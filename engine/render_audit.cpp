@@ -80,6 +80,14 @@ bool tpf_v11_weak_field_alias_requested(const Config& config) {
   return config.tpf_dynamics_mode == "weak_field_correspondence";
 }
 
+bool tpf_direct_tpf_xi_leading_active(const Config& config) {
+  return config.tpf_dynamics_mode == "direct_tpf_xi_leading";
+}
+
+bool tpf_direct_tpf_xi_plus_principal_active(const Config& config) {
+  return config.tpf_dynamics_mode == "direct_tpf_xi_plus_principal_correction";
+}
+
 }  // namespace
 
 std::string compute_active_dynamics_branch(const Config& config) {
@@ -99,6 +107,18 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::ostringstream os;
     os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
+       << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+    return os.str();
+  }
+  if (tpf_direct_tpf_xi_leading_active(config)) {
+    std::ostringstream os;
+    os << "tpf_dynamics_mode=direct_tpf_xi_leading; Xi-leading spike; vdsg_coupling=" << std::scientific
+       << std::setprecision(6) << config.tpf_vdsg_coupling;
+    return os.str();
+  }
+  if (tpf_direct_tpf_xi_plus_principal_active(config)) {
+    std::ostringstream os;
+    os << "tpf_dynamics_mode=direct_tpf_xi_plus_principal_correction; Xi-leading + principal correction spike; vdsg_coupling="
        << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
     return os.str();
   }
@@ -129,6 +149,18 @@ std::string compute_active_metrics_branch(const Config& config) {
          << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
       return os.str();
     }
+    if (tpf_direct_tpf_xi_leading_active(config)) {
+      std::ostringstream os;
+      os << "direct_tpf_xi_leading metrics; Xi-leading spike; vdsg_coupling=" << std::scientific
+         << std::setprecision(6) << config.tpf_vdsg_coupling;
+      return os.str();
+    }
+    if (tpf_direct_tpf_xi_plus_principal_active(config)) {
+      std::ostringstream os;
+      os << "direct_tpf_xi_plus_principal_correction metrics; Xi-leading + principal correction spike; vdsg_coupling="
+         << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
+      return os.str();
+    }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
     return "TPFCore metrics n/a (provisional readout off)";
@@ -150,6 +182,22 @@ std::string compute_acceleration_code_path(const Config& config) {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
                        "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
                        "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
+           + (tpf_vdsg_active_for_audit(config)
+                  ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
+                  : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
+  }
+  if (tpf_direct_tpf_xi_leading_active(config)) {
+    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
+                       "(spike branch: field_evaluation -> Xi-leading readout -> branch-local spike law; principal correction OFF; "
+                       "readout/shunt/cooling rejected)")
+           + (tpf_vdsg_active_for_audit(config)
+                  ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
+                  : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
+  }
+  if (tpf_direct_tpf_xi_plus_principal_active(config)) {
+    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
+                       "(spike branch: field_evaluation -> Xi-leading readout -> optional principal correction -> branch-local spike law; "
+                       "readout/shunt/cooling rejected)")
            + (tpf_vdsg_active_for_audit(config)
                   ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
                   : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));

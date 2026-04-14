@@ -34,6 +34,28 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }
 
+TEST_CASE("compute_active_dynamics_branch: TPF direct xi-leading spikes report truthful labels") {
+  Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf_xi_leading";
+  c.tpf_vdsg_coupling = 0.0;
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "tpf_dynamics_mode=direct_tpf_xi_leading; Xi-leading spike; vdsg_coupling=0.000000e+00");
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "direct_tpf_xi_leading metrics; Xi-leading spike; vdsg_coupling=0.000000e+00");
+  CHECK(galaxy::compute_acceleration_code_path(c).find("field_evaluation -> Xi-leading readout -> branch-local spike law") !=
+        std::string::npos);
+  c.tpf_dynamics_mode = "direct_tpf_xi_plus_principal_correction";
+  c.tpf_vdsg_coupling = 1e-7;
+  CHECK(galaxy::compute_active_dynamics_branch(c) ==
+        "tpf_dynamics_mode=direct_tpf_xi_plus_principal_correction; Xi-leading + principal correction spike; vdsg_coupling=1.000000e-07");
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "direct_tpf_xi_plus_principal_correction metrics; Xi-leading + principal correction spike; vdsg_coupling=1.000000e-07");
+  CHECK(galaxy::compute_acceleration_code_path(c).find(
+            "field_evaluation -> Xi-leading readout -> optional principal correction -> branch-local spike law") !=
+        std::string::npos);
+}
+
 TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") {
   Config c;
   c.physics_package = "TPFCore";

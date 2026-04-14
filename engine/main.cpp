@@ -1381,7 +1381,11 @@ int main(int argc, char** argv) {
           std::cout << "Wrote " << config.output_dir << "/tpf_accel_pipeline_diagnostics.csv\n";
         }
       }
-      if (tpf && config.tpf_dynamics_mode == "direct_tpf" && !snapshots.empty()) {
+      const bool is_direct_tpf_audit_mode =
+          (config.tpf_dynamics_mode == "direct_tpf" ||
+           config.tpf_dynamics_mode == "direct_tpf_xi_leading" ||
+           config.tpf_dynamics_mode == "direct_tpf_xi_plus_principal_correction");
+      if (tpf && is_direct_tpf_audit_mode && !snapshots.empty()) {
         tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
         std::cout << "Wrote " << config.output_dir
                   << "/direct_tpf_step0_raw_accel_audit.csv, direct_tpf_step0_raw_accel_summary.txt\n";
