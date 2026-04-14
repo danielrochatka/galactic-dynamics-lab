@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
+#include "physics/TPFCore/direct_tpf_baseline.hpp"
 #include "physics/TPFCore/field_evaluation.hpp"
 #include "physics/TPFCore/source_ansatz.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
@@ -136,6 +137,74 @@ TEST_CASE("direct_tpf acceleration equals kappa-scaled raw pre-kappa acceleratio
 
     CHECK(ax[i] == doctest::Approx(kappa * ax_raw));
     CHECK(ay[i] == doctest::Approx(kappa * ay_raw));
+  }
+}
+
+TEST_CASE("direct_tpf_xi_leading uses Xi as leading acceleration") {
+  const galaxy::State s = sample_state();
+  const double bh_mass = 2.0e30;
+  const double alpha = 4.25;
+  const double eps = 1.1e7;
+
+  galaxy::Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf_xi_leading";
+  c.tpf_direct_tpf_xi_alpha = alpha;
+  c.tpf_direct_tpf_xi_principal_beta = 0.0;
+  c.tpf_kappa = 3.7e4;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpfcore_source_softening = eps;
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_global_accel_shunt_enable = false;
+  c.tpf_cooling_fraction = 0.0;
+  galaxy::TPFCorePackage pkg;
+  pkg.init_from_config(c);
+
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, bh_mass, true, ax, ay);
+
+  for (int i = 0; i < s.n(); ++i) {
+    const galaxy::tpfcore::FieldAtPoint field =
+        galaxy::tpfcore::evaluate_provisional_field_multi_source(s, i, bh_mass, true, eps);
+    CHECK(ax[i] == doctest::Approx(-alpha * field.xi.x));
+    CHECK(ay[i] == doctest::Approx(-alpha * field.xi.y));
+  }
+}
+
+TEST_CASE("direct_tpf_xi_plus_principal_correction adds principal correction with beta") {
+  const galaxy::State s = sample_state();
+  const double bh_mass = 2.0e30;
+  const double alpha = 2.0;
+  const double beta = 0.25;
+  const double kappa = 3.7e4;
+  const double eps = 1.1e7;
+
+  galaxy::Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf_xi_plus_principal_correction";
+  c.tpf_direct_tpf_xi_alpha = alpha;
+  c.tpf_direct_tpf_xi_principal_beta = beta;
+  c.tpf_kappa = kappa;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpfcore_source_softening = eps;
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_global_accel_shunt_enable = false;
+  c.tpf_cooling_fraction = 0.0;
+  galaxy::TPFCorePackage pkg;
+  pkg.init_from_config(c);
+
+  std::vector<double> ax, ay;
+  run_accel(pkg, s, bh_mass, true, ax, ay);
+
+  for (int i = 0; i < s.n(); ++i) {
+    const galaxy::tpfcore::FieldAtPoint field =
+        galaxy::tpfcore::evaluate_provisional_field_multi_source(s, i, bh_mass, true, eps);
+    const galaxy::tpfcore::DirectTpfBaselineAccelerationResult baseline =
+        galaxy::tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, galaxy::tpfcore::LAMBDA_4D);
+    const double expected_ax = -alpha * field.xi.x + beta * baseline.ax;
+    const double expected_ay = -alpha * field.xi.y + beta * baseline.ay;
+    CHECK(ax[i] == doctest::Approx(expected_ax));
+    CHECK(ay[i] == doctest::Approx(expected_ay));
   }
 }
 
