@@ -102,3 +102,39 @@ The target structure should make the math layers explicit:
 - VDSG additive modifier magnitude/sign for star-star interactions (routing unified, formulas intended unchanged).
 - Tensor-radial mode acceleration parity against previous snapshots/regression baselines.
 - Diagnostics depending on source ordering should be spot-checked (if any downstream code assumed ad hoc loop ordering).
+
+## F) Step 3 readout-family separation (this pass)
+
+### Short diagnosis of readout drift before this pass
+
+- `provisional_readout.cpp` mixed three distinct readout model families in one implementation unit:
+  - tensor-radial projection readout,
+  - derived-radial (TR coherence / derived TPF radial) readout,
+  - experimental radial r-scaling readout.
+- Shared orchestration and per-family formulas lived side-by-side, which made it harder to audit what was:
+  - canonical shared field packaging,
+  - mode-family-specific math,
+  - diagnostics-only bookkeeping.
+- Helper boundaries were implicit (`static` functions in one file), so tracing “which model family is active” required navigating a monolithic file.
+
+### Structural separation completed in this pass
+
+- Separated readout families into explicit implementation units:
+  - `readout_tensor_radial.cpp`
+  - `readout_derived_radial.cpp`
+  - `readout_experimental_radial_scaling.cpp`
+- Added a small readout-family interface header:
+  - `readout_model_families.hpp`
+- Kept `provisional_readout.cpp` as readout orchestration + dispatch + debug CSV wiring.
+
+### What remains canonical/shared (intentionally)
+
+- Canonical source traversal remains shared through `source_iteration.hpp`.
+- Canonical field packaging remains shared through `field_evaluation.*` (`as_canonical_field_objects`, `build_canonical_field_objects`, Theta invariants).
+- Derived radial gravity profile construction remains shared in `derived_tpf_radial.*`.
+
+### Explicitly left for next step
+
+- `tpf_core_package.*` still contains broad orchestration and mode-selection/reporting responsibilities.
+- Optional extension/model-selection plumbing (including VDSG coupling branches) is still primarily package-owned.
+- Next step should continue shrinking `tpf_core_package.*` toward orchestration-only responsibilities and extract additional optional extension logic as safe.
