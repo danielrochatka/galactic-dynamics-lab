@@ -72,6 +72,8 @@ TPFCorePackage::TPFCorePackage()
       source_softening_(0.0),
       kappa_(1.0e32),
       weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
+      direct_tpf_xi_alpha_(1.0),
+      direct_tpf_xi_principal_beta_(0.0),
       vdsg_coupling_(1.0e-20),
       vdsg_mass_baseline_resolved_kg_(0.0),
       simulation_dt_(0.01),
@@ -92,6 +94,8 @@ void TPFCorePackage::init_from_config(const Config& config) {
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
   weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
+  direct_tpf_xi_alpha_ = config.tpf_direct_tpf_xi_alpha;
+  direct_tpf_xi_principal_beta_ = config.tpf_direct_tpf_xi_principal_beta;
   kappa_ = config.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
   derived_poisson_cfg_.kappa = config.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
@@ -288,6 +292,36 @@ void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State
                                                       weak_field_correspondence_alpha_si_, ax, ay);
 }
 
+void TPFCorePackage::compute_direct_tpf_xi_spike_accelerations(const State& state,
+                                                               double bh_mass,
+                                                               double softening,
+                                                               bool star_star,
+                                                               bool include_principal_correction,
+                                                               std::vector<double>& ax,
+                                                               std::vector<double>& ay) const {
+  const int n = state.n();
+  ax.assign(n, 0.0);
+  ay.assign(n, 0.0);
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  const double kappa = kappa_;
+  const double lambda = tpfcore::LAMBDA_4D;
+
+  for (int i = 0; i < n; ++i) {
+    const tpfcore::FieldAtPoint field =
+        tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
+    const double a_xi_x = -direct_tpf_xi_alpha_ * field.xi.x;
+    const double a_xi_y = -direct_tpf_xi_alpha_ * field.xi.y;
+    ax[i] = a_xi_x;
+    ay[i] = a_xi_y;
+    if (include_principal_correction) {
+      const tpfcore::DirectTpfBaselineAccelerationResult baseline =
+          tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
+      ax[i] += direct_tpf_xi_principal_beta_ * baseline.ax;
+      ay[i] += direct_tpf_xi_principal_beta_ * baseline.ay;
+    }
+  }
+}
+
 void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
                                                    double bh_mass,
                                                    double softening,
@@ -335,6 +369,28 @@ void TPFCorePackage::compute_accelerations(const State& state,
           "(direct_tpf does not apply cooling).");
     }
     compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
+    last_pipeline_ = AccelPipelineStats{};
+    return;
+  }
+  if (tpf_dynamics_mode_ == "direct_tpf_xi_leading" ||
+      tpf_dynamics_mode_ == "direct_tpf_xi_plus_principal_correction") {
+    if (provisional_readout_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf_xi_* spike modes reject tpfcore_enable_provisional_readout=true.");
+    }
+    if (shunt_enable_) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf_xi_* spike modes reject tpf_global_accel_shunt_enable=true.");
+    }
+    if (cooling_fraction_ > 0.0) {
+      throw std::runtime_error(
+          "tpf_dynamics_mode=direct_tpf_xi_* spike modes reject positive tpf_cooling_fraction.");
+    }
+    const bool include_principal_correction =
+        (tpf_dynamics_mode_ == "direct_tpf_xi_plus_principal_correction");
+    compute_direct_tpf_xi_spike_accelerations(state, bh_mass, softening, star_star,
+                                              include_principal_correction, ax, ay);
     apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
@@ -1513,7 +1569,11 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
                                              const Config& config,
                                              const std::string& output_dir) const {
   if (snapshots.empty()) return;
-  if (config.tpf_dynamics_mode != "direct_tpf") return;
+  const bool direct_tpf_mode = (config.tpf_dynamics_mode == "direct_tpf");
+  const bool xi_leading_mode = (config.tpf_dynamics_mode == "direct_tpf_xi_leading");
+  const bool xi_plus_principal_mode = (config.tpf_dynamics_mode == "direct_tpf_xi_plus_principal_correction");
+  const bool xi_spike_mode = (xi_leading_mode || xi_plus_principal_mode);
+  if (!direct_tpf_mode && !xi_spike_mode) return;
 
   PhysicsPackage* newton = get_physics_package("Newtonian");
   if (!newton && config.simulation_mode == SimulationMode::bh_orbit_validation) return;
@@ -1530,6 +1590,10 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   std::ofstream txt(params.output_dir + "/tpf_step0_orbit_audit.txt");
   std::ofstream raw_csv(params.output_dir + "/direct_tpf_step0_raw_accel_audit.csv");
   std::ofstream summary(params.output_dir + "/direct_tpf_step0_raw_accel_summary.txt");
+  std::ofstream xi_spike_csv;
+  if (xi_spike_mode) {
+    xi_spike_csv.open(params.output_dir + "/direct_tpf_xi_spike_step0_audit.csv");
+  }
   const bool bh_only_direct_tpf_step0_decomp =
       (!star_star && vdsg_coupling_ == 0.0);
   std::ofstream decomp_csv;
@@ -1539,11 +1603,20 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
     decomp_summary.open(params.output_dir + "/direct_tpf_step0_decomposition_summary.txt");
   }
   if (!raw_csv || !summary) return;
+  if (xi_spike_mode && !xi_spike_csv) return;
 
   raw_csv << "particle_index,x,y,mass,xi_x,xi_y,xi_norm,theta_xx,theta_xy,theta_yy,theta_trace,"
           << "invariant_I,b_xx,b_xy,b_yy,ax_raw,ay_raw,kappa,ax,ay,ax_newton,ay_newton\n";
   raw_csv << std::scientific << std::setprecision(16);
   summary << std::scientific << std::setprecision(16);
+  if (xi_spike_csv) {
+    xi_spike_csv << "particle_index,x,y,r,xi_x,xi_y,xi_norm,a_xi_x,a_xi_y,a_xi_norm,";
+    if (xi_plus_principal_mode) {
+      xi_spike_csv << "a_corr_x,a_corr_y,a_corr_norm,";
+    }
+    xi_spike_csv << "a_x,a_y,a_norm,a_newton_norm,ratio_to_newton,radial_dot_sign\n";
+    xi_spike_csv << std::scientific << std::setprecision(16);
+  }
   if (decomp_csv) {
     decomp_csv << "particle_index,x,y,r,xi_x,xi_y,xi_mag,u_x,u_y,theta_xx,theta_xy,theta_yy,theta_zz,"
                << "theta_trace,invariant_I,c_xx,c_xy,c_yy,c_zz,proj_x,proj_y,a_raw_x,a_raw_y,a_raw_mag,"
@@ -1616,6 +1689,46 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
             << ax_raw << ',' << ay_raw << ',' << kappa << ','
             << ax_from_raw << ',' << ay_from_raw << ','
             << ax_newton << ',' << ay_newton << '\n';
+
+    if (xi_spike_csv) {
+      const double x = s0.x[i];
+      const double y = s0.y[i];
+      const double r = std::hypot(x, y);
+      const double xi_norm_field = std::hypot(field.xi.x, field.xi.y);
+      const double a_xi_x = -direct_tpf_xi_alpha_ * field.xi.x;
+      const double a_xi_y = -direct_tpf_xi_alpha_ * field.xi.y;
+      const double a_xi_norm = std::hypot(a_xi_x, a_xi_y);
+      double a_corr_x = 0.0;
+      double a_corr_y = 0.0;
+      if (xi_plus_principal_mode) {
+        a_corr_x = direct_tpf_xi_principal_beta_ * baseline_readout.ax;
+        a_corr_y = direct_tpf_xi_principal_beta_ * baseline_readout.ay;
+      }
+      const double a_corr_norm = std::hypot(a_corr_x, a_corr_y);
+      const double a_total_x = ax_t[static_cast<size_t>(i)];
+      const double a_total_y = ay_t[static_cast<size_t>(i)];
+      const double a_total_norm = std::hypot(a_total_x, a_total_y);
+      const double a_newton_norm = std::hypot(ax_newton, ay_newton);
+      const double ratio_to_newton =
+          (std::isfinite(a_total_norm) && std::isfinite(a_newton_norm) && (a_newton_norm > 1e-300))
+              ? (a_total_norm / a_newton_norm)
+              : std::numeric_limits<double>::quiet_NaN();
+      double radial_dot = 0.0;
+      if (r > 1e-300) {
+        radial_dot = a_total_x * (x / r) + a_total_y * (y / r);
+      }
+      int radial_dot_sign = 0;
+      if (radial_dot > 0.0) radial_dot_sign = 1;
+      if (radial_dot < 0.0) radial_dot_sign = -1;
+      xi_spike_csv << i << ',' << x << ',' << y << ',' << r << ','
+                   << field.xi.x << ',' << field.xi.y << ',' << xi_norm_field << ','
+                   << a_xi_x << ',' << a_xi_y << ',' << a_xi_norm << ',';
+      if (xi_plus_principal_mode) {
+        xi_spike_csv << a_corr_x << ',' << a_corr_y << ',' << a_corr_norm << ',';
+      }
+      xi_spike_csv << a_total_x << ',' << a_total_y << ',' << a_total_norm << ','
+                   << a_newton_norm << ',' << ratio_to_newton << ',' << radial_dot_sign << '\n';
+    }
 
     if (decomp_csv) {
       const double x = s0.x[i];

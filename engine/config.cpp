@@ -176,15 +176,25 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
     if (s == "weak_field_correspondence") s = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
-    if (s != "legacy_readout" && s != "v11_weak_field_truncation" && s != "direct_tpf") {
+    if (s != "legacy_readout" && s != "v11_weak_field_truncation" && s != "direct_tpf" &&
+        s != "direct_tpf_xi_leading" && s != "direct_tpf_xi_plus_principal_correction") {
       throw std::runtime_error(
-          "tpf_dynamics_mode must be legacy_readout, v11_weak_field_truncation, or direct_tpf, got: " + val);
+          "tpf_dynamics_mode must be legacy_readout, v11_weak_field_truncation, direct_tpf, "
+          "direct_tpf_xi_leading, or direct_tpf_xi_plus_principal_correction, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;
   }
   if (key == "tpf_weak_field_correspondence_alpha_si") {
     config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_direct_tpf_xi_alpha") {
+    config.tpf_direct_tpf_xi_alpha = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_direct_tpf_xi_principal_beta") {
+    config.tpf_direct_tpf_xi_principal_beta = std::stod(val);
     return true;
   }
   if (key == "tpf_analysis_mode") {
@@ -681,6 +691,8 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("physics_package_compare", config.physics_package_compare);
   kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
   kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
+  kv.emplace_back("tpf_direct_tpf_xi_alpha", d(config.tpf_direct_tpf_xi_alpha));
+  kv.emplace_back("tpf_direct_tpf_xi_principal_beta", d(config.tpf_direct_tpf_xi_principal_beta));
   kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
   kv.emplace_back("v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
   kv.emplace_back("v11_em_mass_earth_kg", d(config.v11_em_mass_earth_kg));

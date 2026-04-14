@@ -136,6 +136,8 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    f << "tpf_direct_tpf_xi_alpha\t" << config.tpf_direct_tpf_xi_alpha << "\n";
+    f << "tpf_direct_tpf_xi_principal_beta\t" << config.tpf_direct_tpf_xi_principal_beta << "\n";
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
     f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
     f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
@@ -247,6 +249,8 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_readout_scale_note\tcorrespondence-calibrated effective scale (K_eff); benchmark/readout mapping only, not proof of final TPF dynamics or full Eq. (10) validation\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
     f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    f << "tpf_direct_tpf_xi_alpha\t" << config.tpf_direct_tpf_xi_alpha << "\n";
+    f << "tpf_direct_tpf_xi_principal_beta\t" << config.tpf_direct_tpf_xi_principal_beta << "\n";
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
     f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
     f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";

@@ -135,6 +135,8 @@ class TPFCorePackage : public PhysicsPackage {
   /** Internal paper-baseline coupling used by direct_tpf tensor principal-part route. */
   double kappa_;
   double weak_field_correspondence_alpha_si_;
+  double direct_tpf_xi_alpha_;
+  double direct_tpf_xi_principal_beta_;
   double vdsg_coupling_;
   /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
   double vdsg_mass_baseline_resolved_kg_;
@@ -167,6 +169,13 @@ class TPFCorePackage : public PhysicsPackage {
                                                        bool star_star,
                                                        std::vector<double>& ax,
                                                        std::vector<double>& ay) const;
+  void compute_direct_tpf_xi_spike_accelerations(const State& state,
+                                                 double bh_mass,
+                                                 double softening,
+                                                 bool star_star,
+                                                 bool include_principal_correction,
+                                                 std::vector<double>& ax,
+                                                 std::vector<double>& ay) const;
   void apply_vdsg_additive_extension(const State& state,
                                      double bh_mass,
                                      double softening,

@@ -153,6 +153,10 @@ struct Config {
    * also feeds derived-radial closure parameters where configured).
    */
   double tpf_weak_field_correspondence_alpha_si = -6.67430e-11;
+  /** Spike-only Xi-leading dynamics coupling alpha in a = -alpha * Xi. */
+  double tpf_direct_tpf_xi_alpha = 1.0;
+  /** Spike-only principal correction coupling beta in a = -alpha * Xi - beta * (C·Xi_hat). */
+  double tpf_direct_tpf_xi_principal_beta = 0.0;
 
   /**
    * TPFCore analysis/audit layer; does not replace dynamics.
