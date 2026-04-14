@@ -11,6 +11,7 @@
 #include "readout_closure.hpp"
 #include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
+#include "source_iteration.hpp"
 #include "../../types.hpp"
 #include <cmath>
 #include <fstream>
@@ -48,19 +49,17 @@ static void apply_tensor_radial_closure(const State& state,
 
   const double x = state.x[i];
   const double y = state.y[i];
-  const int n = state.n();
 
-  auto add_contribution = [&](double xs, double ys, double m) {
-    if (m <= 0.0) return;
-    double dx = x - xs;
-    double dy = y - ys;
+  auto add_contribution = [&](const GravitationalSource& source) {
+    const double dx = x - source.x;
+    const double dy = y - source.y;
     double r2 = dx * dx + dy * dy + eps * eps;
     double r = std::sqrt(r2);
     if (r < 1e-30) return;
     double rx = dx / r;
     double ry = dy / r;
 
-    FieldAtPoint field = evaluate_provisional_field_single_source(xs, ys, m, x, y, eps);
+    const FieldAtPoint field = evaluate_provisional_field_single_source(source.x, source.y, source.mass, x, y, eps);
     const Theta3D& theta = field.theta;
     double ax_contrib = theta.xx * rx + theta.xy * ry;
     double ay_contrib = theta.xy * rx + theta.yy * ry;
@@ -79,13 +78,7 @@ static void apply_tensor_radial_closure(const State& state,
     }
   };
 
-  if (bh_mass > 0.0) add_contribution(0.0, 0.0, bh_mass);
-  if (star_star) {
-    for (int j = 0; j < n; ++j) {
-      if (j == i) continue;
-      add_contribution(state.x[j], state.y[j], state.mass[j]);
-    }
-  }
+  for_each_gravitational_source(state, i, bh_mass, star_star, add_contribution);
 }
 
 // --- Superposition: field at particle from all sources (used by tr_coherence closure) ---
