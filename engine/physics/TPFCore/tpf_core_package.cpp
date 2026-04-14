@@ -1644,8 +1644,11 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
       const double a_raw_radial_dot = a_raw_x * r_hat_x + a_raw_y * r_hat_y;
       const double a_newton_mag = std::hypot(ax_newton, ay_newton);
       const double a_newton_radial_dot = ax_newton * r_hat_x + ay_newton * r_hat_y;
-      const bool has_ratio = std::isfinite(a_raw_mag) && std::isfinite(a_newton_mag) && (a_newton_mag > 1e-300);
-      const double ratio_mag = has_ratio ? (a_raw_mag / a_newton_mag) : std::numeric_limits<double>::quiet_NaN();
+      const double ratio_mag =
+          (std::isfinite(a_raw_mag) && std::isfinite(a_newton_mag) && (a_newton_mag > 1e-300))
+              ? (a_raw_mag / a_newton_mag)
+              : std::numeric_limits<double>::quiet_NaN();
+      const bool has_ratio = std::isfinite(ratio_mag);
       decomp_csv << i << ',' << x << ',' << y << ',' << r << ','
                  << xi_x << ',' << xi_y << ',' << xi_mag << ',' << u_x << ',' << u_y << ','
                  << artifacts.theta.theta.xx << ',' << artifacts.theta.theta.xy << ','
@@ -1710,25 +1713,31 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   if (decomp_summary) {
     const double ratio_mean = (ratio_count > 0) ? (ratio_sum / static_cast<double>(ratio_count))
                                                 : std::numeric_limits<double>::quiet_NaN();
+    const double ratio_min_out = (ratio_count > 0) ? ratio_min : std::numeric_limits<double>::quiet_NaN();
+    const double ratio_max_out = (ratio_count > 0) ? ratio_max : std::numeric_limits<double>::quiet_NaN();
     const size_t outward_or_inward_total = raw_outward_count + raw_inward_count;
     const size_t zero_radial_dot_count = static_cast<size_t>(std::max(0, s0.n())) - outward_or_inward_total;
     const double theta_trace_mean =
         (s0.n() > 0) ? (theta_trace_sum / static_cast<double>(s0.n())) : std::numeric_limits<double>::quiet_NaN();
+    const double theta_trace_min_out = (s0.n() > 0) ? theta_trace_min : std::numeric_limits<double>::quiet_NaN();
+    const double theta_trace_max_out = (s0.n() > 0) ? theta_trace_max : std::numeric_limits<double>::quiet_NaN();
     const double invariant_mean =
         (s0.n() > 0) ? (invariant_sum / static_cast<double>(s0.n())) : std::numeric_limits<double>::quiet_NaN();
-    decomp_summary << "|a_raw|/|a_newton| (finite only): min=" << ratio_min
+    const double invariant_min_out = (s0.n() > 0) ? invariant_min : std::numeric_limits<double>::quiet_NaN();
+    const double invariant_max_out = (s0.n() > 0) ? invariant_max : std::numeric_limits<double>::quiet_NaN();
+    decomp_summary << "|a_raw|/|a_newton| (finite only): min=" << ratio_min_out
                    << ", mean=" << ratio_mean
-                   << ", max=" << ratio_max
+                   << ", max=" << ratio_max_out
                    << ", count=" << ratio_count << "\n";
     decomp_summary << "a_raw_radial_dot sign counts: inward=" << raw_inward_count
                    << ", outward=" << raw_outward_count
                    << ", zero=" << zero_radial_dot_count << "\n";
-    decomp_summary << "theta_trace: min=" << theta_trace_min
+    decomp_summary << "theta_trace: min=" << theta_trace_min_out
                    << ", mean=" << theta_trace_mean
-                   << ", max=" << theta_trace_max << "\n";
-    decomp_summary << "invariant_I: min=" << invariant_min
+                   << ", max=" << theta_trace_max_out << "\n";
+    decomp_summary << "invariant_I: min=" << invariant_min_out
                    << ", mean=" << invariant_mean
-                   << ", max=" << invariant_max << "\n";
+                   << ", max=" << invariant_max_out << "\n";
   }
 
   if (!txt) return;
