@@ -16,14 +16,29 @@
 namespace galaxy {
 namespace tpfcore {
 
+/** Canonical package of field math objects used by baselines/readouts. */
+struct CanonicalFieldObjects {
+  Xi2D xi;
+  Theta3D theta;
+  double theta_trace;
+  double invariant_I;
+};
+
 /** Evaluated provisional field at one point (single- or multi-source). */
 struct FieldAtPoint {
   Xi2D xi;
   Theta3D theta;
+  double theta_trace;
   double invariant_I;
   bool has_residual;
   Residual2D residual;
 };
+
+/** Canonical Xi/Theta package with trace and I recomputed from Theta. */
+CanonicalFieldObjects build_canonical_field_objects(const Xi2D& xi, const Theta3D& theta);
+
+/** Adapter from FieldAtPoint to canonical math-object package. */
+CanonicalFieldObjects as_canonical_field_objects(const FieldAtPoint& field);
 
 /**
  * Evaluate provisional field at (x, y) from a single point source.
