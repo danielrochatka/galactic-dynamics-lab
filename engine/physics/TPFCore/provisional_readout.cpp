@@ -11,6 +11,7 @@
 #include "readout_closure.hpp"
 #include "regime_diagnostics.hpp"
 #include "source_ansatz.hpp"
+#include "source_iteration.hpp"
 #include "../../types.hpp"
 #include <cmath>
 #include <fstream>
@@ -48,19 +49,18 @@ static void apply_tensor_radial_closure(const State& state,
 
   const double x = state.x[i];
   const double y = state.y[i];
-  const int n = state.n();
 
-  auto add_contribution = [&](double xs, double ys, double m) {
-    if (m <= 0.0) return;
-    double dx = x - xs;
-    double dy = y - ys;
+  auto add_contribution = [&](const GravitationalSource& source) {
+    const double dx = x - source.x;
+    const double dy = y - source.y;
     double r2 = dx * dx + dy * dy + eps * eps;
     double r = std::sqrt(r2);
     if (r < 1e-30) return;
     double rx = dx / r;
     double ry = dy / r;
 
-    FieldAtPoint field = evaluate_provisional_field_single_source(xs, ys, m, x, y, eps);
+    const CanonicalFieldObjects field =
+        evaluate_canonical_field_single_source(source.x, source.y, source.mass, x, y, eps);
     const Theta3D& theta = field.theta;
     double ax_contrib = theta.xx * rx + theta.xy * ry;
     double ay_contrib = theta.xy * rx + theta.yy * ry;
@@ -79,25 +79,17 @@ static void apply_tensor_radial_closure(const State& state,
     }
   };
 
-  if (bh_mass > 0.0) add_contribution(0.0, 0.0, bh_mass);
-  if (star_star) {
-    for (int j = 0; j < n; ++j) {
-      if (j == i) continue;
-      add_contribution(state.x[j], state.y[j], state.mass[j]);
-    }
-  }
+  for_each_gravitational_source(state, i, bh_mass, star_star, add_contribution);
 }
 
 // --- Superposition: field at particle from all sources (used by tr_coherence closure) ---
-static void compute_theta_sum(const State& state,
-                              int i,
-                              double bh_mass,
-                              bool star_star,
-                              double eps,
-                              double /*x*/, double /*y*/,
-                              Theta3D& theta_sum) {
-  FieldAtPoint field = evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
-  theta_sum = field.theta;
+static CanonicalFieldObjects compute_canonical_field_sum(const State& state,
+                                                         int i,
+                                                         double bh_mass,
+                                                         bool star_star,
+                                                         double eps,
+                                                         double /*x*/, double /*y*/) {
+  return evaluate_canonical_field_multi_source(state, i, bh_mass, star_star, eps);
 }
 
 // --- Closure: hybrid derived TPF radial (bounce baryons + κ ledger + Hessian superposition). ---
@@ -152,6 +144,8 @@ static void apply_derived_tpf_radial_readout_closure(const State& state,
   double provisional_tangential = readout_scale * theta_tr_scale * theta_tr;
 
   if (diag) {
+    const CanonicalFieldObjects canonical_diag =
+        package_canonical_field_objects(Xi2D{0.0, 0.0}, theta_sum);
     diag->theta_rr = theta_rr;
     diag->theta_tt = theta_tt;
     diag->theta_tr = theta_tr;
@@ -161,8 +155,8 @@ static void apply_derived_tpf_radial_readout_closure(const State& state,
     diag->theta_xx = theta_sum.xx;
     diag->theta_xy = theta_sum.xy;
     diag->theta_yy = theta_sum.yy;
-    diag->theta_trace = theta_sum.trace();
-    diag->invariant_I = compute_invariant_I(theta_sum);
+    diag->theta_trace = canonical_diag.theta_trace;
+    diag->invariant_I = canonical_diag.invariant_I;
     diag->theta_norm = theta_frobenius_norm(theta_sum);
     diag->regime = "derived-tpf-radial";
   }
@@ -193,8 +187,9 @@ static void apply_experimental_radial_r_scaling_closure(const State& state,
   double tx = -ry;
   double ty = rx;
 
-  Theta3D theta_sum;
-  compute_theta_sum(state, i, bh_mass, star_star, eps, x, y, theta_sum);
+  const CanonicalFieldObjects field =
+      compute_canonical_field_sum(state, i, bh_mass, star_star, eps, x, y);
+  const Theta3D& theta_sum = field.theta;
 
   double theta_rr = rx * rx * theta_sum.xx + 2.0 * rx * ry * theta_sum.xy + ry * ry * theta_sum.yy;
   double theta_tr = tx * (theta_sum.xx * rx + theta_sum.xy * ry) + ty * (theta_sum.xy * rx + theta_sum.yy * ry);
@@ -217,8 +212,8 @@ static void apply_experimental_radial_r_scaling_closure(const State& state,
     diag->theta_xx = theta_sum.xx;
     diag->theta_xy = theta_sum.xy;
     diag->theta_yy = theta_sum.yy;
-    diag->theta_trace = theta_sum.trace();
-    diag->invariant_I = compute_invariant_I(theta_sum);
+    diag->theta_trace = field.theta_trace;
+    diag->invariant_I = field.invariant_I;
     diag->theta_norm = theta_frobenius_norm(theta_sum);
   }
 }
@@ -323,8 +318,9 @@ void compute_provisional_readout_with_diagnostics(const State& state,
     diag.theta_xx = theta_sum.xx;
     diag.theta_xy = theta_sum.xy;
     diag.theta_yy = theta_sum.yy;
-    diag.theta_trace = theta_sum.trace();
-    diag.invariant_I = compute_invariant_I(theta_sum);
+    const CanonicalFieldObjects canonical_diag = package_canonical_field_objects(Xi2D{0.0, 0.0}, theta_sum);
+    diag.theta_trace = canonical_diag.theta_trace;
+    diag.invariant_I = canonical_diag.invariant_I;
     diag.theta_norm = theta_frobenius_norm(theta_sum);
   } else {
     diag.theta_xx = diag.theta_xy = diag.theta_yy = diag.theta_trace = diag.invariant_I = diag.theta_norm = 0.0;

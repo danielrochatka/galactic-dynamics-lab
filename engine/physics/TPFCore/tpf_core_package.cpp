@@ -22,6 +22,7 @@
 #include "tpf_core_params.hpp"
 #include "v11_weak_field_correspondence.hpp"
 #include "xi_constraint_exterior_solver.hpp"
+#include "source_iteration.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -242,56 +243,33 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
 
   if (!(vdsg_coupling != 0.0) || !std::isfinite(vdsg_coupling)) return;
 
-  /* Star–black hole: r_hat from BH toward star; v_rel = v_star (BH at rest). */
-  if (bh_mass > 0.0) {
-    for (int i = 0; i < n; ++i) {
-      double xi = state.x[i];
-      double yi = state.y[i];
-      double r_sq = xi * xi + yi * yi;
-      double denom = r_sq + eps_sq;
-      double r_mag = std::sqrt(denom);
-      if (r_mag < 1e-300) continue;
-      double ux = xi / r_mag;
-      double uy = yi / r_mag;
-      const double vrel_mag =
-          std::sqrt(state.vx[i] * state.vx[i] + state.vy[i] * state.vy[i] + 1e-300);
+  for (int i = 0; i < n; ++i) {
+    tpfcore::for_each_gravitational_source(state, i, bh_mass, star_star, [&](const tpfcore::GravitationalSource& source) {
+      const double dx = state.x[i] - source.x;
+      const double dy = state.y[i] - source.y;
+      const double r_sq = dx * dx + dy * dy;
+      const double denom = r_sq + eps_sq;
+      const double r_mag = std::sqrt(denom);
+      if (r_mag < 1e-300) return;
+
+      const double ux = dx / r_mag;
+      const double uy = dy / r_mag;
+      double dvx = state.vx[i];
+      double dvy = state.vy[i];
+      if (!source.is_black_hole && source.star_index >= 0) {
+        dvx -= state.vx[source.star_index];
+        dvy -= state.vy[source.star_index];
+      }
+      const double vrel_mag = std::sqrt(dvx * dvx + dvy * dvy + 1e-300);
       const double beta = vrel_mag / C_SI_LIGHT;
-      const double lambda_eff =
-          vdsg_effective_coupling(vdsg_coupling, bh_mass, vdsg_mass_baseline_kg);
+      const double lambda_eff = vdsg_effective_coupling(vdsg_coupling, source.mass, vdsg_mass_baseline_kg);
       const double doppler_scale = 1.0 + lambda_eff * beta;
-      const double a_newt = G * bh_mass / denom;
+      const double a_newt = G * source.mass / denom;
       const double accel_mag = a_newt * (doppler_scale - 1.0);
+
       ax[i] -= ux * accel_mag;
       ay[i] -= uy * accel_mag;
-    }
-  }
-
-  /* Star–star: ordered pairs; reaction on j from (j,i). Acceleration along line i → j. */
-  if (star_star) {
-    for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < n; ++j) {
-        if (i == j) continue;
-        double dx = state.x[j] - state.x[i];
-        double dy = state.y[j] - state.y[i];
-        double r_sq = dx * dx + dy * dy;
-        double denom = r_sq + eps_sq;
-        double r_mag = std::sqrt(denom);
-        if (r_mag < 1e-300) continue;
-        double ux = dx / r_mag;
-        double uy = dy / r_mag;
-        double dvx = state.vx[j] - state.vx[i];
-        double dvy = state.vy[j] - state.vy[i];
-        const double vrel_mag = std::sqrt(dvx * dvx + dvy * dvy + 1e-300);
-        const double beta = vrel_mag / C_SI_LIGHT;
-        const double lambda_eff =
-            vdsg_effective_coupling(vdsg_coupling, state.mass[j], vdsg_mass_baseline_kg);
-        const double doppler_scale = 1.0 + lambda_eff * beta;
-        const double a_newt = G * state.mass[j] / denom;
-        const double accel_mag = a_newt * (doppler_scale - 1.0);
-        ax[i] += ux * accel_mag;
-        ay[i] += uy * accel_mag;
-      }
-    }
+    });
   }
 }
 
@@ -381,8 +359,8 @@ void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
   for (int i = 0; i < n; ++i) {
     // Explicit upstream boundary: Eq. (10) direct_tpf principal-part baseline is applied
     // over the current provisional field ansatz from evaluate_provisional_field_multi_source.
-    const tpfcore::FieldAtPoint field =
-        tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
+    const tpfcore::CanonicalFieldObjects field =
+        tpfcore::evaluate_canonical_field_multi_source(state, i, bh_mass, star_star, eps);
     const tpfcore::DirectTpfBaselineAccelerationResult baseline =
         tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
     ax[i] = baseline.ax;

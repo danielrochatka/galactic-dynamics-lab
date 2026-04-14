@@ -1,0 +1,132 @@
+# TPFCore architecture diagnosis and refactor plan (initial pass)
+
+## Why this document exists
+This plan is a corrective response to drift where TPFCore routing and mode flags ended up controlling *which formulas* run, not just *which parameters* are fed into canonical formulas.
+
+This first pass is intentionally conservative: it reorganizes source routing and records canonicalization rules without changing declared physical models.
+
+## A) Architecture diagnosis
+
+### 1) Duplicate/near-duplicate math paths currently present
+
+- **Source traversal logic duplicated in multiple files**:
+  - `field_evaluation.cpp` had its own BH + star-star superposition loops.
+  - `provisional_readout.cpp` had separate BH + star-star loops for tensor-radial readout.
+  - `tpf_core_package.cpp` had another BH + star-star loop pair in VDSG modifier code.
+  - These loops represent the same conceptual object: “iterate active gravitational sources for target i”.
+
+- **Theta/I usage split across multiple branch-specific entry points**:
+  - `compute_direct_tpf_accelerations` uses `evaluate_provisional_field_multi_source` + direct baseline.
+  - readout closures perform per-mode recomputation or per-source evaluation.
+  - weak-field correspondence has an explicitly separate implementation (kept separate intentionally; different model family).
+
+### 2) Config and routing semantics doing too much
+
+- `tpf_dynamics_mode` currently selects fundamentally different acceleration constructions:
+  - `legacy_readout` (provisional readout + optional VDSG + optional shunt)
+  - `direct_tpf` (principal tensor baseline + optional VDSG)
+  - `v11_weak_field_truncation` (paper correspondence helper)
+- This is valid for model-family selection, but historically drift happened because minor knobs were also treated like hidden route switches.
+
+### 3) Branch-specific implementations that should collapse
+
+- **Source iteration** should not be branch-owned. It is now canonicalized (initial pass) via a shared iterator helper.
+- **Field object construction** is already partly canonical (`source_ansatz` + `field_evaluation`); follow-up should continue collapsing closure-local re-derivations where mathematically equivalent.
+
+### 4) Places representing same conceptual object in multiple places
+
+- “Active source set for particle i” used to be represented in three local loop implementations:
+  - `field_evaluation.cpp`
+  - `provisional_readout.cpp`
+  - `tpf_core_package.cpp`
+- This pass unifies that object under `source_iteration.hpp`.
+
+## B) Target architecture proposal
+
+The target structure should make the math layers explicit:
+
+- **`source_*` layer** (canonical field/source primitives)
+  - `source_ansatz.*`
+  - `source_iteration.hpp` (new canonical source routing primitive)
+
+- **`field_*` layer** (canonical mathematical objects)
+  - `field_evaluation.*` for Xi/Theta/I packaging
+  - direct baseline objects (`direct_tpf_baseline.*`) for principal tensor mapping
+
+- **`readout_*` layer** (readout models only)
+  - `provisional_readout.*` for explicit readout models
+  - each readout mode should stay a named model, not a hidden branch
+
+- **`extensions_*` layer** (optional explicit effects)
+  - VDSG additive extension logic (currently in `tpf_core_package.cpp`, candidate extraction in follow-up)
+
+- **`runtime/orchestration` layer**
+  - `tpf_core_package.*` should orchestrate model selection and compose canonical pieces.
+
+## C) Canonicalization rules
+
+1. **One canonical function per mathematical object** (Xi/Theta/I/principal tensor/source iterator).
+2. **Configs pass parameters, not stealth formula switches**, except explicit model-family selectors.
+3. **Defaults are centralized once**; computational functions require explicit inputs.
+4. **Routing composes canonical functions** instead of re-implementing formulas in branch code.
+5. **New model families must be explicit and isolated** (e.g., correspondence helper, VDSG extension).
+6. **If equivalence is uncertain, do not merge blindly**; label as variant or separate model until proven.
+
+## D) Initial refactor pass completed in this change
+
+- Introduced `source_iteration.hpp` as the canonical source enumerator for BH + star-star interactions.
+- Rewired:
+  - `field_evaluation.cpp`
+  - tensor-radial path in `provisional_readout.cpp`
+  - `accumulate_vdsg_velocity_modifier` in `tpf_core_package.cpp`
+- Result: a single canonical source traversal primitive now feeds multiple math/readout/extension paths.
+
+## E) Transparency report
+
+### Moved
+- Source enumeration logic moved out of local lambdas/loops into `source_iteration.hpp`.
+
+### Merged
+- Equivalent BH/star routing branches in field-evaluation, tensor-radial readout, and VDSG modifier now share one canonical iterator.
+
+### Remaining duplicated or near-duplicated areas (explicitly left for follow-up)
+- Derived radial closure and tensor-radial closure still compute different readout formulas and remain separate.
+- Weak-field correspondence implementation remains separate from direct baseline by design (distinct model family).
+- Some Theta-derived projections appear in multiple closure functions; these require careful equivalence proof before merge.
+
+### Intentionally separate because math is genuinely distinct
+- `direct_tpf` principal-part baseline vs `v11_weak_field_truncation` correspondence helper.
+- Provisional readout models (`tensor_radial_projection`, `derived_tpf_radial_readout`, `experimental_radial_r_scaling`) as explicitly different readout models.
+
+### Behavior-sensitive areas to revalidate after this pass
+- VDSG additive modifier magnitude/sign for star-star interactions (routing unified, formulas intended unchanged).
+- Tensor-radial mode acceleration parity against previous snapshots/regression baselines.
+- Diagnostics depending on source ordering should be spot-checked (if any downstream code assumed ad hoc loop ordering).
+
+---
+
+## Step 2 update — canonical field-object construction and packaging
+
+### What this pass canonicalizes
+
+- `field_evaluation.*` is now the explicit home for canonical Xi/Theta/trace/I packaging via:
+  - `CanonicalFieldObjects`
+  - `package_canonical_field_objects(...)`
+  - `evaluate_canonical_field_single_source(...)`
+  - `evaluate_canonical_field_multi_source(...)`
+- `direct_tpf_baseline.*` now consumes canonical packaged field objects (with `FieldAtPoint` overloads preserved as adapters), so Eq. (10)-mapped baseline wiring reads from one canonical package entry.
+- readout closures now consume canonical packaged field objects where they only need “field sum + invariants” instead of local trace/I repackaging.
+
+### What remains intentionally separate
+
+- Distinct readout models remain separate:
+  - tensor-radial projection
+  - derived radial closure
+  - experimental radial r-scaling
+- weak-field correspondence remains separate from direct baseline (different model family / scope).
+
+### What remains for Step 3
+
+- Separate readout models into explicit model-family implementation units (without changing formulas).
+- Reduce remaining closure-local projection helpers where mathematically equivalent extraction can be proven.
+- Keep orchestration in `tpf_core_package` focused on model composition and gatekeeping, not object math.

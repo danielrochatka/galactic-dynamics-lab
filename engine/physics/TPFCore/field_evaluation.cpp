@@ -5,9 +5,28 @@
 
 #include "field_evaluation.hpp"
 #include "source_ansatz.hpp"
+#include "source_iteration.hpp"
 
 namespace galaxy {
 namespace tpfcore {
+
+CanonicalFieldObjects package_canonical_field_objects(const Xi2D& xi, const Theta3D& theta) {
+  CanonicalFieldObjects out;
+  out.xi = xi;
+  out.theta = theta;
+  out.theta_trace = theta.trace();
+  out.invariant_I = compute_invariant_I(theta);
+  return out;
+}
+
+CanonicalFieldObjects package_canonical_field_objects(const FieldAtPoint& field) {
+  CanonicalFieldObjects out;
+  out.xi = field.xi;
+  out.theta = field.theta;
+  out.theta_trace = field.theta.trace();
+  out.invariant_I = field.invariant_I;
+  return out;
+}
 
 FieldAtPoint evaluate_provisional_field_single_source(double xs, double ys, double m,
                                                       double x, double y, double eps) {
@@ -26,7 +45,6 @@ FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
                                                      double eps) {
   const double x = state.x[i];
   const double y = state.y[i];
-  const int n = state.n();
 
   FieldAtPoint out;
   out.xi.x = out.xi.y = 0.0;
@@ -34,9 +52,8 @@ FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
   out.has_residual = false;
   out.residual.x = out.residual.y = 0.0;
 
-  auto add = [&](double xs, double ys, double m) {
-    if (m <= 0.0) return;
-    PointSourceField pf = provisional_point_source_field(xs, ys, m, x, y, eps);
+  for_each_gravitational_source(state, i, bh_mass, star_star, [&](const GravitationalSource& source) {
+    const PointSourceField pf = provisional_point_source_field(source.x, source.y, source.mass, x, y, eps);
     out.xi.x += pf.xi.x;
     out.xi.y += pf.xi.y;
     out.theta.xx += pf.theta.xx;
@@ -45,18 +62,23 @@ FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
     out.theta.yy += pf.theta.yy;
     out.theta.yz += pf.theta.yz;
     out.theta.zz += pf.theta.zz;
-  };
-
-  if (bh_mass > 0.0) add(0.0, 0.0, bh_mass);
-  if (star_star) {
-    for (int j = 0; j < n; ++j) {
-      if (j == i) continue;
-      add(state.x[j], state.y[j], state.mass[j]);
-    }
-  }
+  });
 
   out.invariant_I = compute_invariant_I(out.theta);
   return out;
+}
+
+CanonicalFieldObjects evaluate_canonical_field_single_source(double xs, double ys, double m,
+                                                             double x, double y, double eps) {
+  return package_canonical_field_objects(
+      evaluate_provisional_field_single_source(xs, ys, m, x, y, eps));
+}
+
+CanonicalFieldObjects evaluate_canonical_field_multi_source(const State& state, int i,
+                                                            double bh_mass, bool star_star,
+                                                            double eps) {
+  return package_canonical_field_objects(
+      evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps));
 }
 
 FieldAtPoint add_provisional_fields(const FieldAtPoint& a, const FieldAtPoint& b) {

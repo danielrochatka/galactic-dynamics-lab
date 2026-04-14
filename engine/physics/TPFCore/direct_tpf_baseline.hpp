@@ -72,7 +72,13 @@ XiDirectedReadoutResult compute_xi_directed_tensor_readout(const Eq10XiDisplacem
 DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const FieldAtPoint& field,
                                                                  double kappa,
                                                                  double lambda);
+DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const CanonicalFieldObjects& field,
+                                                                 double kappa,
+                                                                 double lambda);
 DirectTpfBaselineAccelerationResult compute_direct_tpf_baseline_acceleration(const FieldAtPoint& field,
+                                                                             double kappa,
+                                                                             double lambda);
+DirectTpfBaselineAccelerationResult compute_direct_tpf_baseline_acceleration(const CanonicalFieldObjects& field,
                                                                              double kappa,
                                                                              double lambda);
 

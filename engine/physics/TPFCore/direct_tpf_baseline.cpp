@@ -68,14 +68,19 @@ XiDirectedReadoutResult compute_xi_directed_tensor_readout(const Eq10XiDisplacem
 DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const FieldAtPoint& field,
                                                                  double kappa,
                                                                  double lambda) {
+  return compute_direct_tpf_baseline_artifacts(package_canonical_field_objects(field), kappa, lambda);
+}
+
+DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const CanonicalFieldObjects& field,
+                                                                 double kappa,
+                                                                 double lambda) {
   DirectTpfBaselineArtifacts artifacts{};
   // Upstream boundary is explicit: direct_tpf baseline consumes the current provisional
   // field ansatz output from evaluate_provisional_field_multi_source.
   artifacts.xi.xi = field.xi;
   artifacts.theta.theta = field.theta;
-  artifacts.theta_trace = compute_theta_trace(artifacts.theta);
-  // Eq. (10)-mapped audit path source-of-truth is Theta -> I inside this helper.
-  artifacts.invariant_I = compute_invariant_I(artifacts.theta);
+  artifacts.theta_trace.value = field.theta_trace;
+  artifacts.invariant_I.value = field.invariant_I;
   artifacts.delta_c = compute_deltaC_placeholder_zero();
   artifacts.principal_cij = compute_principal_Cij_from_eq10_baseline(
       artifacts.theta, artifacts.theta_trace, artifacts.invariant_I, artifacts.delta_c, kappa, lambda);
@@ -83,6 +88,12 @@ DirectTpfBaselineArtifacts compute_direct_tpf_baseline_artifacts(const FieldAtPo
 }
 
 DirectTpfBaselineAccelerationResult compute_direct_tpf_baseline_acceleration(const FieldAtPoint& field,
+                                                                             double kappa,
+                                                                             double lambda) {
+  return compute_direct_tpf_baseline_acceleration(package_canonical_field_objects(field), kappa, lambda);
+}
+
+DirectTpfBaselineAccelerationResult compute_direct_tpf_baseline_acceleration(const CanonicalFieldObjects& field,
                                                                              double kappa,
                                                                              double lambda) {
   const DirectTpfBaselineArtifacts artifacts = compute_direct_tpf_baseline_artifacts(field, kappa, lambda);

@@ -25,6 +25,20 @@ struct FieldAtPoint {
   Residual2D residual;
 };
 
+/** Canonical packaged math objects used by baseline/readout consumers. */
+struct CanonicalFieldObjects {
+  Xi2D xi;
+  Theta3D theta;
+  double theta_trace;
+  double invariant_I;
+};
+
+/** Canonical package builder from explicit Xi + Theta (single source of truth for trace + I). */
+CanonicalFieldObjects package_canonical_field_objects(const Xi2D& xi, const Theta3D& theta);
+
+/** Canonical package builder from evaluated field object. */
+CanonicalFieldObjects package_canonical_field_objects(const FieldAtPoint& field);
+
 /**
  * Evaluate provisional field at (x, y) from a single point source.
  * Residual is set (has_residual = true); uses analytic formula.
@@ -39,6 +53,13 @@ FieldAtPoint evaluate_provisional_field_single_source(double xs, double ys, doub
 FieldAtPoint evaluate_provisional_field_multi_source(const State& state, int i,
                                                      double bh_mass, bool star_star,
                                                      double eps);
+
+/** Convenience wrappers: evaluate field then package canonical Xi/Theta/trace/I bundle. */
+CanonicalFieldObjects evaluate_canonical_field_single_source(double xs, double ys, double m,
+                                                             double x, double y, double eps);
+CanonicalFieldObjects evaluate_canonical_field_multi_source(const State& state, int i,
+                                                            double bh_mass, bool star_star,
+                                                            double eps);
 
 /**
  * Combine two single-source field evaluations (e.g. symmetric pair).
