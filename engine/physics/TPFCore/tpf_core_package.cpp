@@ -16,8 +16,10 @@
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
 #include "direct_tpf_baseline.hpp"
+#include "extensions_vdsg.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
+#include "runtime_package_helpers.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
 #include "v11_weak_field_correspondence.hpp"
@@ -30,9 +32,6 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-
-/* File-local: test hook counts per-particle applications of global |a| cap in apply_global_accel_magnitude_shunt. */
-static unsigned g_tpf_shunt_events = 0;
 
 namespace galaxy {
 
@@ -183,96 +182,6 @@ struct TPFCoreRegistrar {
 
 TPFCoreRegistrar s_tpfcore_registrar;
 
-/** Cap total |a| to fraction * |v|/dt per star when enabled. Returns per-particle cap count. */
-unsigned apply_global_accel_magnitude_shunt(const State& state, double dt, bool enable, double fraction,
-                                              std::vector<double>& ax, std::vector<double>& ay) {
-  g_tpf_shunt_events = 0;
-  if (!enable || !(dt > 0.0) || !std::isfinite(dt) || !(fraction > 0.0)) return 0;
-  const int n = state.n();
-  for (int i = 0; i < n; ++i) {
-    double vx = state.vx[i];
-    double vy = state.vy[i];
-    double v_mag = std::sqrt(vx * vx + vy * vy + 1e-30);
-    double a_cap = (fraction * v_mag) / dt;
-    double a_mag = std::sqrt(ax[i] * ax[i] + ay[i] * ay[i]);
-    if (a_mag > a_cap && a_mag > 0.0 && std::isfinite(a_cap)) {
-      double s = a_cap / a_mag;
-      ax[i] *= s;
-      ay[i] *= s;
-      ++g_tpf_shunt_events;
-    }
-  }
-  return g_tpf_shunt_events;
-}
-
-/**
- * PROVISIONAL: mass-normalized VDSG strength per gravitational source.
- * λ_eff = λ · log10(max(M_ref,ε)) / log10(max(M_src,ε)). Heavier M_src → smaller λ_eff (attenuation).
- * Exploratory heuristic; single global λ = tpf_vdsg_coupling only (no separate BH coupling).
- * If M_ref <= 0, returns λ unscaled (identity).
- */
-inline double vdsg_effective_coupling(double lambda0, double source_mass_kg, double baseline_mass_kg) {
-  if (!(lambda0 != 0.0) || !std::isfinite(lambda0)) return lambda0;
-  if (source_mass_kg <= 0.0 || baseline_mass_kg <= 0.0) return lambda0;
-  constexpr double kFloorKg = 1e-99;
-  const double m_src = std::max(source_mass_kg, kFloorKg);
-  const double m_base = std::max(baseline_mass_kg, kFloorKg);
-  const double log_s = std::log10(m_src);
-  const double log_b = std::log10(m_base);
-  if (!std::isfinite(log_s) || !std::isfinite(log_b)) return lambda0;
-  if (std::abs(log_s) < 1e-300) return lambda0;
-  const double g = lambda0 * (log_b / log_s);
-  return std::isfinite(g) ? g : lambda0;
-}
-
-/**
- * VDSG velocity modifier (SI), additive on TPF readout baseline.
- * Current implementation uses beta = |v_rel| / c and doppler_scale = 1 + lambda_eff * beta.
- * The additive contribution is a_newt * (doppler_scale - 1), applied along the Newtonian line.
- */
-void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, double softening,
-                                         bool star_star, double vdsg_coupling,
-                                         double vdsg_mass_baseline_kg, std::vector<double>& ax,
-                                         std::vector<double>& ay) {
-  const int n = state.n();
-  const double G = tpfcore::TPF_G_SI;
-  const double eps_sq = softening * softening;
-
-  ax.assign(n, 0.0);
-  ay.assign(n, 0.0);
-
-  if (!(vdsg_coupling != 0.0) || !std::isfinite(vdsg_coupling)) return;
-
-  for (int i = 0; i < n; ++i) {
-    tpfcore::for_each_gravitational_source(state, i, bh_mass, star_star, [&](const tpfcore::GravitationalSource& source) {
-      const double dx = state.x[i] - source.x;
-      const double dy = state.y[i] - source.y;
-      const double r_sq = dx * dx + dy * dy;
-      const double denom = r_sq + eps_sq;
-      const double r_mag = std::sqrt(denom);
-      if (r_mag < 1e-300) return;
-
-      const double ux = dx / r_mag;
-      const double uy = dy / r_mag;
-      double dvx = state.vx[i];
-      double dvy = state.vy[i];
-      if (!source.is_black_hole && source.star_index >= 0) {
-        dvx -= state.vx[source.star_index];
-        dvy -= state.vy[source.star_index];
-      }
-      const double vrel_mag = std::sqrt(dvx * dvx + dvy * dvy + 1e-300);
-      const double beta = vrel_mag / C_SI_LIGHT;
-      const double lambda_eff = vdsg_effective_coupling(vdsg_coupling, source.mass, vdsg_mass_baseline_kg);
-      const double doppler_scale = 1.0 + lambda_eff * beta;
-      const double a_newt = G * source.mass / denom;
-      const double accel_mag = a_newt * (doppler_scale - 1.0);
-
-      ax[i] -= ux * accel_mag;
-      ay[i] -= uy * accel_mag;
-    });
-  }
-}
-
 }  // namespace
 
 void TPFCorePackage::eval_accel_pipeline(const State& state,
@@ -314,8 +223,8 @@ void TPFCorePackage::eval_accel_pipeline(const State& state,
   const double mean_b = (n > 0) ? (sum_b / static_cast<double>(n)) : 0.0;
 
   std::vector<double> dax, day;
-  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                    vdsg_mass_baseline_resolved_kg_, dax, day);
+  tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                             vdsg_mass_baseline_resolved_kg_, dax, day);
   double sum_v = 0.0;
   for (int i = 0; i < n; ++i) {
     sum_v += std::hypot(dax[i], day[i]);
@@ -328,7 +237,7 @@ void TPFCorePackage::eval_accel_pipeline(const State& state,
   }
 
   const unsigned shunt_n =
-      apply_global_accel_magnitude_shunt(state, simulation_dt_, shunt_enable_, shunt_fraction_, ax, ay);
+      tpfcore::apply_global_accel_magnitude_shunt(state, simulation_dt_, shunt_enable_, shunt_fraction_, ax, ay);
 
   if (stats_out) {
     stats_out->valid = true;
@@ -385,8 +294,8 @@ void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
                                                    std::vector<double>& ax,
                                                    std::vector<double>& ay) const {
   std::vector<double> dax, day;
-  accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                    vdsg_mass_baseline_resolved_kg_, dax, day);
+  tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
+                                             vdsg_mass_baseline_resolved_kg_, dax, day);
   for (int i = 0; i < state.n(); ++i) {
     ax[i] += dax[i];
     ay[i] += day[i];
@@ -505,11 +414,11 @@ void TPFCorePackage::compute_accelerations(const State& state,
               << "\n";
     if (vdsg_active && vdsg_mass_baseline_resolved_kg_ > 0.0) {
       const double le_bh =
-          vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
+          tpfcore::vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
       const int idx_star = (n > 1) ? 1 : 0;
       const double m_st = state.mass[idx_star];
       const double le_st =
-          vdsg_effective_coupling(vdsg_coupling_, m_st, vdsg_mass_baseline_resolved_kg_);
+          tpfcore::vdsg_effective_coupling(vdsg_coupling_, m_st, vdsg_mass_baseline_resolved_kg_);
       std::cerr << "lambda_eff sample (gravitational source = BH, M_src = M_BH) = " << le_bh << "\n";
       std::cerr << "lambda_eff sample (gravitational source = star, M_src = mass[" << idx_star << "]) = " << le_st
                 << "\n";
@@ -532,7 +441,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
             std::sqrt(state.vx[0] * state.vx[0] + state.vy[0] * state.vy[0] + 1e-300);
         const double beta_sample = v_mag / C_SI_LIGHT;
         const double lambda_eff_bh =
-            vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
+            tpfcore::vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
         const double doppler_scale = 1.0 + lambda_eff_bh * beta_sample;
         const double a_newtonian = G_si * bh_mass / denom;
         const double a_VDSG_modifier = a_newtonian * (doppler_scale - 1.0);
@@ -1843,8 +1752,8 @@ void TPFCorePackage::write_accel_pipeline_diagnostics(const std::vector<Snapshot
   }
 }
 
-void tpf_test_reset_global_accel_shunt_events() { g_tpf_shunt_events = 0; }
+void tpf_test_reset_global_accel_shunt_events() { tpfcore::reset_global_accel_shunt_events(); }
 
-unsigned tpf_test_global_accel_shunt_events() { return g_tpf_shunt_events; }
+unsigned tpf_test_global_accel_shunt_events() { return tpfcore::global_accel_shunt_events(); }
 
 }  // namespace galaxy

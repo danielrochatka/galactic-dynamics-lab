@@ -138,3 +138,36 @@ The target structure should make the math layers explicit:
 - `tpf_core_package.*` still contains broad orchestration and mode-selection/reporting responsibilities.
 - Optional extension/model-selection plumbing (including VDSG coupling branches) is still primarily package-owned.
 - Next step should continue shrinking `tpf_core_package.*` toward orchestration-only responsibilities and extract additional optional extension logic as safe.
+
+## G) Step 4 package-orchestration cleanup (this pass)
+
+### Short diagnosis before this pass
+
+- `tpf_core_package.cpp` still contained optional-effect/runtime implementation details that were not orchestration:
+  - VDSG mass-normalization helper + per-source VDSG accumulation implementation.
+  - Global acceleration shunt implementation + test hook state storage.
+- Those helper families are extension/runtime mechanics, not package-level model-family selection.
+- Package orchestration and branch guardrails were mixed with helper implementation internals, making routing intent harder to read.
+
+### Extraction completed
+
+- Extracted VDSG optional extension implementation into:
+  - `extensions_vdsg.hpp`
+  - `extensions_vdsg.cpp`
+- Extracted global shunt runtime helper + event counter storage into:
+  - `runtime_package_helpers.hpp`
+  - `runtime_package_helpers.cpp`
+- `tpf_core_package.cpp` now consumes those helpers as dependencies (`tpfcore::accumulate_vdsg_velocity_modifier`, `tpfcore::vdsg_effective_coupling`, `tpfcore::apply_global_accel_magnitude_shunt`) while keeping mode routing and branch guardrails in place.
+
+### What remains package orchestration (intentionally)
+
+- Dynamics-mode family selection (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`).
+- Config/state guardrails and branch rejection rules.
+- Composition calls into canonical math/readout/correspondence layers.
+- Package-facing diagnostics/reporting entry points and run-level orchestration.
+
+### Intentionally left for follow-up
+
+- Large diagnostics/reporting chunks still live in `tpf_core_package.cpp`; these were left in place to avoid broad churn in this step.
+- `compute_accelerations` still contains one-time branch-audit text emission. It remains functionally unchanged in this pass.
+- Next step should evaluate moving diagnostic/reporting glue into narrower runtime/reporting units once safe seams are identified.
