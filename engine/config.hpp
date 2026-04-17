@@ -37,6 +37,7 @@ enum class SimulationMode {
   timestep_convergence,
   tpf_single_source_inspect,
   tpf_symmetric_pair_inspect,
+  tpf_source_field_benchmark,
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
@@ -250,6 +251,18 @@ struct Config {
   double tpfcore_source_softening = 0.0;
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
+  /** TPF source-field benchmark geometry selector. */
+  std::string tpf_source_benchmark_shape = "monopole";
+  /** TPF source-field benchmark total source mass [kg]. */
+  double tpf_source_benchmark_total_mass = kDefaultBhMassKg;
+  /** TPF source-field benchmark pair separation distance [m] (bonded_pair only). */
+  double tpf_source_benchmark_separation = 1.0e11;
+  /** TPF source-field benchmark orientation angle in-plane [deg] (bonded_pair only). */
+  double tpf_source_benchmark_orientation_deg = 0.0;
+  /** TPF source-field benchmark probe grid half extent L for square domain [-L, +L]. */
+  double tpf_source_probe_grid_half_extent = 2.0e11;
+  /** TPF source-field benchmark probe grid samples per axis N (NxN). */
+  int tpf_source_probe_grid_n = 121;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

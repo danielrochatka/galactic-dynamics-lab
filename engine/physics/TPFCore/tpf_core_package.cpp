@@ -1033,6 +1033,73 @@ void TPFCorePackage::run_symmetric_pair_inspect(const Config& config, const std:
   }
 }
 
+void TPFCorePackage::run_source_field_benchmark(const Config& config, const std::string& output_dir) {
+  using namespace tpfcore;
+
+  const std::string shape = config.tpf_source_benchmark_shape;
+  const double total_mass = config.tpf_source_benchmark_total_mass;
+  const double separation = config.tpf_source_benchmark_separation;
+  const double orientation_deg = config.tpf_source_benchmark_orientation_deg;
+  const double half_extent = config.tpf_source_probe_grid_half_extent;
+  const int n = config.tpf_source_probe_grid_n;
+  const double eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+
+  if (n < 2 || half_extent <= 0.0) return;
+
+  struct SourcePoint {
+    double x;
+    double y;
+    double m;
+  };
+  std::vector<SourcePoint> sources;
+  std::string source_config_id;
+  if (shape == "monopole") {
+    sources.push_back({0.0, 0.0, total_mass});
+    source_config_id = "monopole_centered_origin";
+  } else if (shape == "bonded_pair") {
+    const double angle_rad = orientation_deg * (3.14159265358979323846 / 180.0);
+    const double dx = 0.5 * separation * std::cos(angle_rad);
+    const double dy = 0.5 * separation * std::sin(angle_rad);
+    const double m_each = 0.5 * total_mass;
+    sources.push_back({dx, dy, m_each});
+    sources.push_back({-dx, -dy, m_each});
+    source_config_id = "bonded_pair_centered_origin_equal_mass";
+  } else {
+    return;
+  }
+
+  std::ofstream csv(output_dir + "/tpf_source_field_probe_grid.csv");
+  if (!csv) return;
+
+  csv << "source_shape,source_config_id,source_orientation_deg,x,y,r,xi_x,xi_y,xi_norm,"
+         "theta_xx,theta_xy,theta_yy,theta_zz,theta_trace,invariant_I\n";
+
+  for (int iy = 0; iy < n; ++iy) {
+    const double fy = static_cast<double>(iy) / static_cast<double>(n - 1);
+    const double y = -half_extent + 2.0 * half_extent * fy;
+    for (int ix = 0; ix < n; ++ix) {
+      const double fx = static_cast<double>(ix) / static_cast<double>(n - 1);
+      const double x = -half_extent + 2.0 * half_extent * fx;
+
+      FieldAtPoint combined = evaluate_provisional_field_single_source(
+          sources[0].x, sources[0].y, sources[0].m, x, y, eps);
+      for (size_t k = 1; k < sources.size(); ++k) {
+        FieldAtPoint fk = evaluate_provisional_field_single_source(
+            sources[k].x, sources[k].y, sources[k].m, x, y, eps);
+        combined = add_provisional_fields(combined, fk);
+      }
+
+      const double r = std::hypot(x, y);
+      const double xi_norm = std::hypot(combined.xi.x, combined.xi.y);
+      csv << shape << "," << source_config_id << "," << std::scientific << orientation_deg << ","
+          << x << "," << y << "," << r << ","
+          << combined.xi.x << "," << combined.xi.y << "," << xi_norm << ","
+          << combined.theta.xx << "," << combined.theta.xy << "," << combined.theta.yy << ","
+          << combined.theta.zz << "," << combined.theta_trace << "," << combined.invariant_I << "\n";
+    }
+  }
+}
+
 void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snapshots,
                                               const Config& config,
                                               const std::string& output_dir) const {

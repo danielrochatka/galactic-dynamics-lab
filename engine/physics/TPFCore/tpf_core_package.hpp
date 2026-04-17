@@ -65,6 +65,8 @@ class TPFCorePackage : public PhysicsPackage {
 
   /** Run symmetric-pair inspection: sources at (+d,0) and (-d,0), probe along axes. */
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
+  /** Run source-first field benchmark and dump plane probe grid CSV. */
+  void run_source_field_benchmark(const Config& config, const std::string& output_dir);
 
   /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
   void write_readout_debug(const std::vector<Snapshot>& snapshots,

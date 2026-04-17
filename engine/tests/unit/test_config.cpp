@@ -13,6 +13,12 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_global_accel_shunt_enable == false);
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
+  CHECK(c.tpf_source_benchmark_shape == "monopole");
+  CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(galaxy::kDefaultBhMassKg));
+  CHECK(c.tpf_source_benchmark_separation == doctest::Approx(1.0e11));
+  CHECK(c.tpf_source_benchmark_orientation_deg == doctest::Approx(0.0));
+  CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(2.0e11));
+  CHECK(c.tpf_source_probe_grid_n == 121);
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -123,6 +129,8 @@ TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_corresponden
   CHECK(c.tpf_analysis_mode == "v11_weak_field_correspondence");
   CHECK(apply_config_kv("simulation_mode", "tpf_v11_weak_field_correspondence", c));
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
+  CHECK(apply_config_kv("simulation_mode", "tpf_source_field_benchmark", c));
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark);
 }
 
 TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
@@ -150,4 +158,21 @@ TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
   CHECK(c.tpf_xi_constraint_max_iters == 300);
   CHECK(apply_config_kv("tpf_xi_constraint_tol", "2e-7", c));
   CHECK(c.tpf_xi_constraint_tol == doctest::Approx(2e-7));
+}
+
+TEST_CASE("tpf_source_field_benchmark config keys parse") {
+  Config c;
+  CHECK(apply_config_kv("tpf_source_benchmark_shape", "bonded_pair", c));
+  CHECK(c.tpf_source_benchmark_shape == "bonded_pair");
+  CHECK(apply_config_kv("tpf_source_benchmark_total_mass", "9.99e21", c));
+  CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(9.99e21));
+  CHECK(apply_config_kv("tpf_source_benchmark_separation", "42.0", c));
+  CHECK(c.tpf_source_benchmark_separation == doctest::Approx(42.0));
+  CHECK(apply_config_kv("tpf_source_benchmark_orientation_deg", "27.5", c));
+  CHECK(c.tpf_source_benchmark_orientation_deg == doctest::Approx(27.5));
+  CHECK(apply_config_kv("tpf_source_probe_grid_half_extent", "1234.5", c));
+  CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(1234.5));
+  CHECK(apply_config_kv("tpf_source_probe_grid_n", "75", c));
+  CHECK(c.tpf_source_probe_grid_n == 75);
+  CHECK_THROWS(apply_config_kv("tpf_source_benchmark_shape", "triangle", c));
 }

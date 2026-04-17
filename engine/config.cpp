@@ -61,6 +61,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
   if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
   if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
+  if (t == "tpf_source_field_benchmark") return SimulationMode::tpf_source_field_benchmark;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
@@ -82,6 +83,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::timestep_convergence: return "timestep_convergence";
     case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
     case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
+    case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
@@ -295,6 +297,34 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpfcore_residual_step") {
     config.tpfcore_residual_step = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_shape") {
+    std::string s = trim(val);
+    if (s != "monopole" && s != "bonded_pair") {
+      throw std::runtime_error("tpf_source_benchmark_shape must be monopole or bonded_pair, got: " + val);
+    }
+    config.tpf_source_benchmark_shape = s;
+    return true;
+  }
+  if (key == "tpf_source_benchmark_total_mass") {
+    config.tpf_source_benchmark_total_mass = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_separation") {
+    config.tpf_source_benchmark_separation = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_orientation_deg") {
+    config.tpf_source_benchmark_orientation_deg = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_probe_grid_half_extent") {
+    config.tpf_source_probe_grid_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_probe_grid_n") {
+    config.tpf_source_probe_grid_n = std::stoi(val);
     return true;
   }
   if (key == "tpf_xi_constraint_exterior_inspect") {
@@ -712,6 +742,12 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpfcore_dump_theta_profile", b(config.tpfcore_dump_theta_profile));
   kv.emplace_back("tpfcore_source_softening", d(config.tpfcore_source_softening));
   kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
+  kv.emplace_back("tpf_source_benchmark_shape", config.tpf_source_benchmark_shape);
+  kv.emplace_back("tpf_source_benchmark_total_mass", d(config.tpf_source_benchmark_total_mass));
+  kv.emplace_back("tpf_source_benchmark_separation", d(config.tpf_source_benchmark_separation));
+  kv.emplace_back("tpf_source_benchmark_orientation_deg", d(config.tpf_source_benchmark_orientation_deg));
+  kv.emplace_back("tpf_source_probe_grid_half_extent", d(config.tpf_source_probe_grid_half_extent));
+  kv.emplace_back("tpf_source_probe_grid_n", i(config.tpf_source_probe_grid_n));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));
