@@ -22,6 +22,7 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_source_benchmark_orientation_deg == doctest::Approx(0.0));
   CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(2.0e11));
   CHECK(c.tpf_source_probe_grid_n == 121);
+  CHECK(c.tpf_source_residual_exclusion_radius == doctest::Approx(0.25));
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -181,6 +182,8 @@ TEST_CASE("tpf_source_field_benchmark config keys parse") {
   CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(1234.5));
   CHECK(apply_config_kv("tpf_source_probe_grid_n", "75", c));
   CHECK(c.tpf_source_probe_grid_n == 75);
+  CHECK(apply_config_kv("tpf_source_residual_exclusion_radius", "0.42", c));
+  CHECK(c.tpf_source_residual_exclusion_radius == doctest::Approx(0.42));
   CHECK_THROWS(apply_config_kv("tpf_source_benchmark_shape", "triangle", c));
 }
 
@@ -196,4 +199,5 @@ TEST_CASE("tpf_source_field_benchmark keys serialize") {
   };
   CHECK(has_key("tpf_source_benchmark_mass1"));
   CHECK(has_key("tpf_source_benchmark_mass2"));
+  CHECK(has_key("tpf_source_residual_exclusion_radius"));
 }
