@@ -255,6 +255,10 @@ struct Config {
   std::string tpf_source_benchmark_shape = "monopole";
   /** TPF source-field benchmark total source mass [kg]. */
   double tpf_source_benchmark_total_mass = kDefaultBhMassKg;
+  /** TPF source-field benchmark source-1 mass [kg] (bonded_pair benchmark-only override when > 0). */
+  double tpf_source_benchmark_mass1 = 0.0;
+  /** TPF source-field benchmark source-2 mass [kg] (bonded_pair benchmark-only override when > 0). */
+  double tpf_source_benchmark_mass2 = 0.0;
   /** TPF source-field benchmark pair separation distance [m] (bonded_pair only). */
   double tpf_source_benchmark_separation = 1.0e11;
   /** TPF source-field benchmark orientation angle in-plane [deg] (bonded_pair only). */
