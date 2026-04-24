@@ -1045,6 +1045,10 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
   const double half_extent = config.tpf_source_probe_grid_half_extent;
   const int n = config.tpf_source_probe_grid_n;
   const double eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
+  const double exclusion_radius = (config.tpf_source_residual_exclusion_radius > 0.0)
+      ? config.tpf_source_residual_exclusion_radius
+      : (2.0 * eps);
+  const double lambda = LAMBDA_4D;
 
   if (n < 2 || half_extent <= 0.0) return;
 
@@ -1080,8 +1084,23 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
   const double source_mass1 = sources.empty() ? 0.0 : sources[0].m;
   const double source_mass2 = (sources.size() >= 2) ? sources[1].m : 0.0;
 
-  csv << "source_shape,source_config_id,source_orientation_deg,source_mass1,source_mass2,x,y,r,xi_x,xi_y,xi_norm,"
-         "theta_xx,theta_xy,theta_yy,theta_zz,theta_trace,invariant_I\n";
+  const size_t n_cells = static_cast<size_t>(n) * static_cast<size_t>(n);
+  std::vector<double> x_v(n_cells), y_v(n_cells);
+  std::vector<double> xi_x_v(n_cells), xi_y_v(n_cells), xi_norm_v(n_cells);
+  std::vector<double> theta_xx_v(n_cells), theta_xy_v(n_cells), theta_yy_v(n_cells), theta_zz_v(n_cells);
+  std::vector<double> theta_trace_v(n_cells), invariant_I_v(n_cells), theta_norm_v(n_cells);
+  std::vector<double> residual_x_v(n_cells, std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> residual_y_v(n_cells, std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> residual_norm_v(n_cells, std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> residual_norm_over_theta_norm_v(n_cells, std::numeric_limits<double>::quiet_NaN());
+  std::vector<int> excluded_boundary_v(n_cells, 0);
+  std::vector<int> excluded_near_source_v(n_cells, 0);
+
+  const auto idx_2d = [n](int ix, int iy) -> size_t {
+    return static_cast<size_t>(iy) * static_cast<size_t>(n) + static_cast<size_t>(ix);
+  };
+
+  const double dx = (2.0 * half_extent) / static_cast<double>(n - 1);
 
   for (int iy = 0; iy < n; ++iy) {
     const double fy = static_cast<double>(iy) / static_cast<double>(n - 1);
@@ -1089,6 +1108,7 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
     for (int ix = 0; ix < n; ++ix) {
       const double fx = static_cast<double>(ix) / static_cast<double>(n - 1);
       const double x = -half_extent + 2.0 * half_extent * fx;
+      const size_t idx = idx_2d(ix, iy);
 
       FieldAtPoint combined = evaluate_provisional_field_single_source(
           sources[0].x, sources[0].y, sources[0].m, x, y, eps);
@@ -1098,15 +1118,141 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
         combined = add_provisional_fields(combined, fk);
       }
 
-      const double r = std::hypot(x, y);
-      const double xi_norm = std::hypot(combined.xi.x, combined.xi.y);
-      csv << shape << "," << source_config_id << "," << std::scientific << orientation_deg << ","
-          << source_mass1 << "," << source_mass2 << ","
-          << x << "," << y << "," << r << ","
-          << combined.xi.x << "," << combined.xi.y << "," << xi_norm << ","
-          << combined.theta.xx << "," << combined.theta.xy << "," << combined.theta.yy << ","
-          << combined.theta.zz << "," << combined.theta_trace << "," << combined.invariant_I << "\n";
+      x_v[idx] = x;
+      y_v[idx] = y;
+      xi_x_v[idx] = combined.xi.x;
+      xi_y_v[idx] = combined.xi.y;
+      xi_norm_v[idx] = std::hypot(combined.xi.x, combined.xi.y);
+      theta_xx_v[idx] = combined.theta.xx;
+      theta_xy_v[idx] = combined.theta.xy;
+      theta_yy_v[idx] = combined.theta.yy;
+      theta_zz_v[idx] = combined.theta.zz;
+      theta_trace_v[idx] = combined.theta_trace;
+      invariant_I_v[idx] = combined.invariant_I;
+      theta_norm_v[idx] = theta_frobenius_norm(combined.theta);
+      excluded_boundary_v[idx] = (ix == 0 || iy == 0 || ix == (n - 1) || iy == (n - 1)) ? 1 : 0;
+
+      bool near_source = false;
+      for (const SourcePoint& source : sources) {
+        if (std::hypot(x - source.x, y - source.y) <= exclusion_radius) {
+          near_source = true;
+          break;
+        }
+      }
+      excluded_near_source_v[idx] = near_source ? 1 : 0;
     }
+  }
+
+  const double inv_2dx = 1.0 / (2.0 * dx);
+  for (int iy = 1; iy < n - 1; ++iy) {
+    for (int ix = 1; ix < n - 1; ++ix) {
+      const size_t idx = idx_2d(ix, iy);
+      const size_t idx_xp = idx_2d(ix + 1, iy);
+      const size_t idx_xm = idx_2d(ix - 1, iy);
+      const size_t idx_yp = idx_2d(ix, iy + 1);
+      const size_t idx_ym = idx_2d(ix, iy - 1);
+
+      const double a_xx_p = theta_xx_v[idx_xp] - lambda * theta_trace_v[idx_xp];
+      const double a_xx_m = theta_xx_v[idx_xm] - lambda * theta_trace_v[idx_xm];
+      const double a_xy_p = theta_xy_v[idx_xp];
+      const double a_xy_m = theta_xy_v[idx_xm];
+      const double a_yx_p = theta_xy_v[idx_yp];
+      const double a_yx_m = theta_xy_v[idx_ym];
+      const double a_yy_p = theta_yy_v[idx_yp] - lambda * theta_trace_v[idx_yp];
+      const double a_yy_m = theta_yy_v[idx_ym] - lambda * theta_trace_v[idx_ym];
+
+      const double residual_x = (a_xx_p - a_xx_m) * inv_2dx + (a_yx_p - a_yx_m) * inv_2dx;
+      const double residual_y = (a_xy_p - a_xy_m) * inv_2dx + (a_yy_p - a_yy_m) * inv_2dx;
+      const double residual_norm = std::hypot(residual_x, residual_y);
+      const double theta_norm = theta_norm_v[idx];
+      const double residual_norm_over_theta_norm = (theta_norm > 0.0)
+          ? (residual_norm / theta_norm)
+          : std::numeric_limits<double>::quiet_NaN();
+
+      residual_x_v[idx] = residual_x;
+      residual_y_v[idx] = residual_y;
+      residual_norm_v[idx] = residual_norm;
+      residual_norm_over_theta_norm_v[idx] = residual_norm_over_theta_norm;
+    }
+  }
+
+  size_t excluded_boundary_count = 0;
+  size_t excluded_near_source_count = 0;
+  size_t free_cell_count = 0;
+  double max_residual_norm = 0.0;
+  double sum_residual_norm = 0.0;
+  double max_residual_ratio = 0.0;
+  double sum_residual_ratio = 0.0;
+  size_t residual_ratio_count = 0;
+  std::vector<double> residual_norm_free;
+  residual_norm_free.reserve(n_cells);
+
+  for (size_t idx = 0; idx < n_cells; ++idx) {
+    const bool excluded_boundary = excluded_boundary_v[idx] != 0;
+    const bool excluded_near_source = excluded_near_source_v[idx] != 0;
+    if (excluded_boundary) ++excluded_boundary_count;
+    if (excluded_near_source) ++excluded_near_source_count;
+    if (excluded_boundary || excluded_near_source) continue;
+    if (!std::isfinite(residual_norm_v[idx])) continue;
+    ++free_cell_count;
+    const double rn = residual_norm_v[idx];
+    const double rr = residual_norm_over_theta_norm_v[idx];
+    max_residual_norm = std::max(max_residual_norm, rn);
+    sum_residual_norm += rn;
+    if (std::isfinite(rr)) {
+      max_residual_ratio = std::max(max_residual_ratio, rr);
+      sum_residual_ratio += rr;
+      ++residual_ratio_count;
+    }
+    residual_norm_free.push_back(rn);
+  }
+
+  double median_residual_norm = std::numeric_limits<double>::quiet_NaN();
+  if (!residual_norm_free.empty()) {
+    std::sort(residual_norm_free.begin(), residual_norm_free.end());
+    const size_t mid = residual_norm_free.size() / 2;
+    if ((residual_norm_free.size() % 2) == 0) {
+      median_residual_norm = 0.5 * (residual_norm_free[mid - 1] + residual_norm_free[mid]);
+    } else {
+      median_residual_norm = residual_norm_free[mid];
+    }
+  }
+
+  const double mean_residual_norm = (free_cell_count > 0)
+      ? (sum_residual_norm / static_cast<double>(free_cell_count))
+      : std::numeric_limits<double>::quiet_NaN();
+  const double mean_residual_ratio = (residual_ratio_count > 0)
+      ? (sum_residual_ratio / static_cast<double>(residual_ratio_count))
+      : std::numeric_limits<double>::quiet_NaN();
+
+  std::ofstream summary(output_dir + "/tpf_source_field_residual_summary.txt");
+  if (summary) {
+    summary << std::scientific;
+    summary << "total grid cells: " << n_cells << "\n";
+    summary << "interior free cells used: " << free_cell_count << "\n";
+    summary << "excluded boundary count: " << excluded_boundary_count << "\n";
+    summary << "excluded near-source count: " << excluded_near_source_count << "\n";
+    summary << "max residual norm over free cells: " << max_residual_norm << "\n";
+    summary << "mean residual norm over free cells: " << mean_residual_norm << "\n";
+    summary << "median residual norm over free cells: " << median_residual_norm << "\n";
+    summary << "max residual_norm_over_theta_norm over free cells: " << max_residual_ratio << "\n";
+    summary << "mean residual_norm_over_theta_norm over free cells: " << mean_residual_ratio << "\n";
+  }
+
+  csv << "source_shape,source_config_id,source_orientation_deg,source_mass1,source_mass2,x,y,r,xi_x,xi_y,xi_norm,"
+         "theta_xx,theta_xy,theta_yy,theta_zz,theta_trace,invariant_I,residual_x,residual_y,residual_norm,"
+         "residual_norm_over_theta_norm,excluded_boundary,excluded_near_source\n";
+  for (size_t idx = 0; idx < n_cells; ++idx) {
+    const double r = std::hypot(x_v[idx], y_v[idx]);
+    csv << shape << "," << source_config_id << "," << std::scientific << orientation_deg << ","
+        << source_mass1 << "," << source_mass2 << ","
+        << x_v[idx] << "," << y_v[idx] << "," << r << ","
+        << xi_x_v[idx] << "," << xi_y_v[idx] << "," << xi_norm_v[idx] << ","
+        << theta_xx_v[idx] << "," << theta_xy_v[idx] << "," << theta_yy_v[idx] << ","
+        << theta_zz_v[idx] << "," << theta_trace_v[idx] << "," << invariant_I_v[idx] << ","
+        << residual_x_v[idx] << "," << residual_y_v[idx] << "," << residual_norm_v[idx] << ","
+        << residual_norm_over_theta_norm_v[idx] << ","
+        << excluded_boundary_v[idx] << "," << excluded_near_source_v[idx] << "\n";
   }
 }
 

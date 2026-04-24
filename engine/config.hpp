@@ -267,6 +267,8 @@ struct Config {
   double tpf_source_probe_grid_half_extent = 2.0e11;
   /** TPF source-field benchmark probe grid samples per axis N (NxN). */
   int tpf_source_probe_grid_n = 121;
+  /** TPF source-field benchmark residual diagnostic exclusion radius around source points [m]. */
+  double tpf_source_residual_exclusion_radius = 0.25;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

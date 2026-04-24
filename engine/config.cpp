@@ -335,6 +335,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_source_probe_grid_n = std::stoi(val);
     return true;
   }
+  if (key == "tpf_source_residual_exclusion_radius") {
+    config.tpf_source_residual_exclusion_radius = std::stod(val);
+    return true;
+  }
   if (key == "tpf_xi_constraint_exterior_inspect") {
     config.tpf_xi_constraint_exterior_inspect = parse_bool(val);
     return true;
@@ -758,6 +762,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_source_benchmark_orientation_deg", d(config.tpf_source_benchmark_orientation_deg));
   kv.emplace_back("tpf_source_probe_grid_half_extent", d(config.tpf_source_probe_grid_half_extent));
   kv.emplace_back("tpf_source_probe_grid_n", i(config.tpf_source_probe_grid_n));
+  kv.emplace_back("tpf_source_residual_exclusion_radius", d(config.tpf_source_residual_exclusion_radius));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));
