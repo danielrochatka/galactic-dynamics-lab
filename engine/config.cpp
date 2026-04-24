@@ -311,6 +311,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_source_benchmark_total_mass = std::stod(val);
     return true;
   }
+  if (key == "tpf_source_benchmark_mass1") {
+    config.tpf_source_benchmark_mass1 = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_mass2") {
+    config.tpf_source_benchmark_mass2 = std::stod(val);
+    return true;
+  }
   if (key == "tpf_source_benchmark_separation") {
     config.tpf_source_benchmark_separation = std::stod(val);
     return true;
@@ -744,6 +752,8 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
   kv.emplace_back("tpf_source_benchmark_shape", config.tpf_source_benchmark_shape);
   kv.emplace_back("tpf_source_benchmark_total_mass", d(config.tpf_source_benchmark_total_mass));
+  kv.emplace_back("tpf_source_benchmark_mass1", d(config.tpf_source_benchmark_mass1));
+  kv.emplace_back("tpf_source_benchmark_mass2", d(config.tpf_source_benchmark_mass2));
   kv.emplace_back("tpf_source_benchmark_separation", d(config.tpf_source_benchmark_separation));
   kv.emplace_back("tpf_source_benchmark_orientation_deg", d(config.tpf_source_benchmark_orientation_deg));
   kv.emplace_back("tpf_source_probe_grid_half_extent", d(config.tpf_source_probe_grid_half_extent));

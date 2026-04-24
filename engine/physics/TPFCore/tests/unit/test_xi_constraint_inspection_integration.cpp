@@ -138,3 +138,35 @@ TEST_CASE("xi exterior inspection flag does not change dynamics routing or accel
   CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-12));
   CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-12));
 }
+
+TEST_CASE("source-field benchmark bonded_pair supports explicit unequal masses with fallback") {
+  char dir_template[] = "/tmp/tpf_source_field_benchmark_pair_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_source_benchmark_mass1 = 7.5e11;
+  c.tpf_source_benchmark_mass2 = 2.5e11;
+  c.tpf_source_benchmark_separation = 8.0;
+  c.tpf_source_benchmark_orientation_deg = 90.0;
+  c.tpf_source_probe_grid_half_extent = 20.0;
+  c.tpf_source_probe_grid_n = 9;
+  c.softening = 0.1;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_source_field_benchmark(c, out_dir);
+
+  std::string csv = slurp(std::string(out_dir) + "/tpf_source_field_probe_grid.csv");
+  CHECK(csv.find("source_mass1,source_mass2") != std::string::npos);
+  CHECK(csv.find("bonded_pair_centered_origin_explicit_mass1_mass2") != std::string::npos);
+  CHECK(csv.find(",7.500000e+11,2.500000e+11,") != std::string::npos);
+
+  c.tpf_source_benchmark_mass1 = 0.0;
+  c.tpf_source_benchmark_mass2 = 0.0;
+  pkg.run_source_field_benchmark(c, out_dir);
+  csv = slurp(std::string(out_dir) + "/tpf_source_field_probe_grid.csv");
+  CHECK(csv.find("bonded_pair_centered_origin_equal_mass") != std::string::npos);
+  CHECK(csv.find(",5.000000e+11,5.000000e+11,") != std::string::npos);
+}

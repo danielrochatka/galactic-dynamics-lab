@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
+#include <algorithm>
 
 using galaxy::apply_config_kv;
 using galaxy::Config;
@@ -15,6 +16,8 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
   CHECK(c.tpf_source_benchmark_shape == "monopole");
   CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(galaxy::kDefaultBhMassKg));
+  CHECK(c.tpf_source_benchmark_mass1 == doctest::Approx(0.0));
+  CHECK(c.tpf_source_benchmark_mass2 == doctest::Approx(0.0));
   CHECK(c.tpf_source_benchmark_separation == doctest::Approx(1.0e11));
   CHECK(c.tpf_source_benchmark_orientation_deg == doctest::Approx(0.0));
   CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(2.0e11));
@@ -166,6 +169,10 @@ TEST_CASE("tpf_source_field_benchmark config keys parse") {
   CHECK(c.tpf_source_benchmark_shape == "bonded_pair");
   CHECK(apply_config_kv("tpf_source_benchmark_total_mass", "9.99e21", c));
   CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(9.99e21));
+  CHECK(apply_config_kv("tpf_source_benchmark_mass1", "7.5e11", c));
+  CHECK(c.tpf_source_benchmark_mass1 == doctest::Approx(7.5e11));
+  CHECK(apply_config_kv("tpf_source_benchmark_mass2", "2.5e11", c));
+  CHECK(c.tpf_source_benchmark_mass2 == doctest::Approx(2.5e11));
   CHECK(apply_config_kv("tpf_source_benchmark_separation", "42.0", c));
   CHECK(c.tpf_source_benchmark_separation == doctest::Approx(42.0));
   CHECK(apply_config_kv("tpf_source_benchmark_orientation_deg", "27.5", c));
@@ -175,4 +182,18 @@ TEST_CASE("tpf_source_field_benchmark config keys parse") {
   CHECK(apply_config_kv("tpf_source_probe_grid_n", "75", c));
   CHECK(c.tpf_source_probe_grid_n == 75);
   CHECK_THROWS(apply_config_kv("tpf_source_benchmark_shape", "triangle", c));
+}
+
+TEST_CASE("tpf_source_field_benchmark keys serialize") {
+  Config c;
+  c.tpf_source_benchmark_mass1 = 3.0;
+  c.tpf_source_benchmark_mass2 = 4.0;
+  const auto kv = galaxy::serialize_config_kv(c);
+  const auto has_key = [&kv](const char* key) {
+    return std::any_of(
+        kv.begin(), kv.end(),
+        [key](const std::pair<std::string, std::string>& entry) { return entry.first == key; });
+  };
+  CHECK(has_key("tpf_source_benchmark_mass1"));
+  CHECK(has_key("tpf_source_benchmark_mass2"));
 }

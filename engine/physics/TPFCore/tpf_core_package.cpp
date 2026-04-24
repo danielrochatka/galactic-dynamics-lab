@@ -1038,6 +1038,8 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
 
   const std::string shape = config.tpf_source_benchmark_shape;
   const double total_mass = config.tpf_source_benchmark_total_mass;
+  const double configured_mass1 = config.tpf_source_benchmark_mass1;
+  const double configured_mass2 = config.tpf_source_benchmark_mass2;
   const double separation = config.tpf_source_benchmark_separation;
   const double orientation_deg = config.tpf_source_benchmark_orientation_deg;
   const double half_extent = config.tpf_source_probe_grid_half_extent;
@@ -1060,10 +1062,14 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
     const double angle_rad = orientation_deg * (3.14159265358979323846 / 180.0);
     const double dx = 0.5 * separation * std::cos(angle_rad);
     const double dy = 0.5 * separation * std::sin(angle_rad);
-    const double m_each = 0.5 * total_mass;
-    sources.push_back({dx, dy, m_each});
-    sources.push_back({-dx, -dy, m_each});
-    source_config_id = "bonded_pair_centered_origin_equal_mass";
+    const bool use_unequal_masses = (configured_mass1 > 0.0 && configured_mass2 > 0.0);
+    const double source_mass1 = use_unequal_masses ? configured_mass1 : (0.5 * total_mass);
+    const double source_mass2 = use_unequal_masses ? configured_mass2 : (0.5 * total_mass);
+    sources.push_back({dx, dy, source_mass1});
+    sources.push_back({-dx, -dy, source_mass2});
+    source_config_id = use_unequal_masses
+        ? "bonded_pair_centered_origin_explicit_mass1_mass2"
+        : "bonded_pair_centered_origin_equal_mass";
   } else {
     return;
   }
@@ -1071,7 +1077,10 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
   std::ofstream csv(output_dir + "/tpf_source_field_probe_grid.csv");
   if (!csv) return;
 
-  csv << "source_shape,source_config_id,source_orientation_deg,x,y,r,xi_x,xi_y,xi_norm,"
+  const double source_mass1 = sources.empty() ? 0.0 : sources[0].m;
+  const double source_mass2 = (sources.size() >= 2) ? sources[1].m : 0.0;
+
+  csv << "source_shape,source_config_id,source_orientation_deg,source_mass1,source_mass2,x,y,r,xi_x,xi_y,xi_norm,"
          "theta_xx,theta_xy,theta_yy,theta_zz,theta_trace,invariant_I\n";
 
   for (int iy = 0; iy < n; ++iy) {
@@ -1092,6 +1101,7 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
       const double r = std::hypot(x, y);
       const double xi_norm = std::hypot(combined.xi.x, combined.xi.y);
       csv << shape << "," << source_config_id << "," << std::scientific << orientation_deg << ","
+          << source_mass1 << "," << source_mass2 << ","
           << x << "," << y << "," << r << ","
           << combined.xi.x << "," << combined.xi.y << "," << xi_norm << ","
           << combined.theta.xx << "," << combined.theta.xy << "," << combined.theta.yy << ","
