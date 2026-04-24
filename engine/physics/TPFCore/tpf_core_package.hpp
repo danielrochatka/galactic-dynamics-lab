@@ -4,8 +4,8 @@
 /**
  * TPFCore: Honest primitive TPF structure package.
  *
- * Implements Xi^mu, Theta_{mu nu}, I = Theta_mn Theta^mn - lambda Theta^2.
- * Lambda = 1/4 in 4D (fixed theory; not tunable).
+ * Current runtime field path uses Xi2D / Theta3D slice objects with lambda fixed at 1/4.
+ * Isolated 4D math helpers live in tpf_4d_field.* and are not wired into dynamics in this stage.
  *
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
  * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).

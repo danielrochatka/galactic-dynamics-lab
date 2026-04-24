@@ -4,6 +4,8 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
+Current spike branch status: runtime dynamics still use the existing Xi2D/Theta3D path; isolated 4D field math objects exist for staged migration and are not yet connected to dynamics.
+
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
 ---
