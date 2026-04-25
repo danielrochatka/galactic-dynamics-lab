@@ -38,6 +38,7 @@ enum class SimulationMode {
   tpf_single_source_inspect,
   tpf_symmetric_pair_inspect,
   tpf_source_field_benchmark,
+  tpf_4d_static_residual_benchmark,
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
@@ -269,6 +270,14 @@ struct Config {
   int tpf_source_probe_grid_n = 121;
   /** TPF source-field benchmark residual diagnostic exclusion radius around source points [m]. */
   double tpf_source_residual_exclusion_radius = 0.25;
+  /** TPF 4D static residual benchmark cubic grid size N (NxNxN). */
+  int tpf_4d_residual_grid_n = 33;
+  /** TPF 4D static residual benchmark grid half-extent L for support [-L, +L] in x/y/z. */
+  double tpf_4d_residual_grid_half_extent = 20.0;
+  /** TPF 4D static residual benchmark source exclusion radius around source support points [m]. */
+  double tpf_4d_residual_source_exclusion_radius = 2.0;
+  /** TPF 4D static residual benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_residual_field_softening = 0.1;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

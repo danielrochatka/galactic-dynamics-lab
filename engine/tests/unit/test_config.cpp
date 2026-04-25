@@ -23,6 +23,10 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_source_probe_grid_half_extent == doctest::Approx(2.0e11));
   CHECK(c.tpf_source_probe_grid_n == 121);
   CHECK(c.tpf_source_residual_exclusion_radius == doctest::Approx(0.25));
+  CHECK(c.tpf_4d_residual_grid_n == 33);
+  CHECK(c.tpf_4d_residual_grid_half_extent == doctest::Approx(20.0));
+  CHECK(c.tpf_4d_residual_source_exclusion_radius == doctest::Approx(2.0));
+  CHECK(c.tpf_4d_residual_field_softening == doctest::Approx(0.1));
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -135,6 +139,8 @@ TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_corresponden
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
   CHECK(apply_config_kv("simulation_mode", "tpf_source_field_benchmark", c));
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark);
+  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", c));
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark);
 }
 
 TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
@@ -200,4 +206,27 @@ TEST_CASE("tpf_source_field_benchmark keys serialize") {
   CHECK(has_key("tpf_source_benchmark_mass1"));
   CHECK(has_key("tpf_source_benchmark_mass2"));
   CHECK(has_key("tpf_source_residual_exclusion_radius"));
+}
+
+TEST_CASE("tpf_4d_static_residual_benchmark config keys parse and serialize") {
+  Config c;
+  CHECK(apply_config_kv("tpf_4d_residual_grid_n", "37", c));
+  CHECK(c.tpf_4d_residual_grid_n == 37);
+  CHECK(apply_config_kv("tpf_4d_residual_grid_half_extent", "12.5", c));
+  CHECK(c.tpf_4d_residual_grid_half_extent == doctest::Approx(12.5));
+  CHECK(apply_config_kv("tpf_4d_residual_source_exclusion_radius", "1.25", c));
+  CHECK(c.tpf_4d_residual_source_exclusion_radius == doctest::Approx(1.25));
+  CHECK(apply_config_kv("tpf_4d_residual_field_softening", "0.05", c));
+  CHECK(c.tpf_4d_residual_field_softening == doctest::Approx(0.05));
+
+  const auto kv = galaxy::serialize_config_kv(c);
+  const auto has_key = [&kv](const char* key) {
+    return std::any_of(
+        kv.begin(), kv.end(),
+        [key](const std::pair<std::string, std::string>& entry) { return entry.first == key; });
+  };
+  CHECK(has_key("tpf_4d_residual_grid_n"));
+  CHECK(has_key("tpf_4d_residual_grid_half_extent"));
+  CHECK(has_key("tpf_4d_residual_source_exclusion_radius"));
+  CHECK(has_key("tpf_4d_residual_field_softening"));
 }

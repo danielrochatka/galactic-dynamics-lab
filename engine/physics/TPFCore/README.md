@@ -81,6 +81,8 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_readout_debug.csv`** — Dynamical runs when **`tpfcore_dump_readout_debug`**: mode-dependent columns for diagnosing radial vs tangential acceleration components.
 
+**`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; the CSV is a central **view-plane slice** for display/inspection only.
+
 ---
 
 ## What TPFCore claims vs does not claim

@@ -5,7 +5,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -23,6 +25,19 @@ std::string slurp(const std::string& path) {
 bool file_exists(const std::string& path) {
   std::ifstream in(path);
   return static_cast<bool>(in);
+}
+
+double parse_summary_scalar(const std::string& summary_text, const std::string& key_prefix) {
+  std::istringstream in(summary_text);
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.find(key_prefix) == 0) {
+      const std::size_t p = line.find(':');
+      if (p == std::string::npos) return std::numeric_limits<double>::quiet_NaN();
+      return std::atof(line.substr(p + 1).c_str());
+    }
+  }
+  return std::numeric_limits<double>::quiet_NaN();
 }
 
 galaxy::State one_body_state() {
@@ -230,4 +245,172 @@ TEST_CASE("source-field benchmark near-source exclusion radius flags cells for b
 
   const std::string csv = slurp(std::string(out_dir) + "/tpf_source_field_probe_grid.csv");
   CHECK(csv.find(",0,1\n") != std::string::npos);
+}
+
+TEST_CASE("source-field benchmark unknown shape preserves legacy no-output behavior") {
+  char dir_template[] = "/tmp/tpf_source_field_benchmark_unknown_shape_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "unknown_shape";
+  c.tpf_source_probe_grid_half_extent = 10.0;
+  c.tpf_source_probe_grid_n = 9;
+  c.softening = 0.1;
+
+  galaxy::TPFCorePackage pkg;
+  CHECK_NOTHROW(pkg.run_source_field_benchmark(c, out_dir));
+  CHECK_FALSE(file_exists(std::string(out_dir) + "/tpf_source_field_probe_grid.csv"));
+}
+
+TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
+  char dir_template[] = "/tmp/tpf_4d_static_residual_artifacts_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_residual_grid_n = 7;
+  c.tpf_4d_residual_grid_half_extent = 3.0;
+  c.tpf_4d_residual_source_exclusion_radius = 0.5;
+  c.tpf_4d_residual_field_softening = 0.1;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_residual_benchmark(c, out_dir);
+
+  const std::string summary_path = std::string(out_dir) + "/tpf_4d_static_residual_summary.txt";
+  const std::string csv_path = std::string(out_dir) + "/tpf_4d_static_residual_slice.csv";
+  CHECK(file_exists(summary_path));
+  CHECK(file_exists(csv_path));
+
+  const std::string summary = slurp(summary_path);
+  CHECK(summary.find("grid_n:") != std::string::npos);
+  CHECK(summary.find("free cells used:") != std::string::npos);
+  CHECK(summary.find("mean normalized residual:") != std::string::npos);
+
+  const std::string csv = slurp(csv_path);
+  CHECK(csv.find("source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z") != std::string::npos);
+  CHECK(csv.find("theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary") != std::string::npos);
+}
+
+TEST_CASE("4d static residual benchmark monopole smoke has finite summary and free cells") {
+  char dir_template[] = "/tmp/tpf_4d_static_residual_monopole_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 2.0e12;
+  c.tpf_4d_residual_grid_n = 9;
+  c.tpf_4d_residual_grid_half_extent = 4.0;
+  c.tpf_4d_residual_source_exclusion_radius = 0.4;
+  c.tpf_4d_residual_field_softening = 0.15;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_residual_benchmark(c, out_dir);
+
+  const std::string summary = slurp(std::string(out_dir) + "/tpf_4d_static_residual_summary.txt");
+  const double free_cells = parse_summary_scalar(summary, "free cells used");
+  const double mean_norm = parse_summary_scalar(summary, "mean residual spatial norm");
+  const double max_norm = parse_summary_scalar(summary, "max residual spatial norm");
+  CHECK(free_cells > 0.0);
+  CHECK(std::isfinite(mean_norm));
+  CHECK(std::isfinite(max_norm));
+}
+
+TEST_CASE("4d static residual benchmark bonded pair equal-mass fallback and unequal masses") {
+  char dir_template[] = "/tmp/tpf_4d_static_residual_pair_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_source_benchmark_mass1 = 0.0;
+  c.tpf_source_benchmark_mass2 = 0.0;
+  c.tpf_source_benchmark_separation = 8.0;
+  c.tpf_source_benchmark_orientation_deg = 30.0;
+  c.tpf_4d_residual_grid_n = 7;
+  c.tpf_4d_residual_grid_half_extent = 4.0;
+  c.tpf_4d_residual_source_exclusion_radius = 0.2;
+  c.tpf_4d_residual_field_softening = 0.1;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_residual_benchmark(c, out_dir);
+  std::string summary = slurp(std::string(out_dir) + "/tpf_4d_static_residual_summary.txt");
+  CHECK(summary.find("source config id: bonded_pair_centered_origin_equal_mass") != std::string::npos);
+  CHECK(summary.find("source masses: 5.000000e+11, 5.000000e+11") != std::string::npos);
+  CHECK(std::isfinite(parse_summary_scalar(summary, "mean normalized residual")));
+
+  c.tpf_source_benchmark_mass1 = 8.0e11;
+  c.tpf_source_benchmark_mass2 = 2.0e11;
+  pkg.run_4d_static_residual_benchmark(c, out_dir);
+  summary = slurp(std::string(out_dir) + "/tpf_4d_static_residual_summary.txt");
+  CHECK(summary.find("source config id: bonded_pair_centered_origin_explicit_mass1_mass2") != std::string::npos);
+  CHECK(summary.find("source masses: 8.000000e+11, 2.000000e+11") != std::string::npos);
+  CHECK(std::isfinite(parse_summary_scalar(summary, "max normalized residual")));
+}
+
+TEST_CASE("4d static residual benchmark rejects invalid config values loudly") {
+  char dir_template[] = "/tmp/tpf_4d_static_residual_invalid_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0;
+  c.tpf_4d_residual_grid_n = 2;
+  galaxy::TPFCorePackage pkg;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_grid_n = 5;
+  c.tpf_4d_residual_grid_half_extent = 0.0;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_grid_half_extent = 1.0;
+  c.tpf_4d_residual_field_softening = -0.1;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_field_softening = 0.1;
+  c.tpf_4d_residual_source_exclusion_radius = -0.1;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_source_exclusion_radius = 0.0;
+  c.tpf_source_benchmark_shape = "unknown_shape";
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_4d_residual_field_softening = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_field_softening = 0.1;
+  c.tpf_4d_residual_grid_half_extent = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_grid_half_extent = 1.0;
+  c.tpf_4d_residual_source_exclusion_radius = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_source_exclusion_radius = 0.0;
+  c.tpf_source_benchmark_total_mass = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_total_mass = 1.0;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_mass1 = std::numeric_limits<double>::quiet_NaN();
+  c.tpf_source_benchmark_mass2 = 1.0;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_mass1 = 1.0;
+  c.tpf_source_benchmark_mass2 = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_mass2 = 1.0;
+  c.tpf_source_benchmark_separation = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_separation = 1.0;
+  c.tpf_source_benchmark_orientation_deg = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
 }
