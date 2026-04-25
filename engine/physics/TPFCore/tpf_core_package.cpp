@@ -22,6 +22,7 @@
 #include "runtime_package_helpers.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
+#include "tpf_4d_static_residual.hpp"
 #include "v11_weak_field_correspondence.hpp"
 #include "xi_constraint_exterior_solver.hpp"
 #include "source_iteration.hpp"
@@ -112,6 +113,50 @@ void TPFCorePackage::init_from_config(const Config& config) {
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
+
+struct BenchmarkSourceSpec2D {
+  double x;
+  double y;
+  double m;
+};
+
+struct BenchmarkSourceSpec3D {
+  double x;
+  double y;
+  double z;
+  double m;
+};
+
+std::vector<BenchmarkSourceSpec3D> build_tpf_benchmark_sources_3d(const Config& config, std::string* shape_id_out) {
+  const std::string shape = config.tpf_source_benchmark_shape;
+  const double total_mass = config.tpf_source_benchmark_total_mass;
+  const double configured_mass1 = config.tpf_source_benchmark_mass1;
+  const double configured_mass2 = config.tpf_source_benchmark_mass2;
+  const double separation = config.tpf_source_benchmark_separation;
+  const double orientation_deg = config.tpf_source_benchmark_orientation_deg;
+
+  if (shape == "monopole") {
+    if (shape_id_out) *shape_id_out = "monopole_centered_origin";
+    return std::vector<BenchmarkSourceSpec3D>{BenchmarkSourceSpec3D{0.0, 0.0, 0.0, total_mass}};
+  }
+  if (shape == "bonded_pair") {
+    const double angle_rad = orientation_deg * (3.14159265358979323846 / 180.0);
+    const double dx = 0.5 * separation * std::cos(angle_rad);
+    const double dy = 0.5 * separation * std::sin(angle_rad);
+    const bool use_unequal_masses = (configured_mass1 > 0.0 && configured_mass2 > 0.0);
+    const double source_mass1 = use_unequal_masses ? configured_mass1 : (0.5 * total_mass);
+    const double source_mass2 = use_unequal_masses ? configured_mass2 : (0.5 * total_mass);
+    if (shape_id_out) {
+      *shape_id_out = use_unequal_masses
+                          ? "bonded_pair_centered_origin_explicit_mass1_mass2"
+                          : "bonded_pair_centered_origin_equal_mass";
+    }
+    return std::vector<BenchmarkSourceSpec3D>{
+        BenchmarkSourceSpec3D{dx, dy, 0.0, source_mass1},
+        BenchmarkSourceSpec3D{-dx, -dy, 0.0, source_mass2}};
+  }
+  throw std::runtime_error("unknown tpf_source_benchmark_shape for benchmark source setup: " + shape);
+}
 
 struct XiConstraintExteriorStats {
   size_t n_masked = 0;
@@ -1037,10 +1082,6 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
   using namespace tpfcore;
 
   const std::string shape = config.tpf_source_benchmark_shape;
-  const double total_mass = config.tpf_source_benchmark_total_mass;
-  const double configured_mass1 = config.tpf_source_benchmark_mass1;
-  const double configured_mass2 = config.tpf_source_benchmark_mass2;
-  const double separation = config.tpf_source_benchmark_separation;
   const double orientation_deg = config.tpf_source_benchmark_orientation_deg;
   const double half_extent = config.tpf_source_probe_grid_half_extent;
   const int n = config.tpf_source_probe_grid_n;
@@ -1052,30 +1093,12 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
 
   if (n < 2 || half_extent <= 0.0) return;
 
-  struct SourcePoint {
-    double x;
-    double y;
-    double m;
-  };
-  std::vector<SourcePoint> sources;
   std::string source_config_id;
-  if (shape == "monopole") {
-    sources.push_back({0.0, 0.0, total_mass});
-    source_config_id = "monopole_centered_origin";
-  } else if (shape == "bonded_pair") {
-    const double angle_rad = orientation_deg * (3.14159265358979323846 / 180.0);
-    const double dx = 0.5 * separation * std::cos(angle_rad);
-    const double dy = 0.5 * separation * std::sin(angle_rad);
-    const bool use_unequal_masses = (configured_mass1 > 0.0 && configured_mass2 > 0.0);
-    const double source_mass1 = use_unequal_masses ? configured_mass1 : (0.5 * total_mass);
-    const double source_mass2 = use_unequal_masses ? configured_mass2 : (0.5 * total_mass);
-    sources.push_back({dx, dy, source_mass1});
-    sources.push_back({-dx, -dy, source_mass2});
-    source_config_id = use_unequal_masses
-        ? "bonded_pair_centered_origin_explicit_mass1_mass2"
-        : "bonded_pair_centered_origin_equal_mass";
-  } else {
-    return;
+  const std::vector<BenchmarkSourceSpec3D> sources3d = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  std::vector<BenchmarkSourceSpec2D> sources;
+  sources.reserve(sources3d.size());
+  for (std::size_t i = 0; i < sources3d.size(); ++i) {
+    sources.push_back(BenchmarkSourceSpec2D{sources3d[i].x, sources3d[i].y, sources3d[i].m});
   }
 
   std::ofstream csv(output_dir + "/tpf_source_field_probe_grid.csv");
@@ -1133,7 +1156,7 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
       excluded_boundary_v[idx] = (ix == 0 || iy == 0 || ix == (n - 1) || iy == (n - 1)) ? 1 : 0;
 
       bool near_source = false;
-      for (const SourcePoint& source : sources) {
+      for (const BenchmarkSourceSpec2D& source : sources) {
         if (std::hypot(x - source.x, y - source.y) <= exclusion_radius) {
           near_source = true;
           break;
@@ -1253,6 +1276,109 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
         << residual_x_v[idx] << "," << residual_y_v[idx] << "," << residual_norm_v[idx] << ","
         << residual_norm_over_theta_norm_v[idx] << ","
         << excluded_boundary_v[idx] << "," << excluded_near_source_v[idx] << "\n";
+  }
+}
+
+void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, const std::string& output_dir) {
+  using namespace tpfcore;
+
+  const int grid_n = config.tpf_4d_residual_grid_n;
+  const double half_extent = config.tpf_4d_residual_grid_half_extent;
+  const double source_exclusion_radius = config.tpf_4d_residual_source_exclusion_radius;
+  const double field_softening = config.tpf_4d_residual_field_softening;
+
+  if (grid_n < 3) {
+    throw std::runtime_error("tpf_4d_residual_grid_n must be >= 3");
+  }
+  if (!(half_extent > 0.0)) {
+    throw std::runtime_error("tpf_4d_residual_grid_half_extent must be > 0");
+  }
+  if (source_exclusion_radius < 0.0) {
+    throw std::runtime_error("tpf_4d_residual_source_exclusion_radius must be >= 0");
+  }
+  if (field_softening < 0.0) {
+    throw std::runtime_error("tpf_4d_residual_field_softening must be >= 0");
+  }
+
+  const double spacing = (2.0 * half_extent) / static_cast<double>(grid_n - 1);
+  if (!(spacing > 0.0)) {
+    throw std::runtime_error("tpf_4d_residual spacing must be > 0");
+  }
+
+  std::string source_config_id;
+  const std::vector<BenchmarkSourceSpec3D> source_specs = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  std::vector<StaticSourcePoint4D> sources;
+  sources.reserve(source_specs.size());
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    sources.push_back(StaticSourcePoint4D{source_specs[i].m, source_specs[i].x, source_specs[i].y, source_specs[i].z});
+  }
+
+  StaticResidualGridConfig grid_cfg{};
+  grid_cfg.nx = static_cast<std::size_t>(grid_n);
+  grid_cfg.ny = static_cast<std::size_t>(grid_n);
+  grid_cfg.nz = static_cast<std::size_t>(grid_n);
+  grid_cfg.spacing = spacing;
+  grid_cfg.origin_x = -half_extent;
+  grid_cfg.origin_y = -half_extent;
+  grid_cfg.origin_z = -half_extent;
+  grid_cfg.field_softening_eps = field_softening;
+  grid_cfg.source_exclusion_radius = source_exclusion_radius;
+
+  const StaticResidualGridResult result = evaluate_static_configuration_residual_4d(sources, grid_cfg);
+
+  std::ofstream summary(output_dir + "/tpf_4d_static_residual_summary.txt");
+  if (summary) {
+    summary << std::scientific;
+    summary << "source shape: " << config.tpf_source_benchmark_shape << "\n";
+    summary << "source config id: " << source_config_id << "\n";
+    summary << "source masses: ";
+    for (std::size_t i = 0; i < source_specs.size(); ++i) {
+      if (i > 0) summary << ", ";
+      summary << source_specs[i].m;
+    }
+    summary << "\n";
+    summary << "source positions: ";
+    for (std::size_t i = 0; i < source_specs.size(); ++i) {
+      if (i > 0) summary << "; ";
+      summary << "(" << source_specs[i].x << "," << source_specs[i].y << "," << source_specs[i].z << ")";
+    }
+    summary << "\n";
+    summary << "grid_n: " << grid_n << "\n";
+    summary << "half_extent: " << half_extent << "\n";
+    summary << "spacing: " << spacing << "\n";
+    summary << "softening: " << field_softening << "\n";
+    summary << "exclusion radius: " << source_exclusion_radius << "\n";
+    summary << "total grid cells: " << result.summary.total_grid_cells << "\n";
+    summary << "interior cells: " << result.summary.interior_cells << "\n";
+    summary << "excluded boundary count: " << result.summary.excluded_boundary_count << "\n";
+    summary << "excluded near-source count: " << result.summary.excluded_near_source_count << "\n";
+    summary << "free cells used: " << result.summary.free_cells_used << "\n";
+    summary << "z derivative samples: " << result.summary.z_derivative_samples << "\n";
+    summary << "max residual spatial norm: " << result.summary.max_residual_spatial_norm << "\n";
+    summary << "mean residual spatial norm: " << result.summary.mean_residual_spatial_norm << "\n";
+    summary << "median residual spatial norm: " << result.summary.median_residual_spatial_norm << "\n";
+    summary << "max normalized residual: " << result.summary.max_normalized_residual << "\n";
+    summary << "mean normalized residual: " << result.summary.mean_normalized_residual << "\n";
+  }
+
+  std::ofstream csv(output_dir + "/tpf_4d_static_residual_slice.csv");
+  if (!csv) return;
+
+  const std::size_t slice_k =
+      static_cast<std::size_t>(std::round((0.0 - result.config.origin_z) / result.config.spacing));
+  const std::size_t clamped_slice_k = std::min(result.config.nz - 1, slice_k);
+  csv << std::scientific;
+  csv << "source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z,residual_spatial_norm,"
+         "residual_4_norm_like,theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary\n";
+  for (std::size_t idx = 0; idx < result.points.size(); ++idx) {
+    const StaticResidualAtPoint& p = result.points[idx];
+    if (p.k != clamped_slice_k) continue;
+    csv << config.tpf_source_benchmark_shape << ","
+        << p.x << "," << p.y << "," << p.z << ","
+        << p.residual_t << "," << p.residual_x << "," << p.residual_y << "," << p.residual_z << ","
+        << p.residual_spatial_norm << "," << p.residual_4_norm_like << ","
+        << p.theta_spatial_frobenius_norm << "," << p.normalized_residual << ","
+        << (p.is_boundary ? 1 : 0) << "," << (p.is_near_source ? 1 : 0) << "," << (p.used_in_summary ? 1 : 0) << "\n";
   }
 }
 

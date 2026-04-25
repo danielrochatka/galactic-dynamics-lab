@@ -62,6 +62,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
   if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
   if (t == "tpf_source_field_benchmark") return SimulationMode::tpf_source_field_benchmark;
+  if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
@@ -84,6 +85,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
     case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
     case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
+    case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
@@ -337,6 +339,22 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_source_residual_exclusion_radius") {
     config.tpf_source_residual_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_grid_n") {
+    config.tpf_4d_residual_grid_n = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_grid_half_extent") {
+    config.tpf_4d_residual_grid_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_source_exclusion_radius") {
+    config.tpf_4d_residual_source_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_field_softening") {
+    config.tpf_4d_residual_field_softening = std::stod(val);
     return true;
   }
   if (key == "tpf_xi_constraint_exterior_inspect") {
@@ -706,7 +724,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
     return os.str();
   };
   std::vector<std::pair<std::string, std::string>> kv;
-  kv.reserve(80);
+  kv.reserve(90);
   kv.emplace_back("simulation_mode", mode_to_string(config.simulation_mode));
   kv.emplace_back("n_stars", i(config.n_stars));
   kv.emplace_back("star_mass", d(config.star_mass));
@@ -763,6 +781,10 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_source_probe_grid_half_extent", d(config.tpf_source_probe_grid_half_extent));
   kv.emplace_back("tpf_source_probe_grid_n", i(config.tpf_source_probe_grid_n));
   kv.emplace_back("tpf_source_residual_exclusion_radius", d(config.tpf_source_residual_exclusion_radius));
+  kv.emplace_back("tpf_4d_residual_grid_n", i(config.tpf_4d_residual_grid_n));
+  kv.emplace_back("tpf_4d_residual_grid_half_extent", d(config.tpf_4d_residual_grid_half_extent));
+  kv.emplace_back("tpf_4d_residual_source_exclusion_radius", d(config.tpf_4d_residual_source_exclusion_radius));
+  kv.emplace_back("tpf_4d_residual_field_softening", d(config.tpf_4d_residual_field_softening));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));

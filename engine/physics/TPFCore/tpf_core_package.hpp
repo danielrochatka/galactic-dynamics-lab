@@ -5,7 +5,7 @@
  * TPFCore: Honest primitive TPF structure package.
  *
  * Current runtime field path uses legacy projected-vector / spatial-tensor objects with lambda fixed at 1/4.
- * Isolated 4D math helpers live in tpf_4d_field.* and are not wired into dynamics in this stage.
+ * Isolated 4D math/static residual benchmark helpers live in tpf_4d_field.* / tpf_4d_static_* and are not wired into dynamics.
  *
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
  * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
@@ -67,6 +67,8 @@ class TPFCorePackage : public PhysicsPackage {
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
   /** Run source-first field benchmark and dump plane probe grid CSV. */
   void run_source_field_benchmark(const Config& config, const std::string& output_dir);
+  /** Run static 4D residual benchmark harness and dump summary + view-plane slice artifacts. */
+  void run_4d_static_residual_benchmark(const Config& config, const std::string& output_dir);
 
   /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
   void write_readout_debug(const std::vector<Snapshot>& snapshots,
