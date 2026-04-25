@@ -234,11 +234,47 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
           std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_artifacts\t"
                         "tpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv") != std::string::npos);
+    CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_static_residual_diagnostic_only") != std::string::npos);
+    CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") == std::string::npos);
+    CHECK(run_info.find("configured_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);
     CHECK(run_info.find("tpf_dynamics_mode_effective_for_this_run\tnone_static_residual_diagnostic_only") !=
           std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_scope_note\t"
                         "does_not_validate_dynamics_moving_sources_time_evolution_source_worldlines_orbital_behavior_"
                         "or_DeltaC_closure") != std::string::npos);
     CHECK(run_info.find("tpf_dynamics_mode_effective_for_this_run\tdirect_tpf") == std::string::npos);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual_defaults_provenance_note";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
+    configured.physics_package = "TPFCore";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/Newtonian/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("package_defaults\tphysics/Newtonian/defaults.cfg") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_package_defaults_note\t"
+                        "residual_evaluator_path_is_tpfcore_static_4d_evaluate_static_configuration_residual_4d; "
+                        "layered_package_defaults_provenance_line_is_inherited_loader_selection_and_not_the_active_"
+                        "residual_evaluator_path") != std::string::npos);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_direct_runtime_mode";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_source_field_benchmark;
+    configured.physics_package = "TPFCore";
+    configured.tpf_dynamics_mode = "direct_tpf";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);
   }
 }
