@@ -99,6 +99,32 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field correspondence audit m
   CHECK(galaxy::compute_acceleration_code_path(c).find("audit-only") != std::string::npos);
 }
 
+TEST_CASE("compute_active_* branch labels: tpf_4d_static_residual_benchmark is diagnostic-only") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+
+  const std::string dynamics = galaxy::compute_active_dynamics_branch(c);
+  const std::string metrics = galaxy::compute_active_metrics_branch(c);
+  const std::string accel = galaxy::compute_acceleration_code_path(c);
+
+  CHECK(dynamics.find("diagnostic-only") != std::string::npos);
+  CHECK(dynamics.find("no particle integration") != std::string::npos);
+  CHECK(dynamics.find("no acceleration path") != std::string::npos);
+  CHECK(dynamics.find("direct_tpf") == std::string::npos);
+  CHECK(dynamics.find("compute_direct_tpf_accelerations") == std::string::npos);
+
+  CHECK(metrics.find("static_4D_field_residual") != std::string::npos);
+  CHECK(metrics.find("Xi4") != std::string::npos);
+  CHECK(metrics.find("Theta4") != std::string::npos);
+
+  CHECK(accel.find("none") != std::string::npos);
+  CHECK(accel.find("evaluate_static_configuration_residual_4d") != std::string::npos);
+  CHECK(accel.find("no compute_accelerations call") != std::string::npos);
+  CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
+}
+
 TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part route") {
   Config c;
   c.physics_package = "TPFCore";
