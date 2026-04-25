@@ -39,5 +39,4 @@ Each audit should separate findings into:
 
 ## Current records
 
-- `static_4d_residual_contamination_audit.md` — contamination/sanity audit of `tpf_4d_static_residual_benchmark` dispatch and static residual path.
-
+- `static_4d_residual_contamination_audit.md` — contamination/sanity audit of `tpf_4d_static_residual_benchmark` dispatch and static residual path, including Stage 6 derived radial-bin artifact scope notes.

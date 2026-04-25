@@ -235,12 +235,17 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_artifacts\t"
                         "tpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv;"
                         "tpf_4d_static_residual_slice_xy.csv;tpf_4d_static_residual_slice_xz.csv;"
-                        "tpf_4d_static_residual_slice_yz.csv;tpf_4d_static_residual_sources.csv") != std::string::npos);
+                        "tpf_4d_static_residual_slice_yz.csv;tpf_4d_static_residual_sources.csv;"
+                        "tpf_4d_static_residual_bins_nearest_source.csv;tpf_4d_static_residual_bins_origin.csv") !=
+          std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_slice_csv_note\t"
                         "view-plane inspection/display artifacts only; "
                         "do_not_replace_full_spatial_support_computation") != std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_plot_scope_note\t"
                         "plot_artifacts_do_not_add_physics_validation_or_dynamics_validation") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_bins_note\t"
+                        "binned_residual_files_are_derived_diagnostic_summaries_for_inspection_regression_only_and_"
+                        "do_not_add_physics_validation_or_dynamics_validation") != std::string::npos);
     CHECK(run_info.find("Eq. 10") == std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_static_residual_diagnostic_only") != std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") == std::string::npos);

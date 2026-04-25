@@ -29,6 +29,7 @@ This record reflects code-path inspection and command-driven evidence collection
 6. No particle integration loop is entered for this benchmark mode.
 7. Plotting is post-process only (artifact rendering from CSV inputs).
 8. CSV field columns use `evaluate_static_sources_field_4d(...)`, not duplicated source formulas in benchmark CSV writer logic.
+9. Benchmark path returns after static benchmark artifact writes; no particle integration handoff.
 
 ---
 
@@ -52,6 +53,15 @@ This record reflects code-path inspection and command-driven evidence collection
 
 ---
 
+## Coupling/G status note (scope clarification)
+
+1. `tpf_4d_static_residual_benchmark` does **not** use Newtonian `G` or `TPF_G_SI` in the static residual/tensor diagnostic path.
+2. This benchmark therefore tests uncalibrated geometric/tensor consistency of the source ansatz on the sampled grid.
+3. This must **not** be interpreted as a derivation or prediction of physical gravitational coupling `G`.
+4. Any coupling-derivation claim would require a later units/source-ledger/observable-coupling benchmark path.
+
+---
+
 ## Commands used (evidence collection)
 
 - `rg -n "tpf_4d_static_residual_benchmark|run_4d_static_residual_benchmark|evaluate_static_configuration_residual_4d|static_residual"`
@@ -69,4 +79,3 @@ This record reflects code-path inspection and command-driven evidence collection
 ## Branch/process note
 
 This is spike-only audit documentation and should not be treated as merge-readiness to `main`.
-

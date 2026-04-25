@@ -40,6 +40,28 @@ double parse_summary_scalar(const std::string& summary_text, const std::string& 
   return std::numeric_limits<double>::quiet_NaN();
 }
 
+std::vector<std::string> split_csv_line(const std::string& line) {
+  std::vector<std::string> out;
+  std::string cur;
+  for (std::size_t i = 0; i < line.size(); ++i) {
+    if (line[i] == ',') {
+      out.push_back(cur);
+      cur.clear();
+    } else {
+      cur.push_back(line[i]);
+    }
+  }
+  out.push_back(cur);
+  return out;
+}
+
+double parse_csv_double_or_nan(const std::string& s) {
+  if (s.empty() || s == "nan" || s == "NaN" || s == "NAN") {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  return std::atof(s.c_str());
+}
+
 galaxy::State one_body_state() {
   galaxy::State s;
   s.resize(1);
@@ -285,17 +307,27 @@ TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
   const std::string csv_xz_path = std::string(out_dir) + "/tpf_4d_static_residual_slice_xz.csv";
   const std::string csv_yz_path = std::string(out_dir) + "/tpf_4d_static_residual_slice_yz.csv";
   const std::string sources_csv_path = std::string(out_dir) + "/tpf_4d_static_residual_sources.csv";
+  const std::string bins_nearest_path = std::string(out_dir) + "/tpf_4d_static_residual_bins_nearest_source.csv";
+  const std::string bins_origin_path = std::string(out_dir) + "/tpf_4d_static_residual_bins_origin.csv";
   CHECK(file_exists(summary_path));
   CHECK(file_exists(csv_path));
   CHECK(file_exists(csv_xy_path));
   CHECK(file_exists(csv_xz_path));
   CHECK(file_exists(csv_yz_path));
   CHECK(file_exists(sources_csv_path));
+  CHECK(file_exists(bins_nearest_path));
+  CHECK(file_exists(bins_origin_path));
 
   const std::string summary = slurp(summary_path);
   CHECK(summary.find("grid_n:") != std::string::npos);
   CHECK(summary.find("free cells used:") != std::string::npos);
   CHECK(summary.find("mean normalized residual:") != std::string::npos);
+  CHECK(summary.find("residual bin count:") != std::string::npos);
+  CHECK(summary.find("nearest-source residual bin radius max used:") != std::string::npos);
+  CHECK(summary.find("origin residual bin radius max used:") != std::string::npos);
+  CHECK(summary.find("residual bins nearest-source csv: tpf_4d_static_residual_bins_nearest_source.csv") !=
+        std::string::npos);
+  CHECK(summary.find("residual bins origin csv: tpf_4d_static_residual_bins_origin.csv") != std::string::npos);
 
   const std::string expected_header =
       "source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z,residual_spatial_norm,"
@@ -312,6 +344,15 @@ TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
 
   const std::string sources_csv = slurp(sources_csv_path);
   CHECK(sources_csv.find("source_index,mass,x,y,z,source_config_id,source_shape") != std::string::npos);
+
+  const std::string bins_header =
+      "bin_index,r_min,r_max,r_mid,cell_count_total,cell_count_used,cell_count_boundary,cell_count_near_source,"
+      "mean_normalized_residual,median_normalized_residual,p90_normalized_residual,p95_normalized_residual,"
+      "p99_normalized_residual,max_normalized_residual,mean_residual_spatial_norm,median_residual_spatial_norm,"
+      "p95_residual_spatial_norm,max_residual_spatial_norm,mean_theta_spatial_frobenius_norm,"
+      "median_theta_spatial_frobenius_norm";
+  CHECK(slurp(bins_nearest_path).find(bins_header) != std::string::npos);
+  CHECK(slurp(bins_origin_path).find(bins_header) != std::string::npos);
 }
 
 TEST_CASE("4d static residual benchmark plot script parses under py_compile") {
@@ -331,6 +372,7 @@ TEST_CASE("4d static residual benchmark monopole smoke has finite summary and fr
   c.tpf_4d_residual_grid_half_extent = 4.0;
   c.tpf_4d_residual_source_exclusion_radius = 0.4;
   c.tpf_4d_residual_field_softening = 0.15;
+  c.tpf_4d_residual_bin_count = 16;
 
   galaxy::TPFCorePackage pkg;
   pkg.run_4d_static_residual_benchmark(c, out_dir);
@@ -342,6 +384,38 @@ TEST_CASE("4d static residual benchmark monopole smoke has finite summary and fr
   CHECK(free_cells > 0.0);
   CHECK(std::isfinite(mean_norm));
   CHECK(std::isfinite(max_norm));
+
+  const std::string bins_text = slurp(std::string(out_dir) + "/tpf_4d_static_residual_bins_nearest_source.csv");
+  std::istringstream bins_in(bins_text);
+  std::string line;
+  REQUIRE(std::getline(bins_in, line));
+  int rows = 0;
+  int used_positive_bins = 0;
+  while (std::getline(bins_in, line)) {
+    if (line.empty()) continue;
+    ++rows;
+    const std::vector<std::string> cols = split_csv_line(line);
+    REQUIRE(cols.size() == 20);
+    const int cell_count_used = std::atoi(cols[5].c_str());
+    if (cell_count_used > 0) {
+      ++used_positive_bins;
+      const double median_n = parse_csv_double_or_nan(cols[9]);
+      const double p95_n = parse_csv_double_or_nan(cols[11]);
+      const double max_n = parse_csv_double_or_nan(cols[13]);
+      if (std::isfinite(median_n) && std::isfinite(p95_n)) {
+        CHECK(p95_n >= median_n);
+      }
+      if (std::isfinite(p95_n) && std::isfinite(max_n)) {
+        CHECK(max_n >= p95_n);
+      }
+    } else {
+      CHECK(cols[8] == "nan");
+      CHECK(cols[9] == "nan");
+      CHECK(cols[13] == "nan");
+    }
+  }
+  CHECK(rows == c.tpf_4d_residual_bin_count);
+  CHECK(used_positive_bins > 0);
 }
 
 TEST_CASE("4d static residual benchmark bonded pair equal-mass fallback and unequal masses") {
@@ -360,6 +434,7 @@ TEST_CASE("4d static residual benchmark bonded pair equal-mass fallback and uneq
   c.tpf_4d_residual_grid_half_extent = 4.0;
   c.tpf_4d_residual_source_exclusion_radius = 0.2;
   c.tpf_4d_residual_field_softening = 0.1;
+  c.tpf_4d_residual_bin_count = 12;
 
   galaxy::TPFCorePackage pkg;
   pkg.run_4d_static_residual_benchmark(c, out_dir);
@@ -375,6 +450,31 @@ TEST_CASE("4d static residual benchmark bonded pair equal-mass fallback and uneq
   CHECK(summary.find("source config id: bonded_pair_centered_origin_explicit_mass1_mass2") != std::string::npos);
   CHECK(summary.find("source masses: 8.000000e+11, 2.000000e+11") != std::string::npos);
   CHECK(std::isfinite(parse_summary_scalar(summary, "max normalized residual")));
+
+  const std::string bins_origin_text = slurp(std::string(out_dir) + "/tpf_4d_static_residual_bins_origin.csv");
+  std::istringstream bins_origin_in(bins_origin_text);
+  std::string line;
+  REQUIRE(std::getline(bins_origin_in, line));
+  int rows = 0;
+  bool saw_excluded = false;
+  while (std::getline(bins_origin_in, line)) {
+    if (line.empty()) continue;
+    ++rows;
+    const std::vector<std::string> cols = split_csv_line(line);
+    REQUIRE(cols.size() == 20);
+    const int total = std::atoi(cols[4].c_str());
+    const int used = std::atoi(cols[5].c_str());
+    const int boundary = std::atoi(cols[6].c_str());
+    const int near_source = std::atoi(cols[7].c_str());
+    CHECK(total >= used);
+    CHECK(total >= boundary);
+    CHECK(total >= near_source);
+    if ((boundary > 0 || near_source > 0) && used < total) {
+      saw_excluded = true;
+    }
+  }
+  CHECK(rows == c.tpf_4d_residual_bin_count);
+  CHECK(saw_excluded);
 }
 
 TEST_CASE("4d static residual benchmark rejects invalid config values loudly") {
@@ -406,6 +506,17 @@ TEST_CASE("4d static residual benchmark rejects invalid config values loudly") {
   CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
 
   c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_4d_residual_bin_count = 0;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_bin_count = 4097;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_bin_count = 16;
+  c.tpf_4d_residual_bin_radius_max = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_bin_radius_max = 0.0;
   c.tpf_4d_residual_field_softening = std::numeric_limits<double>::quiet_NaN();
   CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
 

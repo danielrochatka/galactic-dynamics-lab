@@ -357,6 +357,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_4d_residual_field_softening = std::stod(val);
     return true;
   }
+  if (key == "tpf_4d_residual_bin_count") {
+    config.tpf_4d_residual_bin_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_bin_radius_max") {
+    config.tpf_4d_residual_bin_radius_max = std::stod(val);
+    return true;
+  }
   if (key == "tpf_xi_constraint_exterior_inspect") {
     config.tpf_xi_constraint_exterior_inspect = parse_bool(val);
     return true;
@@ -785,6 +793,8 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_4d_residual_grid_half_extent", d(config.tpf_4d_residual_grid_half_extent));
   kv.emplace_back("tpf_4d_residual_source_exclusion_radius", d(config.tpf_4d_residual_source_exclusion_radius));
   kv.emplace_back("tpf_4d_residual_field_softening", d(config.tpf_4d_residual_field_softening));
+  kv.emplace_back("tpf_4d_residual_bin_count", i(config.tpf_4d_residual_bin_count));
+  kv.emplace_back("tpf_4d_residual_bin_radius_max", d(config.tpf_4d_residual_bin_radius_max));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));
