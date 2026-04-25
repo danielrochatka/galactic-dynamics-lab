@@ -247,6 +247,22 @@ TEST_CASE("source-field benchmark near-source exclusion radius flags cells for b
   CHECK(csv.find(",0,1\n") != std::string::npos);
 }
 
+TEST_CASE("source-field benchmark unknown shape preserves legacy no-output behavior") {
+  char dir_template[] = "/tmp/tpf_source_field_benchmark_unknown_shape_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "unknown_shape";
+  c.tpf_source_probe_grid_half_extent = 10.0;
+  c.tpf_source_probe_grid_n = 9;
+  c.softening = 0.1;
+
+  galaxy::TPFCorePackage pkg;
+  CHECK_NOTHROW(pkg.run_source_field_benchmark(c, out_dir));
+  CHECK_FALSE(file_exists(std::string(out_dir) + "/tpf_source_field_probe_grid.csv"));
+}
+
 TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
   char dir_template[] = "/tmp/tpf_4d_static_residual_artifacts_XXXXXX";
   char* out_dir = mkdtemp(dir_template);

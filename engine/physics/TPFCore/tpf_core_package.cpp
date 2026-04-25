@@ -158,6 +158,17 @@ std::vector<BenchmarkSourceSpec3D> build_tpf_benchmark_sources_3d(const Config& 
   throw std::runtime_error("unknown tpf_source_benchmark_shape for benchmark source setup: " + shape);
 }
 
+bool try_build_tpf_benchmark_sources_3d(const Config& config,
+                                        std::vector<BenchmarkSourceSpec3D>* sources_out,
+                                        std::string* shape_id_out) {
+  const std::string shape = config.tpf_source_benchmark_shape;
+  if (shape != "monopole" && shape != "bonded_pair") {
+    return false;
+  }
+  *sources_out = build_tpf_benchmark_sources_3d(config, shape_id_out);
+  return true;
+}
+
 struct XiConstraintExteriorStats {
   size_t n_masked = 0;
   size_t n_pinned = 0;
@@ -1094,7 +1105,10 @@ void TPFCorePackage::run_source_field_benchmark(const Config& config, const std:
   if (n < 2 || half_extent <= 0.0) return;
 
   std::string source_config_id;
-  const std::vector<BenchmarkSourceSpec3D> sources3d = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  std::vector<BenchmarkSourceSpec3D> sources3d;
+  if (!try_build_tpf_benchmark_sources_3d(config, &sources3d, &source_config_id)) {
+    return;
+  }
   std::vector<BenchmarkSourceSpec2D> sources;
   sources.reserve(sources3d.size());
   for (std::size_t i = 0; i < sources3d.size(); ++i) {
