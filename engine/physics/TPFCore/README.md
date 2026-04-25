@@ -4,6 +4,8 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
+Current spike branch status: runtime dynamics still use the existing legacy projected-vector / spatial-tensor runtime path; isolated 4D field math objects exist for staged migration and are not yet connected to dynamics.
+
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
 ---
@@ -22,7 +24,7 @@ It is **not** the old removed “weak-field Newtonian-like TPF” package. For *
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → Theta3D → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional additive VDSG extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
+| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional additive VDSG extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
 | **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). **VDSG** contributes an additive SI excess on top of that baseline, not a replacement readout. |
 
 ---
