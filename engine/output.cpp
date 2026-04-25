@@ -119,6 +119,11 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_4d_static_residual_benchmark_artifacts\ttpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv\n";
     f << "tpf_4d_static_residual_benchmark_slice_csv_note\tview-plane slice for inspection/display only; not the physics domain\n";
     f << "tpf_4d_static_residual_benchmark_scope_note\tdoes_not_validate_dynamics_moving_sources_time_evolution_source_worldlines_orbital_behavior_or_DeltaC_closure\n";
+    if (!package_defaults_path.empty() && package_defaults_path.find("TPFCore") == std::string::npos) {
+      f << "tpf_4d_static_residual_benchmark_package_defaults_note\tresidual_evaluator_path_is_tpfcore_static_4d_"
+           "evaluate_static_configuration_residual_4d; layered_package_defaults_provenance_line_is_inherited_loader_"
+           "selection_and_not_the_active_residual_evaluator_path\n";
+    }
     f << "=== End TPF 4D static residual benchmark note ===\n\n";
   }
   if (config.physics_package == "TPFCore") {

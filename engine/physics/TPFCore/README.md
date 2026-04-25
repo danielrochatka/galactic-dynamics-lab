@@ -4,7 +4,7 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
-Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. This benchmark exits before integrator dynamics and writes a view-plane CSV slice for inspection only.
+Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. This benchmark is diagnostic-only, does not call `compute_accelerations(...)`, exits before particle integration, and writes a view-plane CSV slice for inspection/display only.
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
@@ -14,10 +14,10 @@ Current spike branch status: runtime dynamics still use the existing projected-v
 
 - **Ξ** — displacement field from the potential ansatz (see `source_ansatz.*`).
 - **Runtime dynamics path (current)**: uses existing projected-vector / spatial-tensor structures and route-specific acceleration closures.
-- **Static 4D benchmark path (Stage 1–4, spike branch)**: evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic.
+- **Static 4D benchmark path (Stage 1–4, spike branch)**: diagnostic-only path that evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic (x/y/z stencil), with no particle integration and no acceleration path.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
 - **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt` and `tpf_4d_static_residual_slice.csv`; the CSV is a view-plane display/inspection slice, not the full physics domain artifact.
-- **Not migrated yet**: dynamics, moving-source/time-evolution/source-worldline handling, runtime routing migration, and DeltaC closure.
+- **Not validated by this benchmark**: dynamics, moving sources, source velocities, time evolution, source worldlines, orbital behavior, and DeltaC closure.
 
 ---
 
