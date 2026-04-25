@@ -27,6 +27,7 @@
 #include <string>
 #include <cstdint>
 #include <cstdio>
+#include <vector>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -54,6 +55,50 @@ std::string run_id_from_time() {
 
 bool ensure_dir(const std::string& path) {
   return MKDIR(path.c_str(), 0755) == 0 || errno == EEXIST;
+}
+
+std::string shell_single_quote(const std::string& raw) {
+  std::string out = "'";
+  for (std::size_t i = 0; i < raw.size(); ++i) {
+    if (raw[i] == '\'') {
+      out += "'\"'\"'";
+    } else {
+      out += raw[i];
+    }
+  }
+  out += "'";
+  return out;
+}
+
+bool file_exists(const std::string& path) {
+  std::ifstream f(path.c_str());
+  return static_cast<bool>(f);
+}
+
+std::vector<std::string> existing_tpf_4d_static_plot_pngs(const std::string& output_dir) {
+  const char* candidates[] = {
+      "tpf_4d_static_residual_xy_normalized_residual.png",
+      "tpf_4d_static_residual_xy_residual_spatial_norm.png",
+      "tpf_4d_static_residual_xy_xi_spatial_norm.png",
+      "tpf_4d_static_residual_xy_invariant_I.png",
+      "tpf_4d_static_residual_xz_normalized_residual.png",
+      "tpf_4d_static_residual_xz_residual_spatial_norm.png",
+      "tpf_4d_static_residual_xz_xi_spatial_norm.png",
+      "tpf_4d_static_residual_xz_invariant_I.png",
+      "tpf_4d_static_residual_yz_normalized_residual.png",
+      "tpf_4d_static_residual_yz_residual_spatial_norm.png",
+      "tpf_4d_static_residual_yz_xi_spatial_norm.png",
+      "tpf_4d_static_residual_yz_invariant_I.png",
+      "tpf_4d_static_residual_xy_xi_quiver.png",
+      "tpf_4d_static_residual_xz_xi_quiver.png",
+      "tpf_4d_static_residual_yz_xi_quiver.png",
+  };
+  std::vector<std::string> found;
+  for (std::size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+    const std::string full = output_dir + "/" + candidates[i];
+    if (file_exists(full)) found.push_back(candidates[i]);
+  }
+  return found;
 }
 
 double L_z_total(const galaxy::State& s) {
@@ -542,13 +587,24 @@ int main(int argc, char** argv) {
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
-      const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + config.output_dir;
+      const std::string script = "../plot_tpf_4d_static_residual.py";
+      const std::string cmd = shell_single_quote(py) + " " + shell_single_quote(script) + " " +
+                              shell_single_quote(config.output_dir);
       const int ret = std::system(cmd.c_str());
       if (ret != 0) {
         std::cerr << "Warning: tpf_4d_static_residual_benchmark plot step failed; CSV/text artifacts remain valid.\n";
       } else {
-        std::cout << "Generated optional PNGs in " << config.output_dir
-                  << " (view-plane inspection artifacts only).\n";
+        const std::vector<std::string> generated = existing_tpf_4d_static_plot_pngs(config.output_dir);
+        if (generated.empty()) {
+          std::cerr << "Warning: plot script completed but no expected PNGs were found/generated; "
+                       "CSV/text artifacts remain valid.\n";
+        } else {
+          std::cout << "Generated optional PNGs in " << config.output_dir
+                    << " (view-plane inspection artifacts only):\n";
+          for (std::size_t i = 0; i < generated.size(); ++i) {
+            std::cout << "  " << generated[i] << "\n";
+          }
+        }
       }
     }
     if (config.save_run_info) {
