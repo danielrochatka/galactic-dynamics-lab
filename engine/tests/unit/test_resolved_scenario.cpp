@@ -233,7 +233,15 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     CHECK(run_info.find("=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===") !=
           std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_artifacts\t"
-                        "tpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv") != std::string::npos);
+                        "tpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv;"
+                        "tpf_4d_static_residual_slice_xy.csv;tpf_4d_static_residual_slice_xz.csv;"
+                        "tpf_4d_static_residual_slice_yz.csv;tpf_4d_static_residual_sources.csv") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_slice_csv_note\t"
+                        "view-plane inspection/display artifacts only; "
+                        "do_not_replace_full_spatial_support_computation") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_plot_scope_note\t"
+                        "plot_artifacts_do_not_add_physics_validation_or_dynamics_validation") != std::string::npos);
+    CHECK(run_info.find("Eq. 10") == std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_static_residual_diagnostic_only") != std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") == std::string::npos);
     CHECK(run_info.find("configured_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);

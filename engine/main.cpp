@@ -532,7 +532,25 @@ int main(int argc, char** argv) {
     std::cout << "Benchmark mode: tpf_4d_static_residual_benchmark\n";
     tpfcore->run_4d_static_residual_benchmark(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir
-              << "/tpf_4d_static_residual_summary.txt, tpf_4d_static_residual_slice.csv\n";
+              << "/tpf_4d_static_residual_summary.txt, tpf_4d_static_residual_slice.csv, "
+                 "tpf_4d_static_residual_slice_xy.csv, tpf_4d_static_residual_slice_xz.csv, "
+                 "tpf_4d_static_residual_slice_yz.csv, tpf_4d_static_residual_sources.csv\n";
+    if (auto_plot) {
+      std::cout.flush();
+      std::cerr.flush();
+      std::cout << "Generating optional view-plane inspection PNGs (plot_tpf_4d_static_residual.py)...\n";
+      const std::string dev_py = "../dev/bin/python3";
+      const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+      const std::string py = dev_py_exists ? dev_py : "python3";
+      const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + config.output_dir;
+      const int ret = std::system(cmd.c_str());
+      if (ret != 0) {
+        std::cerr << "Warning: tpf_4d_static_residual_benchmark plot step failed; CSV/text artifacts remain valid.\n";
+      } else {
+        std::cout << "Generated optional PNGs in " << config.output_dir
+                  << " (view-plane inspection artifacts only).\n";
+      }
+    }
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";

@@ -4,7 +4,7 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
-Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. This benchmark is diagnostic-only, does not call `compute_accelerations(...)`, exits before particle integration, and writes a view-plane CSV slice for inspection/display only.
+Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. Stage 5 adds view-plane export/plot artifacts only. This benchmark is diagnostic-only, does not call `compute_accelerations(...)`, exits before particle integration, and writes view-plane inspection/display artifacts only.
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
@@ -16,7 +16,8 @@ Current spike branch status: runtime dynamics still use the existing projected-v
 - **Runtime dynamics path (current)**: uses existing projected-vector / spatial-tensor structures and route-specific acceleration closures.
 - **Static 4D benchmark path (Stage 1–4, spike branch)**: diagnostic-only path that evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic (x/y/z stencil), with no particle integration and no acceleration path.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
-- **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt` and `tpf_4d_static_residual_slice.csv`; the CSV is a view-plane display/inspection slice, not the full physics domain artifact.
+- **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt`, `tpf_4d_static_residual_slice.csv` (legacy alias for central xy view-plane), `tpf_4d_static_residual_slice_xy.csv`, `tpf_4d_static_residual_slice_xz.csv`, `tpf_4d_static_residual_slice_yz.csv`, and `tpf_4d_static_residual_sources.csv`; these are view-plane display/inspection artifacts, not full spatial-support physics-domain replacements.
+- **Optional plot outputs**: when `--plot` is supplied and plotting dependencies are available, `plot_tpf_4d_static_residual.py` emits PNG view-plane inspection artifacts; this does not add physics validation or dynamics validation.
 - **Not validated by this benchmark**: dynamics, moving sources, source velocities, time evolution, source worldlines, orbital behavior, and DeltaC closure.
 
 ---
@@ -83,7 +84,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_readout_debug.csv`** — Dynamical runs when **`tpfcore_dump_readout_debug`**: mode-dependent columns for diagnosing radial vs tangential acceleration components.
 
-**`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; the CSV is a central **view-plane slice** for display/inspection only.
+**`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`**, **`tpf_4d_static_residual_slice_xy.csv`**, **`tpf_4d_static_residual_slice_xz.csv`**, **`tpf_4d_static_residual_slice_yz.csv`**, **`tpf_4d_static_residual_sources.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; these CSVs are **view-plane inspection artifacts** only.
 
 ---
 
