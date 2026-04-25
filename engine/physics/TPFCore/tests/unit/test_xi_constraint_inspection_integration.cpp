@@ -379,4 +379,38 @@ TEST_CASE("4d static residual benchmark rejects invalid config values loudly") {
   c.tpf_4d_residual_source_exclusion_radius = 0.0;
   c.tpf_source_benchmark_shape = "unknown_shape";
   CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_4d_residual_field_softening = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_field_softening = 0.1;
+  c.tpf_4d_residual_grid_half_extent = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_grid_half_extent = 1.0;
+  c.tpf_4d_residual_source_exclusion_radius = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_4d_residual_source_exclusion_radius = 0.0;
+  c.tpf_source_benchmark_total_mass = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_total_mass = 1.0;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_mass1 = std::numeric_limits<double>::quiet_NaN();
+  c.tpf_source_benchmark_mass2 = 1.0;
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_mass1 = 1.0;
+  c.tpf_source_benchmark_mass2 = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_mass2 = 1.0;
+  c.tpf_source_benchmark_separation = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+
+  c.tpf_source_benchmark_separation = 1.0;
+  c.tpf_source_benchmark_orientation_deg = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
 }

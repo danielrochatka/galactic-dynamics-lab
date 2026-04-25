@@ -169,6 +169,35 @@ bool try_build_tpf_benchmark_sources_3d(const Config& config,
   return true;
 }
 
+void validate_stage4_residual_source_inputs(const Config& config) {
+  if (!std::isfinite(config.tpf_source_benchmark_total_mass)) {
+    throw std::runtime_error("tpf_source_benchmark_total_mass must be finite");
+  }
+  if (!std::isfinite(config.tpf_source_benchmark_mass1)) {
+    throw std::runtime_error("tpf_source_benchmark_mass1 must be finite");
+  }
+  if (!std::isfinite(config.tpf_source_benchmark_mass2)) {
+    throw std::runtime_error("tpf_source_benchmark_mass2 must be finite");
+  }
+  if (!std::isfinite(config.tpf_source_benchmark_separation)) {
+    throw std::runtime_error("tpf_source_benchmark_separation must be finite");
+  }
+  if (!std::isfinite(config.tpf_source_benchmark_orientation_deg)) {
+    throw std::runtime_error("tpf_source_benchmark_orientation_deg must be finite");
+  }
+}
+
+void validate_stage4_residual_source_specs(const std::vector<BenchmarkSourceSpec3D>& source_specs) {
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    if (!std::isfinite(source_specs[i].x) ||
+        !std::isfinite(source_specs[i].y) ||
+        !std::isfinite(source_specs[i].z) ||
+        !std::isfinite(source_specs[i].m)) {
+      throw std::runtime_error("resolved Stage 4 source positions and masses must be finite");
+    }
+  }
+}
+
 struct XiConstraintExteriorStats {
   size_t n_masked = 0;
   size_t n_pinned = 0;
@@ -1304,23 +1333,25 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
   if (grid_n < 3) {
     throw std::runtime_error("tpf_4d_residual_grid_n must be >= 3");
   }
-  if (!(half_extent > 0.0)) {
-    throw std::runtime_error("tpf_4d_residual_grid_half_extent must be > 0");
+  if (!std::isfinite(half_extent) || !(half_extent > 0.0)) {
+    throw std::runtime_error("tpf_4d_residual_grid_half_extent must be finite and > 0");
   }
-  if (source_exclusion_radius < 0.0) {
-    throw std::runtime_error("tpf_4d_residual_source_exclusion_radius must be >= 0");
+  if (!std::isfinite(source_exclusion_radius) || source_exclusion_radius < 0.0) {
+    throw std::runtime_error("tpf_4d_residual_source_exclusion_radius must be finite and >= 0");
   }
-  if (field_softening < 0.0) {
-    throw std::runtime_error("tpf_4d_residual_field_softening must be >= 0");
+  if (!std::isfinite(field_softening) || field_softening < 0.0) {
+    throw std::runtime_error("tpf_4d_residual_field_softening must be finite and >= 0");
   }
 
   const double spacing = (2.0 * half_extent) / static_cast<double>(grid_n - 1);
-  if (!(spacing > 0.0)) {
-    throw std::runtime_error("tpf_4d_residual spacing must be > 0");
+  if (!std::isfinite(spacing) || !(spacing > 0.0)) {
+    throw std::runtime_error("tpf_4d_residual spacing must be finite and > 0");
   }
 
+  validate_stage4_residual_source_inputs(config);
   std::string source_config_id;
   const std::vector<BenchmarkSourceSpec3D> source_specs = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  validate_stage4_residual_source_specs(source_specs);
   std::vector<StaticSourcePoint4D> sources;
   sources.reserve(source_specs.size());
   for (std::size_t i = 0; i < source_specs.size(); ++i) {
