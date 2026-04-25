@@ -17,8 +17,9 @@ struct Xi4 {
 
 struct Theta4 {
   double tt, tx, ty, tz;
-  double xx, xy, xz;
-  double yy, yz;
+  double xt, xx, xy, xz;
+  double yt, yx, yy, yz;
+  double zt, zx, zy;
   double zz;
 
   double& component(std::size_t mu, std::size_t nu);

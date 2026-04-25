@@ -1,6 +1,5 @@
 #include "physics/TPFCore/tpf_4d_field.hpp"
 
-#include <algorithm>
 #include <stdexcept>
 
 namespace galaxy {
@@ -19,34 +18,42 @@ double& xi_component_ref(Xi4& xi, std::size_t mu) {
 }
 
 double theta_component_value(const Theta4& theta, std::size_t mu, std::size_t nu) {
-  const std::size_t a = std::min(mu, nu);
-  const std::size_t b = std::max(mu, nu);
-  if (a == 0 && b == 0) return theta.tt;
-  if (a == 0 && b == 1) return theta.tx;
-  if (a == 0 && b == 2) return theta.ty;
-  if (a == 0 && b == 3) return theta.tz;
-  if (a == 1 && b == 1) return theta.xx;
-  if (a == 1 && b == 2) return theta.xy;
-  if (a == 1 && b == 3) return theta.xz;
-  if (a == 2 && b == 2) return theta.yy;
-  if (a == 2 && b == 3) return theta.yz;
-  if (a == 3 && b == 3) return theta.zz;
+  if (mu == 0 && nu == 0) return theta.tt;
+  if (mu == 0 && nu == 1) return theta.tx;
+  if (mu == 0 && nu == 2) return theta.ty;
+  if (mu == 0 && nu == 3) return theta.tz;
+  if (mu == 1 && nu == 0) return theta.xt;
+  if (mu == 1 && nu == 1) return theta.xx;
+  if (mu == 1 && nu == 2) return theta.xy;
+  if (mu == 1 && nu == 3) return theta.xz;
+  if (mu == 2 && nu == 0) return theta.yt;
+  if (mu == 2 && nu == 1) return theta.yx;
+  if (mu == 2 && nu == 2) return theta.yy;
+  if (mu == 2 && nu == 3) return theta.yz;
+  if (mu == 3 && nu == 0) return theta.zt;
+  if (mu == 3 && nu == 1) return theta.zx;
+  if (mu == 3 && nu == 2) return theta.zy;
+  if (mu == 3 && nu == 3) return theta.zz;
   throw std::out_of_range("Theta4 index out of range");
 }
 
 double& theta_component_ref(Theta4& theta, std::size_t mu, std::size_t nu) {
-  const std::size_t a = std::min(mu, nu);
-  const std::size_t b = std::max(mu, nu);
-  if (a == 0 && b == 0) return theta.tt;
-  if (a == 0 && b == 1) return theta.tx;
-  if (a == 0 && b == 2) return theta.ty;
-  if (a == 0 && b == 3) return theta.tz;
-  if (a == 1 && b == 1) return theta.xx;
-  if (a == 1 && b == 2) return theta.xy;
-  if (a == 1 && b == 3) return theta.xz;
-  if (a == 2 && b == 2) return theta.yy;
-  if (a == 2 && b == 3) return theta.yz;
-  if (a == 3 && b == 3) return theta.zz;
+  if (mu == 0 && nu == 0) return theta.tt;
+  if (mu == 0 && nu == 1) return theta.tx;
+  if (mu == 0 && nu == 2) return theta.ty;
+  if (mu == 0 && nu == 3) return theta.tz;
+  if (mu == 1 && nu == 0) return theta.xt;
+  if (mu == 1 && nu == 1) return theta.xx;
+  if (mu == 1 && nu == 2) return theta.xy;
+  if (mu == 1 && nu == 3) return theta.xz;
+  if (mu == 2 && nu == 0) return theta.yt;
+  if (mu == 2 && nu == 1) return theta.yx;
+  if (mu == 2 && nu == 2) return theta.yy;
+  if (mu == 2 && nu == 3) return theta.yz;
+  if (mu == 3 && nu == 0) return theta.zt;
+  if (mu == 3 && nu == 1) return theta.zx;
+  if (mu == 3 && nu == 2) return theta.zy;
+  if (mu == 3 && nu == 3) return theta.zz;
   throw std::out_of_range("Theta4 index out of range");
 }
 

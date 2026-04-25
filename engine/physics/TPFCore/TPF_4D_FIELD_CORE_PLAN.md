@@ -13,4 +13,4 @@
 - No source velocity handling changes.
 - No galaxy behavior changes.
 - No full 4D solver.
-- No replacement of existing 2D/3D benchmark paths.
+- No replacement of existing benchmark/runtime paths.

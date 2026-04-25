@@ -21,16 +21,26 @@ TEST_CASE("4D metric signature signs") {
 
 TEST_CASE("4D trace contraction uses explicit signature") {
   const Theta4 theta{2.0, 0.0, 0.0, 0.0,
-                     5.0, 0.0, 0.0,
-                     7.0, 0.0,
+                     0.0, 5.0, 0.0, 0.0,
+                     0.0, 0.0, 7.0, 0.0,
+                     0.0, 0.0, 0.0,
                      11.0};
   CHECK(trace_contraction_4d(theta) == doctest::Approx(-2.0 + 5.0 + 7.0 + 11.0));
 }
 
+TEST_CASE("Theta4 ordered components are not implicitly symmetrized") {
+  Theta4 theta{};
+  theta.component(0, 1) = 3.0;
+  theta.component(1, 0) = -9.0;
+  CHECK(theta.component(0, 1) == doctest::Approx(3.0));
+  CHECK(theta.component(1, 0) == doctest::Approx(-9.0));
+}
+
 TEST_CASE("4D invariant uses lambda_4d") {
   const Theta4 theta{2.0, 3.0, 5.0, 7.0,
-                     11.0, 13.0, 17.0,
-                     19.0, 23.0,
+                     31.0, 11.0, 13.0, 17.0,
+                     37.0, 41.0, 19.0, 23.0,
+                     43.0, 47.0, 53.0,
                      29.0};
   const double trace = -2.0 + 11.0 + 19.0 + 29.0;
   const double signs[4] = {-1.0, 1.0, 1.0, 1.0};
@@ -43,6 +53,31 @@ TEST_CASE("4D invariant uses lambda_4d") {
   }
   CHECK(theta_double_contraction_4d(theta) == doctest::Approx(contraction));
   CHECK(invariant_I_4d(theta) == doctest::Approx(contraction - LAMBDA_4D * trace * trace));
+}
+
+TEST_CASE("4D invariant handles nonsymmetric tensor entries") {
+  Theta4 theta{};
+  theta.tx = 2.0;
+  theta.xt = 5.0;
+  theta.yz = -3.0;
+  theta.zy = 7.0;
+  theta.tt = 1.0;
+  theta.xx = 4.0;
+  theta.yy = 6.0;
+  theta.zz = 8.0;
+
+  const double trace = -1.0 + 4.0 + 6.0 + 8.0;
+  const double expected_contraction =
+      (1.0 * 1.0) +
+      (-1.0 * 1.0 * 2.0 * 2.0) +
+      (1.0 * -1.0 * 5.0 * 5.0) +
+      (4.0 * 4.0) +
+      (6.0 * 6.0) +
+      (8.0 * 8.0) +
+      (1.0 * 1.0 * -3.0 * -3.0) +
+      (1.0 * 1.0 * 7.0 * 7.0);
+  CHECK(theta_double_contraction_4d(theta) == doctest::Approx(expected_contraction));
+  CHECK(invariant_I_4d(theta) == doctest::Approx(expected_contraction - LAMBDA_4D * trace * trace));
 }
 
 TEST_CASE("4D zero/static component sanity") {
@@ -60,8 +95,9 @@ TEST_CASE("4D zero/static component sanity") {
 
 TEST_CASE("4D simple diagonal tensor sanity") {
   const Theta4 theta{1.5, 0.0, 0.0, 0.0,
-                     2.0, 0.0, 0.0,
-                     3.0, 0.0,
+                     0.0, 2.0, 0.0, 0.0,
+                     0.0, 0.0, 3.0, 0.0,
+                     0.0, 0.0, 0.0,
                      4.0};
   const double trace = -1.5 + 2.0 + 3.0 + 4.0;
   const double contraction = 1.5 * 1.5 + 2.0 * 2.0 + 3.0 * 3.0 + 4.0 * 4.0;
