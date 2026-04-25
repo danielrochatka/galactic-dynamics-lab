@@ -4,7 +4,7 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
-Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. Stage 5 adds view-plane export/plot artifacts only. This benchmark is diagnostic-only, does not call `compute_accelerations(...)`, exits before particle integration, and writes view-plane inspection/display artifacts only.
+Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. Stage 5 adds view-plane export/plot outputs rendered from that full spatial-support static 4D residual evaluation. This benchmark is diagnostic-only, does not call `compute_accelerations(...)`, and exits before particle integration.
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
@@ -18,9 +18,9 @@ Current spike branch status: runtime dynamics still use the existing projected-v
 - **Runtime dynamics path (current)**: uses existing projected-vector / spatial-tensor structures and route-specific acceleration closures.
 - **Static 4D benchmark path (Stage 1–4, spike branch)**: diagnostic-only path that evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic (x/y/z stencil), with no particle integration and no acceleration path.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
-- **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt`, `tpf_4d_static_residual_slice.csv` (legacy alias for central xy view-plane), `tpf_4d_static_residual_slice_xy.csv`, `tpf_4d_static_residual_slice_xz.csv`, `tpf_4d_static_residual_slice_yz.csv`, `tpf_4d_static_residual_sources.csv`, `tpf_4d_static_residual_bins_nearest_source.csv`, and `tpf_4d_static_residual_bins_origin.csv`; slice CSVs are view-plane display/inspection artifacts, and binned CSVs are derived diagnostic summaries for inspection/regression only.
-- **Optional plot outputs**: when `--plot` is supplied and plotting dependencies are available, `plot_tpf_4d_static_residual.py` emits PNG view-plane inspection artifacts; this does not add physics validation or dynamics validation.
-- **Not validated by this benchmark**: dynamics, moving sources, source velocities, time evolution, source worldlines, orbital behavior, and DeltaC closure.
+- **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt`, `tpf_4d_static_residual_slice.csv` (legacy alias for central xy view-plane), `tpf_4d_static_residual_slice_xy.csv`, `tpf_4d_static_residual_slice_xz.csv`, `tpf_4d_static_residual_slice_yz.csv`, `tpf_4d_static_residual_sources.csv`, `tpf_4d_static_residual_bins_nearest_source.csv`, and `tpf_4d_static_residual_bins_origin.csv`; slice CSVs are central view-plane diagnostic renderings from full spatial-support static 4D residual evaluation, and binned CSVs provide quantitative static-field residual evidence for cross-run regression comparison.
+- **Optional plot outputs**: when `--plot` is supplied and plotting dependencies are available, `plot_tpf_4d_static_residual.py` emits PNG view-plane diagnostic renderings from full spatial-support static 4D residual evaluation.
+- **Exercised and unexercised scope**: plots visualize the static 4D residual benchmark. Dynamics, moving sources, source velocities, time evolution, source worldlines, physical coupling, orbital behavior, and DeltaC closure are outside this benchmark’s exercised scope.
 
 ---
 
@@ -86,7 +86,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_readout_debug.csv`** — Dynamical runs when **`tpfcore_dump_readout_debug`**: mode-dependent columns for diagnosing radial vs tangential acceleration components.
 
-**`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`**, **`tpf_4d_static_residual_slice_xy.csv`**, **`tpf_4d_static_residual_slice_xz.csv`**, **`tpf_4d_static_residual_slice_yz.csv`**, **`tpf_4d_static_residual_sources.csv`**, **`tpf_4d_static_residual_bins_nearest_source.csv`**, **`tpf_4d_static_residual_bins_origin.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; slice CSVs are **view-plane inspection artifacts**, and bin CSVs are **derived diagnostic summaries** only.
+**`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`**, **`tpf_4d_static_residual_slice_xy.csv`**, **`tpf_4d_static_residual_slice_xz.csv`**, **`tpf_4d_static_residual_slice_yz.csv`**, **`tpf_4d_static_residual_sources.csv`**, **`tpf_4d_static_residual_bins_nearest_source.csv`**, **`tpf_4d_static_residual_bins_origin.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; slice CSVs are central view-plane diagnostic renderings from that full spatial-support evaluation, and bin CSVs are derived quantitative summaries of the static 4D residual benchmark.
 
 ---
 

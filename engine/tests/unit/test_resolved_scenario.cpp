@@ -238,24 +238,42 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
                         "tpf_4d_static_residual_slice_yz.csv;tpf_4d_static_residual_sources.csv;"
                         "tpf_4d_static_residual_bins_nearest_source.csv;tpf_4d_static_residual_bins_origin.csv") !=
           std::string::npos);
-    CHECK(run_info.find("tpf_4d_static_residual_benchmark_slice_csv_note\t"
-                        "view-plane inspection/display artifacts only; "
-                        "do_not_replace_full_spatial_support_computation") != std::string::npos);
-    CHECK(run_info.find("tpf_4d_static_residual_benchmark_plot_scope_note\t"
-                        "plot_artifacts_do_not_add_physics_validation_or_dynamics_validation") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_visualization_note\t"
+                        "view_plane_renderings_derived_from_full_spatial_support_static_4d_residual_evaluation") !=
+          std::string::npos);
     CHECK(run_info.find("tpf_4d_static_residual_benchmark_bins_note\t"
-                        "binned_residual_files_are_derived_diagnostic_summaries_for_inspection_regression_only_and_"
-                        "do_not_add_physics_validation_or_dynamics_validation") != std::string::npos);
+                        "binned_residual_files_provide_quantitative_static_field_evidence_for_the_4d_residual_"
+                        "benchmark_and_support_regression_comparison_across_runs") != std::string::npos);
     CHECK(run_info.find("Eq. 10") == std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_static_residual_diagnostic_only") != std::string::npos);
     CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") == std::string::npos);
     CHECK(run_info.find("configured_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);
     CHECK(run_info.find("tpf_dynamics_mode_effective_for_this_run\tnone_static_residual_diagnostic_only") !=
           std::string::npos);
-    CHECK(run_info.find("tpf_4d_static_residual_benchmark_scope_note\t"
-                        "does_not_validate_dynamics_moving_sources_time_evolution_source_worldlines_orbital_behavior_"
-                        "or_DeltaC_closure") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_scope\t"
+                        "static_residual_benchmark_exercises_static_Xi4_ordered_Theta4_full_spatial_support_x_y_z_"
+                        "stencil") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_unexercised_scope\t"
+                        "dynamics_moving_sources_physical_coupling_orbital_behavior_and_DeltaC_closure_are_not_"
+                        "exercised_by_this_benchmark") != std::string::npos);
+    CHECK(run_info.find("inspection only") == std::string::npos);
+    CHECK(run_info.find("does not add physics validation") == std::string::npos);
     CHECK(run_info.find("tpf_dynamics_mode_effective_for_this_run\tdirect_tpf") == std::string::npos);
+  }
+
+  {
+    const std::string plot_script = slurp("../plot_tpf_4d_static_residual.py");
+    CHECK(plot_script.find("not full spatial-support physics domain") == std::string::npos);
+    CHECK(plot_script.find("rendered from full spatial-support static 4D residual evaluation") != std::string::npos);
+  }
+
+  {
+    const std::string tpfcore_readme = slurp("../engine/physics/TPFCore/README.md");
+    const std::string tpfcore_plan = slurp("../engine/physics/TPFCore/TPF_4D_FIELD_CORE_PLAN.md");
+    CHECK(tpfcore_readme.find("does not add physics validation") == std::string::npos);
+    CHECK(tpfcore_readme.find("outside this benchmark") != std::string::npos);
+    CHECK(tpfcore_plan.find("inspection-only") == std::string::npos);
+    CHECK(tpfcore_plan.find("residual benchmark evidence") != std::string::npos);
   }
 
   {

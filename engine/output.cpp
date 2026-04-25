@@ -121,15 +121,17 @@ void write_run_info(const std::string& output_dir,
          "tpf_4d_static_residual_slice_xz.csv;tpf_4d_static_residual_slice_yz.csv;"
          "tpf_4d_static_residual_sources.csv;tpf_4d_static_residual_bins_nearest_source.csv;"
          "tpf_4d_static_residual_bins_origin.csv\n";
-    f << "tpf_4d_static_residual_benchmark_slice_csv_note\tview-plane inspection/display artifacts only; "
-         "do_not_replace_full_spatial_support_computation\n";
-    f << "tpf_4d_static_residual_benchmark_plot_png_note\toptional_view_plane_inspection_pngs_generated_only_when_"
+    f << "tpf_4d_static_residual_benchmark_visualization_note\t"
+         "view_plane_renderings_derived_from_full_spatial_support_static_4d_residual_evaluation\n";
+    f << "tpf_4d_static_residual_benchmark_plot_png_note\toptional_view_plane_diagnostic_pngs_generated_only_when_"
          "plot_flag_supplied_and_plot_script_succeeds\n";
-    f << "tpf_4d_static_residual_benchmark_plot_scope_note\tplot_artifacts_do_not_add_physics_validation_or_dynamics_"
-         "validation\n";
-    f << "tpf_4d_static_residual_benchmark_bins_note\tbinned_residual_files_are_derived_diagnostic_summaries_for_"
-         "inspection_regression_only_and_do_not_add_physics_validation_or_dynamics_validation\n";
-    f << "tpf_4d_static_residual_benchmark_scope_note\tdoes_not_validate_dynamics_moving_sources_time_evolution_source_worldlines_orbital_behavior_or_DeltaC_closure\n";
+    f << "tpf_4d_static_residual_benchmark_bins_note\tbinned_residual_files_provide_quantitative_static_field_"
+         "evidence_for_the_4d_residual_benchmark_and_support_regression_comparison_across_runs\n";
+    f << "tpf_4d_static_residual_benchmark_scope\t"
+         "static_residual_benchmark_exercises_static_Xi4_ordered_Theta4_full_spatial_support_x_y_z_stencil\n";
+    f << "tpf_4d_static_residual_benchmark_unexercised_scope\t"
+         "dynamics_moving_sources_physical_coupling_orbital_behavior_and_DeltaC_closure_are_not_exercised_by_this_"
+         "benchmark\n";
     if (!package_defaults_path.empty() && package_defaults_path.find("TPFCore") == std::string::npos) {
       f << "tpf_4d_static_residual_benchmark_package_defaults_note\tresidual_evaluator_path_is_tpfcore_static_4d_"
            "evaluate_static_configuration_residual_4d; layered_package_defaults_provenance_line_is_inherited_loader_"
