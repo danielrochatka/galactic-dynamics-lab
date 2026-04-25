@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-process view-plane inspection artifacts for tpf_4d_static_residual_benchmark."""
+"""Post-process view-plane diagnostic renderings for tpf_4d_static_residual_benchmark."""
 
 from __future__ import annotations
 
@@ -63,6 +63,10 @@ def _summary_mask(df, np):
     if "is_near_source" in df.columns:
         mask &= df["is_near_source"] != 1
     return mask
+
+
+def _plane_footer(plane: str) -> str:
+    return f"central {plane} view-plane rendered from full spatial-support static 4D residual evaluation"
 
 
 def _heatmap(
@@ -138,14 +142,14 @@ def _heatmap(
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
         ax.legend(loc="upper right", fontsize=8)
-    fig.text(0.5, 0.02, "view-plane inspection artifact only; not full spatial-support physics domain", ha="center", fontsize=8)
+    fig.text(0.5, 0.02, _plane_footer(f"{x_col}{y_col}"), ha="center", fontsize=8)
     fig.subplots_adjust(bottom=0.12)
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
     return True
 
 
-def _quiver(plt, np, df, x_col, y_col, u_col, v_col, title, out_path):
+def _quiver(plt, np, df, x_col, y_col, u_col, v_col, title, out_path, plane):
     if u_col not in df.columns or v_col not in df.columns:
         return False
     q_df = df
@@ -165,7 +169,7 @@ def _quiver(plt, np, df, x_col, y_col, u_col, v_col, title, out_path):
     fig.text(
         0.5,
         0.02,
-        "Xi projection quiver for view-plane inspection only; not full spatial-support physics domain",
+        f"Xi projection on central {plane} view-plane from full spatial-support static 4D field evaluation",
         ha="center",
         fontsize=8,
     )
@@ -202,10 +206,10 @@ def main() -> int:
         summary_mask = _summary_mask(df, np)
 
         targets = [
-            ("normalized_residual", f"tpf_4d_static_residual_{plane}_normalized_residual.png", "view-plane inspection: normalized residual"),
-            ("residual_spatial_norm", f"tpf_4d_static_residual_{plane}_residual_spatial_norm.png", "view-plane inspection: residual spatial norm"),
-            ("xi_spatial_norm", f"tpf_4d_static_residual_{plane}_xi_spatial_norm.png", "view-plane inspection: Xi spatial norm"),
-            ("invariant_I_4d", f"tpf_4d_static_residual_{plane}_invariant_I.png", "view-plane inspection: invariant I"),
+            ("normalized_residual", f"tpf_4d_static_residual_{plane}_normalized_residual.png", f"central {plane} view-plane: normalized residual"),
+            ("residual_spatial_norm", f"tpf_4d_static_residual_{plane}_residual_spatial_norm.png", f"central {plane} view-plane: residual spatial norm"),
+            ("xi_spatial_norm", f"tpf_4d_static_residual_{plane}_xi_spatial_norm.png", f"central {plane} view-plane: Xi spatial norm"),
+            ("invariant_I_4d", f"tpf_4d_static_residual_{plane}_invariant_I.png", f"central {plane} view-plane: invariant I"),
         ]
         for value_col, png_name, title in targets:
             out_path = out_dir / png_name
@@ -233,7 +237,18 @@ def main() -> int:
         q_map = {"xy": ("xi_x", "xi_y"), "xz": ("xi_x", "xi_z"), "yz": ("xi_y", "xi_z")}
         u_col, v_col = q_map[plane]
         q_out = out_dir / f"tpf_4d_static_residual_{plane}_xi_quiver.png"
-        if _quiver(plt, np, df, x_col, y_col, u_col, v_col, f"view-plane inspection: Xi projected vector ({plane})", q_out):
+        if _quiver(
+            plt,
+            np,
+            df,
+            x_col,
+            y_col,
+            u_col,
+            v_col,
+            f"central {plane} view-plane: Xi projected vector",
+            q_out,
+            plane,
+        ):
             generated.append(q_out.name)
 
     if generated:

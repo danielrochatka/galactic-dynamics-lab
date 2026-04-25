@@ -10,12 +10,12 @@
 -> `TPFCorePackage::run_4d_static_residual_benchmark(...)`
 -> `evaluate_static_configuration_residual_4d(...)`
 -> `evaluate_static_sources_field_4d(...)`
--> CSV/summary/plot artifacts
+-> CSV/summary/view-plane diagnostic rendering artifacts
 -> return before integration
 
 ## Evidence notes
 
-This record reflects code-path inspection and command-driven evidence collection. It does not assert theory validation and does not claim TPF is validated.
+This record reflects code-path inspection and command-driven evidence collection for contamination/sanity checks.
 
 ---
 
@@ -27,7 +27,7 @@ This record reflects code-path inspection and command-driven evidence collection
 4. No kappa/readout scaling is used for particle accelerations in this benchmark path.
 5. No VDSG/shunt/cooling path is used in this benchmark path.
 6. No particle integration loop is entered for this benchmark mode.
-7. Plotting is post-process only (artifact rendering from CSV inputs).
+7. Plotting is post-process view-plane diagnostic rendering from benchmark CSV inputs.
 8. CSV field columns use `evaluate_static_sources_field_4d(...)`, not duplicated source formulas in benchmark CSV writer logic.
 9. Benchmark path returns after static benchmark artifact writes; no particle integration handoff.
 
@@ -55,10 +55,9 @@ This record reflects code-path inspection and command-driven evidence collection
 
 ## Coupling/G status note (scope clarification)
 
-1. `tpf_4d_static_residual_benchmark` does **not** use Newtonian `G` or `TPF_G_SI` in the static residual/tensor diagnostic path.
-2. This benchmark therefore tests uncalibrated geometric/tensor consistency of the source ansatz on the sampled grid.
-3. This must **not** be interpreted as a derivation or prediction of physical gravitational coupling `G`.
-4. Any coupling-derivation claim would require a later units/source-ledger/observable-coupling benchmark path.
+1. `tpf_4d_static_residual_benchmark` does **not** insert Newtonian `G` or `TPF_G_SI` into the static residual/tensor diagnostic path.
+2. This supports an uncalibrated geometric/tensor consistency test of the source ansatz on the sampled grid.
+3. Predicting observed gravitational coupling requires a later units/source-ledger/observable-coupling benchmark path.
 
 ---
 

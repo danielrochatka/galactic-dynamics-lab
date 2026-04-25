@@ -584,7 +584,7 @@ int main(int argc, char** argv) {
     if (auto_plot) {
       std::cout.flush();
       std::cerr.flush();
-      std::cout << "Generating optional view-plane inspection PNGs (plot_tpf_4d_static_residual.py)...\n";
+      std::cout << "Generating optional view-plane diagnostic PNGs (plot_tpf_4d_static_residual.py)...\n";
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
@@ -601,7 +601,7 @@ int main(int argc, char** argv) {
                        "CSV/text artifacts remain valid.\n";
         } else {
           std::cout << "Generated optional PNGs in " << config.output_dir
-                    << " (view-plane inspection artifacts only):\n";
+                    << " (view-plane diagnostic renderings from full spatial-support static 4D residual evaluation):\n";
           for (std::size_t i = 0; i < generated.size(); ++i) {
             std::cout << "  " << generated[i] << "\n";
           }
