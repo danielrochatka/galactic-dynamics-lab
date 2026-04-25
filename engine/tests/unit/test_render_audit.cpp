@@ -92,3 +92,36 @@ TEST_CASE("write_render_manifest TXT tpf_extension_mode semantics align with JSO
   std::remove((out_dir + "/render_manifest.json").c_str());
   rmdir(out_dir.c_str());
 }
+
+TEST_CASE("write_render_manifest: tpf_4d_static_residual_benchmark uses diagnostic-only audit labels") {
+  char dir_template[] = "/tmp/render_audit_static4d_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
+  c.tpf_dynamics_mode = "direct_tpf";
+  galaxy::write_render_manifest(out_dir, c, 0, 0, 0, nullptr);
+
+  const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  const std::string json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(txt.find("active_dynamics_branch\tTPF_4D_static_residual_benchmark (diagnostic-only; no particle integration; "
+                 "no acceleration path)") != std::string::npos);
+  CHECK(txt.find("active_metrics_branch\tstatic_4D_field_residual: Xi4/Theta4 full spatial-support diagnostic") !=
+        std::string::npos);
+  CHECK(txt.find("acceleration_code_path\tnone (tpf_4d_static_residual_benchmark uses "
+                 "evaluate_static_configuration_residual_4d; no compute_accelerations call)") != std::string::npos);
+  CHECK(json.find("\"active_dynamics_branch\": \"TPF_4D_static_residual_benchmark (diagnostic-only; no particle "
+                  "integration; no acceleration path)\"") != std::string::npos);
+  CHECK(json.find("\"active_metrics_branch\": \"static_4D_field_residual: Xi4/Theta4 full spatial-support diagnostic\"") !=
+        std::string::npos);
+  CHECK(json.find("\"acceleration_code_path\": \"none (tpf_4d_static_residual_benchmark uses "
+                  "evaluate_static_configuration_residual_4d; no compute_accelerations call)\"") != std::string::npos);
+  CHECK(json.find("compute_direct_tpf_accelerations") == std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
+}

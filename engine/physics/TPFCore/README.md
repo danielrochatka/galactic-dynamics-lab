@@ -1,21 +1,23 @@
 # TPFCore physics package
 
-**TPFCore** is a **compiled physics package** inside the **Galactic Dynamics Lab** repository (`engine/physics/TPFCore/`). It implements the **primitive TPF field structure** from the manuscript (configuration displacement **Ξ**, gradient tensor **Θ**, scalar invariant **I**) on the simulation plane, plus **labeled experimental layers** for motion and diagnostics.
+**TPFCore** is a **compiled physics package** inside the **Galactic Dynamics Lab** repository (`engine/physics/TPFCore/`). It contains the runtime TPF dynamics routes used by the simulator plus staged field/residual benchmark paths used for isolated static diagnostics.
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
-Current spike branch status: runtime dynamics still use the existing legacy projected-vector / spatial-tensor runtime path; isolated 4D field math objects exist for staged migration and are not yet connected to dynamics.
+Current spike branch status: runtime dynamics still use the existing projected-vector / spatial-tensor runtime path (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. This benchmark exits before integrator dynamics and writes a view-plane CSV slice for inspection only.
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
 ---
 
-## Paper-backed core (honest scope)
+## Runtime dynamics vs static 4D benchmark scope
 
 - **Ξ** — displacement field from the potential ansatz (see `source_ansatz.*`).
-- **Θ_{μν} = ∇_μ Ξ_ν** — symmetric tensor; evaluated as **3D Hessian** of a softened Coulomb **Φ** on **z = 0** (field and sources in the plane; `Theta_xz = Theta_yz = 0` on slice).
+- **Runtime dynamics path (current)**: uses existing projected-vector / spatial-tensor structures and route-specific acceleration closures.
+- **Static 4D benchmark path (Stage 1–4, spike branch)**: evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
-- **Configuration-equation (Xi/Theta) residual** (inspection modes): evaluates `partial_i(Theta_i_nu - lambda delta_i_nu Theta)` in the form used in code; analytic derivatives; **structural sanity check** only, not validation of the full Eq. (10) field relation.
+- **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt` and `tpf_4d_static_residual_slice.csv`; the CSV is a view-plane display/inspection slice, not the full physics domain artifact.
+- **Not migrated yet**: dynamics, moving-source/time-evolution/source-worldline handling, runtime routing migration, and DeltaC closure.
 
 ---
 
