@@ -32,29 +32,92 @@ def _import_plot_stack():
 
 
 def _safe_log10(arr, np):
-    return np.log10(np.clip(np.abs(arr), 1e-300, None))
+    out = np.full_like(arr, np.nan, dtype=float)
+    finite = np.isfinite(arr)
+    positive = np.abs(arr) > 0.0
+    valid = finite & positive
+    out[valid] = np.log10(np.abs(arr[valid]))
+    return out
 
 
-def _heatmap(plt, np, pd, df, x_col, y_col, value_col, title, out_path, sources_df=None, cmap="viridis"):
+def _robust_limits(values, np, lo=2.0, hi=98.0):
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None, None
+    vmin = np.nanpercentile(finite, lo)
+    vmax = np.nanpercentile(finite, hi)
+    if not np.isfinite(vmin) or not np.isfinite(vmax):
+        return float(np.nanmin(finite)), float(np.nanmax(finite))
+    if vmin == vmax:
+        pad = max(abs(vmin) * 0.05, 1e-6)
+        return vmin - pad, vmax + pad
+    return float(vmin), float(vmax)
+
+
+def _summary_mask(df, np):
+    if "used_in_summary" in df.columns:
+        return df["used_in_summary"] == 1
+    mask = np.ones(len(df), dtype=bool)
+    if "is_boundary" in df.columns:
+        mask &= df["is_boundary"] != 1
+    if "is_near_source" in df.columns:
+        mask &= df["is_near_source"] != 1
+    return mask
+
+
+def _heatmap(
+    plt,
+    np,
+    pd,
+    df,
+    x_col,
+    y_col,
+    value_col,
+    title,
+    out_path,
+    sources_df=None,
+    cmap="viridis",
+    log_scale=False,
+    scale_mask=None,
+    display_mask=None,
+):
     if value_col not in df.columns:
         print(f"plot_tpf_4d_static_residual: skipping {out_path.name}; missing column {value_col}")
         return False
 
-    pivot = df.pivot_table(index=y_col, columns=x_col, values=value_col, aggfunc="mean")
+    df_plot = df.copy()
+    if display_mask is not None:
+        df_plot.loc[~display_mask, value_col] = np.nan
+
+    pivot = df_plot.pivot_table(index=y_col, columns=x_col, values=value_col, aggfunc="mean")
     if pivot.empty:
         return False
 
     z = pivot.to_numpy(dtype=float)
-    if "residual" in value_col or "invariant" in value_col:
+    if log_scale:
         z = _safe_log10(z, np)
         colorbar_label = f"log10(|{value_col}|)"
     else:
         colorbar_label = value_col
 
+    if scale_mask is None:
+        scale_df = df_plot
+    else:
+        scale_df = df_plot.loc[scale_mask]
+    scale_pivot = scale_df.pivot_table(index=y_col, columns=x_col, values=value_col, aggfunc="mean")
+    scale_vals = scale_pivot.to_numpy(dtype=float) if not scale_pivot.empty else np.array([], dtype=float)
+    if log_scale:
+        scale_vals = _safe_log10(scale_vals, np)
+    vmin, vmax = _robust_limits(scale_vals, np)
+
     fig, ax = plt.subplots(figsize=(7.5, 6), dpi=150)
     x_min, x_max = float(np.min(pivot.columns)), float(np.max(pivot.columns))
     y_min, y_max = float(np.min(pivot.index)), float(np.max(pivot.index))
-    im = ax.imshow(z, extent=[x_min, x_max, y_min, y_max], origin="lower", aspect="equal", cmap=cmap)
+    im_kwargs = dict(extent=[x_min, x_max, y_min, y_max], origin="lower", aspect="equal", cmap=cmap)
+    if vmin is not None and vmax is not None:
+        im_kwargs["vmin"] = vmin
+        im_kwargs["vmax"] = vmax
+    im = ax.imshow(z, **im_kwargs)
     cb = fig.colorbar(im, ax=ax)
     cb.set_label(colorbar_label)
 
@@ -85,16 +148,27 @@ def _heatmap(plt, np, pd, df, x_col, y_col, value_col, title, out_path, sources_
 def _quiver(plt, np, df, x_col, y_col, u_col, v_col, title, out_path):
     if u_col not in df.columns or v_col not in df.columns:
         return False
+    q_df = df
+    if "is_near_source" in df.columns:
+        q_df = df[df["is_near_source"] != 1]
+    if q_df.empty:
+        return False
     fig, ax = plt.subplots(figsize=(7.5, 6), dpi=150)
-    step = max(1, int(math.sqrt(max(len(df), 1)) // 24))
-    q = df.iloc[::step]
+    step = max(1, int(math.sqrt(max(len(q_df), 1)) // 24))
+    q = q_df.iloc[::step]
     mag = np.sqrt(np.square(q[u_col].to_numpy(dtype=float)) + np.square(q[v_col].to_numpy(dtype=float)))
     ax.quiver(q[x_col], q[y_col], q[u_col], q[v_col], mag, angles="xy", scale_units="xy", scale=None, cmap="plasma")
     ax.set_xlabel(x_col)
     ax.set_ylabel(y_col)
     ax.set_title(title)
     ax.set_aspect("equal", adjustable="box")
-    fig.text(0.5, 0.02, "Xi projection quiver for view-plane inspection only", ha="center", fontsize=8)
+    fig.text(
+        0.5,
+        0.02,
+        "Xi projection quiver for view-plane inspection only; not full spatial-support physics domain",
+        ha="center",
+        fontsize=8,
+    )
     fig.subplots_adjust(bottom=0.12)
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
@@ -125,6 +199,7 @@ def main() -> int:
 
         axis = {"xy": ("x", "y"), "xz": ("x", "z"), "yz": ("y", "z")}[plane]
         x_col, y_col = axis
+        summary_mask = _summary_mask(df, np)
 
         targets = [
             ("normalized_residual", f"tpf_4d_static_residual_{plane}_normalized_residual.png", "view-plane inspection: normalized residual"),
@@ -134,7 +209,25 @@ def main() -> int:
         ]
         for value_col, png_name, title in targets:
             out_path = out_dir / png_name
-            if _heatmap(plt, np, pd, df, x_col, y_col, value_col, title, out_path, sources_df=sources_df):
+            residual_related = value_col in {"normalized_residual", "residual_spatial_norm"}
+            log_scale = residual_related or value_col in {"xi_spatial_norm", "invariant_I_4d"}
+            scale_mask = summary_mask if (residual_related or value_col == "xi_spatial_norm") else None
+            display_mask = summary_mask if residual_related else None
+            if _heatmap(
+                plt,
+                np,
+                pd,
+                df,
+                x_col,
+                y_col,
+                value_col,
+                title,
+                out_path,
+                sources_df=sources_df,
+                log_scale=log_scale,
+                scale_mask=scale_mask,
+                display_mask=display_mask,
+            ):
                 generated.append(out_path.name)
 
         q_map = {"xy": ("xi_x", "xi_y"), "xz": ("xi_x", "xi_z"), "yz": ("xi_y", "xi_z")}
