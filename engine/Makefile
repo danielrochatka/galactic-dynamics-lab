@@ -16,6 +16,7 @@ CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor -MMD -MP
 LIB_SRCS = config.cpp compare_orchestration.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
 	physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp \
 	physics/TPFCore/tpf_4d_field.cpp physics/TPFCore/tpf_4d_static_field.cpp \
+	physics/TPFCore/tpf_4d_static_residual.cpp \
 	physics/TPFCore/direct_tpf_baseline.cpp physics/TPFCore/derived_tpf_radial.cpp physics/TPFCore/extensions_vdsg.cpp \
 	physics/TPFCore/runtime_package_helpers.cpp physics/TPFCore/provisional_readout.cpp \
 	physics/TPFCore/readout_tensor_radial.cpp physics/TPFCore/readout_derived_radial.cpp \
