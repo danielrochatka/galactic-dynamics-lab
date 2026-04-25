@@ -34,6 +34,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 namespace galaxy {
 
@@ -1406,24 +1407,60 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
     summary << "mean normalized residual: " << result.summary.mean_normalized_residual << "\n";
   }
 
-  std::ofstream csv(output_dir + "/tpf_4d_static_residual_slice.csv");
-  if (!csv) return;
-
-  const std::size_t slice_k =
-      static_cast<std::size_t>(std::round((0.0 - result.config.origin_z) / result.config.spacing));
+  const std::size_t slice_i = static_cast<std::size_t>(
+      std::round((0.0 - result.config.origin_x) / result.config.spacing));
+  const std::size_t slice_j = static_cast<std::size_t>(
+      std::round((0.0 - result.config.origin_y) / result.config.spacing));
+  const std::size_t slice_k = static_cast<std::size_t>(
+      std::round((0.0 - result.config.origin_z) / result.config.spacing));
+  const std::size_t clamped_slice_i = std::min(result.config.nx - 1, slice_i);
+  const std::size_t clamped_slice_j = std::min(result.config.ny - 1, slice_j);
   const std::size_t clamped_slice_k = std::min(result.config.nz - 1, slice_k);
-  csv << std::scientific;
-  csv << "source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z,residual_spatial_norm,"
-         "residual_4_norm_like,theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary\n";
-  for (std::size_t idx = 0; idx < result.points.size(); ++idx) {
-    const StaticResidualAtPoint& p = result.points[idx];
-    if (p.k != clamped_slice_k) continue;
-    csv << config.tpf_source_benchmark_shape << ","
-        << p.x << "," << p.y << "," << p.z << ","
-        << p.residual_t << "," << p.residual_x << "," << p.residual_y << "," << p.residual_z << ","
-        << p.residual_spatial_norm << "," << p.residual_4_norm_like << ","
-        << p.theta_spatial_frobenius_norm << "," << p.normalized_residual << ","
-        << (p.is_boundary ? 1 : 0) << "," << (p.is_near_source ? 1 : 0) << "," << (p.used_in_summary ? 1 : 0) << "\n";
+
+  const char* header =
+      "source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z,residual_spatial_norm,"
+      "residual_4_norm_like,theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary,"
+      "xi_t,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d\n";
+
+  auto write_view_plane_csv =
+      [&](const std::string& csv_path, const std::size_t fixed_axis_idx, const char fixed_axis) {
+        std::ofstream csv(csv_path);
+        if (!csv) return;
+        csv << std::scientific;
+        csv << header;
+        for (std::size_t idx = 0; idx < result.points.size(); ++idx) {
+          const StaticResidualAtPoint& p = result.points[idx];
+          bool in_plane = false;
+          if (fixed_axis == 'x') in_plane = (p.i == fixed_axis_idx);
+          if (fixed_axis == 'y') in_plane = (p.j == fixed_axis_idx);
+          if (fixed_axis == 'z') in_plane = (p.k == fixed_axis_idx);
+          if (!in_plane) continue;
+          const StaticProbePoint4D probe{p.x, p.y, p.z};
+          const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, result.config.field_softening_eps);
+          const double xi_spatial_norm = std::sqrt(field.xi.x * field.xi.x + field.xi.y * field.xi.y + field.xi.z * field.xi.z);
+          csv << config.tpf_source_benchmark_shape << ","
+              << p.x << "," << p.y << "," << p.z << ","
+              << p.residual_t << "," << p.residual_x << "," << p.residual_y << "," << p.residual_z << ","
+              << p.residual_spatial_norm << "," << p.residual_4_norm_like << ","
+              << p.theta_spatial_frobenius_norm << "," << p.normalized_residual << ","
+              << (p.is_boundary ? 1 : 0) << "," << (p.is_near_source ? 1 : 0) << "," << (p.used_in_summary ? 1 : 0) << ","
+              << field.xi.t << "," << field.xi.x << "," << field.xi.y << "," << field.xi.z << ","
+              << xi_spatial_norm << "," << field.theta_trace_4d << "," << field.invariant_I_4d << "\n";
+        }
+      };
+
+  write_view_plane_csv(output_dir + "/tpf_4d_static_residual_slice_xy.csv", clamped_slice_k, 'z');
+  write_view_plane_csv(output_dir + "/tpf_4d_static_residual_slice_xz.csv", clamped_slice_j, 'y');
+  write_view_plane_csv(output_dir + "/tpf_4d_static_residual_slice_yz.csv", clamped_slice_i, 'x');
+  write_view_plane_csv(output_dir + "/tpf_4d_static_residual_slice.csv", clamped_slice_k, 'z');
+
+  std::ofstream sources_csv(output_dir + "/tpf_4d_static_residual_sources.csv");
+  if (!sources_csv) return;
+  sources_csv << std::scientific;
+  sources_csv << "source_index,mass,x,y,z,source_config_id,source_shape\n";
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    sources_csv << i << "," << source_specs[i].m << "," << source_specs[i].x << "," << source_specs[i].y << ","
+                << source_specs[i].z << "," << source_config_id << "," << config.tpf_source_benchmark_shape << "\n";
   }
 }
 

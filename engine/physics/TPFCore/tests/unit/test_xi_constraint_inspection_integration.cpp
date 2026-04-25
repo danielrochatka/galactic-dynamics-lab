@@ -281,17 +281,42 @@ TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
 
   const std::string summary_path = std::string(out_dir) + "/tpf_4d_static_residual_summary.txt";
   const std::string csv_path = std::string(out_dir) + "/tpf_4d_static_residual_slice.csv";
+  const std::string csv_xy_path = std::string(out_dir) + "/tpf_4d_static_residual_slice_xy.csv";
+  const std::string csv_xz_path = std::string(out_dir) + "/tpf_4d_static_residual_slice_xz.csv";
+  const std::string csv_yz_path = std::string(out_dir) + "/tpf_4d_static_residual_slice_yz.csv";
+  const std::string sources_csv_path = std::string(out_dir) + "/tpf_4d_static_residual_sources.csv";
   CHECK(file_exists(summary_path));
   CHECK(file_exists(csv_path));
+  CHECK(file_exists(csv_xy_path));
+  CHECK(file_exists(csv_xz_path));
+  CHECK(file_exists(csv_yz_path));
+  CHECK(file_exists(sources_csv_path));
 
   const std::string summary = slurp(summary_path);
   CHECK(summary.find("grid_n:") != std::string::npos);
   CHECK(summary.find("free cells used:") != std::string::npos);
   CHECK(summary.find("mean normalized residual:") != std::string::npos);
 
+  const std::string expected_header =
+      "source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z,residual_spatial_norm,"
+      "residual_4_norm_like,theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary,"
+      "xi_t,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d";
   const std::string csv = slurp(csv_path);
-  CHECK(csv.find("source_shape,x,y,z,residual_t,residual_x,residual_y,residual_z") != std::string::npos);
-  CHECK(csv.find("theta_spatial_frobenius_norm,normalized_residual,is_boundary,is_near_source,used_in_summary") != std::string::npos);
+  const std::string csv_xy = slurp(csv_xy_path);
+  const std::string csv_xz = slurp(csv_xz_path);
+  const std::string csv_yz = slurp(csv_yz_path);
+  CHECK(csv.find(expected_header) != std::string::npos);
+  CHECK(csv_xy.find(expected_header) != std::string::npos);
+  CHECK(csv_xz.find(expected_header) != std::string::npos);
+  CHECK(csv_yz.find(expected_header) != std::string::npos);
+
+  const std::string sources_csv = slurp(sources_csv_path);
+  CHECK(sources_csv.find("source_index,mass,x,y,z,source_config_id,source_shape") != std::string::npos);
+}
+
+TEST_CASE("4d static residual benchmark plot script parses under py_compile") {
+  const int ret = std::system("python3 -m py_compile ../plot_tpf_4d_static_residual.py");
+  CHECK(ret == 0);
 }
 
 TEST_CASE("4d static residual benchmark monopole smoke has finite summary and free cells") {

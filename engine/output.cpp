@@ -116,8 +116,16 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_4d_static_residual_benchmark_field_objects\tstatic_Xi4_ordered_Theta4\n";
     f << "tpf_4d_static_residual_benchmark_residual_support\tfull_spatial_support_x_y_z_stencil\n";
     f << "tpf_4d_static_residual_benchmark_time_terms\tintentionally_zero_by_static_assumption\n";
-    f << "tpf_4d_static_residual_benchmark_artifacts\ttpf_4d_static_residual_summary.txt;tpf_4d_static_residual_slice.csv\n";
-    f << "tpf_4d_static_residual_benchmark_slice_csv_note\tview-plane slice for inspection/display only; not the physics domain\n";
+    f << "tpf_4d_static_residual_benchmark_artifacts\ttpf_4d_static_residual_summary.txt;"
+         "tpf_4d_static_residual_slice.csv;tpf_4d_static_residual_slice_xy.csv;"
+         "tpf_4d_static_residual_slice_xz.csv;tpf_4d_static_residual_slice_yz.csv;"
+         "tpf_4d_static_residual_sources.csv\n";
+    f << "tpf_4d_static_residual_benchmark_slice_csv_note\tview-plane inspection/display artifacts only; "
+         "do_not_replace_full_spatial_support_computation\n";
+    f << "tpf_4d_static_residual_benchmark_plot_png_note\toptional_view_plane_inspection_pngs_generated_only_when_"
+         "plot_flag_supplied_and_plot_script_succeeds\n";
+    f << "tpf_4d_static_residual_benchmark_plot_scope_note\tplot_artifacts_do_not_add_physics_validation_or_dynamics_"
+         "validation\n";
     f << "tpf_4d_static_residual_benchmark_scope_note\tdoes_not_validate_dynamics_moving_sources_time_evolution_source_worldlines_orbital_behavior_or_DeltaC_closure\n";
     if (!package_defaults_path.empty() && package_defaults_path.find("TPFCore") == std::string::npos) {
       f << "tpf_4d_static_residual_benchmark_package_defaults_note\tresidual_evaluator_path_is_tpfcore_static_4d_"
