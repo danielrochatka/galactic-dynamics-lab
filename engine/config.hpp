@@ -278,6 +278,10 @@ struct Config {
   double tpf_4d_residual_source_exclusion_radius = 2.0;
   /** TPF 4D static residual benchmark field softening epsilon [m] used by static 4D evaluator. */
   double tpf_4d_residual_field_softening = 0.1;
+  /** TPF 4D static residual benchmark radial-bin count for diagnostic summary exports. */
+  int tpf_4d_residual_bin_count = 32;
+  /** TPF 4D static residual benchmark radial-bin max radius [m]; <=0 selects auto max by binning mode. */
+  double tpf_4d_residual_bin_radius_max = 0.0;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

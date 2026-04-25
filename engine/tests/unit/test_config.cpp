@@ -27,6 +27,8 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_4d_residual_grid_half_extent == doctest::Approx(20.0));
   CHECK(c.tpf_4d_residual_source_exclusion_radius == doctest::Approx(2.0));
   CHECK(c.tpf_4d_residual_field_softening == doctest::Approx(0.1));
+  CHECK(c.tpf_4d_residual_bin_count == 32);
+  CHECK(c.tpf_4d_residual_bin_radius_max == doctest::Approx(0.0));
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -218,6 +220,10 @@ TEST_CASE("tpf_4d_static_residual_benchmark config keys parse and serialize") {
   CHECK(c.tpf_4d_residual_source_exclusion_radius == doctest::Approx(1.25));
   CHECK(apply_config_kv("tpf_4d_residual_field_softening", "0.05", c));
   CHECK(c.tpf_4d_residual_field_softening == doctest::Approx(0.05));
+  CHECK(apply_config_kv("tpf_4d_residual_bin_count", "48", c));
+  CHECK(c.tpf_4d_residual_bin_count == 48);
+  CHECK(apply_config_kv("tpf_4d_residual_bin_radius_max", "9.5", c));
+  CHECK(c.tpf_4d_residual_bin_radius_max == doctest::Approx(9.5));
 
   const auto kv = galaxy::serialize_config_kv(c);
   const auto has_key = [&kv](const char* key) {
@@ -229,4 +235,6 @@ TEST_CASE("tpf_4d_static_residual_benchmark config keys parse and serialize") {
   CHECK(has_key("tpf_4d_residual_grid_half_extent"));
   CHECK(has_key("tpf_4d_residual_source_exclusion_radius"));
   CHECK(has_key("tpf_4d_residual_field_softening"));
+  CHECK(has_key("tpf_4d_residual_bin_count"));
+  CHECK(has_key("tpf_4d_residual_bin_radius_max"));
 }

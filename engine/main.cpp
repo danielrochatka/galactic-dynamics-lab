@@ -579,7 +579,8 @@ int main(int argc, char** argv) {
     std::cout << "Wrote " << config.output_dir
               << "/tpf_4d_static_residual_summary.txt, tpf_4d_static_residual_slice.csv, "
                  "tpf_4d_static_residual_slice_xy.csv, tpf_4d_static_residual_slice_xz.csv, "
-                 "tpf_4d_static_residual_slice_yz.csv, tpf_4d_static_residual_sources.csv\n";
+                 "tpf_4d_static_residual_slice_yz.csv, tpf_4d_static_residual_sources.csv, "
+                 "tpf_4d_static_residual_bins_nearest_source.csv, tpf_4d_static_residual_bins_origin.csv\n";
     if (auto_plot) {
       std::cout.flush();
       std::cerr.flush();

@@ -128,6 +128,145 @@ struct BenchmarkSourceSpec3D {
   double m;
 };
 
+struct ResidualBinAccumulator {
+  std::size_t cell_count_total = 0;
+  std::size_t cell_count_used = 0;
+  std::size_t cell_count_boundary = 0;
+  std::size_t cell_count_near_source = 0;
+  std::vector<double> normalized_residual;
+  std::vector<double> residual_spatial_norm;
+  std::vector<double> theta_spatial_frobenius_norm;
+};
+
+double nearest_source_distance(const std::vector<BenchmarkSourceSpec3D>& source_specs, double x, double y, double z) {
+  if (source_specs.empty()) {
+    return 0.0;
+  }
+  double best = std::numeric_limits<double>::infinity();
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    const double dx = x - source_specs[i].x;
+    const double dy = y - source_specs[i].y;
+    const double dz = z - source_specs[i].z;
+    const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (r < best) best = r;
+  }
+  return best;
+}
+
+double percentile_sorted_linear(const std::vector<double>& sorted_values, double p) {
+  if (sorted_values.empty()) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (p <= 0.0) return sorted_values.front();
+  if (p >= 1.0) return sorted_values.back();
+  const double rank = p * static_cast<double>(sorted_values.size() - 1);
+  const std::size_t lo = static_cast<std::size_t>(std::floor(rank));
+  const std::size_t hi = static_cast<std::size_t>(std::ceil(rank));
+  if (lo == hi) return sorted_values[lo];
+  const double w = rank - static_cast<double>(lo);
+  return (1.0 - w) * sorted_values[lo] + w * sorted_values[hi];
+}
+
+double mean_or_nan(const std::vector<double>& values) {
+  if (values.empty()) return std::numeric_limits<double>::quiet_NaN();
+  double sum = 0.0;
+  for (std::size_t i = 0; i < values.size(); ++i) sum += values[i];
+  return sum / static_cast<double>(values.size());
+}
+
+double max_or_nan(const std::vector<double>& values) {
+  if (values.empty()) return std::numeric_limits<double>::quiet_NaN();
+  double out = values[0];
+  for (std::size_t i = 1; i < values.size(); ++i) out = std::max(out, values[i]);
+  return out;
+}
+
+std::size_t compute_bin_index(double r, double radius_max, int bin_count) {
+  if (bin_count <= 1 || !(radius_max > 0.0) || !std::isfinite(radius_max)) {
+    return 0;
+  }
+  if (r <= 0.0) return 0;
+  if (r >= radius_max) return static_cast<std::size_t>(bin_count - 1);
+  const double unit = r / radius_max;
+  const std::size_t idx = static_cast<std::size_t>(std::floor(unit * static_cast<double>(bin_count)));
+  const std::size_t max_idx = static_cast<std::size_t>(bin_count - 1);
+  return std::min(idx, max_idx);
+}
+
+double write_residual_bins_csv(const std::string& csv_path,
+                               const tpfcore::StaticResidualGridResult& result,
+                               const std::vector<BenchmarkSourceSpec3D>& source_specs,
+                               int bin_count,
+                               double configured_radius_max,
+                               bool bin_by_nearest_source) {
+  std::vector<double> radius_per_point(result.points.size(), 0.0);
+  double observed_radius_max = 0.0;
+  for (std::size_t i = 0; i < result.points.size(); ++i) {
+    const tpfcore::StaticResidualAtPoint& p = result.points[i];
+    const double r = bin_by_nearest_source
+                         ? nearest_source_distance(source_specs, p.x, p.y, p.z)
+                         : std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    radius_per_point[i] = r;
+    observed_radius_max = std::max(observed_radius_max, r);
+  }
+
+  double radius_max_used = configured_radius_max;
+  if (!(radius_max_used > 0.0)) {
+    radius_max_used = observed_radius_max;
+  }
+  if (!(radius_max_used > 0.0) || !std::isfinite(radius_max_used)) {
+    radius_max_used = 1.0;
+  }
+
+  std::vector<ResidualBinAccumulator> bins(static_cast<std::size_t>(bin_count));
+  for (std::size_t i = 0; i < result.points.size(); ++i) {
+    const tpfcore::StaticResidualAtPoint& p = result.points[i];
+    const std::size_t bi = compute_bin_index(radius_per_point[i], radius_max_used, bin_count);
+    ResidualBinAccumulator& b = bins[bi];
+    ++b.cell_count_total;
+    if (p.is_boundary) ++b.cell_count_boundary;
+    if (p.is_near_source) ++b.cell_count_near_source;
+    if (p.used_in_summary) {
+      ++b.cell_count_used;
+      b.normalized_residual.push_back(p.normalized_residual);
+      b.residual_spatial_norm.push_back(p.residual_spatial_norm);
+      b.theta_spatial_frobenius_norm.push_back(p.theta_spatial_frobenius_norm);
+    }
+  }
+
+  std::ofstream csv(csv_path);
+  if (!csv) return radius_max_used;
+  csv << std::scientific;
+  csv << "bin_index,r_min,r_max,r_mid,cell_count_total,cell_count_used,cell_count_boundary,cell_count_near_source,"
+         "mean_normalized_residual,median_normalized_residual,p90_normalized_residual,p95_normalized_residual,"
+         "p99_normalized_residual,max_normalized_residual,mean_residual_spatial_norm,median_residual_spatial_norm,"
+         "p95_residual_spatial_norm,max_residual_spatial_norm,mean_theta_spatial_frobenius_norm,"
+         "median_theta_spatial_frobenius_norm\n";
+
+  const double bin_width = radius_max_used / static_cast<double>(bin_count);
+  for (int i = 0; i < bin_count; ++i) {
+    const ResidualBinAccumulator& b = bins[static_cast<std::size_t>(i)];
+    const double r_min = bin_width * static_cast<double>(i);
+    const double r_max = (i + 1 == bin_count) ? radius_max_used : bin_width * static_cast<double>(i + 1);
+    const double r_mid = 0.5 * (r_min + r_max);
+    std::vector<double> n = b.normalized_residual;
+    std::vector<double> s = b.residual_spatial_norm;
+    std::vector<double> t = b.theta_spatial_frobenius_norm;
+    std::sort(n.begin(), n.end());
+    std::sort(s.begin(), s.end());
+    std::sort(t.begin(), t.end());
+    csv << i << "," << r_min << "," << r_max << "," << r_mid << ","
+        << b.cell_count_total << "," << b.cell_count_used << "," << b.cell_count_boundary << ","
+        << b.cell_count_near_source << ","
+        << mean_or_nan(n) << "," << percentile_sorted_linear(n, 0.5) << "," << percentile_sorted_linear(n, 0.9)
+        << "," << percentile_sorted_linear(n, 0.95) << "," << percentile_sorted_linear(n, 0.99) << ","
+        << max_or_nan(n) << "," << mean_or_nan(s) << "," << percentile_sorted_linear(s, 0.5) << ","
+        << percentile_sorted_linear(s, 0.95) << "," << max_or_nan(s) << "," << mean_or_nan(t) << ","
+        << percentile_sorted_linear(t, 0.5) << "\n";
+  }
+  return radius_max_used;
+}
+
 std::vector<BenchmarkSourceSpec3D> build_tpf_benchmark_sources_3d(const Config& config, std::string* shape_id_out) {
   const std::string shape = config.tpf_source_benchmark_shape;
   const double total_mass = config.tpf_source_benchmark_total_mass;
@@ -1327,9 +1466,11 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
   using namespace tpfcore;
 
   const int grid_n = config.tpf_4d_residual_grid_n;
+  const int bin_count = config.tpf_4d_residual_bin_count;
   const double half_extent = config.tpf_4d_residual_grid_half_extent;
   const double source_exclusion_radius = config.tpf_4d_residual_source_exclusion_radius;
   const double field_softening = config.tpf_4d_residual_field_softening;
+  const double configured_bin_radius_max = config.tpf_4d_residual_bin_radius_max;
 
   if (grid_n < 3) {
     throw std::runtime_error("tpf_4d_residual_grid_n must be >= 3");
@@ -1342,6 +1483,12 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
   }
   if (!std::isfinite(field_softening) || field_softening < 0.0) {
     throw std::runtime_error("tpf_4d_residual_field_softening must be finite and >= 0");
+  }
+  if (bin_count <= 0 || bin_count > 4096) {
+    throw std::runtime_error("tpf_4d_residual_bin_count must be in [1, 4096]");
+  }
+  if (!std::isfinite(configured_bin_radius_max)) {
+    throw std::runtime_error("tpf_4d_residual_bin_radius_max must be finite");
   }
 
   const double spacing = (2.0 * half_extent) / static_cast<double>(grid_n - 1);
@@ -1371,6 +1518,20 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
   grid_cfg.source_exclusion_radius = source_exclusion_radius;
 
   const StaticResidualGridResult result = evaluate_static_configuration_residual_4d(sources, grid_cfg);
+  const double nearest_source_bin_radius_max_used = write_residual_bins_csv(
+      output_dir + "/tpf_4d_static_residual_bins_nearest_source.csv",
+      result,
+      source_specs,
+      bin_count,
+      configured_bin_radius_max,
+      true);
+  const double origin_bin_radius_max_used = write_residual_bins_csv(
+      output_dir + "/tpf_4d_static_residual_bins_origin.csv",
+      result,
+      source_specs,
+      bin_count,
+      configured_bin_radius_max,
+      false);
 
   std::ofstream summary(output_dir + "/tpf_4d_static_residual_summary.txt");
   if (summary) {
@@ -1405,6 +1566,11 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
     summary << "median residual spatial norm: " << result.summary.median_residual_spatial_norm << "\n";
     summary << "max normalized residual: " << result.summary.max_normalized_residual << "\n";
     summary << "mean normalized residual: " << result.summary.mean_normalized_residual << "\n";
+    summary << "residual bin count: " << bin_count << "\n";
+    summary << "nearest-source residual bin radius max used: " << nearest_source_bin_radius_max_used << "\n";
+    summary << "origin residual bin radius max used: " << origin_bin_radius_max_used << "\n";
+    summary << "residual bins nearest-source csv: tpf_4d_static_residual_bins_nearest_source.csv\n";
+    summary << "residual bins origin csv: tpf_4d_static_residual_bins_origin.csv\n";
   }
 
   const std::size_t slice_i = static_cast<std::size_t>(
