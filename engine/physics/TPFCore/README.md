@@ -8,6 +8,8 @@ Current spike branch status: runtime dynamics still use the existing projected-v
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
+**Audit evidence records (contamination/sanity):** **[audits/](audits/README.md)**.
+
 ---
 
 ## Runtime dynamics vs static 4D benchmark scope
