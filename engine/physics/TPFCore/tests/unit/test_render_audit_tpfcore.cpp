@@ -125,6 +125,23 @@ TEST_CASE("compute_active_* branch labels: tpf_4d_static_residual_benchmark is d
   CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
 }
 
+TEST_CASE("compute_active_* branch labels: tpf_4d_static_motion_readout_benchmark is benchmark-only") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+
+  const std::string dynamics = galaxy::compute_active_dynamics_branch(c);
+  const std::string metrics = galaxy::compute_active_metrics_branch(c);
+  const std::string accel = galaxy::compute_acceleration_code_path(c);
+
+  CHECK(dynamics.find("TPF_4D_static_motion_readout_benchmark") != std::string::npos);
+  CHECK(metrics.find("GravityStaticMotionReadout_v1") != std::string::npos);
+  CHECK(accel.find("evaluate_static_sources_field_4d") != std::string::npos);
+  CHECK(accel.find("no compute_accelerations call") != std::string::npos);
+  CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
+}
+
 TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part route") {
   Config c;
   c.physics_package = "TPFCore";

@@ -27,6 +27,7 @@
 #include "xi_constraint_exterior_solver.hpp"
 #include "source_iteration.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -337,6 +338,23 @@ void validate_stage4_residual_source_specs(const std::vector<BenchmarkSourceSpec
     }
   }
 }
+
+struct MotionReadoutPoint {
+  double x = 0.0, y = 0.0, z = 0.0;
+  double r_origin = 0.0;
+  double r_nearest_source = 0.0;
+  double xi_t = 0.0, xi_x = 0.0, xi_y = 0.0, xi_z = 0.0, xi_spatial_norm = 0.0;
+  double theta_trace_4d = 0.0;
+  double invariant_I_4d = 0.0;
+  double c_xx = 0.0, c_xy = 0.0, c_xz = 0.0, c_yx = 0.0, c_yy = 0.0, c_yz = 0.0, c_zx = 0.0, c_zy = 0.0, c_zz = 0.0;
+  double a_x = 0.0, a_y = 0.0, a_z = 0.0, a_norm = 0.0;
+  double radial_alignment_to_origin_inward = std::numeric_limits<double>::quiet_NaN();
+  double transverse_fraction_origin = std::numeric_limits<double>::quiet_NaN();
+  bool is_boundary = false;
+  bool is_near_source = false;
+  bool xi_degenerate = false;
+  bool used_in_summary = false;
+};
 
 struct XiConstraintExteriorStats {
   size_t n_masked = 0;
@@ -1628,6 +1646,281 @@ void TPFCorePackage::run_4d_static_residual_benchmark(const Config& config, cons
     sources_csv << i << "," << source_specs[i].m << "," << source_specs[i].x << "," << source_specs[i].y << ","
                 << source_specs[i].z << "," << source_config_id << "," << config.tpf_source_benchmark_shape << "\n";
   }
+}
+
+void TPFCorePackage::run_4d_static_motion_readout_benchmark(const Config& config, const std::string& output_dir) {
+  using namespace tpfcore;
+
+  const int grid_n = config.tpf_4d_motion_probe_grid_n;
+  const int bin_count = config.tpf_4d_motion_bin_count;
+  const double half_extent = config.tpf_4d_motion_probe_grid_half_extent;
+  const double source_exclusion_radius = config.tpf_4d_motion_source_exclusion_radius;
+  const double field_softening = config.tpf_4d_motion_field_softening;
+  const double kappa_motion = config.tpf_4d_motion_kappa;
+  const double motion_readout_scale = config.tpf_4d_motion_readout_scale;
+
+  if (grid_n < 3) throw std::runtime_error("tpf_4d_motion_probe_grid_n must be >= 3");
+  if (!std::isfinite(half_extent) || !(half_extent > 0.0)) throw std::runtime_error("tpf_4d_motion_probe_grid_half_extent must be finite and > 0");
+  if (!std::isfinite(source_exclusion_radius) || source_exclusion_radius < 0.0) throw std::runtime_error("tpf_4d_motion_source_exclusion_radius must be finite and >= 0");
+  if (!std::isfinite(field_softening) || field_softening < 0.0) throw std::runtime_error("tpf_4d_motion_field_softening must be finite and >= 0");
+  if (!std::isfinite(kappa_motion)) throw std::runtime_error("tpf_4d_motion_kappa must be finite");
+  if (!std::isfinite(motion_readout_scale)) throw std::runtime_error("tpf_4d_motion_readout_scale must be finite");
+  if (bin_count < 1 || bin_count > 4096) throw std::runtime_error("tpf_4d_motion_bin_count must be in [1, 4096]");
+
+  validate_stage4_residual_source_inputs(config);
+  std::string source_config_id;
+  const std::vector<BenchmarkSourceSpec3D> source_specs = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  validate_stage4_residual_source_specs(source_specs);
+  std::vector<StaticSourcePoint4D> sources;
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    sources.push_back(StaticSourcePoint4D{source_specs[i].m, source_specs[i].x, source_specs[i].y, source_specs[i].z});
+  }
+
+  const double spacing = (2.0 * half_extent) / static_cast<double>(grid_n - 1);
+  if (!std::isfinite(spacing) || !(spacing > 0.0)) {
+    throw std::runtime_error("tpf_4d_motion spacing must be finite and > 0");
+  }
+
+  const double xi_eps = 1e-30;
+  const std::size_t total_cells = static_cast<std::size_t>(grid_n) * static_cast<std::size_t>(grid_n) * static_cast<std::size_t>(grid_n);
+  std::vector<MotionReadoutPoint> points;
+  points.reserve(total_cells);
+  std::size_t boundary_count = 0;
+  std::size_t near_source_count = 0;
+  std::size_t interior_cells = (grid_n >= 3) ? static_cast<std::size_t>(grid_n - 2) * static_cast<std::size_t>(grid_n - 2) * static_cast<std::size_t>(grid_n - 2) : 0;
+  std::size_t degenerate_count = 0;
+
+  for (int k = 0; k < grid_n; ++k) {
+    for (int j = 0; j < grid_n; ++j) {
+      for (int i = 0; i < grid_n; ++i) {
+        MotionReadoutPoint p{};
+        p.x = -half_extent + spacing * static_cast<double>(i);
+        p.y = -half_extent + spacing * static_cast<double>(j);
+        p.z = -half_extent + spacing * static_cast<double>(k);
+        p.r_origin = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+        p.is_boundary = (i == 0 || j == 0 || k == 0 || i + 1 == grid_n || j + 1 == grid_n || k + 1 == grid_n);
+        if (p.is_boundary) ++boundary_count;
+        p.r_nearest_source = nearest_source_distance(source_specs, p.x, p.y, p.z);
+        p.is_near_source = (source_exclusion_radius > 0.0 && p.r_nearest_source <= source_exclusion_radius);
+        if (!p.is_boundary && p.is_near_source) ++near_source_count;
+
+        const StaticProbePoint4D probe{p.x, p.y, p.z};
+        const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, field_softening);
+        p.xi_t = field.xi.t;
+        p.xi_x = field.xi.x;
+        p.xi_y = field.xi.y;
+        p.xi_z = field.xi.z;
+        p.theta_trace_4d = field.theta_trace_4d;
+        p.invariant_I_4d = field.invariant_I_4d;
+        p.xi_spatial_norm = std::sqrt(p.xi_x * p.xi_x + p.xi_y * p.xi_y + p.xi_z * p.xi_z);
+
+        const double theta_xx = field.theta.xx;
+        const double theta_xy = field.theta.xy;
+        const double theta_xz = field.theta.xz;
+        const double theta_yx = field.theta.yx;
+        const double theta_yy = field.theta.yy;
+        const double theta_yz = field.theta.yz;
+        const double theta_zx = field.theta.zx;
+        const double theta_zy = field.theta.zy;
+        const double theta_zz = field.theta.zz;
+        const double theta_tr = field.theta_trace_4d;
+        const double inv_I = field.invariant_I_4d;
+
+        const double t_xx = theta_xx * theta_xx + theta_xy * theta_xy + theta_xz * theta_xz;
+        const double t_xy = theta_xx * theta_yx + theta_xy * theta_yy + theta_xz * theta_yz;
+        const double t_xz = theta_xx * theta_zx + theta_xy * theta_zy + theta_xz * theta_zz;
+        const double t_yx = theta_yx * theta_xx + theta_yy * theta_xy + theta_yz * theta_xz;
+        const double t_yy = theta_yx * theta_yx + theta_yy * theta_yy + theta_yz * theta_yz;
+        const double t_yz = theta_yx * theta_zx + theta_yy * theta_zy + theta_yz * theta_zz;
+        const double t_zx = theta_zx * theta_xx + theta_zy * theta_xy + theta_zz * theta_xz;
+        const double t_zy = theta_zx * theta_yx + theta_zy * theta_yy + theta_zz * theta_yz;
+        const double t_zz = theta_zx * theta_zx + theta_zy * theta_zy + theta_zz * theta_zz;
+
+        p.c_xx = kappa_motion * (t_xx - LAMBDA_4D * theta_tr * theta_xx - 0.5 * inv_I);
+        p.c_xy = kappa_motion * (t_xy - LAMBDA_4D * theta_tr * theta_xy);
+        p.c_xz = kappa_motion * (t_xz - LAMBDA_4D * theta_tr * theta_xz);
+        p.c_yx = kappa_motion * (t_yx - LAMBDA_4D * theta_tr * theta_yx);
+        p.c_yy = kappa_motion * (t_yy - LAMBDA_4D * theta_tr * theta_yy - 0.5 * inv_I);
+        p.c_yz = kappa_motion * (t_yz - LAMBDA_4D * theta_tr * theta_yz);
+        p.c_zx = kappa_motion * (t_zx - LAMBDA_4D * theta_tr * theta_zx);
+        p.c_zy = kappa_motion * (t_zy - LAMBDA_4D * theta_tr * theta_zy);
+        p.c_zz = kappa_motion * (t_zz - LAMBDA_4D * theta_tr * theta_zz - 0.5 * inv_I);
+
+        if (p.xi_spatial_norm <= xi_eps) {
+          p.xi_degenerate = true;
+          ++degenerate_count;
+          p.a_x = p.a_y = p.a_z = 0.0;
+        } else {
+          const double hx = p.xi_x / p.xi_spatial_norm;
+          const double hy = p.xi_y / p.xi_spatial_norm;
+          const double hz = p.xi_z / p.xi_spatial_norm;
+          p.a_x = -motion_readout_scale * (p.c_xx * hx + p.c_xy * hy + p.c_xz * hz);
+          p.a_y = -motion_readout_scale * (p.c_yx * hx + p.c_yy * hy + p.c_yz * hz);
+          p.a_z = -motion_readout_scale * (p.c_zx * hx + p.c_zy * hy + p.c_zz * hz);
+        }
+        p.a_norm = std::sqrt(p.a_x * p.a_x + p.a_y * p.a_y + p.a_z * p.a_z);
+
+        if (p.r_origin > 1e-30 && p.a_norm > 1e-30) {
+          const double inward_x = -p.x / p.r_origin;
+          const double inward_y = -p.y / p.r_origin;
+          const double inward_z = -p.z / p.r_origin;
+          const double radial = (p.a_x * inward_x + p.a_y * inward_y + p.a_z * inward_z) / p.a_norm;
+          p.radial_alignment_to_origin_inward = radial;
+          p.transverse_fraction_origin = std::sqrt(std::max(0.0, 1.0 - std::min(1.0, radial * radial)));
+        }
+        p.used_in_summary = (!p.is_boundary && !p.is_near_source && !p.xi_degenerate);
+        points.push_back(p);
+      }
+    }
+  }
+
+  std::vector<double> used_norms, used_align, used_transverse;
+  double sum_norm = 0.0, sum_align = 0.0, sum_transverse = 0.0;
+  double max_norm = 0.0;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    if (!points[i].used_in_summary) continue;
+    used_norms.push_back(points[i].a_norm);
+    sum_norm += points[i].a_norm;
+    max_norm = std::max(max_norm, points[i].a_norm);
+    if (std::isfinite(points[i].radial_alignment_to_origin_inward)) {
+      used_align.push_back(points[i].radial_alignment_to_origin_inward);
+      sum_align += points[i].radial_alignment_to_origin_inward;
+    }
+    if (std::isfinite(points[i].transverse_fraction_origin)) {
+      used_transverse.push_back(points[i].transverse_fraction_origin);
+      sum_transverse += points[i].transverse_fraction_origin;
+    }
+  }
+  std::sort(used_norms.begin(), used_norms.end());
+  std::sort(used_align.begin(), used_align.end());
+  std::sort(used_transverse.begin(), used_transverse.end());
+  const double mean_norm = used_norms.empty() ? 0.0 : (sum_norm / static_cast<double>(used_norms.size()));
+  const double median_norm = percentile_sorted_linear(used_norms, 0.5);
+  const double mean_align = used_align.empty() ? 0.0 : (sum_align / static_cast<double>(used_align.size()));
+  const double median_align = percentile_sorted_linear(used_align, 0.5);
+  const double mean_transverse = used_transverse.empty() ? 0.0 : (sum_transverse / static_cast<double>(used_transverse.size()));
+
+  std::ofstream probe_csv(output_dir + "/tpf_4d_static_motion_readout_probe_grid.csv");
+  probe_csv << std::scientific;
+  probe_csv << "source_shape,x,y,z,r_origin,r_nearest_source,xi_t,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d,"
+               "c_xx,c_xy,c_xz,c_yx,c_yy,c_yz,c_zx,c_zy,c_zz,a_x,a_y,a_z,a_norm,radial_alignment_to_origin_inward,"
+               "transverse_fraction_origin,is_boundary,is_near_source,xi_degenerate,used_in_summary\n";
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    const MotionReadoutPoint& p = points[i];
+    probe_csv << config.tpf_source_benchmark_shape << "," << p.x << "," << p.y << "," << p.z << "," << p.r_origin << ","
+              << p.r_nearest_source << "," << p.xi_t << "," << p.xi_x << "," << p.xi_y << "," << p.xi_z << ","
+              << p.xi_spatial_norm << "," << p.theta_trace_4d << "," << p.invariant_I_4d << ","
+              << p.c_xx << "," << p.c_xy << "," << p.c_xz << "," << p.c_yx << "," << p.c_yy << "," << p.c_yz << ","
+              << p.c_zx << "," << p.c_zy << "," << p.c_zz << "," << p.a_x << "," << p.a_y << "," << p.a_z << "," << p.a_norm
+              << "," << p.radial_alignment_to_origin_inward << "," << p.transverse_fraction_origin << ","
+              << (p.is_boundary ? 1 : 0) << "," << (p.is_near_source ? 1 : 0) << "," << (p.xi_degenerate ? 1 : 0) << ","
+              << (p.used_in_summary ? 1 : 0) << "\n";
+  }
+
+  struct BinAccum {
+    int total = 0;
+    int used = 0;
+    std::vector<double> a_norm, align, transverse;
+  };
+  const double radius_max = std::sqrt(3.0) * half_extent;
+  const double bin_width = radius_max / static_cast<double>(bin_count);
+  std::vector<BinAccum> bins(static_cast<std::size_t>(bin_count));
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    int idx = (bin_width > 0.0) ? static_cast<int>(points[i].r_origin / bin_width) : 0;
+    if (idx < 0) idx = 0;
+    if (idx >= bin_count) idx = bin_count - 1;
+    BinAccum& b = bins[static_cast<std::size_t>(idx)];
+    ++b.total;
+    if (!points[i].used_in_summary) continue;
+    ++b.used;
+    b.a_norm.push_back(points[i].a_norm);
+    if (std::isfinite(points[i].radial_alignment_to_origin_inward)) b.align.push_back(points[i].radial_alignment_to_origin_inward);
+    if (std::isfinite(points[i].transverse_fraction_origin)) b.transverse.push_back(points[i].transverse_fraction_origin);
+  }
+
+  std::ofstream bins_csv(output_dir + "/tpf_4d_static_motion_readout_bins_origin.csv");
+  bins_csv << std::scientific;
+  bins_csv << "bin_index,r_min,r_max,r_mid,cell_count_total,cell_count_used,mean_a_norm,median_a_norm,p95_a_norm,max_a_norm,"
+              "mean_radial_alignment,median_radial_alignment,mean_transverse_fraction,median_transverse_fraction\n";
+  for (int i = 0; i < bin_count; ++i) {
+    BinAccum& b = bins[static_cast<std::size_t>(i)];
+    std::sort(b.a_norm.begin(), b.a_norm.end());
+    std::sort(b.align.begin(), b.align.end());
+    std::sort(b.transverse.begin(), b.transverse.end());
+    const double r_min = bin_width * static_cast<double>(i);
+    const double r_max = (i + 1 == bin_count) ? radius_max : (bin_width * static_cast<double>(i + 1));
+    const double r_mid = 0.5 * (r_min + r_max);
+    bins_csv << i << "," << r_min << "," << r_max << "," << r_mid << "," << b.total << "," << b.used << ","
+             << mean_or_nan(b.a_norm) << "," << percentile_sorted_linear(b.a_norm, 0.5) << ","
+             << percentile_sorted_linear(b.a_norm, 0.95) << "," << max_or_nan(b.a_norm) << ","
+             << mean_or_nan(b.align) << "," << percentile_sorted_linear(b.align, 0.5) << ","
+             << mean_or_nan(b.transverse) << "," << percentile_sorted_linear(b.transverse, 0.5) << "\n";
+  }
+
+  double falloff_slope = std::numeric_limits<double>::quiet_NaN();
+  if (config.tpf_source_benchmark_shape == "monopole") {
+    std::vector<double> xs;
+    std::vector<double> ys;
+    for (int i = 0; i < bin_count; ++i) {
+      const BinAccum& b = bins[static_cast<std::size_t>(i)];
+      if (b.used <= 0) continue;
+      const double r_mid = (static_cast<double>(i) + 0.5) * bin_width;
+      const double mean_a = mean_or_nan(b.a_norm);
+      if (r_mid > 0.0 && std::isfinite(mean_a) && mean_a > 0.0) {
+        xs.push_back(std::log(r_mid));
+        ys.push_back(std::log(mean_a));
+      }
+    }
+    if (xs.size() >= 2) {
+      double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+      for (std::size_t i = 0; i < xs.size(); ++i) {
+        sx += xs[i]; sy += ys[i]; sxx += xs[i] * xs[i]; sxy += xs[i] * ys[i];
+      }
+      const double n = static_cast<double>(xs.size());
+      const double denom = n * sxx - sx * sx;
+      if (std::fabs(denom) > 1e-30) {
+        falloff_slope = (n * sxy - sx * sy) / denom;
+      }
+    }
+  }
+
+  std::ofstream summary(output_dir + "/tpf_4d_static_motion_readout_summary.txt");
+  summary << std::scientific;
+  summary << "source shape: " << config.tpf_source_benchmark_shape << "\n";
+  summary << "source config id: " << source_config_id << "\n";
+  summary << "source masses: ";
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    if (i > 0) summary << ", ";
+    summary << source_specs[i].m;
+  }
+  summary << "\nsource positions: ";
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    if (i > 0) summary << "; ";
+    summary << "(" << source_specs[i].x << "," << source_specs[i].y << "," << source_specs[i].z << ")";
+  }
+  summary << "\n";
+  summary << "grid_n: " << grid_n << "\n";
+  summary << "half_extent: " << half_extent << "\n";
+  summary << "spacing: " << spacing << "\n";
+  summary << "field softening: " << field_softening << "\n";
+  summary << "exclusion radius: " << source_exclusion_radius << "\n";
+  summary << "kappa_motion: " << kappa_motion << "\n";
+  summary << "motion_readout_scale: " << motion_readout_scale << "\n";
+  summary << "total grid cells: " << total_cells << "\n";
+  summary << "interior/free probe cells: " << interior_cells << "\n";
+  summary << "excluded boundary count: " << boundary_count << "\n";
+  summary << "excluded near-source count: " << near_source_count << "\n";
+  summary << "degenerate Xi count: " << degenerate_count << "\n";
+  summary << "mean acceleration norm: " << mean_norm << "\n";
+  summary << "median acceleration norm: " << median_norm << "\n";
+  summary << "max acceleration norm: " << max_norm << "\n";
+  summary << "mean radial alignment: " << mean_align << "\n";
+  summary << "median radial alignment: " << median_align << "\n";
+  summary << "mean transverse fraction: " << mean_transverse << "\n";
+  summary << "measured log-log falloff slope for monopole if available: " << falloff_slope << "\n";
+  summary << "falloff slope note: slope is measured from this readout and is not forced to Newtonian.\n";
+  summary << "bins origin csv: tpf_4d_static_motion_readout_bins_origin.csv\n";
+  summary << "probe grid csv: tpf_4d_static_motion_readout_probe_grid.csv\n";
 }
 
 void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snapshots,
