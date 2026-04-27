@@ -378,6 +378,7 @@ int main(int argc, char** argv) {
         std::cerr << e.what() << "\nAllowed: galaxy, earth_moon_benchmark, bh_orbit_validation, two_body_orbit (deprecated), "
                      "symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, "
                      "tpf_symmetric_pair_inspect, tpf_source_field_benchmark, tpf_4d_static_residual_benchmark, "
+                     "tpf_4d_static_motion_readout_benchmark, "
                      "tpf_two_body_sweep, tpf_weak_field_calibration, "
                      "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep, "
                      "tpf_v11_weak_field_correspondence\n";
@@ -608,6 +609,25 @@ int main(int argc, char** argv) {
         }
       }
     }
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    write_resolved_artifacts(config);
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    if (!tpfcore) {
+      std::cerr << "tpf_4d_static_motion_readout_benchmark requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Benchmark mode: tpf_4d_static_motion_readout_benchmark\n";
+    tpfcore->run_4d_static_motion_readout_benchmark(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir
+              << "/tpf_4d_static_motion_readout_summary.txt, "
+                 "tpf_4d_static_motion_readout_probe_grid.csv, "
+                 "tpf_4d_static_motion_readout_bins_origin.csv\n";
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
@@ -996,6 +1016,7 @@ int main(int argc, char** argv) {
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
     case galaxy::SimulationMode::tpf_source_field_benchmark:
     case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
+    case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
     case galaxy::SimulationMode::tpf_two_body_sweep:
     case galaxy::SimulationMode::tpf_weak_field_calibration:
     case galaxy::SimulationMode::tpf_newtonian_force_compare:

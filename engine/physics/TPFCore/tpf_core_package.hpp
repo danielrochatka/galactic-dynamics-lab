@@ -69,6 +69,8 @@ class TPFCorePackage : public PhysicsPackage {
   void run_source_field_benchmark(const Config& config, const std::string& output_dir);
   /** Run static 4D residual benchmark harness and dump summary + view-plane slice artifacts. */
   void run_4d_static_residual_benchmark(const Config& config, const std::string& output_dir);
+  /** Run static 4D field -> principal tensor -> probe-motion readout benchmark harness. */
+  void run_4d_static_motion_readout_benchmark(const Config& config, const std::string& output_dir);
 
   /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
   void write_readout_debug(const std::vector<Snapshot>& snapshots,

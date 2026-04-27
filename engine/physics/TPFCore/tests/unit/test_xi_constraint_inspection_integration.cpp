@@ -62,6 +62,13 @@ double parse_csv_double_or_nan(const std::string& s) {
   return std::atof(s.c_str());
 }
 
+int find_csv_col(const std::vector<std::string>& header, const std::string& key) {
+  for (std::size_t i = 0; i < header.size(); ++i) {
+    if (header[i] == key) return static_cast<int>(i);
+  }
+  return -1;
+}
+
 galaxy::State one_body_state() {
   galaxy::State s;
   s.resize(1);
@@ -549,4 +556,205 @@ TEST_CASE("4d static residual benchmark rejects invalid config values loudly") {
   c.tpf_source_benchmark_separation = 1.0;
   c.tpf_source_benchmark_orientation_deg = std::numeric_limits<double>::infinity();
   CHECK_THROWS(pkg.run_4d_static_residual_benchmark(c, out_dir));
+}
+
+TEST_CASE("4d static motion readout benchmark writes required artifacts and finite summary stats") {
+  char dir_template[] = "/tmp/tpf_4d_static_motion_readout_artifacts_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_motion_probe_grid_n = 9;
+  c.tpf_4d_motion_probe_grid_half_extent = 4.0;
+  c.tpf_4d_motion_source_exclusion_radius = 0.5;
+  c.tpf_4d_motion_field_softening = 0.1;
+  c.tpf_4d_motion_kappa = 1.0;
+  c.tpf_4d_motion_readout_scale = 1.0;
+  c.tpf_4d_motion_bin_count = 12;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_motion_readout_benchmark(c, out_dir);
+
+  const std::string summary_path = std::string(out_dir) + "/tpf_4d_static_motion_readout_summary.txt";
+  const std::string probe_path = std::string(out_dir) + "/tpf_4d_static_motion_readout_probe_grid.csv";
+  const std::string bins_path = std::string(out_dir) + "/tpf_4d_static_motion_readout_bins_origin.csv";
+  CHECK(file_exists(summary_path));
+  CHECK(file_exists(probe_path));
+  CHECK(file_exists(bins_path));
+
+  const std::string summary = slurp(summary_path);
+  CHECK(summary.find("kappa_motion:") != std::string::npos);
+  CHECK(summary.find("motion_readout_scale:") != std::string::npos);
+  CHECK(summary.find("measured log-log falloff slope for monopole if available:") != std::string::npos);
+  CHECK(std::isfinite(parse_summary_scalar(summary, "mean acceleration norm")));
+  CHECK(std::isfinite(parse_summary_scalar(summary, "max acceleration norm")));
+}
+
+TEST_CASE("4d static motion readout monopole axis direction and symmetry") {
+  char dir_template[] = "/tmp/tpf_4d_static_motion_readout_axis_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 2.0e12;
+  c.tpf_4d_motion_probe_grid_n = 11;
+  c.tpf_4d_motion_probe_grid_half_extent = 5.0;
+  c.tpf_4d_motion_source_exclusion_radius = 0.5;
+  c.tpf_4d_motion_field_softening = 0.1;
+  c.tpf_4d_motion_kappa = 1.0;
+  c.tpf_4d_motion_readout_scale = 1.0;
+  c.tpf_4d_motion_bin_count = 16;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_motion_readout_benchmark(c, out_dir);
+
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_static_motion_readout_probe_grid.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int x_col = find_csv_col(header, "x");
+  const int y_col = find_csv_col(header, "y");
+  const int z_col = find_csv_col(header, "z");
+  const int ax_col = find_csv_col(header, "a_x");
+  const int ay_col = find_csv_col(header, "a_y");
+  const int az_col = find_csv_col(header, "a_z");
+  const int an_col = find_csv_col(header, "a_norm");
+  const int used_col = find_csv_col(header, "used_in_summary");
+  REQUIRE(x_col >= 0);
+  REQUIRE(used_col >= 0);
+
+  double ax_pos = 0.0, ay_pos = 0.0, az_pos = 0.0;
+  double ax_neg = 0.0, ay_neg = 0.0, az_neg = 0.0;
+  bool found_pos = false;
+  bool found_neg = false;
+  double a_xaxis = 0.0, a_yaxis = 0.0, a_zaxis = 0.0;
+  bool found_x = false, found_y = false, found_z = false;
+
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    if (std::atoi(cols[used_col].c_str()) == 0) continue;
+    const double x = std::atof(cols[x_col].c_str());
+    const double y = std::atof(cols[y_col].c_str());
+    const double z = std::atof(cols[z_col].c_str());
+    const double ax = std::atof(cols[ax_col].c_str());
+    const double ay = std::atof(cols[ay_col].c_str());
+    const double az = std::atof(cols[az_col].c_str());
+    const double an = std::atof(cols[an_col].c_str());
+    if (!found_pos && x == 3.0 && y == 0.0 && z == 0.0) {
+      found_pos = true;
+      ax_pos = ax; ay_pos = ay; az_pos = az;
+      a_xaxis = an; found_x = true;
+    }
+    if (!found_neg && x == -3.0 && y == 0.0 && z == 0.0) {
+      found_neg = true;
+      ax_neg = ax; ay_neg = ay; az_neg = az;
+    }
+    if (!found_y && x == 0.0 && y == 3.0 && z == 0.0) {
+      a_yaxis = an; found_y = true;
+    }
+    if (!found_z && x == 0.0 && y == 0.0 && z == 3.0) {
+      a_zaxis = an; found_z = true;
+    }
+  }
+  REQUIRE(found_pos);
+  REQUIRE(found_neg);
+  CHECK(ax_pos < 0.0);
+  CHECK(std::fabs(ay_pos) < std::fabs(ax_pos) * 1e-6 + 1e-12);
+  CHECK(std::fabs(az_pos) < std::fabs(ax_pos) * 1e-6 + 1e-12);
+  CHECK(ax_neg > 0.0);
+  CHECK(std::fabs(ay_neg) < std::fabs(ax_neg) * 1e-6 + 1e-12);
+  CHECK(std::fabs(az_neg) < std::fabs(ax_neg) * 1e-6 + 1e-12);
+  REQUIRE(found_x);
+  REQUIRE(found_y);
+  REQUIRE(found_z);
+  CHECK(a_yaxis == doctest::Approx(a_xaxis).epsilon(0.25));
+  CHECK(a_zaxis == doctest::Approx(a_xaxis).epsilon(0.25));
+}
+
+TEST_CASE("4d static motion readout monopole falloff slope is finite when available") {
+  char dir_template[] = "/tmp/tpf_4d_static_motion_readout_falloff_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_motion_probe_grid_n = 11;
+  c.tpf_4d_motion_probe_grid_half_extent = 6.0;
+  c.tpf_4d_motion_source_exclusion_radius = 0.75;
+  c.tpf_4d_motion_field_softening = 0.1;
+  c.tpf_4d_motion_bin_count = 16;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_static_motion_readout_benchmark(c, out_dir);
+  const std::string summary = slurp(std::string(out_dir) + "/tpf_4d_static_motion_readout_summary.txt");
+  const double slope = parse_summary_scalar(summary, "measured log-log falloff slope for monopole if available");
+  CHECK(std::isfinite(slope));
+}
+
+TEST_CASE("4d static motion readout bonded pair smoke and source mass recording") {
+  char dir_template[] = "/tmp/tpf_4d_static_motion_readout_pair_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_source_benchmark_mass1 = 8.0e11;
+  c.tpf_source_benchmark_mass2 = 2.0e11;
+  c.tpf_source_benchmark_separation = 8.0;
+  c.tpf_source_benchmark_orientation_deg = 45.0;
+  c.tpf_4d_motion_probe_grid_n = 9;
+  c.tpf_4d_motion_probe_grid_half_extent = 4.0;
+  c.tpf_4d_motion_source_exclusion_radius = 0.5;
+  c.tpf_4d_motion_bin_count = 12;
+
+  galaxy::TPFCorePackage pkg;
+  CHECK_NOTHROW(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  const std::string summary = slurp(std::string(out_dir) + "/tpf_4d_static_motion_readout_summary.txt");
+  CHECK(summary.find("source masses: 8.000000e+11, 2.000000e+11") != std::string::npos);
+  CHECK(std::isfinite(parse_summary_scalar(summary, "mean acceleration norm")));
+}
+
+TEST_CASE("4d static motion readout benchmark rejects invalid config values loudly") {
+  char dir_template[] = "/tmp/tpf_4d_static_motion_readout_invalid_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0;
+  galaxy::TPFCorePackage pkg;
+
+  c.tpf_4d_motion_probe_grid_n = 2;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_probe_grid_n = 5;
+  c.tpf_4d_motion_probe_grid_half_extent = 0.0;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_probe_grid_half_extent = 1.0;
+  c.tpf_4d_motion_source_exclusion_radius = -0.1;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_source_exclusion_radius = 0.1;
+  c.tpf_4d_motion_field_softening = -0.1;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_field_softening = 0.1;
+  c.tpf_4d_motion_kappa = std::numeric_limits<double>::quiet_NaN();
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_kappa = 1.0;
+  c.tpf_4d_motion_readout_scale = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_readout_scale = 1.0;
+  c.tpf_4d_motion_bin_count = 0;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_bin_count = 4097;
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
+  c.tpf_4d_motion_bin_count = 16;
+  c.tpf_source_benchmark_shape = "unknown";
+  CHECK_THROWS(pkg.run_4d_static_motion_readout_benchmark(c, out_dir));
 }

@@ -39,6 +39,7 @@ enum class SimulationMode {
   tpf_symmetric_pair_inspect,
   tpf_source_field_benchmark,
   tpf_4d_static_residual_benchmark,
+  tpf_4d_static_motion_readout_benchmark,
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
@@ -282,6 +283,20 @@ struct Config {
   int tpf_4d_residual_bin_count = 32;
   /** TPF 4D static residual benchmark radial-bin max radius [m]; <=0 selects auto max by binning mode. */
   double tpf_4d_residual_bin_radius_max = 0.0;
+  /** TPF 4D static motion-readout benchmark cubic probe grid size N (NxNxN). */
+  int tpf_4d_motion_probe_grid_n = 33;
+  /** TPF 4D static motion-readout benchmark grid half-extent L for support [-L, +L] in x/y/z. */
+  double tpf_4d_motion_probe_grid_half_extent = 20.0;
+  /** TPF 4D static motion-readout benchmark source exclusion radius around source support points [m]. */
+  double tpf_4d_motion_source_exclusion_radius = 3.0;
+  /** TPF 4D static motion-readout benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_motion_field_softening = 0.1;
+  /** TPF 4D static motion-readout benchmark kappa multiplier in principal spatial tensor readout. */
+  double tpf_4d_motion_kappa = 1.0;
+  /** TPF 4D static motion-readout benchmark acceleration/readout scale multiplier. */
+  double tpf_4d_motion_readout_scale = 1.0;
+  /** TPF 4D static motion-readout benchmark radial-bin count for diagnostic exports. */
+  int tpf_4d_motion_bin_count = 32;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

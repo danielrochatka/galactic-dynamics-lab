@@ -29,6 +29,13 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_4d_residual_field_softening == doctest::Approx(0.1));
   CHECK(c.tpf_4d_residual_bin_count == 32);
   CHECK(c.tpf_4d_residual_bin_radius_max == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_motion_probe_grid_n == 33);
+  CHECK(c.tpf_4d_motion_probe_grid_half_extent == doctest::Approx(20.0));
+  CHECK(c.tpf_4d_motion_source_exclusion_radius == doctest::Approx(3.0));
+  CHECK(c.tpf_4d_motion_field_softening == doctest::Approx(0.1));
+  CHECK(c.tpf_4d_motion_kappa == doctest::Approx(1.0));
+  CHECK(c.tpf_4d_motion_readout_scale == doctest::Approx(1.0));
+  CHECK(c.tpf_4d_motion_bin_count == 32);
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -143,6 +150,8 @@ TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_corresponden
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark);
   CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", c));
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark);
+  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_motion_readout_benchmark", c));
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark);
 }
 
 TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
@@ -237,4 +246,36 @@ TEST_CASE("tpf_4d_static_residual_benchmark config keys parse and serialize") {
   CHECK(has_key("tpf_4d_residual_field_softening"));
   CHECK(has_key("tpf_4d_residual_bin_count"));
   CHECK(has_key("tpf_4d_residual_bin_radius_max"));
+}
+
+TEST_CASE("tpf_4d_static_motion_readout_benchmark config keys parse and serialize") {
+  Config c;
+  CHECK(apply_config_kv("tpf_4d_motion_probe_grid_n", "35", c));
+  CHECK(c.tpf_4d_motion_probe_grid_n == 35);
+  CHECK(apply_config_kv("tpf_4d_motion_probe_grid_half_extent", "11.5", c));
+  CHECK(c.tpf_4d_motion_probe_grid_half_extent == doctest::Approx(11.5));
+  CHECK(apply_config_kv("tpf_4d_motion_source_exclusion_radius", "2.75", c));
+  CHECK(c.tpf_4d_motion_source_exclusion_radius == doctest::Approx(2.75));
+  CHECK(apply_config_kv("tpf_4d_motion_field_softening", "0.15", c));
+  CHECK(c.tpf_4d_motion_field_softening == doctest::Approx(0.15));
+  CHECK(apply_config_kv("tpf_4d_motion_kappa", "4.5", c));
+  CHECK(c.tpf_4d_motion_kappa == doctest::Approx(4.5));
+  CHECK(apply_config_kv("tpf_4d_motion_readout_scale", "0.25", c));
+  CHECK(c.tpf_4d_motion_readout_scale == doctest::Approx(0.25));
+  CHECK(apply_config_kv("tpf_4d_motion_bin_count", "12", c));
+  CHECK(c.tpf_4d_motion_bin_count == 12);
+
+  const auto kv = galaxy::serialize_config_kv(c);
+  const auto has_key = [&kv](const char* key) {
+    return std::any_of(
+        kv.begin(), kv.end(),
+        [key](const std::pair<std::string, std::string>& entry) { return entry.first == key; });
+  };
+  CHECK(has_key("tpf_4d_motion_probe_grid_n"));
+  CHECK(has_key("tpf_4d_motion_probe_grid_half_extent"));
+  CHECK(has_key("tpf_4d_motion_source_exclusion_radius"));
+  CHECK(has_key("tpf_4d_motion_field_softening"));
+  CHECK(has_key("tpf_4d_motion_kappa"));
+  CHECK(has_key("tpf_4d_motion_readout_scale"));
+  CHECK(has_key("tpf_4d_motion_bin_count"));
 }
