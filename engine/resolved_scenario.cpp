@@ -122,6 +122,8 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
     effective_tpf_dynamics_mode = "none_static_residual_diagnostic_only";
   } else if (resolved.config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
     effective_tpf_dynamics_mode = "none_static_motion_readout_benchmark_only";
+  } else if (resolved.config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    effective_tpf_dynamics_mode = "none_xi_motion_probe_benchmark_only";
   }
   std::vector<std::pair<std::string, std::string>> kv;
   kv.reserve(16);

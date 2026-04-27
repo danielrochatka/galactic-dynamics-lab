@@ -40,6 +40,7 @@ enum class SimulationMode {
   tpf_source_field_benchmark,
   tpf_4d_static_residual_benchmark,
   tpf_4d_static_motion_readout_benchmark,
+  tpf_4d_xi_motion_probe_benchmark,
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
@@ -297,6 +298,28 @@ struct Config {
   double tpf_4d_motion_readout_scale = 1.0;
   /** TPF 4D static motion-readout benchmark radial-bin count for diagnostic exports. */
   int tpf_4d_motion_bin_count = 32;
+  /** TPF 4D Xi motion benchmark timestep size. */
+  double tpf_4d_xi_motion_dt = 0.001;
+  /** TPF 4D Xi motion benchmark number of timesteps. */
+  int tpf_4d_xi_motion_steps = 2000;
+  /** TPF 4D Xi motion benchmark readout scale K_xi in a=-K_xi*Xi_spatial. */
+  double tpf_4d_xi_motion_readout_scale = 1.0e-12;
+  /** TPF 4D Xi motion benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_xi_motion_field_softening = 0.1;
+  /** TPF 4D Xi motion benchmark source exclusion radius around source points [m]. */
+  double tpf_4d_xi_motion_source_exclusion_radius = 0.5;
+  /** TPF 4D Xi motion benchmark moving probe layout selector. */
+  std::string tpf_4d_xi_motion_probe_layout = "ring";
+  /** TPF 4D Xi motion benchmark probe count. */
+  int tpf_4d_xi_motion_probe_count = 24;
+  /** TPF 4D Xi motion benchmark initial probe radius [m]. */
+  double tpf_4d_xi_motion_probe_radius = 10.0;
+  /** TPF 4D Xi motion benchmark initial probe speed [m/s]. */
+  double tpf_4d_xi_motion_probe_speed = 0.0;
+  /** TPF 4D Xi motion benchmark integrator selector. */
+  std::string tpf_4d_xi_motion_integrator = "velocity_verlet";
+  /** TPF 4D Xi motion benchmark trajectory dump cadence in steps. */
+  int tpf_4d_xi_motion_dump_every = 1;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */
