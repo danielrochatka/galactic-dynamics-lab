@@ -93,6 +93,14 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_4d_xi_motion_probe_summary.txt`**, **`tpf_4d_xi_motion_probe_trajectories.csv`**, **`tpf_4d_xi_motion_probe_initial_readout.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_xi_motion_probe_benchmark`. This path advances dynamic probes with `GravityXiMotionReadout_v1` (`a=-K_xi*Xi_spatial`) using fixed-source Stage 7B field evaluation and writes trajectory readout samples for each probe over time.
 
+### Stage 8A Xi-kernel deformation (benchmark-only)
+
+`GravityXiKernelDeformation_v1` adds an isolated, configurable kernel deformation stage inside `tpf_4d_xi_motion_probe_benchmark` before Xi acceleration readout. The benchmark now computes per-source Xi contributions, applies a configured deformation mode (`off`, `scalar_beta`, `metric_radial`, `metric_velocity`, `spacetime_metric`), sums `Xi_eff`, then reads acceleration strictly as `a=-K_xi*Xi_eff_spatial`.
+
+- `off` preserves Stage 7B behavior exactly (same Xi kernel and same readout equation).
+- `spacetime_metric` can emit an `Xi_t`/Xi0 diagnostic (`tpf_4d_xi_temporal_mode=norm_scaled`) but does not feed Xi0 into acceleration in Stage 8A.
+- This is distinct from older additive acceleration VDSG paths; Stage 8A deforms Xi kernel evaluation before readout and does not append acceleration terms.
+
 **Optional trajectory visualization PNGs** — `plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:
 `tpf_4d_xi_motion_probe_xy_trajectories.png`,
 `tpf_4d_xi_motion_probe_xz_trajectories.png`,

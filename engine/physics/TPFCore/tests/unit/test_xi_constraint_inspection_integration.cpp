@@ -791,9 +791,11 @@ TEST_CASE("4d xi motion probe benchmark writes required artifacts and finite val
 
   const std::string summary = slurp(summary_path);
   CHECK(summary.find("readout name: GravityXiMotionReadout_v1") != std::string::npos);
-  CHECK(summary.find("acceleration formula: a=-K_xi*Xi_spatial") != std::string::npos);
+  CHECK(summary.find("xi kernel readout name: GravityXiKernelDeformation_v1") != std::string::npos);
+  CHECK(summary.find("acceleration formula: a=-K_xi*Xi_eff_spatial") != std::string::npos);
   CHECK(summary.find("no compute_accelerations(...) calls: true") != std::string::npos);
   CHECK(summary.find("no compute_direct_tpf_accelerations(...) calls: true") != std::string::npos);
+  CHECK(summary.find("note: old additive acceleration VDSG path is not used") != std::string::npos);
   CHECK(summary.find("escaped/invalid probe count:") != std::string::npos);
   CHECK(summary.find("escaped/invalid trajectory row count:") != std::string::npos);
 
@@ -805,6 +807,15 @@ TEST_CASE("4d xi motion probe benchmark writes required artifacts and finite val
   const int step_col = find_csv_col(header, "step");
   const int x_col = find_csv_col(header, "x");
   const int valid_col = find_csv_col(header, "valid");
+  CHECK(find_csv_col(header, "xi_t") >= 0);
+  CHECK(find_csv_col(header, "xi_x_base") >= 0);
+  CHECK(find_csv_col(header, "xi_x_eff") >= 0);
+  CHECK(find_csv_col(header, "beta_rel") >= 0);
+  CHECK(find_csv_col(header, "gamma_rel") >= 0);
+  CHECK(find_csv_col(header, "xi_kernel_factor_raw") >= 0);
+  CHECK(find_csv_col(header, "xi_kernel_metric_scale") >= 0);
+  CHECK(find_csv_col(header, "xi_kernel_mode") >= 0);
+  CHECK(find_csv_col(header, "xi_temporal_mode") >= 0);
   REQUIRE(step_col >= 0);
   REQUIRE(x_col >= 0);
   REQUIRE(valid_col >= 0);
@@ -836,6 +847,149 @@ TEST_CASE("4d xi motion probe benchmark writes required artifacts and finite val
   CHECK(std::isfinite(x0));
   CHECK(std::isfinite(x_last));
   CHECK(x_last != doctest::Approx(x0));
+}
+
+TEST_CASE("4d xi motion probe benchmark off mode preserves Xi base and acceleration readout") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_off_regression_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_motion_readout_scale = 2.0e-12;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int xi_x_col = find_csv_col(header, "xi_x");
+  const int xi_y_col = find_csv_col(header, "xi_y");
+  const int xi_z_col = find_csv_col(header, "xi_z");
+  const int xi_x_base_col = find_csv_col(header, "xi_x_base");
+  const int xi_y_base_col = find_csv_col(header, "xi_y_base");
+  const int xi_z_base_col = find_csv_col(header, "xi_z_base");
+  const int xi_x_eff_col = find_csv_col(header, "xi_x_eff");
+  const int xi_y_eff_col = find_csv_col(header, "xi_y_eff");
+  const int xi_z_eff_col = find_csv_col(header, "xi_z_eff");
+  const int ax_col = find_csv_col(header, "ax");
+  const int ay_col = find_csv_col(header, "ay");
+  const int az_col = find_csv_col(header, "az");
+  const int xi_t_col = find_csv_col(header, "xi_t");
+  REQUIRE(xi_x_col >= 0);
+  REQUIRE(ax_col >= 0);
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    const double xi_x = std::atof(cols[xi_x_col].c_str());
+    const double xi_y = std::atof(cols[xi_y_col].c_str());
+    const double xi_z = std::atof(cols[xi_z_col].c_str());
+    CHECK(xi_x == doctest::Approx(std::atof(cols[xi_x_base_col].c_str())));
+    CHECK(xi_y == doctest::Approx(std::atof(cols[xi_y_base_col].c_str())));
+    CHECK(xi_z == doctest::Approx(std::atof(cols[xi_z_base_col].c_str())));
+    CHECK(xi_x == doctest::Approx(std::atof(cols[xi_x_eff_col].c_str())));
+    CHECK(xi_y == doctest::Approx(std::atof(cols[xi_y_eff_col].c_str())));
+    CHECK(xi_z == doctest::Approx(std::atof(cols[xi_z_eff_col].c_str())));
+    CHECK(std::atof(cols[ax_col].c_str()) == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_x));
+    CHECK(std::atof(cols[ay_col].c_str()) == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_y));
+    CHECK(std::atof(cols[az_col].c_str()) == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_z));
+    CHECK(std::atof(cols[xi_t_col].c_str()) == doctest::Approx(0.0));
+  }
+}
+
+TEST_CASE("4d xi motion probe benchmark scalar_beta scales Xi_eff by 1+factor_raw") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_scalar_beta_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_speed = 0.1 * 299792458.0;
+  c.tpf_4d_xi_kernel_mode = "scalar_beta";
+  c.tpf_4d_xi_kernel_coupling = 0.5;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int base_col = find_csv_col(header, "xi_x_base");
+  const int eff_col = find_csv_col(header, "xi_x_eff");
+  const int factor_col = find_csv_col(header, "xi_kernel_factor_raw");
+  const int ax_col = find_csv_col(header, "ax");
+  const int xicol = find_csv_col(header, "xi_x");
+  REQUIRE(base_col >= 0);
+  REQUIRE(eff_col >= 0);
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    const double base = std::atof(cols[base_col].c_str());
+    const double factor = std::atof(cols[factor_col].c_str());
+    const double eff = std::atof(cols[eff_col].c_str());
+    CHECK(eff == doctest::Approx(base * (1.0 + factor)));
+    CHECK(std::atof(cols[xicol].c_str()) == doctest::Approx(eff));
+    CHECK(std::atof(cols[ax_col].c_str()) == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * eff));
+  }
+}
+
+TEST_CASE("4d xi motion probe benchmark spacetime_metric emits xi_t diagnostics only") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_spacetime_metric_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_speed = 0.05 * 299792458.0;
+  c.tpf_4d_xi_kernel_mode = "spacetime_metric";
+  c.tpf_4d_xi_kernel_coupling = 0.75;
+  c.tpf_4d_xi_temporal_mode = "norm_scaled";
+  c.tpf_4d_xi_temporal_coupling = 1.0;
+  c.tpf_4d_xi_source_speed_x = 1.0e5;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int xi_t_col = find_csv_col(header, "xi_t");
+  const int ax_col = find_csv_col(header, "ax");
+  const int xi_x_eff_col = find_csv_col(header, "xi_x_eff");
+  REQUIRE(xi_t_col >= 0);
+
+  bool saw_nonzero_xi_t = false;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    const double xi_t = std::atof(cols[xi_t_col].c_str());
+    const double xi_x_eff = std::atof(cols[xi_x_eff_col].c_str());
+    const double ax = std::atof(cols[ax_col].c_str());
+    if (std::fabs(xi_t) > 0.0) saw_nonzero_xi_t = true;
+    CHECK(ax == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_x_eff));
+  }
+  CHECK(saw_nonzero_xi_t);
 }
 
 TEST_CASE("4d xi motion probe benchmark monopole axis acceleration points inward with low transverse fraction") {
@@ -958,6 +1112,27 @@ TEST_CASE("4d xi motion probe benchmark rejects invalid config values loudly") {
   c.tpf_4d_xi_motion_integrator = "rk4";
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
   c.tpf_4d_xi_motion_integrator = "velocity_verlet";
+  c.tpf_4d_xi_kernel_mode = "bad";
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_kernel_factor_mode = "bad";
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_temporal_mode = "bad";
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_temporal_mode = "off";
+  c.tpf_4d_xi_kernel_beta_power = -1.0;
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_metric_min = 0.0;
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_kernel_metric_min = 0.1;
+  c.tpf_4d_xi_kernel_metric_max = 0.05;
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_kernel_metric_max = 10.0;
+  c.tpf_4d_xi_source_speed_x = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_source_speed_x = 0.0;
   c.tpf_source_benchmark_shape = "unknown";
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
 }
