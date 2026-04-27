@@ -1926,6 +1926,330 @@ void TPFCorePackage::run_4d_static_motion_readout_benchmark(const Config& config
   summary << "probe grid csv: tpf_4d_static_motion_readout_probe_grid.csv\n";
 }
 
+void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, const std::string& output_dir) {
+  using namespace tpfcore;
+
+  const double dt = config.tpf_4d_xi_motion_dt;
+  const int steps = config.tpf_4d_xi_motion_steps;
+  const double readout_scale = config.tpf_4d_xi_motion_readout_scale;
+  const double field_softening = config.tpf_4d_xi_motion_field_softening;
+  const double source_exclusion_radius = config.tpf_4d_xi_motion_source_exclusion_radius;
+  const std::string layout = config.tpf_4d_xi_motion_probe_layout;
+  const int probe_count_cfg = config.tpf_4d_xi_motion_probe_count;
+  const double probe_radius = config.tpf_4d_xi_motion_probe_radius;
+  const double probe_speed = config.tpf_4d_xi_motion_probe_speed;
+  const std::string integrator = config.tpf_4d_xi_motion_integrator;
+  const int dump_every = config.tpf_4d_xi_motion_dump_every;
+
+  if (!std::isfinite(dt) || dt <= 0.0) throw std::runtime_error("tpf_4d_xi_motion_dt must be finite and > 0");
+  if (steps < 1) throw std::runtime_error("tpf_4d_xi_motion_steps must be >= 1");
+  if (!std::isfinite(readout_scale)) throw std::runtime_error("tpf_4d_xi_motion_readout_scale must be finite");
+  if (!std::isfinite(field_softening) || field_softening < 0.0) throw std::runtime_error("tpf_4d_xi_motion_field_softening must be finite and >= 0");
+  if (!std::isfinite(source_exclusion_radius) || source_exclusion_radius < 0.0) throw std::runtime_error("tpf_4d_xi_motion_source_exclusion_radius must be finite and >= 0");
+  if (probe_count_cfg < 1 || probe_count_cfg > 4096) throw std::runtime_error("tpf_4d_xi_motion_probe_count must be in [1, 4096]");
+  if (!std::isfinite(probe_radius) || probe_radius < 0.0) throw std::runtime_error("tpf_4d_xi_motion_probe_radius must be finite and >= 0");
+  if (!std::isfinite(probe_speed)) throw std::runtime_error("tpf_4d_xi_motion_probe_speed must be finite");
+  if (layout != "ring" && layout != "axis") throw std::runtime_error("tpf_4d_xi_motion_probe_layout must be ring or axis");
+  if (integrator != "velocity_verlet" && integrator != "semi_implicit_euler") throw std::runtime_error("tpf_4d_xi_motion_integrator must be velocity_verlet or semi_implicit_euler");
+  if (dump_every < 1) throw std::runtime_error("tpf_4d_xi_motion_dump_every must be >= 1");
+  validate_stage4_residual_source_inputs(config);
+
+  std::string source_config_id;
+  const std::vector<BenchmarkSourceSpec3D> source_specs = build_tpf_benchmark_sources_3d(config, &source_config_id);
+  validate_stage4_residual_source_specs(source_specs);
+  std::vector<StaticSourcePoint4D> sources;
+  sources.reserve(source_specs.size());
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    sources.push_back(StaticSourcePoint4D{source_specs[i].m, source_specs[i].x, source_specs[i].y, source_specs[i].z});
+  }
+
+  struct ProbeState {
+    int id = 0;
+    double x = 0.0, y = 0.0, z = 0.0;
+    double vx = 0.0, vy = 0.0, vz = 0.0;
+    double ax = 0.0, ay = 0.0, az = 0.0;
+    double xi_x = 0.0, xi_y = 0.0, xi_z = 0.0;
+    double xi_spatial_norm = 0.0;
+    double theta_trace_4d = 0.0;
+    double invariant_I_4d = 0.0;
+    bool is_near_source = false;
+    bool escaped = false;
+    bool valid = true;
+  };
+  auto eval_probe = [&](ProbeState& p) {
+    p.is_near_source = (source_exclusion_radius > 0.0 &&
+                        nearest_source_distance(source_specs, p.x, p.y, p.z) <= source_exclusion_radius);
+    p.valid = std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
+              std::isfinite(p.vx) && std::isfinite(p.vy) && std::isfinite(p.vz) && !p.is_near_source;
+    if (!p.valid) {
+      p.escaped = true;
+      p.ax = p.ay = p.az = 0.0;
+      p.xi_x = p.xi_y = p.xi_z = 0.0;
+      p.xi_spatial_norm = 0.0;
+      p.theta_trace_4d = std::numeric_limits<double>::quiet_NaN();
+      p.invariant_I_4d = std::numeric_limits<double>::quiet_NaN();
+      return;
+    }
+    const StaticProbePoint4D probe{p.x, p.y, p.z};
+    const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, field_softening);
+    p.xi_x = field.xi.x;
+    p.xi_y = field.xi.y;
+    p.xi_z = field.xi.z;
+    p.xi_spatial_norm = std::sqrt(p.xi_x * p.xi_x + p.xi_y * p.xi_y + p.xi_z * p.xi_z);
+    p.theta_trace_4d = field.theta_trace_4d;
+    p.invariant_I_4d = field.invariant_I_4d;
+    p.ax = -readout_scale * p.xi_x;
+    p.ay = -readout_scale * p.xi_y;
+    p.az = -readout_scale * p.xi_z;
+    p.valid = p.valid && std::isfinite(p.ax) && std::isfinite(p.ay) && std::isfinite(p.az);
+    if (!p.valid) p.escaped = true;
+  };
+
+  std::vector<ProbeState> probes;
+  if (layout == "ring") {
+    probes.resize(static_cast<std::size_t>(probe_count_cfg));
+    for (int i = 0; i < probe_count_cfg; ++i) {
+      const double t = (2.0 * 3.14159265358979323846 * static_cast<double>(i)) / static_cast<double>(probe_count_cfg);
+      ProbeState p;
+      p.id = i;
+      p.x = probe_radius * std::cos(t);
+      p.y = probe_radius * std::sin(t);
+      p.z = 0.0;
+      p.vx = -probe_speed * std::sin(t);
+      p.vy = probe_speed * std::cos(t);
+      p.vz = 0.0;
+      probes[static_cast<std::size_t>(i)] = p;
+    }
+  } else {
+    const int n = std::max(6, probe_count_cfg);
+    probes.resize(static_cast<std::size_t>(n));
+    const double coords[6][3] = {
+        {probe_radius, 0.0, 0.0}, {-probe_radius, 0.0, 0.0},
+        {0.0, probe_radius, 0.0}, {0.0, -probe_radius, 0.0},
+        {0.0, 0.0, probe_radius}, {0.0, 0.0, -probe_radius}};
+    for (int i = 0; i < n; ++i) {
+      ProbeState p;
+      p.id = i;
+      p.x = coords[i % 6][0];
+      p.y = coords[i % 6][1];
+      p.z = coords[i % 6][2];
+      probes[static_cast<std::size_t>(i)] = p;
+    }
+  }
+
+  std::ofstream traj(output_dir + "/tpf_4d_xi_motion_probe_trajectories.csv");
+  std::ofstream init_csv(output_dir + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  if (!traj || !init_csv) throw std::runtime_error("failed to open Xi motion benchmark CSV outputs");
+  traj << std::scientific;
+  init_csv << std::scientific;
+  traj << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d,"
+          "r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
+  init_csv << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d,"
+             "r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
+
+  std::size_t rows_written = 0;
+  std::size_t escaped_or_invalid = 0;
+  double min_radius = std::numeric_limits<double>::infinity();
+  double max_radius = 0.0;
+  double sum_align = 0.0, sum_transverse = 0.0;
+  std::size_t align_count = 0, trans_count = 0;
+
+  auto dump_row = [&](int step_idx, double tcur, const ProbeState& p, std::ostream& out) {
+    const double a_norm = std::sqrt(p.ax * p.ax + p.ay * p.ay + p.az * p.az);
+    const double r_origin = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    double align = std::numeric_limits<double>::quiet_NaN();
+    double transverse = std::numeric_limits<double>::quiet_NaN();
+    if (r_origin > 1e-30 && a_norm > 1e-30) {
+      const double inx = -p.x / r_origin;
+      const double iny = -p.y / r_origin;
+      const double inz = -p.z / r_origin;
+      align = (p.ax * inx + p.ay * iny + p.az * inz) / a_norm;
+      const double clipped = std::max(-1.0, std::min(1.0, align));
+      transverse = std::sqrt(std::max(0.0, 1.0 - clipped * clipped));
+    }
+    out << step_idx << "," << tcur << "," << p.id << ","
+        << p.x << "," << p.y << "," << p.z << ","
+        << p.vx << "," << p.vy << "," << p.vz << ","
+        << p.ax << "," << p.ay << "," << p.az << "," << a_norm << ","
+        << p.xi_x << "," << p.xi_y << "," << p.xi_z << "," << p.xi_spatial_norm << ","
+        << p.theta_trace_4d << "," << p.invariant_I_4d << ","
+        << r_origin << "," << align << "," << transverse << ","
+        << (p.is_near_source ? 1 : 0) << "," << (p.escaped ? 1 : 0) << "," << (p.valid ? 1 : 0) << "\n";
+  };
+
+  for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i]);
+  for (std::size_t i = 0; i < probes.size(); ++i) {
+    dump_row(0, 0.0, probes[i], traj);
+    dump_row(0, 0.0, probes[i], init_csv);
+    ++rows_written;
+    const double r_origin = std::sqrt(probes[i].x * probes[i].x + probes[i].y * probes[i].y + probes[i].z * probes[i].z);
+    if (probes[i].valid) {
+      min_radius = std::min(min_radius, r_origin);
+      max_radius = std::max(max_radius, r_origin);
+    } else {
+      ++escaped_or_invalid;
+    }
+  }
+
+  std::vector<double> ax_old(probes.size(), 0.0), ay_old(probes.size(), 0.0), az_old(probes.size(), 0.0);
+  std::vector<double> ax_new(probes.size(), 0.0), ay_new(probes.size(), 0.0), az_new(probes.size(), 0.0);
+  for (int step = 1; step <= steps; ++step) {
+    if (integrator == "velocity_verlet") {
+      for (std::size_t i = 0; i < probes.size(); ++i) {
+        ProbeState& p = probes[i];
+        ax_old[i] = p.ax;
+        ay_old[i] = p.ay;
+        az_old[i] = p.az;
+        if (!p.valid) continue;
+        p.x += p.vx * dt + 0.5 * p.ax * dt * dt;
+        p.y += p.vy * dt + 0.5 * p.ay * dt * dt;
+        p.z += p.vz * dt + 0.5 * p.az * dt * dt;
+      }
+      for (std::size_t i = 0; i < probes.size(); ++i) {
+        ProbeState& p = probes[i];
+        eval_probe(p);
+        ax_new[i] = p.ax;
+        ay_new[i] = p.ay;
+        az_new[i] = p.az;
+      }
+      for (std::size_t i = 0; i < probes.size(); ++i) {
+        ProbeState& p = probes[i];
+        if (!p.valid) continue;
+        p.vx += 0.5 * (ax_old[i] + ax_new[i]) * dt;
+        p.vy += 0.5 * (ay_old[i] + ay_new[i]) * dt;
+        p.vz += 0.5 * (az_old[i] + az_new[i]) * dt;
+      }
+    } else {
+      for (std::size_t i = 0; i < probes.size(); ++i) {
+        ProbeState& p = probes[i];
+        eval_probe(p);
+        if (!p.valid) continue;
+        p.vx += p.ax * dt;
+        p.vy += p.ay * dt;
+        p.vz += p.az * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.z += p.vz * dt;
+      }
+      for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i]);
+    }
+
+    if ((step % dump_every) == 0) {
+      const double tcur = dt * static_cast<double>(step);
+      for (std::size_t i = 0; i < probes.size(); ++i) {
+        const ProbeState& p = probes[i];
+        dump_row(step, tcur, p, traj);
+        ++rows_written;
+        const double a_norm = std::sqrt(p.ax * p.ax + p.ay * p.ay + p.az * p.az);
+        const double r_origin = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+        if (!p.valid) {
+          ++escaped_or_invalid;
+          continue;
+        }
+        min_radius = std::min(min_radius, r_origin);
+        max_radius = std::max(max_radius, r_origin);
+        if (r_origin > 1e-30 && a_norm > 1e-30) {
+          const double inx = -p.x / r_origin;
+          const double iny = -p.y / r_origin;
+          const double inz = -p.z / r_origin;
+          const double align = (p.ax * inx + p.ay * iny + p.az * inz) / a_norm;
+          const double clipped = std::max(-1.0, std::min(1.0, align));
+          const double transverse = std::sqrt(std::max(0.0, 1.0 - clipped * clipped));
+          sum_align += align;
+          sum_transverse += transverse;
+          ++align_count;
+          ++trans_count;
+        }
+      }
+    }
+  }
+
+  double slope = std::numeric_limits<double>::quiet_NaN();
+  std::vector<double> slope_log_r;
+  std::vector<double> slope_log_a;
+  if (config.tpf_source_benchmark_shape == "monopole") {
+    const double r_base = std::max(1.0, probe_radius);
+    for (int i = 0; i < 12; ++i) {
+      const double r = r_base * (0.7 + 0.3 * static_cast<double>(i));
+      if (!(r > 0.0)) continue;
+      if (source_exclusion_radius > 0.0 && r <= source_exclusion_radius) continue;
+      const StaticProbePoint4D probe{r, 0.0, 0.0};
+      const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, field_softening);
+      const double ax = -readout_scale * field.xi.x;
+      const double ay = -readout_scale * field.xi.y;
+      const double az = -readout_scale * field.xi.z;
+      const double a = std::sqrt(ax * ax + ay * ay + az * az);
+      if (std::isfinite(a) && a > 0.0) {
+        slope_log_r.push_back(std::log(r));
+        slope_log_a.push_back(std::log(a));
+      }
+    }
+  }
+  if (slope_log_r.size() >= 2) {
+    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+    for (std::size_t i = 0; i < slope_log_r.size(); ++i) {
+      sx += slope_log_r[i];
+      sy += slope_log_a[i];
+      sxx += slope_log_r[i] * slope_log_r[i];
+      sxy += slope_log_r[i] * slope_log_a[i];
+    }
+    const double n = static_cast<double>(slope_log_r.size());
+    const double d = n * sxx - sx * sx;
+    if (std::fabs(d) > 1e-30) slope = (n * sxy - sx * sy) / d;
+  }
+
+  std::ofstream summary(output_dir + "/tpf_4d_xi_motion_probe_summary.txt");
+  if (!summary) throw std::runtime_error("failed to open Xi motion benchmark summary");
+  summary << std::scientific;
+  summary << "mode: tpf_4d_xi_motion_probe_benchmark\n";
+  summary << "readout name: GravityXiMotionReadout_v1\n";
+  summary << "source shape: " << config.tpf_source_benchmark_shape << "\n";
+  summary << "source config id: " << source_config_id << "\n";
+  summary << "source masses: ";
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    if (i > 0) summary << ", ";
+    summary << source_specs[i].m;
+  }
+  summary << "\nsource positions: ";
+  for (std::size_t i = 0; i < source_specs.size(); ++i) {
+    if (i > 0) summary << "; ";
+    summary << "(" << source_specs[i].x << "," << source_specs[i].y << "," << source_specs[i].z << ")";
+  }
+  summary << "\n";
+  summary << "dt: " << dt << "\n";
+  summary << "steps: " << steps << "\n";
+  summary << "integrator: " << integrator << "\n";
+  summary << "readout scale: " << readout_scale << "\n";
+  summary << "field softening: " << field_softening << "\n";
+  summary << "source exclusion radius: " << source_exclusion_radius << "\n";
+  summary << "probe layout: " << layout << "\n";
+  summary << "probe count: " << probes.size() << "\n";
+  summary << "probe radius: " << probe_radius << "\n";
+  summary << "probe speed: " << probe_speed << "\n";
+  summary << "total trajectory rows written: " << rows_written << "\n";
+  summary << "escaped/invalid probe count: " << escaped_or_invalid << "\n";
+  summary << "minimum radius reached: " << min_radius << "\n";
+  summary << "maximum radius reached: " << max_radius << "\n";
+  summary << "mean radial alignment of acceleration with inward source/origin direction: "
+          << (align_count > 0 ? sum_align / static_cast<double>(align_count) : std::numeric_limits<double>::quiet_NaN()) << "\n";
+  summary << "mean transverse acceleration fraction: "
+          << (trans_count > 0 ? sum_transverse / static_cast<double>(trans_count) : std::numeric_limits<double>::quiet_NaN()) << "\n";
+  summary << "measured Xi acceleration falloff slope from initial probe samples if available: " << slope << "\n";
+  summary << "acceleration formula: a=-K_xi*Xi_spatial\n";
+  summary << "evaluator: evaluate_static_sources_field_4d(...)\n";
+  summary << "source behavior: fixed sources for Stage 7B\n";
+  summary << "probe behavior: moving probes\n";
+  summary << "no Newtonian acceleration calls: true\n";
+  summary << "no compute_accelerations(...) calls: true\n";
+  summary << "no compute_direct_tpf_accelerations(...) calls: true\n";
+  summary << "no principal C tensor acceleration: true\n";
+  summary << "no VDSG/shunt/cooling: true\n";
+  summary << "no production dynamics route: true\n";
+  summary << "note: acceleration is -K_xi * Xi_spatial\n";
+  summary << "note: no Newtonian acceleration or principal-C readout is used\n";
+  summary << "description: dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation.\n";
+}
+
 void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snapshots,
                                               const Config& config,
                                               const std::string& output_dir) const {

@@ -157,3 +157,35 @@ TEST_CASE("write_render_manifest: tpf_4d_static_motion_readout_benchmark uses be
   std::remove((out_dir + "/render_manifest.json").c_str());
   rmdir(out_dir.c_str());
 }
+
+TEST_CASE("write_render_manifest: tpf_4d_xi_motion_probe_benchmark uses Xi-direct benchmark-only audit labels") {
+  char dir_template[] = "/tmp/render_audit_static4d_ximotion_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark;
+  c.tpf_dynamics_mode = "direct_tpf";
+  galaxy::write_render_manifest(out_dir, c, 0, 0, 0, nullptr);
+
+  const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  const std::string json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(txt.find("active_dynamics_branch\tTPF_4D_xi_motion_probe_benchmark") != std::string::npos);
+  CHECK(txt.find("active_metrics_branch\tdynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes") !=
+        std::string::npos);
+  CHECK(txt.find("acceleration_code_path\tnone (tpf_4d_xi_motion_probe_benchmark uses "
+                 "evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)") !=
+        std::string::npos);
+  CHECK(json.find("\"active_dynamics_branch\": \"TPF_4D_xi_motion_probe_benchmark") != std::string::npos);
+  CHECK(json.find("\"active_metrics_branch\": \"dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving "
+                  "probes\"") != std::string::npos);
+  CHECK(json.find("\"acceleration_code_path\": \"none (tpf_4d_xi_motion_probe_benchmark uses "
+                  "evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)\"") !=
+        std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
+}

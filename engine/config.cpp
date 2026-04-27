@@ -64,6 +64,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_source_field_benchmark") return SimulationMode::tpf_source_field_benchmark;
   if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
   if (t == "tpf_4d_static_motion_readout_benchmark") return SimulationMode::tpf_4d_static_motion_readout_benchmark;
+  if (t == "tpf_4d_xi_motion_probe_benchmark") return SimulationMode::tpf_4d_xi_motion_probe_benchmark;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
@@ -88,6 +89,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
     case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
     case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
@@ -393,6 +395,50 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_4d_motion_bin_count") {
     config.tpf_4d_motion_bin_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_dt") {
+    config.tpf_4d_xi_motion_dt = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_steps") {
+    config.tpf_4d_xi_motion_steps = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_readout_scale") {
+    config.tpf_4d_xi_motion_readout_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_field_softening") {
+    config.tpf_4d_xi_motion_field_softening = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_source_exclusion_radius") {
+    config.tpf_4d_xi_motion_source_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_layout") {
+    config.tpf_4d_xi_motion_probe_layout = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_count") {
+    config.tpf_4d_xi_motion_probe_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_radius") {
+    config.tpf_4d_xi_motion_probe_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_speed") {
+    config.tpf_4d_xi_motion_probe_speed = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_integrator") {
+    config.tpf_4d_xi_motion_integrator = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_dump_every") {
+    config.tpf_4d_xi_motion_dump_every = std::stoi(val);
     return true;
   }
   if (key == "tpf_xi_constraint_exterior_inspect") {
@@ -832,6 +878,17 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_4d_motion_kappa", d(config.tpf_4d_motion_kappa));
   kv.emplace_back("tpf_4d_motion_readout_scale", d(config.tpf_4d_motion_readout_scale));
   kv.emplace_back("tpf_4d_motion_bin_count", i(config.tpf_4d_motion_bin_count));
+  kv.emplace_back("tpf_4d_xi_motion_dt", d(config.tpf_4d_xi_motion_dt));
+  kv.emplace_back("tpf_4d_xi_motion_steps", i(config.tpf_4d_xi_motion_steps));
+  kv.emplace_back("tpf_4d_xi_motion_readout_scale", d(config.tpf_4d_xi_motion_readout_scale));
+  kv.emplace_back("tpf_4d_xi_motion_field_softening", d(config.tpf_4d_xi_motion_field_softening));
+  kv.emplace_back("tpf_4d_xi_motion_source_exclusion_radius", d(config.tpf_4d_xi_motion_source_exclusion_radius));
+  kv.emplace_back("tpf_4d_xi_motion_probe_layout", config.tpf_4d_xi_motion_probe_layout);
+  kv.emplace_back("tpf_4d_xi_motion_probe_count", i(config.tpf_4d_xi_motion_probe_count));
+  kv.emplace_back("tpf_4d_xi_motion_probe_radius", d(config.tpf_4d_xi_motion_probe_radius));
+  kv.emplace_back("tpf_4d_xi_motion_probe_speed", d(config.tpf_4d_xi_motion_probe_speed));
+  kv.emplace_back("tpf_4d_xi_motion_integrator", config.tpf_4d_xi_motion_integrator);
+  kv.emplace_back("tpf_4d_xi_motion_dump_every", i(config.tpf_4d_xi_motion_dump_every));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));

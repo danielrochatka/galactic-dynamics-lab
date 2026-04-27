@@ -89,6 +89,9 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
     return "TPF_4D_static_motion_readout_benchmark (static field -> principal tensor -> probe acceleration readout)";
   }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
+  }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
@@ -125,6 +128,9 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
     return "static_4D_motion_readout: GravityStaticMotionReadout_v1 over probe grid";
   }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
+  }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
@@ -154,6 +160,9 @@ std::string compute_acceleration_code_path(const Config& config) {
   }
   if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
     return "none (tpf_4d_static_motion_readout_benchmark uses evaluate_static_sources_field_4d + GravityStaticMotionReadout_v1; no compute_accelerations call)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
   }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";

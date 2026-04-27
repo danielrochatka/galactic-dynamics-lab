@@ -36,6 +36,17 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_4d_motion_kappa == doctest::Approx(1.0));
   CHECK(c.tpf_4d_motion_readout_scale == doctest::Approx(1.0));
   CHECK(c.tpf_4d_motion_bin_count == 32);
+  CHECK(c.tpf_4d_xi_motion_dt == doctest::Approx(0.001));
+  CHECK(c.tpf_4d_xi_motion_steps == 2000);
+  CHECK(c.tpf_4d_xi_motion_readout_scale == doctest::Approx(1.0e-12));
+  CHECK(c.tpf_4d_xi_motion_field_softening == doctest::Approx(0.1));
+  CHECK(c.tpf_4d_xi_motion_source_exclusion_radius == doctest::Approx(0.5));
+  CHECK(c.tpf_4d_xi_motion_probe_layout == "ring");
+  CHECK(c.tpf_4d_xi_motion_probe_count == 24);
+  CHECK(c.tpf_4d_xi_motion_probe_radius == doctest::Approx(10.0));
+  CHECK(c.tpf_4d_xi_motion_probe_speed == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_xi_motion_integrator == "velocity_verlet");
+  CHECK(c.tpf_4d_xi_motion_dump_every == 1);
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -152,6 +163,8 @@ TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_corresponden
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark);
   CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_motion_readout_benchmark", c));
   CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark);
+  CHECK(apply_config_kv("simulation_mode", "tpf_4d_xi_motion_probe_benchmark", c));
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark);
 }
 
 TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
@@ -278,4 +291,48 @@ TEST_CASE("tpf_4d_static_motion_readout_benchmark config keys parse and serializ
   CHECK(has_key("tpf_4d_motion_kappa"));
   CHECK(has_key("tpf_4d_motion_readout_scale"));
   CHECK(has_key("tpf_4d_motion_bin_count"));
+}
+
+TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
+  Config c;
+  CHECK(apply_config_kv("tpf_4d_xi_motion_dt", "0.0025", c));
+  CHECK(c.tpf_4d_xi_motion_dt == doctest::Approx(0.0025));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_steps", "123", c));
+  CHECK(c.tpf_4d_xi_motion_steps == 123);
+  CHECK(apply_config_kv("tpf_4d_xi_motion_readout_scale", "9e-13", c));
+  CHECK(c.tpf_4d_xi_motion_readout_scale == doctest::Approx(9e-13));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_field_softening", "0.2", c));
+  CHECK(c.tpf_4d_xi_motion_field_softening == doctest::Approx(0.2));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_source_exclusion_radius", "0.75", c));
+  CHECK(c.tpf_4d_xi_motion_source_exclusion_radius == doctest::Approx(0.75));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_probe_layout", "axis", c));
+  CHECK(c.tpf_4d_xi_motion_probe_layout == "axis");
+  CHECK(apply_config_kv("tpf_4d_xi_motion_probe_count", "64", c));
+  CHECK(c.tpf_4d_xi_motion_probe_count == 64);
+  CHECK(apply_config_kv("tpf_4d_xi_motion_probe_radius", "15.0", c));
+  CHECK(c.tpf_4d_xi_motion_probe_radius == doctest::Approx(15.0));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_probe_speed", "2.0", c));
+  CHECK(c.tpf_4d_xi_motion_probe_speed == doctest::Approx(2.0));
+  CHECK(apply_config_kv("tpf_4d_xi_motion_integrator", "semi_implicit_euler", c));
+  CHECK(c.tpf_4d_xi_motion_integrator == "semi_implicit_euler");
+  CHECK(apply_config_kv("tpf_4d_xi_motion_dump_every", "3", c));
+  CHECK(c.tpf_4d_xi_motion_dump_every == 3);
+
+  const auto kv = galaxy::serialize_config_kv(c);
+  const auto has_key = [&kv](const char* key) {
+    return std::any_of(
+        kv.begin(), kv.end(),
+        [key](const std::pair<std::string, std::string>& entry) { return entry.first == key; });
+  };
+  CHECK(has_key("tpf_4d_xi_motion_dt"));
+  CHECK(has_key("tpf_4d_xi_motion_steps"));
+  CHECK(has_key("tpf_4d_xi_motion_readout_scale"));
+  CHECK(has_key("tpf_4d_xi_motion_field_softening"));
+  CHECK(has_key("tpf_4d_xi_motion_source_exclusion_radius"));
+  CHECK(has_key("tpf_4d_xi_motion_probe_layout"));
+  CHECK(has_key("tpf_4d_xi_motion_probe_count"));
+  CHECK(has_key("tpf_4d_xi_motion_probe_radius"));
+  CHECK(has_key("tpf_4d_xi_motion_probe_speed"));
+  CHECK(has_key("tpf_4d_xi_motion_integrator"));
+  CHECK(has_key("tpf_4d_xi_motion_dump_every"));
 }
