@@ -91,6 +91,15 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_4d_static_motion_readout_summary.txt`**, **`tpf_4d_static_motion_readout_probe_grid.csv`**, **`tpf_4d_static_motion_readout_bins_origin.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_motion_readout_benchmark`. This path evaluates frozen static 4D field objects and computes candidate probe-motion readout accelerations from the principal spatial tensor construction (`GravityStaticMotionReadout_v1`).
 
+**`tpf_4d_xi_motion_probe_summary.txt`**, **`tpf_4d_xi_motion_probe_trajectories.csv`**, **`tpf_4d_xi_motion_probe_initial_readout.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_xi_motion_probe_benchmark`. This path advances dynamic probes with `GravityXiMotionReadout_v1` (`a=-K_xi*Xi_spatial`) using fixed-source Stage 7B field evaluation and writes trajectory readout samples for each probe over time.
+
+**Optional trajectory visualization PNGs** — `plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:
+`tpf_4d_xi_motion_probe_xy_trajectories.png`,
+`tpf_4d_xi_motion_probe_xz_trajectories.png`,
+`tpf_4d_xi_motion_probe_yz_trajectories.png`,
+`tpf_4d_xi_motion_probe_radius_vs_time.png`,
+`tpf_4d_xi_motion_probe_acceleration_norm_vs_time.png`.
+
 ---
 
 ## What TPFCore claims vs does not claim
