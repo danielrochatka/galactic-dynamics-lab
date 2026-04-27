@@ -587,6 +587,9 @@ TEST_CASE("4d static motion readout benchmark writes required artifacts and fini
   const std::string summary = slurp(summary_path);
   CHECK(summary.find("kappa_motion:") != std::string::npos);
   CHECK(summary.find("motion_readout_scale:") != std::string::npos);
+  CHECK(summary.find("interior cells:") != std::string::npos);
+  CHECK(summary.find("used/free probe cells:") != std::string::npos);
+  CHECK(summary.find("interior/free probe cells:") == std::string::npos);
   CHECK(summary.find("measured log-log falloff slope for monopole if available:") != std::string::npos);
   CHECK(std::isfinite(parse_summary_scalar(summary, "mean acceleration norm")));
   CHECK(std::isfinite(parse_summary_scalar(summary, "max acceleration norm")));
