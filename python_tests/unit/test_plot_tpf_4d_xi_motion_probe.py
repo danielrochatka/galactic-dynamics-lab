@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -45,9 +44,13 @@ class TestPlotTPF4DXiMotionProbe(unittest.TestCase):
             )
             self.assertEqual(proc.returncode, 0)
 
-            deps_available = all(
-                importlib.util.find_spec(mod) is not None for mod in ("numpy", "pandas", "matplotlib")
-            )
+            try:
+                import matplotlib.pyplot  # noqa: F401
+                import numpy  # noqa: F401
+                import pandas  # noqa: F401
+                deps_available = True
+            except Exception:
+                deps_available = False
             if deps_available:
                 self.assertTrue((out_dir / "tpf_4d_xi_motion_probe_xy_trajectories.png").exists())
                 self.assertTrue((out_dir / "tpf_4d_xi_motion_probe_xz_trajectories.png").exists())

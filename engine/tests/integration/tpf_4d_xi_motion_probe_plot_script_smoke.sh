@@ -27,10 +27,14 @@ if [[ $RET -ne 0 ]]; then
 fi
 
 if python3 - <<'PY'
-import importlib.util
 import sys
-mods = ("numpy", "pandas", "matplotlib")
-sys.exit(0 if all(importlib.util.find_spec(m) is not None for m in mods) else 1)
+try:
+    import matplotlib.pyplot  # noqa: F401
+    import numpy  # noqa: F401
+    import pandas  # noqa: F401
+except Exception:
+    sys.exit(1)
+sys.exit(0)
 PY
 then
   test -f "$OUT_DIR/tpf_4d_xi_motion_probe_xy_trajectories.png"
