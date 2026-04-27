@@ -794,6 +794,8 @@ TEST_CASE("4d xi motion probe benchmark writes required artifacts and finite val
   CHECK(summary.find("acceleration formula: a=-K_xi*Xi_spatial") != std::string::npos);
   CHECK(summary.find("no compute_accelerations(...) calls: true") != std::string::npos);
   CHECK(summary.find("no compute_direct_tpf_accelerations(...) calls: true") != std::string::npos);
+  CHECK(summary.find("escaped/invalid probe count:") != std::string::npos);
+  CHECK(summary.find("escaped/invalid trajectory row count:") != std::string::npos);
 
   std::ifstream in(traj_path);
   REQUIRE(static_cast<bool>(in));
@@ -921,7 +923,14 @@ TEST_CASE("4d xi motion probe benchmark monopole falloff slope near -2 and near-
     CHECK(slope > -2.3);
     CHECK(slope < -1.7);
   }
-  CHECK(parse_summary_scalar(summary, "escaped/invalid probe count") > 0.0);
+  const double invalid_probe_count = parse_summary_scalar(summary, "escaped/invalid probe count");
+  const double invalid_row_count = parse_summary_scalar(summary, "escaped/invalid trajectory row count");
+  CHECK(invalid_probe_count > 0.0);
+  CHECK(invalid_probe_count <= static_cast<double>(c.tpf_4d_xi_motion_probe_count));
+  CHECK(invalid_row_count >= invalid_probe_count);
+  CHECK(invalid_row_count > invalid_probe_count);
+  CHECK(std::isnan(parse_summary_scalar(summary, "minimum radius reached")));
+  CHECK(std::isnan(parse_summary_scalar(summary, "maximum radius reached")));
 }
 
 TEST_CASE("4d xi motion probe benchmark rejects invalid config values loudly") {

@@ -2048,7 +2048,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
              "r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
 
   std::size_t rows_written = 0;
-  std::size_t escaped_or_invalid = 0;
+  std::size_t invalid_row_count = 0;
   double min_radius = std::numeric_limits<double>::infinity();
   double max_radius = 0.0;
   double sum_align = 0.0, sum_transverse = 0.0;
@@ -2087,7 +2087,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       min_radius = std::min(min_radius, r_origin);
       max_radius = std::max(max_radius, r_origin);
     } else {
-      ++escaped_or_invalid;
+      ++invalid_row_count;
     }
   }
 
@@ -2143,7 +2143,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         const double a_norm = std::sqrt(p.ax * p.ax + p.ay * p.ay + p.az * p.az);
         const double r_origin = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
         if (!p.valid) {
-          ++escaped_or_invalid;
+          ++invalid_row_count;
           continue;
         }
         min_radius = std::min(min_radius, r_origin);
@@ -2162,6 +2162,15 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         }
       }
     }
+  }
+
+  std::size_t invalid_probe_count = 0;
+  for (std::size_t i = 0; i < probes.size(); ++i) {
+    if (probes[i].escaped || !probes[i].valid) ++invalid_probe_count;
+  }
+  if (!std::isfinite(min_radius) || min_radius == std::numeric_limits<double>::infinity()) {
+    min_radius = std::numeric_limits<double>::quiet_NaN();
+    max_radius = std::numeric_limits<double>::quiet_NaN();
   }
 
   double slope = std::numeric_limits<double>::quiet_NaN();
@@ -2227,7 +2236,8 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   summary << "probe radius: " << probe_radius << "\n";
   summary << "probe speed: " << probe_speed << "\n";
   summary << "total trajectory rows written: " << rows_written << "\n";
-  summary << "escaped/invalid probe count: " << escaped_or_invalid << "\n";
+  summary << "escaped/invalid probe count: " << invalid_probe_count << "\n";
+  summary << "escaped/invalid trajectory row count: " << invalid_row_count << "\n";
   summary << "minimum radius reached: " << min_radius << "\n";
   summary << "maximum radius reached: " << max_radius << "\n";
   summary << "mean radial alignment of acceleration with inward source/origin direction: "
