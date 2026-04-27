@@ -1907,7 +1907,8 @@ void TPFCorePackage::run_4d_static_motion_readout_benchmark(const Config& config
   summary << "kappa_motion: " << kappa_motion << "\n";
   summary << "motion_readout_scale: " << motion_readout_scale << "\n";
   summary << "total grid cells: " << total_cells << "\n";
-  summary << "interior/free probe cells: " << interior_cells << "\n";
+  summary << "interior cells: " << interior_cells << "\n";
+  summary << "used/free probe cells: " << used_norms.size() << "\n";
   summary << "excluded boundary count: " << boundary_count << "\n";
   summary << "excluded near-source count: " << near_source_count << "\n";
   summary << "degenerate Xi count: " << degenerate_count << "\n";
@@ -1916,7 +1917,9 @@ void TPFCorePackage::run_4d_static_motion_readout_benchmark(const Config& config
   summary << "max acceleration norm: " << max_norm << "\n";
   summary << "mean radial alignment: " << mean_align << "\n";
   summary << "median radial alignment: " << median_align << "\n";
+  summary << "radial alignment sample count: " << used_align.size() << "\n";
   summary << "mean transverse fraction: " << mean_transverse << "\n";
+  summary << "transverse fraction sample count: " << used_transverse.size() << "\n";
   summary << "measured log-log falloff slope for monopole if available: " << falloff_slope << "\n";
   summary << "falloff slope note: slope is measured from this readout and is not forced to Newtonian.\n";
   summary << "bins origin csv: tpf_4d_static_motion_readout_bins_origin.csv\n";
