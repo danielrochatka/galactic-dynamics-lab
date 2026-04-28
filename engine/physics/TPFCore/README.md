@@ -99,6 +99,7 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 - `off` preserves Stage 7B behavior exactly (same Xi kernel and same readout equation).
 - `spacetime_metric` can emit an `Xi_t`/Xi0 diagnostic (`tpf_4d_xi_temporal_mode=norm_scaled`) but does not feed Xi0 into acceleration in Stage 8A.
+- Active velocity-dependent kernel deformation (`tpf_4d_xi_kernel_mode!=off` with nonzero `tpf_4d_xi_kernel_coupling`) requires `tpf_4d_xi_motion_integrator=semi_implicit_euler`; `velocity_verlet` remains valid for off/identity (Stage 7B-equivalent) behavior.
 - This is distinct from older additive acceleration VDSG paths; Stage 8A deforms Xi kernel evaluation before readout and does not append acceleration terms.
 
 **Optional trajectory visualization PNGs** — `plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:

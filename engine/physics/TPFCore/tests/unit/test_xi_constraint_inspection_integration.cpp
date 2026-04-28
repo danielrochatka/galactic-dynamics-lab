@@ -918,6 +918,7 @@ TEST_CASE("4d xi motion probe benchmark scalar_beta scales Xi_eff by 1+factor_ra
   c.tpf_4d_xi_motion_probe_layout = "ring";
   c.tpf_4d_xi_motion_probe_count = 8;
   c.tpf_4d_xi_motion_probe_speed = 0.1 * 299792458.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
   c.tpf_4d_xi_kernel_mode = "scalar_beta";
   c.tpf_4d_xi_kernel_coupling = 0.5;
 
@@ -961,6 +962,7 @@ TEST_CASE("4d xi motion probe benchmark metric_velocity deforms Xi when relative
   c.tpf_4d_xi_motion_probe_layout = "ring";
   c.tpf_4d_xi_motion_probe_count = 8;
   c.tpf_4d_xi_motion_probe_speed = 0.05 * 299792458.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
   c.tpf_4d_xi_source_speed_x = 0.02 * 299792458.0;
   c.tpf_4d_xi_kernel_mode = "metric_velocity";
   c.tpf_4d_xi_kernel_coupling = 0.75;
@@ -1041,6 +1043,7 @@ TEST_CASE("4d xi motion probe benchmark metric_velocity is identity at zero rela
   c.tpf_4d_xi_source_speed_x = 0.0;
   c.tpf_4d_xi_source_speed_y = 0.0;
   c.tpf_4d_xi_source_speed_z = 0.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
   c.tpf_4d_xi_kernel_mode = "metric_velocity";
   c.tpf_4d_xi_kernel_coupling = 0.75;
 
@@ -1076,6 +1079,7 @@ TEST_CASE("4d xi motion probe benchmark spacetime_metric emits xi_t diagnostics 
   c.tpf_4d_xi_motion_probe_layout = "axis";
   c.tpf_4d_xi_motion_probe_count = 6;
   c.tpf_4d_xi_motion_probe_speed = 0.05 * 299792458.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
   c.tpf_4d_xi_kernel_mode = "spacetime_metric";
   c.tpf_4d_xi_kernel_coupling = 0.75;
   c.tpf_4d_xi_temporal_mode = "norm_scaled";
@@ -1250,6 +1254,7 @@ TEST_CASE("4d xi motion probe benchmark rejects invalid config values loudly") {
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
   c.tpf_4d_xi_source_speed_x = 0.0;
   c.tpf_4d_xi_kernel_mode = "scalar_beta";
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
   c.tpf_4d_xi_motion_probe_layout = "ring";
   c.tpf_4d_xi_motion_probe_count = 8;
   c.tpf_4d_xi_motion_probe_speed = 0.75 * 299792458.0;
@@ -1258,4 +1263,42 @@ TEST_CASE("4d xi motion probe benchmark rejects invalid config values loudly") {
   c.tpf_4d_xi_source_speed_x = 0.0;
   c.tpf_source_benchmark_shape = "unknown";
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+}
+
+TEST_CASE("4d xi motion probe benchmark rejects velocity_verlet for active Xi-kernel deformation") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_vv_active_kernel_reject_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_integrator = "velocity_verlet";
+  c.tpf_4d_xi_kernel_mode = "scalar_beta";
+  c.tpf_4d_xi_kernel_coupling = 1.0;
+
+  galaxy::TPFCorePackage pkg;
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+}
+
+TEST_CASE("4d xi motion probe benchmark allows velocity_verlet for off and zero-coupling identity modes") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_vv_identity_allow_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_integrator = "velocity_verlet";
+
+  galaxy::TPFCorePackage pkg;
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_kernel_coupling = 0.0;
+  CHECK_NOTHROW(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 0.0;
+  CHECK_NOTHROW(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
 }

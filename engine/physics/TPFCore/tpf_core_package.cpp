@@ -1974,6 +1974,10 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     throw std::runtime_error("tpf_4d_xi_temporal_mode must be off or norm_scaled");
   }
   if (!std::isfinite(kernel_coupling)) throw std::runtime_error("tpf_4d_xi_kernel_coupling must be finite");
+  const bool xi_kernel_deformation_active = (kernel_mode != "off" && kernel_coupling != 0.0);
+  if (xi_kernel_deformation_active && integrator == "velocity_verlet") {
+    throw std::runtime_error("velocity_verlet is disabled for active velocity-dependent Xi kernel modes; use semi_implicit_euler");
+  }
   if (!std::isfinite(kernel_beta_power) || kernel_beta_power < 0.0) {
     throw std::runtime_error("tpf_4d_xi_kernel_beta_power must be finite and >= 0");
   }
