@@ -672,7 +672,16 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       double factor_raw = 0.0;
       if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_effective, xi_kernel_beta_power_);
       else factor_raw = xi_kernel_coupling_ * (gamma_rel - 1.0);
-      const double metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
+      double metric_scale = 1.0;
+      if (xi_kernel_mode_ == "metric_transverse_wake") {
+        constexpr double k_factor_floor_eps = 1.0e-12;
+        const double denom_floor = -1.0 + k_factor_floor_eps;
+        const double guarded_factor = std::max(factor_raw, denom_floor);
+        metric_scale = std::max(xi_kernel_metric_min_,
+                                std::min(xi_kernel_metric_max_, 1.0 / (1.0 + guarded_factor)));
+      } else {
+        metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
+      }
       const double r2 = dx * dx + dy * dy + dz * dz + eps2;
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
@@ -2310,7 +2319,16 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         factor_raw = kernel_coupling * (gamma_source - 1.0);
       }
       if (!std::isfinite(factor_raw)) throw std::runtime_error("non-finite factor_raw in Xi kernel deformation");
-      const double metric_scale = std::max(kernel_metric_min, std::min(kernel_metric_max, 1.0 + factor_raw));
+      double metric_scale = 1.0;
+      if (kernel_mode == "metric_transverse_wake") {
+        constexpr double k_factor_floor_eps = 1.0e-12;
+        const double denom_floor = -1.0 + k_factor_floor_eps;
+        const double guarded_factor = std::max(factor_raw, denom_floor);
+        metric_scale = std::max(kernel_metric_min,
+                                std::min(kernel_metric_max, 1.0 / (1.0 + guarded_factor)));
+      } else {
+        metric_scale = std::max(kernel_metric_min, std::min(kernel_metric_max, 1.0 + factor_raw));
+      }
       const double w = std::fabs(source_specs[si].m);
       wake_weight += w;
       v_radial_wsum += w * wake.v_radial;
