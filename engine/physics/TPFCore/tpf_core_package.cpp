@@ -649,6 +649,11 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     double xi_y_eff = 0.0;
     for (std::size_t si = 0; si < sources.size(); ++si) {
       const XiKernelRuntimeSource& src = sources[si];
+      // Sign convention (source-target geometry):
+      //   d = target - source
+      //   Xi_base = source_mass * d / |d|^3
+      //   acceleration readout = -K_xi * Xi_eff_spatial
+      // This keeps BH attraction inward for positive K_xi.
       const double dx = state.x[i] - src.x;
       const double dy = state.y[i] - src.y;
       const double dz = 0.0;
@@ -713,6 +718,21 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     }
     ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
     ay[i] = -xi_motion_readout_scale_ * xi_y_eff;
+
+    // BH-only sign audit: for particles away from the origin, Xi-kernel readout must point inward
+    // toward the central BH when K_xi is positive.
+    if (bh_mass > 0.0 && !star_star && xi_motion_readout_scale_ > 0.0) {
+      const double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i]);
+      const double a_norm = std::sqrt(ax[i] * ax[i] + ay[i] * ay[i]);
+      if (r > 1.0e-30 && a_norm > 1.0e-30) {
+        const double inward_x = -state.x[i] / r;
+        const double inward_y = -state.y[i] / r;
+        const double radial_alignment_to_bh_inward = (ax[i] * inward_x + ay[i] * inward_y) / a_norm;
+        if (!std::isfinite(radial_alignment_to_bh_inward) || radial_alignment_to_bh_inward < -1.0e-12) {
+          throw std::runtime_error("xi_kernel_deformed BH-only sign audit failed: acceleration points outward");
+        }
+      }
+    }
   }
 }
 

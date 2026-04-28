@@ -27,6 +27,43 @@ void run_xi_mode(const galaxy::Config& cfg,
   pkg.compute_accelerations(s, bh_mass, 0.0, star_star, ax, ay);
 }
 
+void check_bh_inward_cardinal_signs(const galaxy::Config& c) {
+  constexpr double bh_mass = 10.0;
+  constexpr double r = 2.0;
+  const struct {
+    double x;
+    double y;
+    double ax_sign;
+    double ay_sign;
+  } cases[] = {
+      {+r, 0.0, -1.0, 0.0},
+      {-r, 0.0, +1.0, 0.0},
+      {0.0, +r, 0.0, -1.0},
+      {0.0, -r, 0.0, +1.0},
+  };
+
+  for (const auto& tc : cases) {
+    galaxy::State s;
+    s.resize(1);
+    s.x[0] = tc.x;
+    s.y[0] = tc.y;
+    s.vx[0] = 0.0;
+    s.vy[0] = 0.0;
+    s.mass[0] = 1.0;
+
+    std::vector<double> ax, ay;
+    run_xi_mode(c, s, bh_mass, false, ax, ay);
+    REQUIRE(ax.size() == 1);
+    REQUIRE(ay.size() == 1);
+    if (tc.ax_sign < 0.0) CHECK(ax[0] < 0.0);
+    if (tc.ax_sign > 0.0) CHECK(ax[0] > 0.0);
+    if (tc.ax_sign == 0.0) CHECK(ax[0] == doctest::Approx(0.0));
+    if (tc.ay_sign < 0.0) CHECK(ay[0] < 0.0);
+    if (tc.ay_sign > 0.0) CHECK(ay[0] > 0.0);
+    if (tc.ay_sign == 0.0) CHECK(ay[0] == doctest::Approx(0.0));
+  }
+}
+
 }  // namespace
 
 TEST_CASE("xi_kernel_deformed runtime path executes for tiny galaxy state") {
@@ -59,6 +96,14 @@ TEST_CASE("xi_kernel_deformed off mode matches baseline BH Xi acceleration shape
   const double xi_x_base = 10.0 * 2.0 / std::pow(2.0, 3.0);
   CHECK(ax[0] == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_x_base));
   CHECK(ay[0] == doctest::Approx(0.0));
+}
+
+TEST_CASE("xi_kernel_deformed BH-only inward cardinal directions hold in off mode") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_motion_readout_scale = 6.67430e-11;
+  check_bh_inward_cardinal_signs(c);
 }
 
 TEST_CASE("xi_kernel_deformed scalar_beta uses Xi_eff and differs from Xi_base with nonzero relative speed") {
@@ -116,6 +161,17 @@ TEST_CASE("xi_kernel_deformed metric_velocity applies non-identity metric scale 
   CHECK(std::isfinite(ay_metric[0]));
 }
 
+TEST_CASE("xi_kernel_deformed BH-only inward cardinal directions hold in metric_velocity mode") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 10.0;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 6.67430e-11;
+  check_bh_inward_cardinal_signs(c);
+}
+
 TEST_CASE("xi_kernel_deformed metric_transverse_wake uses transverse wake strength with radial metric axis") {
   galaxy::Config c;
   c.tpf_dynamics_mode = "xi_kernel_deformed";
@@ -141,6 +197,17 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake uses transverse wake streng
 
   CHECK(std::fabs(ax_wake[0] - ax_off[0]) > 1.0e-18);
   CHECK(ay_wake[0] == doctest::Approx(0.0));
+}
+
+TEST_CASE("xi_kernel_deformed BH-only inward cardinal directions hold in metric_transverse_wake mode") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 10.0;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 6.67430e-11;
+  check_bh_inward_cardinal_signs(c);
 }
 
 TEST_CASE("xi_kernel_deformed route does not use additive VDSG or direct/provisional readout paths") {
