@@ -105,6 +105,17 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si";
   }
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    std::ostringstream os;
+    os << "tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
+       << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
+       << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
+       << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
+       << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
+       << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
+       << "; additive_vdsg=off; principal_c=off; direct_tpf=off; newtonian=off";
+    return os.str();
+  }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::ostringstream os;
     os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
@@ -147,6 +158,9 @@ std::string compute_active_metrics_branch(const Config& config) {
          << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
       return os.str();
     }
+    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+      return "xi_kernel_deformed metrics; Xi_eff readout a=-K_xi*Xi_eff_spatial";
+    }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
     return "TPFCore metrics n/a (provisional readout off)";
@@ -172,6 +186,9 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (Eq.42-44 correspondence implementation; "
            "alpha_si path; no VDSG/readout/shunt/cooling)";
+  }
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (runtime Xi-kernel deformation; per-source Xi_eff sum -> a=-K_xi*Xi_eff_spatial; no additive VDSG helper; no principal-C direct_tpf readout)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "

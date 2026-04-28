@@ -181,6 +181,27 @@ class TPFCorePackage : public PhysicsPackage {
                                      bool star_star,
                                      std::vector<double>& ax,
                                      std::vector<double>& ay) const;
+  void compute_xi_kernel_deformed_accelerations(const State& state,
+                                                double bh_mass,
+                                                double softening,
+                                                bool star_star,
+                                                std::vector<double>& ax,
+                                                std::vector<double>& ay) const;
+  void validate_xi_kernel_runtime_config() const;
+  bool xi_kernel_deformation_active() const;
+
+  double xi_motion_readout_scale_;
+  std::string xi_kernel_mode_;
+  double xi_kernel_coupling_;
+  double xi_kernel_beta_power_;
+  std::string xi_kernel_factor_mode_;
+  double xi_kernel_metric_min_;
+  double xi_kernel_metric_max_;
+  std::string xi_temporal_mode_;
+  double xi_temporal_coupling_;
+  double xi_source_speed_x_;
+  double xi_source_speed_y_;
+  double xi_source_speed_z_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

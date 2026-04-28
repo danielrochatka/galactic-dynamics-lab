@@ -81,7 +81,19 @@ TPFCorePackage::TPFCorePackage()
       cooling_fraction_(0.2),
       shunt_enable_(false),
       shunt_fraction_(0.001),
-      pipeline_diagnostics_csv_(true) {}
+      pipeline_diagnostics_csv_(true),
+      xi_motion_readout_scale_(1.0e-12),
+      xi_kernel_mode_("off"),
+      xi_kernel_coupling_(0.0),
+      xi_kernel_beta_power_(1.0),
+      xi_kernel_factor_mode_("beta_power"),
+      xi_kernel_metric_min_(0.1),
+      xi_kernel_metric_max_(10.0),
+      xi_temporal_mode_("off"),
+      xi_temporal_coupling_(0.0),
+      xi_source_speed_x_(0.0),
+      xi_source_speed_y_(0.0),
+      xi_source_speed_z_(0.0) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
@@ -110,11 +122,29 @@ void TPFCorePackage::init_from_config(const Config& config) {
                         ? config.tpf_global_accel_shunt_fraction
                         : 0.001;
   pipeline_diagnostics_csv_ = config.tpf_accel_pipeline_diagnostics_csv;
+  xi_motion_readout_scale_ = config.tpf_4d_xi_motion_readout_scale;
+  xi_kernel_mode_ = config.tpf_4d_xi_kernel_mode;
+  xi_kernel_coupling_ = config.tpf_4d_xi_kernel_coupling;
+  xi_kernel_beta_power_ = config.tpf_4d_xi_kernel_beta_power;
+  xi_kernel_factor_mode_ = config.tpf_4d_xi_kernel_factor_mode;
+  xi_kernel_metric_min_ = config.tpf_4d_xi_kernel_metric_min;
+  xi_kernel_metric_max_ = config.tpf_4d_xi_kernel_metric_max;
+  xi_temporal_mode_ = config.tpf_4d_xi_temporal_mode;
+  xi_temporal_coupling_ = config.tpf_4d_xi_temporal_coupling;
+  xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
+  xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
+  xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
 }
 
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
+
+struct XiKernelRuntimeSource {
+  double x = 0.0, y = 0.0, z = 0.0;
+  double vx = 0.0, vy = 0.0, vz = 0.0;
+  double mass = 0.0;
+};
 
 struct BenchmarkSourceSpec2D {
   double x;
@@ -546,12 +576,146 @@ void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
   }
 }
 
+bool TPFCorePackage::xi_kernel_deformation_active() const {
+  return (xi_kernel_mode_ != "off" && xi_kernel_coupling_ != 0.0);
+}
+
+void TPFCorePackage::validate_xi_kernel_runtime_config() const {
+  if (!std::isfinite(xi_motion_readout_scale_)) throw std::runtime_error("tpf_4d_xi_motion_readout_scale must be finite");
+  if (xi_kernel_mode_ != "off" && xi_kernel_mode_ != "scalar_beta" && xi_kernel_mode_ != "metric_radial" &&
+      xi_kernel_mode_ != "metric_velocity" && xi_kernel_mode_ != "spacetime_metric") {
+    throw std::runtime_error("tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, spacetime_metric");
+  }
+  if (xi_kernel_factor_mode_ != "beta_power" && xi_kernel_factor_mode_ != "gamma_minus_one") {
+    throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
+  }
+  if (xi_temporal_mode_ != "off" && xi_temporal_mode_ != "norm_scaled") {
+    throw std::runtime_error("tpf_4d_xi_temporal_mode must be off or norm_scaled");
+  }
+  if (!std::isfinite(xi_kernel_coupling_)) throw std::runtime_error("tpf_4d_xi_kernel_coupling must be finite");
+  if (!std::isfinite(xi_kernel_beta_power_) || xi_kernel_beta_power_ < 0.0) {
+    throw std::runtime_error("tpf_4d_xi_kernel_beta_power must be finite and >= 0");
+  }
+  if (!std::isfinite(xi_kernel_metric_min_) || xi_kernel_metric_min_ <= 0.0) {
+    throw std::runtime_error("tpf_4d_xi_kernel_metric_min must be finite and > 0");
+  }
+  if (!std::isfinite(xi_kernel_metric_max_) || xi_kernel_metric_max_ < xi_kernel_metric_min_) {
+    throw std::runtime_error("tpf_4d_xi_kernel_metric_max must be finite and >= tpf_4d_xi_kernel_metric_min");
+  }
+  if (!std::isfinite(xi_temporal_coupling_)) throw std::runtime_error("tpf_4d_xi_temporal_coupling must be finite");
+  if (!std::isfinite(xi_source_speed_x_) || !std::isfinite(xi_source_speed_y_) || !std::isfinite(xi_source_speed_z_)) {
+    throw std::runtime_error("tpf_4d_xi_source_speed_x/y/z must all be finite");
+  }
+}
+
+void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state,
+                                                              double bh_mass,
+                                                              double softening,
+                                                              bool star_star,
+                                                              std::vector<double>& ax,
+                                                              std::vector<double>& ay) const {
+  validate_xi_kernel_runtime_config();
+  const int n = state.n();
+  ax.assign(static_cast<std::size_t>(n), 0.0);
+  ay.assign(static_cast<std::size_t>(n), 0.0);
+  const double eps2 = softening * softening;
+  for (int i = 0; i < n; ++i) {
+    std::vector<XiKernelRuntimeSource> sources;
+    if (bh_mass > 0.0) {
+      XiKernelRuntimeSource s;
+      s.mass = bh_mass;
+      s.vx = xi_source_speed_x_;
+      s.vy = xi_source_speed_y_;
+      s.vz = xi_source_speed_z_;
+      sources.push_back(s);
+    }
+    if (star_star) {
+      sources.reserve(sources.size() + static_cast<std::size_t>(std::max(0, n - 1)));
+      for (int j = 0; j < n; ++j) {
+        if (j == i) continue;
+        XiKernelRuntimeSource s;
+        s.x = state.x[j];
+        s.y = state.y[j];
+        s.vx = state.vx[j];
+        s.vy = state.vy[j];
+        s.mass = state.mass[j];
+        sources.push_back(s);
+      }
+    }
+
+    double xi_x_eff = 0.0;
+    double xi_y_eff = 0.0;
+    for (std::size_t si = 0; si < sources.size(); ++si) {
+      const XiKernelRuntimeSource& src = sources[si];
+      const double dx = state.x[i] - src.x;
+      const double dy = state.y[i] - src.y;
+      const double dz = 0.0;
+      const double vx_rel = state.vx[i] - src.vx;
+      const double vy_rel = state.vy[i] - src.vy;
+      const double vz_rel = 0.0 - src.vz;
+      const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
+      const double beta_rel = v_rel_norm / C_SI_LIGHT;
+      if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
+      if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
+      const double beta_for_gamma = std::min(beta_rel, 1.0 - 1.0e-12);
+      const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
+      double factor_raw = 0.0;
+      if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_rel, xi_kernel_beta_power_);
+      else factor_raw = xi_kernel_coupling_ * (gamma_rel - 1.0);
+      const double metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
+      const double r2 = dx * dx + dy * dy + dz * dz + eps2;
+      const double r = std::sqrt(r2);
+      const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+      const double xi_sx = src.mass * dx * inv_r3;
+      const double xi_sy = src.mass * dy * inv_r3;
+      if (xi_kernel_mode_ == "off") {
+        xi_x_eff += xi_sx;
+        xi_y_eff += xi_sy;
+      } else if (xi_kernel_mode_ == "scalar_beta") {
+        const double scalar = 1.0 + factor_raw;
+        xi_x_eff += xi_sx * scalar;
+        xi_y_eff += xi_sy * scalar;
+      } else {
+        double nx = 0.0, ny = 0.0, nz = 0.0;
+        double n_norm = 0.0;
+        if (xi_kernel_mode_ == "metric_radial") {
+          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
+          nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
+        } else {
+          n_norm = v_rel_norm;
+          if (n_norm > 1.0e-30) {
+            nx = vx_rel / n_norm; ny = vy_rel / n_norm; nz = vz_rel / n_norm;
+          }
+        }
+        const double alpha = (n_norm > 1.0e-30) ? (metric_scale - 1.0) : 0.0;
+        const double nd = nx * dx + ny * dy + nz * dz;
+        const double gx = dx + alpha * nx * nd;
+        const double gy = dy + alpha * ny * nd;
+        const double gz = dz + alpha * nz * nd;
+        const double r_eff2 = dx * gx + dy * gy + dz * gz + eps2;
+        const double r_eff = std::sqrt(r_eff2);
+        const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
+        xi_x_eff += src.mass * gx * inv_r_eff3;
+        xi_y_eff += src.mass * gy * inv_r_eff3;
+      }
+    }
+    ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
+    ay[i] = -xi_motion_readout_scale_ * xi_y_eff;
+  }
+}
+
 void TPFCorePackage::compute_accelerations(const State& state,
                                             double bh_mass,
                                             double softening,
                                             bool star_star,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
+  if (tpf_dynamics_mode_ == "xi_kernel_deformed") {
+    compute_xi_kernel_deformed_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    last_pipeline_ = AccelPipelineStats{};
+    return;
+  }
   if (tpf_dynamics_mode_ == "direct_tpf") {
     if (provisional_readout_) {
       throw std::runtime_error(

@@ -228,6 +228,19 @@ void write_run_info(const std::string& output_dir,
         f << "tpf_provisional_readout_status\toff_required\n";
         f << "tpf_readout_closure_knobs_status\trejected_on_direct_tpf\n";
         f << "tpf_stabilizer_status\tshunt_off_and_cooling_off_required\n";
+      } else if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+        f << "tpf_core_dynamics_route\txi_kernel_deformed\n";
+        f << "tpf_acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
+        f << "tpf_xi_readout_scale_key\ttpf_4d_xi_motion_readout_scale\n";
+        f << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
+        f << "tpf_4d_xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
+        f << "tpf_4d_xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
+        f << "tpf_4d_xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
+        f << "tpf_4d_xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
+        f << "tpf_old_additive_vdsg_path_used\t0\n";
+        f << "tpf_principal_c_tensor_acceleration_used\t0\n";
+        f << "tpf_direct_tpf_tensor_radial_projection_used\t0\n";
+        f << "tpf_newtonian_package_used\t0\n";
       }
       f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
       f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
@@ -293,6 +306,7 @@ void write_run_info(const std::string& output_dir,
       f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
       f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
       f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs v11_weak_field_truncation vs direct_tpf); "
+           "xi_kernel_deformed uses runtime Xi-kernel deformation with a=-tpf_4d_xi_motion_readout_scale*Xi_eff_spatial and no additive VDSG; "
            "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
            "v11_weak_field_truncation is the Eq.42-44 weak-field correspondence helper (alpha_si correspondence path); "
            "direct_tpf is canonical paper-facing tensor principal-part route "

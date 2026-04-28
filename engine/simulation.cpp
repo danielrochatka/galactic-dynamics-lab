@@ -53,12 +53,19 @@ std::vector<Snapshot> run_simulation(const Config& config,
 
   const bool tpf_cooling_on =
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
+  const bool xi_kernel_deformation_active =
+      (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "xi_kernel_deformed" &&
+       config.tpf_4d_xi_kernel_mode != "off" && config.tpf_4d_xi_kernel_coupling != 0.0);
   const int cooling_steps = tpf_cooling_on
       ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
       : 0;
 
   for (int step = 1; step <= n_steps; ++step) {
-    velocity_verlet_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
+    if (xi_kernel_deformation_active) {
+      semi_implicit_euler_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
+    } else {
+      velocity_verlet_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
+    }
 
     if (tpf_cooling_on && step < cooling_steps) {
       apply_radial_cooling_damping(state, kTpfRadialCoolingDampingFactor);
