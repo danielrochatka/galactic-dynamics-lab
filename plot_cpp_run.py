@@ -151,6 +151,16 @@ def physics_label_from_run_info(
     if pkg != "TPFCore":
         return _slug(pkg)
     dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "legacy_readout") or "legacy_readout")
+    if dyn == "xi_kernel_deformed":
+        kernel_mode = str(
+            _run_info_effective_value(
+                run_info,
+                "tpf_4d_xi_kernel_mode",
+                _run_info_configured_value(run_info, "tpf_4d_xi_kernel_mode", "unknown_kernel"),
+            )
+            or "unknown_kernel"
+        )
+        return f"tpfcore_xi_kernel_deformed_{_slug(kernel_mode)}"
     if dyn == "direct_tpf":
         return "tpfcore_direct_tpf"
     readout = str(_run_info_configured_value(run_info, "tpfcore_readout_mode", "legacy_readout") or "legacy_readout")

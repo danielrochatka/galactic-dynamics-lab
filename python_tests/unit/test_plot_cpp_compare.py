@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from plot_cpp_compare import (
+    _panel_physics_text,
     resolve_compare_display_selection,
     _resolve_side_run_dir,
     _mode_aware_compare_name,
@@ -260,6 +261,38 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertEqual(
             name,
             "galaxy_compare__tpfcore_direct_tpf_vs_newtonian__compare__initial_side_by_side.png",
+        )
+
+    def test_mode_aware_compare_name_supports_xi_kernel_deformed(self) -> None:
+        left = {
+            "simulation_mode": "galaxy",
+            "physics_package": "TPFCore",
+            "tpf_dynamics_mode": "xi_kernel_deformed",
+            "tpf_4d_xi_kernel_mode": "gaussian_compact",
+        }
+        right = {"simulation_mode": "galaxy", "physics_package": "Newtonian"}
+        name = _mode_aware_compare_name("initial", left, right, ext="png")
+        self.assertEqual(
+            name,
+            "galaxy_compare__tpfcore_xi_kernel_deformed_gaussian_compact_vs_newtonian__compare__initial_side_by_side.png",
+        )
+
+    def test_panel_physics_text_labels_newtonian_baseline(self) -> None:
+        self.assertEqual(
+            _panel_physics_text({"effective_physics_package": "Newtonian"}),
+            "Newtonian baseline package",
+        )
+
+    def test_panel_physics_text_labels_xi_kernel_deformed(self) -> None:
+        self.assertEqual(
+            _panel_physics_text(
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
+                }
+            ),
+            "TPFCore xi_kernel_deformed / gaussian_compact",
         )
 
     @unittest.skipUnless(

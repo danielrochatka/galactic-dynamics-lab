@@ -92,8 +92,13 @@ def _panel_physics_text(run_info: dict) -> str:
     pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip()
     if not pkg:
         return "?"
+    if pkg == "Newtonian":
+        return "Newtonian baseline package"
     if pkg == "TPFCore":
         dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
+        if dyn == "xi_kernel_deformed":
+            kernel_mode = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "unknown_kernel") or "unknown_kernel")
+            return f"TPFCore xi_kernel_deformed / {kernel_mode}"
         if dyn:
             return f"{pkg} ({dyn})"
     return pkg
