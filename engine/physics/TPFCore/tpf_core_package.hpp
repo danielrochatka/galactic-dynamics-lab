@@ -24,6 +24,7 @@
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
 #include "source_ansatz.hpp"
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -101,6 +102,14 @@ class TPFCorePackage : public PhysicsPackage {
 
   /** Last integrator-step pipeline stats (updated every compute_accelerations). */
   const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
+  struct XiRuntimeCounters {
+    std::uint64_t theta_evaluations = 0;
+    std::uint64_t invariant_I_evaluations = 0;
+    std::uint64_t direct_tpf_evaluations = 0;
+    std::uint64_t provisional_readout_evaluations = 0;
+    std::uint64_t xi_pair_evaluations = 0;
+  };
+  XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
 
   /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -202,6 +211,7 @@ class TPFCorePackage : public PhysicsPackage {
   double xi_source_speed_x_;
   double xi_source_speed_y_;
   double xi_source_speed_z_;
+  mutable XiRuntimeCounters xi_runtime_counters_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

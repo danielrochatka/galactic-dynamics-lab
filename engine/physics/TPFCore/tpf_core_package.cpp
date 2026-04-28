@@ -648,6 +648,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     double xi_x_eff = 0.0;
     double xi_y_eff = 0.0;
     for (std::size_t si = 0; si < sources.size(); ++si) {
+      ++xi_runtime_counters_.xi_pair_evaluations;
       const XiKernelRuntimeSource& src = sources[si];
       // Sign convention (source-target geometry):
       //   d = target - source
@@ -752,6 +753,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
   if (tpf_dynamics_mode_ == "xi_kernel_deformed") {
+    xi_runtime_counters_ = XiRuntimeCounters{};
     compute_xi_kernel_deformed_accelerations(state, bh_mass, softening, star_star, ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
@@ -934,6 +936,7 @@ void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                          const Config& config,
                                          const std::string& output_dir) const {
   tpfcore::TPFCoreParams params = build_params(config, output_dir);
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed" && !config.tpf_xi_kernel_dump_field_diagnostics) return;
   if (!provisional_readout_ || !params.tpfcore_dump_readout_debug || snapshots.empty())
     return;
   tpfcore::write_readout_debug_csv(snapshots, params.output_dir,
@@ -2764,6 +2767,7 @@ void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snaps
                                               const std::string& output_dir) const {
   using namespace tpfcore;
   if (snapshots.empty()) return;
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed" && !config.tpf_xi_kernel_dump_field_diagnostics) return;
 
   TPFCoreParams params = build_params(config, output_dir);
   double eps = params.effective_source_softening;
@@ -2780,6 +2784,8 @@ void TPFCorePackage::write_regime_diagnostics(const std::vector<Snapshot>& snaps
     const State& s = snap.state;
     for (int i = 0; i < s.n(); ++i) {
       FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps);
+      ++xi_runtime_counters_.theta_evaluations;
+      ++xi_runtime_counters_.invariant_I_evaluations;
       double tn = theta_frobenius_norm(field.theta);
       double I = field.invariant_I;
 
@@ -2900,6 +2906,7 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
   using namespace tpfcore;
   RegimeSummary out;
   if (snapshots.empty()) return out;
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed" && !config.tpf_xi_kernel_dump_field_diagnostics) return out;
 
   TPFCoreParams params = build_params(config, output_dir);
   double eps = params.effective_source_softening;
@@ -2915,6 +2922,7 @@ TPFCorePackage::RegimeSummary TPFCorePackage::compute_regime_summary(const std::
     const State& s = snap.state;
     for (int i = 0; i < s.n(); ++i) {
       FieldAtPoint field = evaluate_provisional_field_multi_source(s, i, bh_mass, star_star, eps);
+      ++xi_runtime_counters_.theta_evaluations;
       double tn = theta_frobenius_norm(field.theta);
       sum_theta_norm += tn;
       if (tn < min_theta_norm) min_theta_norm = tn;
