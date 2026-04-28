@@ -544,6 +544,12 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertAlmostEqual(_time_display_factor("day"), 1.0 / 86400.0)
         t_plot = 2.0 * 86400.0 * _time_display_factor("day")
         self.assertAlmostEqual(t_plot, 2.0)
+        self.assertAlmostEqual(60.0 * _time_display_factor("min"), 1.0)
+        self.assertAlmostEqual(3600.0 * _time_display_factor("hr"), 1.0)
+        seconds_per_year = 365.25 * 86400.0
+        self.assertAlmostEqual(seconds_per_year * _time_display_factor("yr"), 1.0)
+        self.assertAlmostEqual((1.0e3 * seconds_per_year) * _time_display_factor("kyr"), 1.0)
+        self.assertAlmostEqual((1.0e6 * seconds_per_year) * _time_display_factor("Myr"), 1.0)
 
     def test_velocity_display_factor_scales_km_s(self) -> None:
         self.assertAlmostEqual(_velocity_display_factor("km/s"), 1.0e-3)

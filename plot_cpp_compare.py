@@ -491,10 +491,18 @@ def save_compare_profile_plot(parent_dir, mode_name, alias_name, left_xy, right_
 
 def _time_display_factor(unit: str) -> float:
     u = str(unit or "s")
+    seconds_per_day = 86400.0
+    seconds_per_julian_year = 365.25 * seconds_per_day
+    seconds_per_kyr = 1.0e3 * seconds_per_julian_year
+    seconds_per_myr = 1.0e6 * seconds_per_julian_year
+    if u == "Myr":
+        return 1.0 / seconds_per_myr
+    if u == "kyr":
+        return 1.0 / seconds_per_kyr
     if u == "yr":
-        return 1.0 / (365.25 * 86400.0)
+        return 1.0 / seconds_per_julian_year
     if u == "day":
-        return 1.0 / 86400.0
+        return 1.0 / seconds_per_day
     if u == "hr":
         return 1.0 / 3600.0
     if u == "min":
