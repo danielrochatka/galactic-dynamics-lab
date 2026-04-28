@@ -21,6 +21,9 @@ from plot_cpp_compare import (
     calculate_compare_smart_viewport,
     matched_steps_strict,
     render_compare,
+    radial_kinematics,
+    estimate_snapshot_accelerations,
+    binned_profile,
 )
 from display_units import DisplayUnitConfig
 
@@ -489,6 +492,37 @@ class TestPlotCppCompare(unittest.TestCase):
         )
         self.assertFalse(sel.config.units_in_overlay)
         self.assertFalse(sel.config.show_unit_reference)
+
+
+    def test_radial_kinematics_plus_x_plus_y(self) -> None:
+        class S: pass
+        s=S(); import numpy as np
+        s.positions=np.array([[1.0,0.0]])
+        s.velocities=np.array([[0.0,2.0]])
+        out=radial_kinematics(s)
+        self.assertAlmostEqual(float(out["v_radial"][0]), 0.0)
+        self.assertAlmostEqual(float(out["v_t"][0]), 2.0)
+
+    def test_estimate_snapshot_accelerations_delta_v_over_dt(self) -> None:
+        class S: pass
+        snaps=[]
+        for t,v in [(0.0,0.0),(1.0,2.0),(2.0,4.0)]:
+            s=S(); import numpy as np
+            s.time=t; s.velocities=np.array([[v,0.0]])
+            snaps.append(s)
+        acc=estimate_snapshot_accelerations(snaps)
+        self.assertAlmostEqual(float(acc[1][0,0]), 2.0)
+        self.assertAlmostEqual(float(acc[0][0,0]), 2.0)
+        self.assertAlmostEqual(float(acc[2][0,0]), 2.0)
+
+    def test_binned_profile_skips_empty_and_returns_medians(self) -> None:
+        import numpy as np
+        x=np.array([0.0,0.1,0.2,9.8,9.9,10.0])
+        y=np.array([1,3,5,7,9,11],dtype=float)
+        bx,bm,_,_=binned_profile(x,y,bins=10)
+        self.assertGreater(len(bx), 1)
+        self.assertTrue(np.all(np.isfinite(bm)))
+
 
 
 if __name__ == "__main__":
