@@ -7,6 +7,7 @@ import unittest
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 # Repo root (parent of python_tests/)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,8 @@ from plot_cpp_compare import (
     radial_kinematics,
     estimate_snapshot_accelerations,
     binned_profile,
+    _time_display_factor,
+    _velocity_display_factor,
 )
 from display_units import DisplayUnitConfig
 
@@ -224,6 +227,13 @@ class TestPlotCppCompare(unittest.TestCase):
             render_compare(parent, no_animation=True, overlay_mode="none")
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
+            self.assertTrue((parent / "compare_rotation_curve_final.png").exists())
+            self.assertTrue((parent / "compare_binned_inward_acceleration_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_radial_acceleration_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_centripetal_profile_final.png").exists())
+            self.assertTrue((parent / "compare_radial_velocity_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_radius_percentiles_over_time.png").exists())
+            self.assertTrue((parent / "compare_acceleration_ratio_vs_radius_final.png").exists())
 
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
@@ -522,6 +532,34 @@ class TestPlotCppCompare(unittest.TestCase):
         bx,bm,_,_=binned_profile(x,y,bins=10)
         self.assertGreater(len(bx), 1)
         self.assertTrue(np.all(np.isfinite(bm)))
+
+    def test_distance_scaling_uses_spatial_display_factor(self) -> None:
+        import plot_cpp_compare
+
+        spatial = SimpleNamespace(factor=2.5, unit="km")
+        self.assertEqual(spatial.factor, 2.5)
+        self.assertFalse(hasattr(spatial, "scale_to_display"))
+
+    def test_time_display_factor_scales_days(self) -> None:
+        self.assertAlmostEqual(_time_display_factor("day"), 1.0 / 86400.0)
+        t_plot = 2.0 * 86400.0 * _time_display_factor("day")
+        self.assertAlmostEqual(t_plot, 2.0)
+
+    def test_velocity_display_factor_scales_km_s(self) -> None:
+        self.assertAlmostEqual(_velocity_display_factor("km/s"), 1.0e-3)
+        self.assertAlmostEqual(2000.0 * _velocity_display_factor("km/s"), 2.0)
+
+    def test_raw_acceleration_plot_not_binned_helper(self) -> None:
+        import plot_cpp_compare
+        text = Path(plot_cpp_compare.__file__).read_text(encoding="utf-8")
+        self.assertIn("ax.scatter(lk[\"radius\"] * dist_scale, l_in", text)
+
+    def test_acceleration_ratio_uses_binned_profiles(self) -> None:
+        import plot_cpp_compare
+        text = Path(plot_cpp_compare.__file__).read_text(encoding="utf-8")
+        self.assertIn("l_x, l_med, _, _ = binned_profile", text)
+        self.assertIn("r_x, r_med, _, _ = binned_profile", text)
+        self.assertNotIn("rx=lk['radius'][:m]*dist_scale", text)
 
 
 

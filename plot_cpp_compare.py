@@ -489,6 +489,23 @@ def save_compare_profile_plot(parent_dir, mode_name, alias_name, left_xy, right_
     plt.close(fig)
 
 
+def _time_display_factor(unit: str) -> float:
+    u = str(unit or "s")
+    if u == "yr":
+        return 1.0 / (365.25 * 86400.0)
+    if u == "day":
+        return 1.0 / 86400.0
+    if u == "hr":
+        return 1.0 / 3600.0
+    if u == "min":
+        return 1.0 / 60.0
+    return 1.0
+
+
+def _velocity_display_factor(unit: str) -> float:
+    return 1.0e-3 if str(unit or "m/s") == "km/s" else 1.0
+
+
 def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, spatial_display) -> None:
     from render import scatter_frame
 
@@ -622,8 +639,11 @@ def render_compare(
     shutil.copy2(parent_dir / mode_aware_final, parent_dir / "galaxy_final_compare.png")
 
     try:
-        dist_scale = spatial_display.scale_to_display if getattr(spatial_display, "scale_to_display", None) else 1.0
+        dist_scale = spatial_display.factor
         dist_unit = getattr(spatial_display, "unit", shared_display.active_distance_unit)
+        time_scale = _time_display_factor(shared_display.active_time_unit)
+        vel_scale = _velocity_display_factor(shared_display.active_velocity_unit)
+        vel_unit = shared_display.active_velocity_unit
         lk = radial_kinematics(left_snaps[-1])
         rk = radial_kinematics(right_snaps[-1])
         la_all = estimate_snapshot_accelerations(left_snaps)
@@ -643,13 +663,30 @@ def render_compare(
         left_name = _slug(_physics_label(left.run_info))
         right_name = _slug(_physics_label(right.run_info))
         pref = f"galaxy_compare__{left_name}_vs_{right_name}__compare__"
-        save_compare_profile_plot(parent_dir, pref+"radial_acceleration_vs_radius_final.png", "compare_radial_acceleration_vs_radius_final.png", (lk["radius"]*dist_scale, l_in) if l_in is not None else None, (rk["radius"]*dist_scale, r_in) if r_in is not None else None, left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="inward radial acceleration [m/s^2]", title="Final snapshot inward radial acceleration vs radius")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="black")
+        ax.set_facecolor("black")
+        ax.tick_params(colors="gray")
+        for s in ax.spines.values():
+            s.set_color("gray")
+        if l_in is not None:
+            ax.scatter(lk["radius"] * dist_scale, l_in, s=8, alpha=0.2, color="tab:cyan", label=left_panel_label)
+        if r_in is not None:
+            ax.scatter(rk["radius"] * dist_scale, r_in, s=8, alpha=0.2, color="tab:orange", label=right_panel_label)
+        ax.set_xlabel(f"radius [{dist_unit}]", color="white")
+        ax.set_ylabel("inward radial acceleration [m/s^2]", color="white")
+        ax.set_title("Final snapshot inward radial acceleration vs radius (raw)", color="white")
+        ax.legend(facecolor="black", edgecolor="gray")
+        fig.tight_layout()
+        fig.savefig(parent_dir / (pref + "radial_acceleration_vs_radius_final.png"), dpi=150, facecolor="black", edgecolor="none")
+        fig.savefig(parent_dir / "compare_radial_acceleration_vs_radius_final.png", dpi=150, facecolor="black", edgecolor="none")
+        plt.close(fig)
         save_compare_profile_plot(parent_dir, pref+"binned_inward_acceleration_vs_radius_final.png", "compare_binned_inward_acceleration_vs_radius_final.png", (lk["radius"]*dist_scale, l_in) if l_in is not None else None, (rk["radius"]*dist_scale, r_in) if r_in is not None else None, left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="inward radial acceleration [m/s^2]", title="Binned inward radial acceleration vs radius")
-        save_compare_profile_plot(parent_dir, pref+"rotation_curve_final.png", "compare_rotation_curve_final.png", (lk["radius"]*dist_scale, lk["v_t"]), (rk["radius"]*dist_scale, rk["v_t"]), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="tangential speed [m/s]", title="Rotation curve (final snapshot)")
+        save_compare_profile_plot(parent_dir, pref+"rotation_curve_final.png", "compare_rotation_curve_final.png", (lk["radius"]*dist_scale, lk["v_t"] * vel_scale), (rk["radius"]*dist_scale, rk["v_t"] * vel_scale), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel=f"tangential speed [{vel_unit}]", title="Rotation curve (final snapshot)")
         l_cent = np.divide(lk["v_t"]**2, lk["radius"], out=np.full_like(lk["radius"], np.nan), where=lk["radius"]>0)
         r_cent = np.divide(rk["v_t"]**2, rk["radius"], out=np.full_like(rk["radius"], np.nan), where=rk["radius"]>0)
         save_compare_profile_plot(parent_dir, pref+"centripetal_profile_final.png", "compare_centripetal_profile_final.png", (lk["radius"]*dist_scale, l_cent), (rk["radius"]*dist_scale, r_cent), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="v_t^2 / r [m/s^2]", title="Centripetal profile (final snapshot)")
-        save_compare_profile_plot(parent_dir, pref+"radial_velocity_vs_radius_final.png", "compare_radial_velocity_vs_radius_final.png", (lk["radius"]*dist_scale, lk["v_radial"]), (rk["radius"]*dist_scale, rk["v_radial"]), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="radial velocity [m/s]", title="Radial velocity vs radius (final snapshot)")
+        save_compare_profile_plot(parent_dir, pref+"radial_velocity_vs_radius_final.png", "compare_radial_velocity_vs_radius_final.png", (lk["radius"]*dist_scale, lk["v_radial"] * vel_scale), (rk["radius"]*dist_scale, rk["v_radial"] * vel_scale), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel=f"radial velocity [{vel_unit}]", title="Radial velocity vs radius (final snapshot)")
 
         lmed=[];lp25=[];lp75=[];rmed=[];rp25=[];rp75=[];tvals=[]
         for ls, rs in zip(left_snaps, right_snaps):
@@ -658,22 +695,25 @@ def render_compare(
             tvals.append(float(ls.time))
             lmed.append(np.median(lr)); lp25.append(np.percentile(lr,25)); lp75.append(np.percentile(lr,75))
             rmed.append(np.median(rr)); rp25.append(np.percentile(rr,25)); rp75.append(np.percentile(rr,75))
-        import matplotlib.pyplot as plt
         fig, ax = plt.subplots(1,1,figsize=(9,6),facecolor='black'); ax.set_facecolor('black'); ax.tick_params(colors='gray')
         for s in ax.spines.values(): s.set_color('gray')
-        t=np.asarray(tvals); ax.plot(t,lmed,color='tab:cyan',label=left_panel_label); ax.fill_between(t,lp25,lp75,color='tab:cyan',alpha=0.2)
+        t=np.asarray(tvals) * time_scale; ax.plot(t,lmed,color='tab:cyan',label=left_panel_label); ax.fill_between(t,lp25,lp75,color='tab:cyan',alpha=0.2)
         ax.plot(t,rmed,color='tab:orange',label=right_panel_label); ax.fill_between(t,rp25,rp75,color='tab:orange',alpha=0.2)
         ax.set_xlabel(f"time [{shared_display.active_time_unit}]", color='white'); ax.set_ylabel(f"radius [{dist_unit}]", color='white'); ax.set_title('Radius percentiles over time', color='white'); ax.legend(facecolor='black',edgecolor='gray'); fig.tight_layout()
         fig.savefig(parent_dir/(pref+"radius_percentiles_over_time.png"),dpi=150,facecolor='black',edgecolor='none'); fig.savefig(parent_dir/"compare_radius_percentiles_over_time.png",dpi=150,facecolor='black',edgecolor='none'); plt.close(fig)
 
         if l_in is not None and r_in is not None:
-            m=min(l_in.shape[0], r_in.shape[0], lk['radius'].shape[0])
-            denom=l_in[:m]; num=r_in[:m]; rx=lk['radius'][:m]*dist_scale
-            valid=np.isfinite(denom)&np.isfinite(num)&np.isfinite(rx)&(np.abs(denom)>0)
-            if np.any(~valid):
-                print(f"Warning: skipped {int(np.sum(~valid))} invalid acceleration-ratio points")
-            ratio=np.divide(num[valid],denom[valid])
-            save_compare_profile_plot(parent_dir, pref+"acceleration_ratio_vs_radius_final.png", "compare_acceleration_ratio_vs_radius_final.png", None, (rx[valid], ratio), left_label=left_panel_label, right_label=f"{right_panel_label}/{left_panel_label}", xlabel=f"radius [{dist_unit}]", ylabel="inward_accel_right / inward_accel_left", title="Acceleration ratio vs radius (final snapshot)", add_ref1=True)
+            l_x, l_med, _, _ = binned_profile(lk["radius"] * dist_scale, l_in, bins=30)
+            r_x, r_med, _, _ = binned_profile(rk["radius"] * dist_scale, r_in, bins=30)
+            common_x = np.union1d(l_x, r_x)
+            if common_x.size > 0:
+                l_interp = np.interp(common_x, l_x, l_med, left=np.nan, right=np.nan)
+                r_interp = np.interp(common_x, r_x, r_med, left=np.nan, right=np.nan)
+                valid = np.isfinite(l_interp) & np.isfinite(r_interp) & (np.abs(l_interp) > 0.0)
+                if np.any(~valid):
+                    print(f"Warning: skipped {int(np.sum(~valid))} invalid acceleration-ratio bins")
+                ratio = np.divide(r_interp[valid], l_interp[valid])
+                save_compare_profile_plot(parent_dir, pref+"acceleration_ratio_vs_radius_final.png", "compare_acceleration_ratio_vs_radius_final.png", None, (common_x[valid], ratio), left_label=left_panel_label, right_label=f"{right_panel_label}/{left_panel_label}", xlabel=f"radius [{dist_unit}]", ylabel="inward_accel_right / inward_accel_left", title="Acceleration ratio vs radius (final snapshot)", add_ref1=True)
     except Exception as e:
         print(f"Warning: compare diagnostic overlay plots failed: {e}")
 
