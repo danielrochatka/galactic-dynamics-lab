@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
+#include "physics/TPFCore/runtime_package_helpers.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
 #include "types.hpp"
 
@@ -817,6 +818,10 @@ TEST_CASE("4d xi motion probe benchmark writes required artifacts and finite val
   CHECK(find_csv_col(header, "beta_pass") >= 0);
   CHECK(find_csv_col(header, "wake_gate") >= 0);
   CHECK(find_csv_col(header, "beta_effective") >= 0);
+  CHECK(find_csv_col(header, "v_radial_min") >= 0);
+  CHECK(find_csv_col(header, "v_radial_max") >= 0);
+  CHECK(find_csv_col(header, "wake_gate_min") >= 0);
+  CHECK(find_csv_col(header, "wake_gate_max") >= 0);
   CHECK(find_csv_col(header, "xi_kernel_factor_raw") >= 0);
   CHECK(find_csv_col(header, "xi_kernel_metric_scale") >= 0);
   CHECK(find_csv_col(header, "xi_kernel_mode") >= 0);
@@ -1231,6 +1236,91 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake wake gate is high
   REQUIRE(wake_approach >= 0.0);
   REQUIRE(wake_separate >= 0.0);
   CHECK(wake_separate > wake_approach);
+}
+
+TEST_CASE("metric_transverse_wake bonded_pair benchmark reports per-source wake spread diagnostics") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_transverse_wake_pair_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "bonded_pair";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_source_benchmark_mass1 = 7.0e11;
+  c.tpf_source_benchmark_mass2 = 3.0e11;
+  c.tpf_source_benchmark_separation = 8.0;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_speed = 0.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 3000.0;
+  c.tpf_4d_xi_source_speed_x = -0.01 * 299792458.0;
+  c.tpf_4d_xi_source_speed_y = 0.03 * 299792458.0;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int wake_min_col = find_csv_col(header, "wake_gate_min");
+  const int wake_max_col = find_csv_col(header, "wake_gate_max");
+  const int vr_min_col = find_csv_col(header, "v_radial_min");
+  const int vr_max_col = find_csv_col(header, "v_radial_max");
+  REQUIRE(wake_min_col >= 0);
+  REQUIRE(wake_max_col >= 0);
+  REQUIRE(vr_min_col >= 0);
+  REQUIRE(vr_max_col >= 0);
+
+  bool saw_wake_spread = false;
+  bool saw_vr_spread = false;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    const double wake_min = std::atof(cols[wake_min_col].c_str());
+    const double wake_max = std::atof(cols[wake_max_col].c_str());
+    const double vr_min = std::atof(cols[vr_min_col].c_str());
+    const double vr_max = std::atof(cols[vr_max_col].c_str());
+    CHECK(wake_max >= wake_min);
+    CHECK(vr_max >= vr_min);
+    if ((wake_max - wake_min) > 1e-12) saw_wake_spread = true;
+    if ((vr_max - vr_min) > 1e-6) saw_vr_spread = true;
+  }
+  CHECK(saw_wake_spread);
+  CHECK(saw_vr_spread);
+}
+
+TEST_CASE("compute_xi_wake_kinematics follows the same per-interaction formula used by benchmark and runtime") {
+  const double dx = 3.0;
+  const double dy = 4.0;
+  const double dz = 0.0;
+  const double vx_rel = 1.0e5;
+  const double vy_rel = -3.0e5;
+  const double vz_rel = 2.0e4;
+
+  const galaxy::tpfcore::XiWakeKinematics k =
+      galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, 299792458.0);
+
+  const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+  const double rx = dx / r, ry = dy / r, rz = dz / r;
+  const double v_rad = vx_rel * rx + vy_rel * ry + vz_rel * rz;
+  const double vtx = vx_rel - v_rad * rx;
+  const double vty = vy_rel - v_rad * ry;
+  const double vtz = vz_rel - v_rad * rz;
+  const double vt = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
+  const double beta_pass = vt / 299792458.0;
+  const double wake_gate = 0.5 * (1.0 + std::tanh(v_rad / std::max(vt, 1.0e-30)));
+  const double beta_effective = beta_pass * wake_gate;
+
+  CHECK(k.v_radial == doctest::Approx(v_rad));
+  CHECK(k.v_transverse == doctest::Approx(vt));
+  CHECK(k.beta_pass == doctest::Approx(beta_pass));
+  CHECK(k.wake_gate == doctest::Approx(wake_gate));
+  CHECK(k.beta_effective == doctest::Approx(beta_effective));
 }
 
 TEST_CASE("4d xi motion probe benchmark spacetime_metric emits xi_t diagnostics only") {

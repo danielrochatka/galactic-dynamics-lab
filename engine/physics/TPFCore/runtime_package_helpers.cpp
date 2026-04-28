@@ -9,6 +9,37 @@ namespace {
 unsigned g_tpf_shunt_events = 0;
 }
 
+XiWakeKinematics compute_xi_wake_kinematics(double dx,
+                                            double dy,
+                                            double dz,
+                                            double vx_rel,
+                                            double vy_rel,
+                                            double vz_rel,
+                                            double c_light) {
+  XiWakeKinematics k;
+  const double r_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+  const double inv_r = (r_norm > 1.0e-30) ? (1.0 / r_norm) : 0.0;
+  const double r_hat_x = dx * inv_r;
+  const double r_hat_y = dy * inv_r;
+  const double r_hat_z = dz * inv_r;
+  k.v_radial = vx_rel * r_hat_x + vy_rel * r_hat_y + vz_rel * r_hat_z;
+  const double vtx = vx_rel - k.v_radial * r_hat_x;
+  const double vty = vy_rel - k.v_radial * r_hat_y;
+  const double vtz = vz_rel - k.v_radial * r_hat_z;
+  k.v_transverse = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
+  k.beta_pass = k.v_transverse / c_light;
+  k.wake_gate = 0.5 * (1.0 + std::tanh(k.v_radial / std::max(k.v_transverse, 1.0e-30)));
+  k.beta_effective = k.beta_pass * k.wake_gate;
+  if (k.v_transverse > 1.0e-30) {
+    const double inv_vt = 1.0 / k.v_transverse;
+    k.axis_x = vtx * inv_vt;
+    k.axis_y = vty * inv_vt;
+    k.axis_z = vtz * inv_vt;
+    k.has_axis = true;
+  }
+  return k;
+}
+
 unsigned apply_global_accel_magnitude_shunt(const State& state,
                                             double dt,
                                             bool enable,
