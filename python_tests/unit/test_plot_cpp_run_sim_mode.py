@@ -127,6 +127,19 @@ class TestPhysicsLabelFromRunInfo(unittest.TestCase):
         self.assertEqual(physics_label_from_run_info(ri, "galaxy"), "tpfcore_legacy_readout_vdsg_off")
         self.assertTrue(should_draw_central_bh_marker(ri, "galaxy"))
 
+    def test_xi_kernel_deformed_label_uses_xi_kernel_mode(self) -> None:
+        ri = {
+            "effective_physics_package": "TPFCore",
+            "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+            "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
+            "configured_tpfcore_readout_mode": "tensor_radial_projection",
+            "configured_tpf_vdsg_coupling": 0.0,
+        }
+        self.assertEqual(
+            physics_label_from_run_info(ri, "galaxy"),
+            "tpfcore_xi_kernel_deformed_gaussian_compact",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
