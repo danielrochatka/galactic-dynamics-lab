@@ -320,6 +320,28 @@ struct Config {
   std::string tpf_4d_xi_motion_integrator = "velocity_verlet";
   /** TPF 4D Xi motion benchmark trajectory dump cadence in steps. */
   int tpf_4d_xi_motion_dump_every = 1;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation mode selector. */
+  std::string tpf_4d_xi_kernel_mode = "off";
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation coupling strength. */
+  double tpf_4d_xi_kernel_coupling = 0.0;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation beta exponent for beta_power factor mode. */
+  double tpf_4d_xi_kernel_beta_power = 1.0;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation factor mode. */
+  std::string tpf_4d_xi_kernel_factor_mode = "beta_power";
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation minimum metric scale clamp. */
+  double tpf_4d_xi_kernel_metric_min = 0.1;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation maximum metric scale clamp. */
+  double tpf_4d_xi_kernel_metric_max = 10.0;
+  /** TPF 4D Xi motion benchmark-only Xi temporal diagnostic mode selector. */
+  std::string tpf_4d_xi_temporal_mode = "off";
+  /** TPF 4D Xi motion benchmark-only Xi temporal diagnostic coupling. */
+  double tpf_4d_xi_temporal_coupling = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity x-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_x = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity y-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_y = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity z-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_z = 0.0;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */

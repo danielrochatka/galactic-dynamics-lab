@@ -1940,6 +1940,17 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   const double probe_speed = config.tpf_4d_xi_motion_probe_speed;
   const std::string integrator = config.tpf_4d_xi_motion_integrator;
   const int dump_every = config.tpf_4d_xi_motion_dump_every;
+  const std::string kernel_mode = config.tpf_4d_xi_kernel_mode;
+  const double kernel_coupling = config.tpf_4d_xi_kernel_coupling;
+  const double kernel_beta_power = config.tpf_4d_xi_kernel_beta_power;
+  const std::string kernel_factor_mode = config.tpf_4d_xi_kernel_factor_mode;
+  const double kernel_metric_min = config.tpf_4d_xi_kernel_metric_min;
+  const double kernel_metric_max = config.tpf_4d_xi_kernel_metric_max;
+  const std::string temporal_mode = config.tpf_4d_xi_temporal_mode;
+  const double temporal_coupling = config.tpf_4d_xi_temporal_coupling;
+  const double source_speed_x = config.tpf_4d_xi_source_speed_x;
+  const double source_speed_y = config.tpf_4d_xi_source_speed_y;
+  const double source_speed_z = config.tpf_4d_xi_source_speed_z;
 
   if (!std::isfinite(dt) || dt <= 0.0) throw std::runtime_error("tpf_4d_xi_motion_dt must be finite and > 0");
   if (steps < 1) throw std::runtime_error("tpf_4d_xi_motion_steps must be >= 1");
@@ -1952,15 +1963,43 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   if (layout != "ring" && layout != "axis") throw std::runtime_error("tpf_4d_xi_motion_probe_layout must be ring or axis");
   if (integrator != "velocity_verlet" && integrator != "semi_implicit_euler") throw std::runtime_error("tpf_4d_xi_motion_integrator must be velocity_verlet or semi_implicit_euler");
   if (dump_every < 1) throw std::runtime_error("tpf_4d_xi_motion_dump_every must be >= 1");
+  if (kernel_mode != "off" && kernel_mode != "scalar_beta" && kernel_mode != "metric_radial" && kernel_mode != "metric_velocity" &&
+      kernel_mode != "spacetime_metric") {
+    throw std::runtime_error("tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, spacetime_metric");
+  }
+  if (kernel_factor_mode != "beta_power" && kernel_factor_mode != "gamma_minus_one") {
+    throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
+  }
+  if (temporal_mode != "off" && temporal_mode != "norm_scaled") {
+    throw std::runtime_error("tpf_4d_xi_temporal_mode must be off or norm_scaled");
+  }
+  if (!std::isfinite(kernel_coupling)) throw std::runtime_error("tpf_4d_xi_kernel_coupling must be finite");
+  const bool xi_kernel_deformation_active = (kernel_mode != "off" && kernel_coupling != 0.0);
+  if (xi_kernel_deformation_active && integrator == "velocity_verlet") {
+    throw std::runtime_error("velocity_verlet is disabled for active velocity-dependent Xi kernel modes; use semi_implicit_euler");
+  }
+  if (!std::isfinite(kernel_beta_power) || kernel_beta_power < 0.0) {
+    throw std::runtime_error("tpf_4d_xi_kernel_beta_power must be finite and >= 0");
+  }
+  if (!std::isfinite(kernel_metric_min) || kernel_metric_min <= 0.0) {
+    throw std::runtime_error("tpf_4d_xi_kernel_metric_min must be finite and > 0");
+  }
+  if (!std::isfinite(kernel_metric_max) || kernel_metric_max < kernel_metric_min) {
+    throw std::runtime_error("tpf_4d_xi_kernel_metric_max must be finite and >= tpf_4d_xi_kernel_metric_min");
+  }
+  if (!std::isfinite(temporal_coupling)) throw std::runtime_error("tpf_4d_xi_temporal_coupling must be finite");
+  if (!std::isfinite(source_speed_x) || !std::isfinite(source_speed_y) || !std::isfinite(source_speed_z)) {
+    throw std::runtime_error("tpf_4d_xi_source_speed_x/y/z must all be finite");
+  }
   validate_stage4_residual_source_inputs(config);
 
   std::string source_config_id;
   const std::vector<BenchmarkSourceSpec3D> source_specs = build_tpf_benchmark_sources_3d(config, &source_config_id);
   validate_stage4_residual_source_specs(source_specs);
-  std::vector<StaticSourcePoint4D> sources;
-  sources.reserve(source_specs.size());
+  std::vector<StaticSourcePoint4D> static_sources;
+  static_sources.reserve(source_specs.size());
   for (std::size_t i = 0; i < source_specs.size(); ++i) {
-    sources.push_back(StaticSourcePoint4D{source_specs[i].m, source_specs[i].x, source_specs[i].y, source_specs[i].z});
+    static_sources.push_back(StaticSourcePoint4D{source_specs[i].m, source_specs[i].x, source_specs[i].y, source_specs[i].z});
   }
 
   struct ProbeState {
@@ -1969,14 +2008,36 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     double vx = 0.0, vy = 0.0, vz = 0.0;
     double ax = 0.0, ay = 0.0, az = 0.0;
     double xi_x = 0.0, xi_y = 0.0, xi_z = 0.0;
+    double xi_x_base = 0.0, xi_y_base = 0.0, xi_z_base = 0.0;
+    double xi_x_eff = 0.0, xi_y_eff = 0.0, xi_z_eff = 0.0;
     double xi_spatial_norm = 0.0;
+    double xi_t = 0.0;
+    double beta_rel = 0.0;
+    double gamma_rel = 1.0;
+    double xi_kernel_factor_raw = 0.0;
+    double xi_kernel_metric_scale = 1.0;
     double theta_trace_4d = 0.0;
     double invariant_I_4d = 0.0;
     bool is_near_source = false;
     bool escaped = false;
     bool valid = true;
   };
-  auto eval_probe = [&](ProbeState& p) {
+
+  struct KernelStats {
+    double sum_beta_rel = 0.0;
+    double max_beta_rel = 0.0;
+    double sum_gamma_rel = 0.0;
+    double max_gamma_rel = 1.0;
+    double sum_factor_raw = 0.0;
+    double max_abs_factor_raw = 0.0;
+    double sum_metric_scale = 0.0;
+    double max_metric_scale = 1.0;
+    double sum_xi_t = 0.0;
+    double max_abs_xi_t = 0.0;
+    std::size_t sample_count = 0;
+  } kernel_stats;
+
+  auto eval_probe = [&](ProbeState& p, bool track_stats) {
     p.is_near_source = (source_exclusion_radius > 0.0 &&
                         nearest_source_distance(source_specs, p.x, p.y, p.z) <= source_exclusion_radius);
     p.valid = std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
@@ -1985,24 +2046,149 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       p.escaped = true;
       p.ax = p.ay = p.az = 0.0;
       p.xi_x = p.xi_y = p.xi_z = 0.0;
+      p.xi_x_base = p.xi_y_base = p.xi_z_base = 0.0;
+      p.xi_x_eff = p.xi_y_eff = p.xi_z_eff = 0.0;
       p.xi_spatial_norm = 0.0;
+      p.xi_t = 0.0;
+      p.beta_rel = 0.0;
+      p.gamma_rel = 1.0;
+      p.xi_kernel_factor_raw = 0.0;
+      p.xi_kernel_metric_scale = 1.0;
       p.theta_trace_4d = std::numeric_limits<double>::quiet_NaN();
       p.invariant_I_4d = std::numeric_limits<double>::quiet_NaN();
       return;
     }
-    const StaticProbePoint4D probe{p.x, p.y, p.z};
-    const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, field_softening);
-    p.xi_x = field.xi.x;
-    p.xi_y = field.xi.y;
-    p.xi_z = field.xi.z;
-    p.xi_spatial_norm = std::sqrt(p.xi_x * p.xi_x + p.xi_y * p.xi_y + p.xi_z * p.xi_z);
-    p.theta_trace_4d = field.theta_trace_4d;
-    p.invariant_I_4d = field.invariant_I_4d;
-    p.ax = -readout_scale * p.xi_x;
-    p.ay = -readout_scale * p.xi_y;
-    p.az = -readout_scale * p.xi_z;
+
+    const double vx_rel = p.vx - source_speed_x;
+    const double vy_rel = p.vy - source_speed_y;
+    const double vz_rel = p.vz - source_speed_z;
+    const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
+    const double beta_rel = v_rel_norm / C_SI_LIGHT;
+    if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
+    if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
+    const double beta_for_gamma = std::min(beta_rel, 1.0 - 1.0e-12);
+    const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
+    if (!std::isfinite(gamma_rel)) throw std::runtime_error("non-finite gamma_rel in Xi kernel deformation");
+
+    double factor_raw = 0.0;
+    if (kernel_factor_mode == "beta_power") {
+      factor_raw = kernel_coupling * std::pow(beta_rel, kernel_beta_power);
+    } else {
+      factor_raw = kernel_coupling * (gamma_rel - 1.0);
+    }
+    if (!std::isfinite(factor_raw)) throw std::runtime_error("non-finite factor_raw in Xi kernel deformation");
+
+    const double metric_scale = std::max(kernel_metric_min, std::min(kernel_metric_max, 1.0 + factor_raw));
+
+    double xi_base_x = 0.0, xi_base_y = 0.0, xi_base_z = 0.0;
+    double xi_eff_x = 0.0, xi_eff_y = 0.0, xi_eff_z = 0.0;
+
+    for (std::size_t si = 0; si < source_specs.size(); ++si) {
+      const double dx = p.x - source_specs[si].x;
+      const double dy = p.y - source_specs[si].y;
+      const double dz = p.z - source_specs[si].z;
+      const double r2 = dx * dx + dy * dy + dz * dz + field_softening * field_softening;
+      const double r = std::sqrt(r2);
+      const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+      const double xi_sx = source_specs[si].m * dx * inv_r3;
+      const double xi_sy = source_specs[si].m * dy * inv_r3;
+      const double xi_sz = source_specs[si].m * dz * inv_r3;
+      xi_base_x += xi_sx;
+      xi_base_y += xi_sy;
+      xi_base_z += xi_sz;
+
+      if (kernel_mode == "off") {
+        xi_eff_x += xi_sx;
+        xi_eff_y += xi_sy;
+        xi_eff_z += xi_sz;
+      } else if (kernel_mode == "scalar_beta") {
+        const double scalar = 1.0 + factor_raw;
+        xi_eff_x += xi_sx * scalar;
+        xi_eff_y += xi_sy * scalar;
+        xi_eff_z += xi_sz * scalar;
+      } else {
+        double nx = 0.0, ny = 0.0, nz = 0.0;
+        double n_norm = 0.0;
+        if (kernel_mode == "metric_radial") {
+          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
+          nx = dx / n_norm;
+          ny = dy / n_norm;
+          nz = dz / n_norm;
+        } else {
+          n_norm = v_rel_norm;
+          if (n_norm > 1.0e-30) {
+            nx = vx_rel / n_norm;
+            ny = vy_rel / n_norm;
+            nz = vz_rel / n_norm;
+          }
+        }
+
+        const double alpha = (n_norm > 1.0e-30) ? (metric_scale - 1.0) : 0.0;
+        const double nd = nx * dx + ny * dy + nz * dz;
+        const double gx = dx + alpha * nx * nd;
+        const double gy = dy + alpha * ny * nd;
+        const double gz = dz + alpha * nz * nd;
+        const double r_eff2 = dx * gx + dy * gy + dz * gz + field_softening * field_softening;
+        const double r_eff = std::sqrt(r_eff2);
+        const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
+        xi_eff_x += source_specs[si].m * gx * inv_r_eff3;
+        xi_eff_y += source_specs[si].m * gy * inv_r_eff3;
+        xi_eff_z += source_specs[si].m * gz * inv_r_eff3;
+      }
+    }
+
+    const StaticProbePoint4D probe_field{p.x, p.y, p.z};
+    const Field4DAtPoint field_diag = evaluate_static_sources_field_4d(static_sources, probe_field, field_softening);
+
+    const double xi_eff_norm = std::sqrt(xi_eff_x * xi_eff_x + xi_eff_y * xi_eff_y + xi_eff_z * xi_eff_z);
+    double xi_t = 0.0;
+    if (temporal_mode == "norm_scaled" && kernel_mode == "spacetime_metric") {
+      xi_t = temporal_coupling * factor_raw * xi_eff_norm;
+    }
+
+    if (!std::isfinite(xi_eff_x) || !std::isfinite(xi_eff_y) || !std::isfinite(xi_eff_z) || !std::isfinite(xi_t)) {
+      throw std::runtime_error("non-finite Xi kernel deformation outputs");
+    }
+
+    p.xi_x_base = xi_base_x;
+    p.xi_y_base = xi_base_y;
+    p.xi_z_base = xi_base_z;
+    p.xi_x_eff = xi_eff_x;
+    p.xi_y_eff = xi_eff_y;
+    p.xi_z_eff = xi_eff_z;
+    p.xi_x = xi_eff_x;
+    p.xi_y = xi_eff_y;
+    p.xi_z = xi_eff_z;
+    p.xi_spatial_norm = xi_eff_norm;
+    p.xi_t = xi_t;
+    p.beta_rel = beta_rel;
+    p.gamma_rel = gamma_rel;
+    p.xi_kernel_factor_raw = (kernel_mode == "off") ? 0.0 : factor_raw;
+    p.xi_kernel_metric_scale = (kernel_mode == "metric_radial" || kernel_mode == "metric_velocity" || kernel_mode == "spacetime_metric")
+                                   ? metric_scale
+                                   : 1.0;
+    p.theta_trace_4d = field_diag.theta_trace_4d;
+    p.invariant_I_4d = field_diag.invariant_I_4d;
+    p.ax = -readout_scale * p.xi_x_eff;
+    p.ay = -readout_scale * p.xi_y_eff;
+    p.az = -readout_scale * p.xi_z_eff;
     p.valid = p.valid && std::isfinite(p.ax) && std::isfinite(p.ay) && std::isfinite(p.az);
     if (!p.valid) p.escaped = true;
+
+    if (track_stats) {
+      kernel_stats.sum_beta_rel += p.beta_rel;
+      kernel_stats.max_beta_rel = std::max(kernel_stats.max_beta_rel, p.beta_rel);
+      kernel_stats.sum_gamma_rel += p.gamma_rel;
+      kernel_stats.max_gamma_rel = std::max(kernel_stats.max_gamma_rel, p.gamma_rel);
+      kernel_stats.sum_factor_raw += p.xi_kernel_factor_raw;
+      kernel_stats.max_abs_factor_raw = std::max(kernel_stats.max_abs_factor_raw, std::fabs(p.xi_kernel_factor_raw));
+      kernel_stats.sum_metric_scale += p.xi_kernel_metric_scale;
+      kernel_stats.max_metric_scale = std::max(kernel_stats.max_metric_scale, p.xi_kernel_metric_scale);
+      kernel_stats.sum_xi_t += p.xi_t;
+      kernel_stats.max_abs_xi_t = std::max(kernel_stats.max_abs_xi_t, std::fabs(p.xi_t));
+      ++kernel_stats.sample_count;
+    }
   };
 
   std::vector<ProbeState> probes;
@@ -2042,10 +2228,12 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   if (!traj || !init_csv) throw std::runtime_error("failed to open Xi motion benchmark CSV outputs");
   traj << std::scientific;
   init_csv << std::scientific;
-  traj << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d,"
-          "r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
-  init_csv << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,theta_trace_4d,invariant_I_4d,"
-             "r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
+  traj << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,xi_t,xi_x_base,xi_y_base,xi_z_base,"
+          "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
+          "theta_trace_4d,invariant_I_4d,r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
+  init_csv << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,xi_t,xi_x_base,xi_y_base,xi_z_base,"
+              "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
+              "theta_trace_4d,invariant_I_4d,r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
 
   std::size_t rows_written = 0;
   std::size_t invalid_row_count = 0;
@@ -2072,12 +2260,18 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         << p.vx << "," << p.vy << "," << p.vz << ","
         << p.ax << "," << p.ay << "," << p.az << "," << a_norm << ","
         << p.xi_x << "," << p.xi_y << "," << p.xi_z << "," << p.xi_spatial_norm << ","
+        << p.xi_t << ","
+        << p.xi_x_base << "," << p.xi_y_base << "," << p.xi_z_base << ","
+        << p.xi_x_eff << "," << p.xi_y_eff << "," << p.xi_z_eff << ","
+        << p.beta_rel << "," << p.gamma_rel << ","
+        << p.xi_kernel_factor_raw << "," << p.xi_kernel_metric_scale << ","
+        << kernel_mode << "," << temporal_mode << ","
         << p.theta_trace_4d << "," << p.invariant_I_4d << ","
         << r_origin << "," << align << "," << transverse << ","
         << (p.is_near_source ? 1 : 0) << "," << (p.escaped ? 1 : 0) << "," << (p.valid ? 1 : 0) << "\n";
   };
 
-  for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i]);
+  for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i], true);
   for (std::size_t i = 0; i < probes.size(); ++i) {
     dump_row(0, 0.0, probes[i], traj);
     dump_row(0, 0.0, probes[i], init_csv);
@@ -2107,7 +2301,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       }
       for (std::size_t i = 0; i < probes.size(); ++i) {
         ProbeState& p = probes[i];
-        eval_probe(p);
+        eval_probe(p, true);
         ax_new[i] = p.ax;
         ay_new[i] = p.ay;
         az_new[i] = p.az;
@@ -2122,7 +2316,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     } else {
       for (std::size_t i = 0; i < probes.size(); ++i) {
         ProbeState& p = probes[i];
-        eval_probe(p);
+        eval_probe(p, true);
         if (!p.valid) continue;
         p.vx += p.ax * dt;
         p.vy += p.ay * dt;
@@ -2131,7 +2325,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         p.y += p.vy * dt;
         p.z += p.vz * dt;
       }
-      for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i]);
+      for (std::size_t i = 0; i < probes.size(); ++i) eval_probe(probes[i], true);
     }
 
     if ((step % dump_every) == 0) {
@@ -2182,12 +2376,13 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       const double r = r_base * (0.7 + 0.3 * static_cast<double>(i));
       if (!(r > 0.0)) continue;
       if (source_exclusion_radius > 0.0 && r <= source_exclusion_radius) continue;
-      const StaticProbePoint4D probe{r, 0.0, 0.0};
-      const Field4DAtPoint field = evaluate_static_sources_field_4d(sources, probe, field_softening);
-      const double ax = -readout_scale * field.xi.x;
-      const double ay = -readout_scale * field.xi.y;
-      const double az = -readout_scale * field.xi.z;
-      const double a = std::sqrt(ax * ax + ay * ay + az * az);
+      ProbeState p;
+      p.x = r;
+      p.y = 0.0;
+      p.z = 0.0;
+      p.vx = p.vy = p.vz = 0.0;
+      eval_probe(p, false);
+      const double a = std::sqrt(p.ax * p.ax + p.ay * p.ay + p.az * p.az);
       if (std::isfinite(a) && a > 0.0) {
         slope_log_r.push_back(std::log(r));
         slope_log_a.push_back(std::log(a));
@@ -2212,6 +2407,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   summary << std::scientific;
   summary << "mode: tpf_4d_xi_motion_probe_benchmark\n";
   summary << "readout name: GravityXiMotionReadout_v1\n";
+  summary << "xi kernel readout name: GravityXiKernelDeformation_v1\n";
   summary << "source shape: " << config.tpf_source_benchmark_shape << "\n";
   summary << "source config id: " << source_config_id << "\n";
   summary << "source masses: ";
@@ -2225,6 +2421,15 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     summary << "(" << source_specs[i].x << "," << source_specs[i].y << "," << source_specs[i].z << ")";
   }
   summary << "\n";
+  summary << "tpf_4d_xi_kernel_mode: " << kernel_mode << "\n";
+  summary << "tpf_4d_xi_kernel_coupling: " << kernel_coupling << "\n";
+  summary << "tpf_4d_xi_kernel_beta_power: " << kernel_beta_power << "\n";
+  summary << "tpf_4d_xi_kernel_factor_mode: " << kernel_factor_mode << "\n";
+  summary << "tpf_4d_xi_kernel_metric_min: " << kernel_metric_min << "\n";
+  summary << "tpf_4d_xi_kernel_metric_max: " << kernel_metric_max << "\n";
+  summary << "tpf_4d_xi_temporal_mode: " << temporal_mode << "\n";
+  summary << "tpf_4d_xi_temporal_coupling: " << temporal_coupling << "\n";
+  summary << "configured source velocity vector: (" << source_speed_x << ", " << source_speed_y << ", " << source_speed_z << ")\n";
   summary << "dt: " << dt << "\n";
   summary << "steps: " << steps << "\n";
   summary << "integrator: " << integrator << "\n";
@@ -2245,8 +2450,20 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   summary << "mean transverse acceleration fraction: "
           << (trans_count > 0 ? sum_transverse / static_cast<double>(trans_count) : std::numeric_limits<double>::quiet_NaN()) << "\n";
   summary << "measured Xi acceleration falloff slope from initial probe samples if available: " << slope << "\n";
-  summary << "acceleration formula: a=-K_xi*Xi_spatial\n";
-  summary << "evaluator: evaluate_static_sources_field_4d(...)\n";
+  const double n_kernel = (kernel_stats.sample_count > 0) ? static_cast<double>(kernel_stats.sample_count) : 1.0;
+  summary << "mean beta_rel: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_beta_rel / n_kernel : 0.0) << "\n";
+  summary << "max beta_rel: " << kernel_stats.max_beta_rel << "\n";
+  summary << "mean gamma_rel: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_gamma_rel / n_kernel : 1.0) << "\n";
+  summary << "max gamma_rel: " << kernel_stats.max_gamma_rel << "\n";
+  summary << "mean factor_raw: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_factor_raw / n_kernel : 0.0) << "\n";
+  summary << "max abs factor_raw: " << kernel_stats.max_abs_factor_raw << "\n";
+  summary << "mean factor_clamped_or_metric_scale: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_metric_scale / n_kernel : 1.0) << "\n";
+  summary << "max metric_scale: " << kernel_stats.max_metric_scale << "\n";
+  summary << "mean xi_t: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_xi_t / n_kernel : 0.0) << "\n";
+  summary << "max abs xi_t: " << kernel_stats.max_abs_xi_t << "\n";
+  summary << "acceleration formula: a=-K_xi*Xi_eff_spatial\n";
+  summary << "xi kernel evaluator: per-source softened Xi kernel with optional GravityXiKernelDeformation_v1\n";
+  summary << "theta diagnostic evaluator: evaluate_static_sources_field_4d(...)\n";
   summary << "source behavior: fixed sources for Stage 7B\n";
   summary << "probe behavior: moving probes\n";
   summary << "no Newtonian acceleration calls: true\n";
@@ -2255,8 +2472,9 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   summary << "no principal C tensor acceleration: true\n";
   summary << "no VDSG/shunt/cooling: true\n";
   summary << "no production dynamics route: true\n";
-  summary << "note: acceleration is -K_xi * Xi_spatial\n";
-  summary << "note: no Newtonian acceleration or principal-C readout is used\n";
+  summary << "note: Xi-kernel deformation is applied before acceleration readout\n";
+  summary << "note: acceleration remains a=-K_xi*Xi_eff_spatial\n";
+  summary << "note: old additive acceleration VDSG path is not used\n";
   summary << "description: dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation.\n";
 }
 

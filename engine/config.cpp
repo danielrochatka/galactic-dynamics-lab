@@ -441,6 +441,50 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_4d_xi_motion_dump_every = std::stoi(val);
     return true;
   }
+  if (key == "tpf_4d_xi_kernel_mode") {
+    config.tpf_4d_xi_kernel_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_coupling") {
+    config.tpf_4d_xi_kernel_coupling = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_beta_power") {
+    config.tpf_4d_xi_kernel_beta_power = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_factor_mode") {
+    config.tpf_4d_xi_kernel_factor_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_metric_min") {
+    config.tpf_4d_xi_kernel_metric_min = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_metric_max") {
+    config.tpf_4d_xi_kernel_metric_max = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_temporal_mode") {
+    config.tpf_4d_xi_temporal_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_temporal_coupling") {
+    config.tpf_4d_xi_temporal_coupling = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_x") {
+    config.tpf_4d_xi_source_speed_x = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_y") {
+    config.tpf_4d_xi_source_speed_y = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_z") {
+    config.tpf_4d_xi_source_speed_z = std::stod(val);
+    return true;
+  }
   if (key == "tpf_xi_constraint_exterior_inspect") {
     config.tpf_xi_constraint_exterior_inspect = parse_bool(val);
     return true;
@@ -889,6 +933,17 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_4d_xi_motion_probe_speed", d(config.tpf_4d_xi_motion_probe_speed));
   kv.emplace_back("tpf_4d_xi_motion_integrator", config.tpf_4d_xi_motion_integrator);
   kv.emplace_back("tpf_4d_xi_motion_dump_every", i(config.tpf_4d_xi_motion_dump_every));
+  kv.emplace_back("tpf_4d_xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
+  kv.emplace_back("tpf_4d_xi_kernel_coupling", d(config.tpf_4d_xi_kernel_coupling));
+  kv.emplace_back("tpf_4d_xi_kernel_beta_power", d(config.tpf_4d_xi_kernel_beta_power));
+  kv.emplace_back("tpf_4d_xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+  kv.emplace_back("tpf_4d_xi_kernel_metric_min", d(config.tpf_4d_xi_kernel_metric_min));
+  kv.emplace_back("tpf_4d_xi_kernel_metric_max", d(config.tpf_4d_xi_kernel_metric_max));
+  kv.emplace_back("tpf_4d_xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+  kv.emplace_back("tpf_4d_xi_temporal_coupling", d(config.tpf_4d_xi_temporal_coupling));
+  kv.emplace_back("tpf_4d_xi_source_speed_x", d(config.tpf_4d_xi_source_speed_x));
+  kv.emplace_back("tpf_4d_xi_source_speed_y", d(config.tpf_4d_xi_source_speed_y));
+  kv.emplace_back("tpf_4d_xi_source_speed_z", d(config.tpf_4d_xi_source_speed_z));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));

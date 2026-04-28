@@ -47,6 +47,17 @@ TEST_CASE("config defaults") {
   CHECK(c.tpf_4d_xi_motion_probe_speed == doctest::Approx(0.0));
   CHECK(c.tpf_4d_xi_motion_integrator == "velocity_verlet");
   CHECK(c.tpf_4d_xi_motion_dump_every == 1);
+  CHECK(c.tpf_4d_xi_kernel_mode == "off");
+  CHECK(c.tpf_4d_xi_kernel_coupling == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_xi_kernel_beta_power == doctest::Approx(1.0));
+  CHECK(c.tpf_4d_xi_kernel_factor_mode == "beta_power");
+  CHECK(c.tpf_4d_xi_kernel_metric_min == doctest::Approx(0.1));
+  CHECK(c.tpf_4d_xi_kernel_metric_max == doctest::Approx(10.0));
+  CHECK(c.tpf_4d_xi_temporal_mode == "off");
+  CHECK(c.tpf_4d_xi_temporal_coupling == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_xi_source_speed_x == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_xi_source_speed_y == doctest::Approx(0.0));
+  CHECK(c.tpf_4d_xi_source_speed_z == doctest::Approx(0.0));
   CHECK(c.tpf_xi_constraint_exterior_inspect == false);
   CHECK(c.tpf_xi_constraint_grid_n == 65);
   CHECK(c.tpf_xi_constraint_half_extent == doctest::Approx(10.0));
@@ -317,6 +328,28 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
   CHECK(c.tpf_4d_xi_motion_integrator == "semi_implicit_euler");
   CHECK(apply_config_kv("tpf_4d_xi_motion_dump_every", "3", c));
   CHECK(c.tpf_4d_xi_motion_dump_every == 3);
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_mode", "metric_velocity", c));
+  CHECK(c.tpf_4d_xi_kernel_mode == "metric_velocity");
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_coupling", "11.0", c));
+  CHECK(c.tpf_4d_xi_kernel_coupling == doctest::Approx(11.0));
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_beta_power", "1.5", c));
+  CHECK(c.tpf_4d_xi_kernel_beta_power == doctest::Approx(1.5));
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_factor_mode", "gamma_minus_one", c));
+  CHECK(c.tpf_4d_xi_kernel_factor_mode == "gamma_minus_one");
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_metric_min", "0.2", c));
+  CHECK(c.tpf_4d_xi_kernel_metric_min == doctest::Approx(0.2));
+  CHECK(apply_config_kv("tpf_4d_xi_kernel_metric_max", "12.0", c));
+  CHECK(c.tpf_4d_xi_kernel_metric_max == doctest::Approx(12.0));
+  CHECK(apply_config_kv("tpf_4d_xi_temporal_mode", "norm_scaled", c));
+  CHECK(c.tpf_4d_xi_temporal_mode == "norm_scaled");
+  CHECK(apply_config_kv("tpf_4d_xi_temporal_coupling", "0.25", c));
+  CHECK(c.tpf_4d_xi_temporal_coupling == doctest::Approx(0.25));
+  CHECK(apply_config_kv("tpf_4d_xi_source_speed_x", "1.0", c));
+  CHECK(c.tpf_4d_xi_source_speed_x == doctest::Approx(1.0));
+  CHECK(apply_config_kv("tpf_4d_xi_source_speed_y", "-2.0", c));
+  CHECK(c.tpf_4d_xi_source_speed_y == doctest::Approx(-2.0));
+  CHECK(apply_config_kv("tpf_4d_xi_source_speed_z", "3.5", c));
+  CHECK(c.tpf_4d_xi_source_speed_z == doctest::Approx(3.5));
 
   const auto kv = galaxy::serialize_config_kv(c);
   const auto has_key = [&kv](const char* key) {
@@ -335,4 +368,15 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
   CHECK(has_key("tpf_4d_xi_motion_probe_speed"));
   CHECK(has_key("tpf_4d_xi_motion_integrator"));
   CHECK(has_key("tpf_4d_xi_motion_dump_every"));
+  CHECK(has_key("tpf_4d_xi_kernel_mode"));
+  CHECK(has_key("tpf_4d_xi_kernel_coupling"));
+  CHECK(has_key("tpf_4d_xi_kernel_beta_power"));
+  CHECK(has_key("tpf_4d_xi_kernel_factor_mode"));
+  CHECK(has_key("tpf_4d_xi_kernel_metric_min"));
+  CHECK(has_key("tpf_4d_xi_kernel_metric_max"));
+  CHECK(has_key("tpf_4d_xi_temporal_mode"));
+  CHECK(has_key("tpf_4d_xi_temporal_coupling"));
+  CHECK(has_key("tpf_4d_xi_source_speed_x"));
+  CHECK(has_key("tpf_4d_xi_source_speed_y"));
+  CHECK(has_key("tpf_4d_xi_source_speed_z"));
 }
