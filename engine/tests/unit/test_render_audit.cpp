@@ -114,6 +114,39 @@ TEST_CASE("write_render_manifest TXT tpf_extension_mode semantics align with JSO
   rmdir(out_dir.c_str());
 }
 
+TEST_CASE("write_render_manifest: xi_kernel_deformed reports xi law metadata (not legacy provisional)") {
+  char dir_template[] = "/tmp/render_audit_xi_kernel_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::galaxy;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "scalar_beta";
+  c.tpf_4d_xi_kernel_coupling = 3.0e-3;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_temporal_mode = "off";
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+
+  const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  const std::string json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(txt.find("tpf_core_law_mode\txi_kernel_deformed") != std::string::npos);
+  CHECK(txt.find("acceleration_formula\ta=-K_xi*Xi_eff_spatial") != std::string::npos);
+  CHECK(txt.find("principal_c_direct_tpf_used\t0") != std::string::npos);
+  CHECK(txt.find("provisional_readout_used\t0") != std::string::npos);
+  CHECK(txt.find("legacy_readout_provisional") == std::string::npos);
+  CHECK(json.find("\"tpf_core_law_mode\": \"xi_kernel_deformed\"") != std::string::npos);
+  CHECK(json.find("\"acceleration_formula\": \"a=-K_xi*Xi_eff_spatial\"") != std::string::npos);
+  CHECK(json.find("\"principal_c_direct_tpf_used\": false") != std::string::npos);
+  CHECK(json.find("\"provisional_readout_used\": false") != std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
+}
+
 TEST_CASE("write_render_manifest: tpf_4d_static_residual_benchmark uses diagnostic-only audit labels") {
   char dir_template[] = "/tmp/render_audit_static4d_XXXXXX";
   char* out_dir_c = mkdtemp(dir_template);

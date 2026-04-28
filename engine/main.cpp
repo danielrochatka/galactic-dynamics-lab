@@ -226,7 +226,8 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   if (!csv) return;
   csv << std::scientific << std::setprecision(17);
   csv << "particle_index,radius,vx0,vy0,"
-      << "ax_direct_tpf,ay_direct_tpf,ax_vdsg,ay_vdsg,"
+      << "active_route,applied_acceleration,decomposition_note,"
+      << "ax_reference_direct_tpf,ay_reference_direct_tpf,ax_reference_vdsg,ay_reference_vdsg,"
       << "ax_total,ay_total,ax_bh_only,ay_bh_only,ax_star_star_only,ay_star_star_only\n";
 
   std::vector<double> ax_total, ay_total;
@@ -238,53 +239,73 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   std::vector<double> ax_star_only, ay_star_only;
   physics->compute_accelerations(state, 0.0, config.softening, config.enable_star_star_gravity, ax_star_only, ay_star_only);
 
-  std::vector<double> ax_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ay_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ax_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ay_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ax_reference_direct_tpf(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_reference_direct_tpf(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ax_reference_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_reference_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::string active_route = config.physics_package;
+  std::string applied_accel_formula = "n/a";
+  std::string decomposition_note = "reference decomposition unavailable";
 
   if (config.physics_package == "TPFCore") {
-    galaxy::Config cfg_direct = config;
-    // Step-0 decomposition audit branch:
-    //  1) force direct_tpf dynamics,
-    //  2) force tensor_radial_projection readout implementation,
-    //  3) zero VDSG for the direct/baseline branch,
-    //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
-    cfg_direct.tpf_dynamics_mode = "direct_tpf";
-    cfg_direct.tpfcore_enable_provisional_readout = false;
-    // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
-    cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
-    cfg_direct.tpfcore_readout_scale = 1.0;
-    cfg_direct.tpfcore_theta_tt_scale = 1.0;
-    cfg_direct.tpfcore_theta_tr_scale = 1.0;
-    cfg_direct.tpf_global_accel_shunt_enable = false;
-    cfg_direct.tpf_cooling_fraction = 0.0;
-    cfg_direct.tpf_vdsg_coupling = 0.0;
+    active_route = config.tpf_dynamics_mode;
+    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+      applied_accel_formula = "a=-K_xi*Xi_eff_spatial";
+      decomposition_note =
+          "direct_tpf/principal-C and additive-VDSG decomposition not applicable for active xi_kernel_deformed route";
+    } else {
+      applied_accel_formula = (config.tpf_dynamics_mode == "direct_tpf")
+                                  ? "direct_tpf principal-C (+ optional additive VDSG)"
+                                  : "legacy_readout baseline (+ optional additive VDSG)";
+      decomposition_note = "reference columns report direct_tpf baseline plus additive VDSG excess";
 
-    galaxy::Config cfg_total = cfg_direct;
-    cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
+      galaxy::Config cfg_direct = config;
+      // Step-0 reference decomposition branch:
+      //  1) force direct_tpf dynamics,
+      //  2) force tensor_radial_projection readout implementation,
+      //  3) zero VDSG for the direct/baseline branch,
+      //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
+      cfg_direct.tpf_dynamics_mode = "direct_tpf";
+      cfg_direct.tpfcore_enable_provisional_readout = false;
+      // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
+      cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
+      cfg_direct.tpfcore_readout_scale = 1.0;
+      cfg_direct.tpfcore_theta_tt_scale = 1.0;
+      cfg_direct.tpfcore_theta_tr_scale = 1.0;
+      cfg_direct.tpf_global_accel_shunt_enable = false;
+      cfg_direct.tpf_cooling_fraction = 0.0;
+      cfg_direct.tpf_vdsg_coupling = 0.0;
 
-    galaxy::TPFCorePackage tpf_direct;
-    tpf_direct.init_from_config(cfg_direct);
-    tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
-                                     config.enable_star_star_gravity, ax_direct, ay_direct);
+      galaxy::Config cfg_total = cfg_direct;
+      cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
 
-    std::vector<double> ax_total_direct, ay_total_direct;
-    galaxy::TPFCorePackage tpf_total;
-    tpf_total.init_from_config(cfg_total);
-    tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
-                                    config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
-    for (int i = 0; i < state.n(); ++i) {
-      ax_vdsg[static_cast<size_t>(i)] = ax_total_direct[static_cast<size_t>(i)] - ax_direct[static_cast<size_t>(i)];
-      ay_vdsg[static_cast<size_t>(i)] = ay_total_direct[static_cast<size_t>(i)] - ay_direct[static_cast<size_t>(i)];
+      galaxy::TPFCorePackage tpf_direct;
+      tpf_direct.init_from_config(cfg_direct);
+      tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
+                                       config.enable_star_star_gravity, ax_reference_direct_tpf,
+                                       ay_reference_direct_tpf);
+
+      std::vector<double> ax_total_direct, ay_total_direct;
+      galaxy::TPFCorePackage tpf_total;
+      tpf_total.init_from_config(cfg_total);
+      tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
+                                      config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
+      for (int i = 0; i < state.n(); ++i) {
+        ax_reference_vdsg[static_cast<size_t>(i)] =
+            ax_total_direct[static_cast<size_t>(i)] - ax_reference_direct_tpf[static_cast<size_t>(i)];
+        ay_reference_vdsg[static_cast<size_t>(i)] =
+            ay_total_direct[static_cast<size_t>(i)] - ay_reference_direct_tpf[static_cast<size_t>(i)];
+      }
     }
   }
 
   for (int i = 0; i < state.n(); ++i) {
     const double radius = std::hypot(state.x[i], state.y[i]);
     csv << i << ',' << radius << ',' << state.vx[i] << ',' << state.vy[i] << ','
-        << ax_direct[static_cast<size_t>(i)] << ',' << ay_direct[static_cast<size_t>(i)] << ','
-        << ax_vdsg[static_cast<size_t>(i)] << ',' << ay_vdsg[static_cast<size_t>(i)] << ','
+        << active_route << ',' << applied_accel_formula << ',' << decomposition_note << ','
+        << ax_reference_direct_tpf[static_cast<size_t>(i)] << ',' << ay_reference_direct_tpf[static_cast<size_t>(i)]
+        << ','
+        << ax_reference_vdsg[static_cast<size_t>(i)] << ',' << ay_reference_vdsg[static_cast<size_t>(i)] << ','
         << ax_total[static_cast<size_t>(i)] << ',' << ay_total[static_cast<size_t>(i)] << ','
         << ax_bh_only[static_cast<size_t>(i)] << ',' << ay_bh_only[static_cast<size_t>(i)] << ','
         << ax_star_only[static_cast<size_t>(i)] << ',' << ay_star_only[static_cast<size_t>(i)] << '\n';
