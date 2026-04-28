@@ -158,6 +158,8 @@ TEST_CASE("tpf_dynamics_mode accepts v11_weak_field_truncation and deprecated we
   CHECK(c.tpf_dynamics_mode == "v11_weak_field_truncation");
   CHECK(apply_config_kv("tpf_dynamics_mode", "direct_tpf", c));
   CHECK(c.tpf_dynamics_mode == "direct_tpf");
+  CHECK(apply_config_kv("tpf_dynamics_mode", "xi_kernel_deformed", c));
+  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
   CHECK(apply_config_kv("tpf_weak_field_correspondence_alpha_si", "-6.0e-11", c));
   CHECK(c.tpf_weak_field_correspondence_alpha_si == doctest::Approx(-6.0e-11));
 }

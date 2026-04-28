@@ -62,6 +62,27 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
         "rejected) + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)");
 }
 
+TEST_CASE("compute_active_dynamics_branch: xi_kernel_deformed reports Xi runtime route semantics") {
+  Config c;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_motion_readout_scale = 1.0e-12;
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 2.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_temporal_mode = "off";
+  const std::string dyn = galaxy::compute_active_dynamics_branch(c);
+  CHECK(dyn.find("tpf_dynamics_mode=xi_kernel_deformed") != std::string::npos);
+  CHECK(dyn.find("a=-K_xi*Xi_eff_spatial") != std::string::npos);
+  CHECK(dyn.find("additive_vdsg=off") != std::string::npos);
+  CHECK(dyn.find("principal_c=off") != std::string::npos);
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "xi_kernel_deformed metrics; Xi_eff readout a=-K_xi*Xi_eff_spatial");
+  const std::string code_path = galaxy::compute_acceleration_code_path(c);
+  CHECK(code_path.find("compute_xi_kernel_deformed_accelerations") != std::string::npos);
+  CHECK(code_path.find("no additive VDSG helper") != std::string::npos);
+}
+
 TEST_CASE("write_render_manifest TXT tpf_extension_mode semantics align with JSON semantics") {
   char dir_template[] = "/tmp/render_audit_txt_ext_mode_XXXXXX";
   char* out_dir_c = mkdtemp(dir_template);

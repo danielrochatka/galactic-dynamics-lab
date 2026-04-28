@@ -32,4 +32,25 @@ void velocity_verlet_step(State& state,
   }
 }
 
+void semi_implicit_euler_step(State& state,
+                              const PhysicsPackage* physics,
+                              double bh_mass,
+                              double softening,
+                              bool star_star,
+                              double dt,
+                              std::vector<double>& ax,
+                              std::vector<double>& ay) {
+  const int n = state.n();
+  if (ax.size() != static_cast<size_t>(n)) ax.resize(n);
+  if (ay.size() != static_cast<size_t>(n)) ay.resize(n);
+
+  physics->compute_accelerations(state, bh_mass, softening, star_star, ax, ay);
+  for (int i = 0; i < n; ++i) {
+    state.vx[i] += ax[i] * dt;
+    state.vy[i] += ay[i] * dt;
+    state.x[i] += state.vx[i] * dt;
+    state.y[i] += state.vy[i] * dt;
+  }
+}
+
 }  // namespace galaxy
