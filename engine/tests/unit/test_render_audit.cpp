@@ -133,14 +133,22 @@ TEST_CASE("write_render_manifest: xi_kernel_deformed reports xi law metadata (no
   const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
   const std::string json = slurp_file(out_dir + "/render_manifest.json");
   CHECK(txt.find("tpf_core_law_mode\txi_kernel_deformed") != std::string::npos);
+  CHECK(txt.find("K_xi\ttpf_4d_xi_motion_readout_scale") != std::string::npos);
   CHECK(txt.find("acceleration_formula\ta=-K_xi*Xi_eff_spatial") != std::string::npos);
-  CHECK(txt.find("principal_c_direct_tpf_used\t0") != std::string::npos);
-  CHECK(txt.find("provisional_readout_used\t0") != std::string::npos);
+  CHECK(txt.find("xi_kernel_factor_mode\tbeta_power") != std::string::npos);
+  CHECK(txt.find("xi_temporal_mode\toff") != std::string::npos);
+  CHECK(txt.find("xi_kernel_metric_min\t") != std::string::npos);
+  CHECK(txt.find("xi_kernel_metric_max\t") != std::string::npos);
+  CHECK(txt.find("tpf_extension_mode\t") == std::string::npos);
+  CHECK(txt.find("tpf_stabilizer_mode\t") == std::string::npos);
   CHECK(txt.find("legacy_readout_provisional") == std::string::npos);
   CHECK(json.find("\"tpf_core_law_mode\": \"xi_kernel_deformed\"") != std::string::npos);
+  CHECK(json.find("\"K_xi\": \"tpf_4d_xi_motion_readout_scale\"") != std::string::npos);
   CHECK(json.find("\"acceleration_formula\": \"a=-K_xi*Xi_eff_spatial\"") != std::string::npos);
-  CHECK(json.find("\"principal_c_direct_tpf_used\": false") != std::string::npos);
-  CHECK(json.find("\"provisional_readout_used\": false") != std::string::npos);
+  CHECK(json.find("\"xi_kernel_factor_mode\": \"beta_power\"") != std::string::npos);
+  CHECK(json.find("\"xi_temporal_mode\": \"off\"") != std::string::npos);
+  CHECK(json.find("\"tpf_extension_mode\"") == std::string::npos);
+  CHECK(json.find("\"tpf_stabilizer_mode\"") == std::string::npos);
 
   std::remove((out_dir + "/render_manifest.txt").c_str());
   std::remove((out_dir + "/render_manifest.json").c_str());
