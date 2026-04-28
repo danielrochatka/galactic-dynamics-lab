@@ -107,9 +107,14 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
     std::ostringstream os;
+    const std::string kernel_desc =
+        (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
+            ? "VDSG transverse wake Xi-kernel deformation"
+            : "standard Xi-kernel deformation";
     os << "tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
        << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
        << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
+       << "; xi_kernel_label=" << kernel_desc
        << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
        << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
        << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
