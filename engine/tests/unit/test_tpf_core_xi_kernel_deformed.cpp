@@ -172,7 +172,24 @@ TEST_CASE("xi_kernel_deformed BH-only inward cardinal directions hold in metric_
   check_bh_inward_cardinal_signs(c);
 }
 
-TEST_CASE("xi_kernel_deformed metric_transverse_wake uses transverse wake strength with radial metric axis") {
+TEST_CASE("xi_kernel_deformed metric_transverse_wake positive coupling maps to compressive metric_scale") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 10.0;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+
+  const double beta_pass = 1.0e7 / 299792458.0;
+  const double beta_effective = 0.5 * beta_pass;
+  const double factor_raw = c.tpf_4d_xi_kernel_coupling * beta_effective;
+  const double metric_scale = std::max(c.tpf_4d_xi_kernel_metric_min,
+                                       std::min(c.tpf_4d_xi_kernel_metric_max, 1.0 / (1.0 + factor_raw)));
+  CHECK(beta_effective > 0.0);
+  CHECK(metric_scale < 1.0);
+}
+
+TEST_CASE("xi_kernel_deformed metric_transverse_wake positive coupling strengthens Xi_eff and keeps inward acceleration") {
   galaxy::Config c;
   c.tpf_dynamics_mode = "xi_kernel_deformed";
   c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
@@ -195,8 +212,81 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake uses transverse wake streng
   run_xi_mode(c_off, s, 10.0, false, ax_off, ay_off);
   run_xi_mode(c, s, 10.0, false, ax_wake, ay_wake);
 
-  CHECK(std::fabs(ax_wake[0] - ax_off[0]) > 1.0e-18);
+  const double xi_base_mag = std::fabs(ax_off[0]) / c.tpf_4d_xi_motion_readout_scale;
+  const double xi_wake_mag = std::fabs(ax_wake[0]) / c.tpf_4d_xi_motion_readout_scale;
+  CHECK(xi_wake_mag > xi_base_mag);
+  CHECK(ax_wake[0] < 0.0);
   CHECK(ay_wake[0] == doctest::Approx(0.0));
+}
+
+TEST_CASE("xi_kernel_deformed metric_transverse_wake stronger positive coupling increases Xi_eff until clamp") {
+  galaxy::Config c_lo;
+  c_lo.tpf_dynamics_mode = "xi_kernel_deformed";
+  c_lo.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c_lo.tpf_4d_xi_kernel_coupling = 10.0;
+  c_lo.tpf_4d_xi_kernel_beta_power = 1.0;
+  c_lo.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c_lo.tpf_4d_xi_motion_readout_scale = 1.0e-12;
+
+  galaxy::Config c_hi = c_lo;
+  c_hi.tpf_4d_xi_kernel_coupling = 100.0;
+
+  galaxy::Config c_clamp = c_lo;
+  c_clamp.tpf_4d_xi_kernel_coupling = 1000.0;
+
+  galaxy::Config c_more_clamp = c_lo;
+  c_more_clamp.tpf_4d_xi_kernel_coupling = 5000.0;
+
+  galaxy::State s;
+  s.resize(1);
+  s.x[0] = 2.0;
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 1.0e7;
+  s.mass[0] = 1.0;
+
+  std::vector<double> ax_lo, ay_lo, ax_hi, ay_hi, ax_clamp, ay_clamp, ax_more_clamp, ay_more_clamp;
+  run_xi_mode(c_lo, s, 10.0, false, ax_lo, ay_lo);
+  run_xi_mode(c_hi, s, 10.0, false, ax_hi, ay_hi);
+  run_xi_mode(c_clamp, s, 10.0, false, ax_clamp, ay_clamp);
+  run_xi_mode(c_more_clamp, s, 10.0, false, ax_more_clamp, ay_more_clamp);
+
+  const double xi_lo = std::fabs(ax_lo[0]) / c_lo.tpf_4d_xi_motion_readout_scale;
+  const double xi_hi = std::fabs(ax_hi[0]) / c_hi.tpf_4d_xi_motion_readout_scale;
+  const double xi_clamp = std::fabs(ax_clamp[0]) / c_clamp.tpf_4d_xi_motion_readout_scale;
+  const double xi_more_clamp = std::fabs(ax_more_clamp[0]) / c_more_clamp.tpf_4d_xi_motion_readout_scale;
+
+  CHECK(xi_hi > xi_lo);
+  CHECK(xi_clamp > xi_hi);
+  CHECK(xi_more_clamp == doctest::Approx(xi_clamp));
+}
+
+TEST_CASE("xi_kernel_deformed metric_transverse_wake negative coupling weakens Xi_eff") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = -0.5;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 1.0e-12;
+
+  galaxy::State s;
+  s.resize(1);
+  s.x[0] = 2.0;
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 1.0e7;
+  s.mass[0] = 1.0;
+
+  std::vector<double> ax_off, ay_off, ax_wake, ay_wake;
+  galaxy::Config c_off = c;
+  c_off.tpf_4d_xi_kernel_mode = "off";
+  run_xi_mode(c_off, s, 10.0, false, ax_off, ay_off);
+  run_xi_mode(c, s, 10.0, false, ax_wake, ay_wake);
+
+  const double xi_base_mag = std::fabs(ax_off[0]) / c.tpf_4d_xi_motion_readout_scale;
+  const double xi_wake_mag = std::fabs(ax_wake[0]) / c.tpf_4d_xi_motion_readout_scale;
+  CHECK(xi_wake_mag < xi_base_mag);
 }
 
 TEST_CASE("xi_kernel_deformed BH-only inward cardinal directions hold in metric_transverse_wake mode") {
