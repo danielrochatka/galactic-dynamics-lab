@@ -116,6 +116,33 @@ TEST_CASE("xi_kernel_deformed metric_velocity applies non-identity metric scale 
   CHECK(std::isfinite(ay_metric[0]));
 }
 
+TEST_CASE("xi_kernel_deformed metric_transverse_wake uses transverse wake strength with radial metric axis") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 10.0;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 1.0e-12;
+
+  galaxy::State s;
+  s.resize(1);
+  s.x[0] = 2.0;
+  s.y[0] = 0.0;
+  s.vx[0] = 0.0;
+  s.vy[0] = 1.0e7;
+  s.mass[0] = 1.0;
+
+  std::vector<double> ax_off, ay_off, ax_wake, ay_wake;
+  galaxy::Config c_off = c;
+  c_off.tpf_4d_xi_kernel_mode = "off";
+  run_xi_mode(c_off, s, 10.0, false, ax_off, ay_off);
+  run_xi_mode(c, s, 10.0, false, ax_wake, ay_wake);
+
+  CHECK(std::fabs(ax_wake[0] - ax_off[0]) > 1.0e-18);
+  CHECK(ay_wake[0] == doctest::Approx(0.0));
+}
+
 TEST_CASE("xi_kernel_deformed route does not use additive VDSG or direct/provisional readout paths") {
   galaxy::Config c0;
   c0.tpf_dynamics_mode = "xi_kernel_deformed";
