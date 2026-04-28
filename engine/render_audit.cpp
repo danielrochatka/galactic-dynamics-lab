@@ -289,32 +289,31 @@ void write_render_manifest(const std::string& output_dir,
                         : (is_xi_kernel ? "xi_kernel_deformed"
                                         : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper"
                                                         : "legacy_readout_provisional")));
-      json_kv(jf, first, "tpf_truncation_mode",
-              is_direct
-                  ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                  : (is_xi_kernel ? "none_xi_kernel_deformed_route"
-                                  : (is_v11_alias
-                                         ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                                         : "none")));
-      json_kv(jf, first, "tpf_extension_mode",
-              is_xi_kernel ? "none_old_additive_vdsg_path_not_used"
-                           : (is_v11_alias ? "none_vdsg_rejected"
-                                           : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none")));
-      json_kv(jf, first, "tpf_stabilizer_mode",
-              (is_direct || is_xi_kernel || is_v11_alias)
-                  ? "none_shunt_and_cooling_rejected"
-                  : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                         ? "shunt_or_cooling_configured"
-                         : "none"));
       if (is_xi_kernel) {
         json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_eff_spatial");
+        json_kv(jf, first, "K_xi", "tpf_4d_xi_motion_readout_scale");
+        json_kv_num(jf, first, "tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
         json_kv(jf, first, "xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
         json_kv_num(jf, first, "xi_kernel_coupling", config.tpf_4d_xi_kernel_coupling);
-        json_kv(jf, first, "factor_mode", config.tpf_4d_xi_kernel_factor_mode);
-        json_kv(jf, first, "temporal_mode", config.tpf_4d_xi_temporal_mode);
-        json_kv_bool(jf, first, "old_additive_vdsg_path_used", false);
-        json_kv_bool(jf, first, "principal_c_direct_tpf_used", false);
-        json_kv_bool(jf, first, "provisional_readout_used", false);
+        json_kv(jf, first, "xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+        json_kv_num(jf, first, "xi_kernel_metric_min", config.tpf_4d_xi_kernel_metric_min);
+        json_kv_num(jf, first, "xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
+        json_kv(jf, first, "xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+      } else {
+        json_kv(jf, first, "tpf_truncation_mode",
+                is_direct
+                    ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                    : (is_v11_alias
+                           ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
+                           : "none"));
+        json_kv(jf, first, "tpf_extension_mode",
+                is_v11_alias ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
+        json_kv(jf, first, "tpf_stabilizer_mode",
+                (is_direct || is_v11_alias)
+                    ? "none_shunt_and_cooling_rejected"
+                    : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                           ? "shunt_or_cooling_configured"
+                           : "none"));
       }
       if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
         json_kv_bool(jf, first, "tpf_dynamics_mode_deprecated_alias_used", true);
@@ -395,35 +394,33 @@ void write_render_manifest(const std::string& output_dir,
                                        : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper"
                                                        : "legacy_readout_provisional")))
          << "\n";
-      tf << "tpf_truncation_mode\t"
-         << (is_direct
-                 ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                 : (is_xi_kernel ? "none_xi_kernel_deformed_route"
-                                 : (is_v11_alias
-                        ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                        : "none")))
-         << "\n";
-      tf << "tpf_extension_mode\t"
-         << (is_xi_kernel ? "none_old_additive_vdsg_path_not_used"
-                          : (is_v11_alias ? "none_vdsg_rejected"
-                                          : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none")))
-         << "\n";
-      tf << "tpf_stabilizer_mode\t"
-         << ((is_direct || is_xi_kernel || is_v11_alias)
-                 ? "none_shunt_and_cooling_rejected"
-                 : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                        ? "shunt_or_cooling_configured"
-                        : "none"))
-         << "\n";
       if (is_xi_kernel) {
         tf << "acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
+        tf << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
+        tf << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
         tf << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
         tf << "xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
-        tf << "factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
-        tf << "temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
-        tf << "old_additive_vdsg_path_used\t0\n";
-        tf << "principal_c_direct_tpf_used\t0\n";
-        tf << "provisional_readout_used\t0\n";
+        tf << "xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
+        tf << "xi_kernel_metric_min\t" << config.tpf_4d_xi_kernel_metric_min << "\n";
+        tf << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
+        tf << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
+      } else {
+        tf << "tpf_truncation_mode\t"
+           << (is_direct ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                         : (is_v11_alias
+                                ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
+                                : "none"))
+           << "\n";
+        tf << "tpf_extension_mode\t"
+           << (is_v11_alias ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
+           << "\n";
+        tf << "tpf_stabilizer_mode\t"
+           << ((is_direct || is_v11_alias)
+                   ? "none_shunt_and_cooling_rejected"
+                   : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                          ? "shunt_or_cooling_configured"
+                          : "none"))
+           << "\n";
       }
       if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
         tf << "tpf_dynamics_mode_deprecated_alias_used\t1\n";
