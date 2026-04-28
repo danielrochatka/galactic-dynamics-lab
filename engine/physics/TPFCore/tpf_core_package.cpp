@@ -688,12 +688,11 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
           if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
           nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
         } else if (xi_kernel_mode_ == "metric_transverse_wake") {
-          if (wake.has_axis) {
-            n_norm = 1.0;
-            nx = wake.axis_x;
-            ny = wake.axis_y;
-            nz = wake.axis_z;
-          }
+          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake Xi kernel mode");
+          nx = dx / n_norm;
+          ny = dy / n_norm;
+          nz = dz / n_norm;
         } else {
           n_norm = v_rel_norm;
           if (n_norm > 1.0e-30) {
@@ -2336,12 +2335,11 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
           ny = dy / n_norm;
           nz = dz / n_norm;
         } else if (kernel_mode == "metric_transverse_wake") {
-          if (wake.has_axis) {
-            n_norm = 1.0;
-            nx = wake.axis_x;
-            ny = wake.axis_y;
-            nz = wake.axis_z;
-          }
+          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake Xi kernel mode");
+          nx = dx / n_norm;
+          ny = dy / n_norm;
+          nz = dz / n_norm;
         } else {
           n_norm = v_rel_norm;
           if (n_norm > 1.0e-30) {
