@@ -915,8 +915,8 @@ TEST_CASE("4d xi motion probe benchmark scalar_beta scales Xi_eff by 1+factor_ra
   c.tpf_source_benchmark_shape = "monopole";
   c.tpf_source_benchmark_total_mass = 1.0e12;
   c.tpf_4d_xi_motion_steps = 1;
-  c.tpf_4d_xi_motion_probe_layout = "axis";
-  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_layout = "ring";
+  c.tpf_4d_xi_motion_probe_count = 8;
   c.tpf_4d_xi_motion_probe_speed = 0.1 * 299792458.0;
   c.tpf_4d_xi_kernel_mode = "scalar_beta";
   c.tpf_4d_xi_kernel_coupling = 0.5;
@@ -942,9 +942,125 @@ TEST_CASE("4d xi motion probe benchmark scalar_beta scales Xi_eff by 1+factor_ra
     const double base = std::atof(cols[base_col].c_str());
     const double factor = std::atof(cols[factor_col].c_str());
     const double eff = std::atof(cols[eff_col].c_str());
+    CHECK(std::fabs(factor) > 0.0);
     CHECK(eff == doctest::Approx(base * (1.0 + factor)));
     CHECK(std::atof(cols[xicol].c_str()) == doctest::Approx(eff));
     CHECK(std::atof(cols[ax_col].c_str()) == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * eff));
+  }
+}
+
+TEST_CASE("4d xi motion probe benchmark metric_velocity deforms Xi when relative speed is nonzero and stays finite") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_velocity_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "ring";
+  c.tpf_4d_xi_motion_probe_count = 8;
+  c.tpf_4d_xi_motion_probe_speed = 0.05 * 299792458.0;
+  c.tpf_4d_xi_source_speed_x = 0.02 * 299792458.0;
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 0.75;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int xi_x_base_col = find_csv_col(header, "xi_x_base");
+  const int xi_y_base_col = find_csv_col(header, "xi_y_base");
+  const int xi_z_base_col = find_csv_col(header, "xi_z_base");
+  const int xi_x_eff_col = find_csv_col(header, "xi_x_eff");
+  const int xi_y_eff_col = find_csv_col(header, "xi_y_eff");
+  const int xi_z_eff_col = find_csv_col(header, "xi_z_eff");
+  const int factor_col = find_csv_col(header, "xi_kernel_factor_raw");
+  const int metric_col = find_csv_col(header, "xi_kernel_metric_scale");
+  const int ax_col = find_csv_col(header, "ax");
+  const int valid_col = find_csv_col(header, "valid");
+  REQUIRE(xi_x_base_col >= 0);
+  REQUIRE(metric_col >= 0);
+
+  bool saw_nontrivial_metric = false;
+  bool saw_nontrivial_xi = false;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    if (std::atoi(cols[valid_col].c_str()) != 1) continue;
+    const double xi_x_base = std::atof(cols[xi_x_base_col].c_str());
+    const double xi_y_base = std::atof(cols[xi_y_base_col].c_str());
+    const double xi_z_base = std::atof(cols[xi_z_base_col].c_str());
+    const double xi_x_eff = std::atof(cols[xi_x_eff_col].c_str());
+    const double xi_y_eff = std::atof(cols[xi_y_eff_col].c_str());
+    const double xi_z_eff = std::atof(cols[xi_z_eff_col].c_str());
+    const double factor = std::atof(cols[factor_col].c_str());
+    const double metric = std::atof(cols[metric_col].c_str());
+    const double ax = std::atof(cols[ax_col].c_str());
+    CHECK(std::isfinite(xi_x_base));
+    CHECK(std::isfinite(xi_y_base));
+    CHECK(std::isfinite(xi_z_base));
+    CHECK(std::isfinite(xi_x_eff));
+    CHECK(std::isfinite(xi_y_eff));
+    CHECK(std::isfinite(xi_z_eff));
+    CHECK(std::isfinite(metric));
+    CHECK(std::isfinite(ax));
+    if (std::fabs(factor) > 0.0) {
+      CHECK(metric != doctest::Approx(1.0));
+      saw_nontrivial_metric = true;
+    }
+    const double delta_norm = std::sqrt((xi_x_eff - xi_x_base) * (xi_x_eff - xi_x_base) +
+                                        (xi_y_eff - xi_y_base) * (xi_y_eff - xi_y_base) +
+                                        (xi_z_eff - xi_z_base) * (xi_z_eff - xi_z_base));
+    const double base_norm = std::sqrt(xi_x_base * xi_x_base + xi_y_base * xi_y_base + xi_z_base * xi_z_base);
+    if (base_norm > 1e-30) {
+      if (delta_norm > 0.0) saw_nontrivial_xi = true;
+    }
+    CHECK(ax == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * xi_x_eff));
+  }
+  CHECK(saw_nontrivial_metric);
+  CHECK(saw_nontrivial_xi);
+}
+
+TEST_CASE("4d xi motion probe benchmark metric_velocity is identity at zero relative speed") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_velocity_identity_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_speed = 0.0;
+  c.tpf_4d_xi_source_speed_x = 0.0;
+  c.tpf_4d_xi_source_speed_y = 0.0;
+  c.tpf_4d_xi_source_speed_z = 0.0;
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 0.75;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int xi_base_col = find_csv_col(header, "xi_x_base");
+  const int xi_eff_col = find_csv_col(header, "xi_x_eff");
+  const int metric_col = find_csv_col(header, "xi_kernel_metric_scale");
+  REQUIRE(metric_col >= 0);
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    CHECK(std::atof(cols[metric_col].c_str()) == doctest::Approx(1.0));
+    CHECK(std::atof(cols[xi_eff_col].c_str()) == doctest::Approx(std::atof(cols[xi_base_col].c_str())));
   }
 }
 
@@ -1131,6 +1247,13 @@ TEST_CASE("4d xi motion probe benchmark rejects invalid config values loudly") {
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
   c.tpf_4d_xi_kernel_metric_max = 10.0;
   c.tpf_4d_xi_source_speed_x = std::numeric_limits<double>::infinity();
+  CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
+  c.tpf_4d_xi_source_speed_x = 0.0;
+  c.tpf_4d_xi_kernel_mode = "scalar_beta";
+  c.tpf_4d_xi_motion_probe_layout = "ring";
+  c.tpf_4d_xi_motion_probe_count = 8;
+  c.tpf_4d_xi_motion_probe_speed = 0.75 * 299792458.0;
+  c.tpf_4d_xi_source_speed_x = -0.75 * 299792458.0;
   CHECK_THROWS(pkg.run_4d_xi_motion_probe_benchmark(c, out_dir));
   c.tpf_4d_xi_source_speed_x = 0.0;
   c.tpf_source_benchmark_shape = "unknown";

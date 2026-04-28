@@ -2061,6 +2061,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
     const double beta_rel = v_rel_norm / C_SI_LIGHT;
     if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
+    if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
     const double beta_for_gamma = std::min(beta_rel, 1.0 - 1.0e-12);
     const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
     if (!std::isfinite(gamma_rel)) throw std::runtime_error("non-finite gamma_rel in Xi kernel deformation");
@@ -2457,7 +2458,8 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   summary << "mean xi_t: " << (kernel_stats.sample_count > 0 ? kernel_stats.sum_xi_t / n_kernel : 0.0) << "\n";
   summary << "max abs xi_t: " << kernel_stats.max_abs_xi_t << "\n";
   summary << "acceleration formula: a=-K_xi*Xi_eff_spatial\n";
-  summary << "evaluator: evaluate_static_sources_field_4d(...)\n";
+  summary << "xi kernel evaluator: per-source softened Xi kernel with optional GravityXiKernelDeformation_v1\n";
+  summary << "theta diagnostic evaluator: evaluate_static_sources_field_4d(...)\n";
   summary << "source behavior: fixed sources for Stage 7B\n";
   summary << "probe behavior: moving probes\n";
   summary << "no Newtonian acceleration calls: true\n";
