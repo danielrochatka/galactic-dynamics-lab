@@ -583,8 +583,10 @@ bool TPFCorePackage::xi_kernel_deformation_active() const {
 void TPFCorePackage::validate_xi_kernel_runtime_config() const {
   if (!std::isfinite(xi_motion_readout_scale_)) throw std::runtime_error("tpf_4d_xi_motion_readout_scale must be finite");
   if (xi_kernel_mode_ != "off" && xi_kernel_mode_ != "scalar_beta" && xi_kernel_mode_ != "metric_radial" &&
-      xi_kernel_mode_ != "metric_velocity" && xi_kernel_mode_ != "spacetime_metric") {
-    throw std::runtime_error("tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, spacetime_metric");
+      xi_kernel_mode_ != "metric_velocity" && xi_kernel_mode_ != "metric_transverse_wake" &&
+      xi_kernel_mode_ != "spacetime_metric") {
+    throw std::runtime_error(
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, spacetime_metric");
   }
   if (xi_kernel_factor_mode_ != "beta_power" && xi_kernel_factor_mode_ != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
@@ -653,14 +655,27 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       const double vx_rel = state.vx[i] - src.vx;
       const double vy_rel = state.vy[i] - src.vy;
       const double vz_rel = 0.0 - src.vz;
+      const double r_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+      const double inv_r_norm = (r_norm > 1.0e-30) ? (1.0 / r_norm) : 0.0;
+      const double r_hat_x = dx * inv_r_norm;
+      const double r_hat_y = dy * inv_r_norm;
+      const double r_hat_z = dz * inv_r_norm;
       const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
       const double beta_rel = v_rel_norm / C_SI_LIGHT;
       if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
       if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
-      const double beta_for_gamma = std::min(beta_rel, 1.0 - 1.0e-12);
+      const double v_radial = vx_rel * r_hat_x + vy_rel * r_hat_y + vz_rel * r_hat_z;
+      const double v_trans_x = vx_rel - v_radial * r_hat_x;
+      const double v_trans_y = vy_rel - v_radial * r_hat_y;
+      const double v_trans_z = vz_rel - v_radial * r_hat_z;
+      const double v_trans = std::sqrt(v_trans_x * v_trans_x + v_trans_y * v_trans_y + v_trans_z * v_trans_z);
+      const double beta_pass = v_trans / C_SI_LIGHT;
+      const double wake_gate = 0.5 * (1.0 + std::tanh(v_radial / std::max(v_trans, 1.0e-30)));
+      const double beta_effective = beta_pass * wake_gate;
+      const double beta_for_gamma = std::min(beta_effective, 1.0 - 1.0e-12);
       const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
       double factor_raw = 0.0;
-      if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_rel, xi_kernel_beta_power_);
+      if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_effective, xi_kernel_beta_power_);
       else factor_raw = xi_kernel_coupling_ * (gamma_rel - 1.0);
       const double metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
       const double r2 = dx * dx + dy * dy + dz * dz + eps2;
@@ -682,6 +697,13 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
           n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
           if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
           nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
+        } else if (xi_kernel_mode_ == "metric_transverse_wake") {
+          n_norm = v_trans;
+          if (n_norm > 1.0e-30) {
+            nx = v_trans_x / n_norm;
+            ny = v_trans_y / n_norm;
+            nz = v_trans_z / n_norm;
+          }
         } else {
           n_norm = v_rel_norm;
           if (n_norm > 1.0e-30) {
@@ -2128,8 +2150,9 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   if (integrator != "velocity_verlet" && integrator != "semi_implicit_euler") throw std::runtime_error("tpf_4d_xi_motion_integrator must be velocity_verlet or semi_implicit_euler");
   if (dump_every < 1) throw std::runtime_error("tpf_4d_xi_motion_dump_every must be >= 1");
   if (kernel_mode != "off" && kernel_mode != "scalar_beta" && kernel_mode != "metric_radial" && kernel_mode != "metric_velocity" &&
-      kernel_mode != "spacetime_metric") {
-    throw std::runtime_error("tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, spacetime_metric");
+      kernel_mode != "metric_transverse_wake" && kernel_mode != "spacetime_metric") {
+    throw std::runtime_error(
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, spacetime_metric");
   }
   if (kernel_factor_mode != "beta_power" && kernel_factor_mode != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
@@ -2178,6 +2201,11 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     double xi_t = 0.0;
     double beta_rel = 0.0;
     double gamma_rel = 1.0;
+    double v_radial = 0.0;
+    double v_transverse = 0.0;
+    double beta_pass = 0.0;
+    double wake_gate = 0.0;
+    double beta_effective = 0.0;
     double xi_kernel_factor_raw = 0.0;
     double xi_kernel_metric_scale = 1.0;
     double theta_trace_4d = 0.0;
@@ -2216,6 +2244,11 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       p.xi_t = 0.0;
       p.beta_rel = 0.0;
       p.gamma_rel = 1.0;
+      p.v_radial = 0.0;
+      p.v_transverse = 0.0;
+      p.beta_pass = 0.0;
+      p.wake_gate = 0.0;
+      p.beta_effective = 0.0;
       p.xi_kernel_factor_raw = 0.0;
       p.xi_kernel_metric_scale = 1.0;
       p.theta_trace_4d = std::numeric_limits<double>::quiet_NaN();
@@ -2230,13 +2263,26 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     const double beta_rel = v_rel_norm / C_SI_LIGHT;
     if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
     if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
-    const double beta_for_gamma = std::min(beta_rel, 1.0 - 1.0e-12);
+    const double r_norm_origin = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    const double inv_r_origin = (r_norm_origin > 1.0e-30) ? (1.0 / r_norm_origin) : 0.0;
+    const double r_hat_x = p.x * inv_r_origin;
+    const double r_hat_y = p.y * inv_r_origin;
+    const double r_hat_z = p.z * inv_r_origin;
+    const double v_radial_from_hat = vx_rel * r_hat_x + vy_rel * r_hat_y + vz_rel * r_hat_z;
+    const double v_trans_x = vx_rel - v_radial_from_hat * r_hat_x;
+    const double v_trans_y = vy_rel - v_radial_from_hat * r_hat_y;
+    const double v_trans_z = vz_rel - v_radial_from_hat * r_hat_z;
+    const double v_transverse = std::sqrt(v_trans_x * v_trans_x + v_trans_y * v_trans_y + v_trans_z * v_trans_z);
+    const double beta_pass = v_transverse / C_SI_LIGHT;
+    const double wake_gate = 0.5 * (1.0 + std::tanh(v_radial_from_hat / std::max(v_transverse, 1.0e-30)));
+    const double beta_effective = beta_pass * wake_gate;
+    const double beta_for_gamma = std::min(beta_effective, 1.0 - 1.0e-12);
     const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
     if (!std::isfinite(gamma_rel)) throw std::runtime_error("non-finite gamma_rel in Xi kernel deformation");
 
     double factor_raw = 0.0;
     if (kernel_factor_mode == "beta_power") {
-      factor_raw = kernel_coupling * std::pow(beta_rel, kernel_beta_power);
+      factor_raw = kernel_coupling * std::pow(beta_effective, kernel_beta_power);
     } else {
       factor_raw = kernel_coupling * (gamma_rel - 1.0);
     }
@@ -2279,6 +2325,13 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
           nx = dx / n_norm;
           ny = dy / n_norm;
           nz = dz / n_norm;
+        } else if (kernel_mode == "metric_transverse_wake") {
+          n_norm = std::sqrt(v_trans_x * v_trans_x + v_trans_y * v_trans_y + v_trans_z * v_trans_z);
+          if (n_norm > 1.0e-30) {
+            nx = v_trans_x / n_norm;
+            ny = v_trans_y / n_norm;
+            nz = v_trans_z / n_norm;
+          }
         } else {
           n_norm = v_rel_norm;
           if (n_norm > 1.0e-30) {
@@ -2328,8 +2381,14 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
     p.xi_t = xi_t;
     p.beta_rel = beta_rel;
     p.gamma_rel = gamma_rel;
+    p.v_radial = v_radial_from_hat;
+    p.v_transverse = v_transverse;
+    p.beta_pass = beta_pass;
+    p.wake_gate = wake_gate;
+    p.beta_effective = beta_effective;
     p.xi_kernel_factor_raw = (kernel_mode == "off") ? 0.0 : factor_raw;
-    p.xi_kernel_metric_scale = (kernel_mode == "metric_radial" || kernel_mode == "metric_velocity" || kernel_mode == "spacetime_metric")
+    p.xi_kernel_metric_scale = (kernel_mode == "metric_radial" || kernel_mode == "metric_velocity" ||
+                                kernel_mode == "metric_transverse_wake" || kernel_mode == "spacetime_metric")
                                    ? metric_scale
                                    : 1.0;
     p.theta_trace_4d = field_diag.theta_trace_4d;
@@ -2393,10 +2452,12 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   traj << std::scientific;
   init_csv << std::scientific;
   traj << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,xi_t,xi_x_base,xi_y_base,xi_z_base,"
-          "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
+          "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,v_radial,v_transverse,beta_pass,wake_gate,beta_effective,"
+          "xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
           "theta_trace_4d,invariant_I_4d,r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
   init_csv << "step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm,xi_t,xi_x_base,xi_y_base,xi_z_base,"
-              "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
+              "xi_x_eff,xi_y_eff,xi_z_eff,beta_rel,gamma_rel,v_radial,v_transverse,beta_pass,wake_gate,beta_effective,"
+              "xi_kernel_factor_raw,xi_kernel_metric_scale,xi_kernel_mode,xi_temporal_mode,"
               "theta_trace_4d,invariant_I_4d,r_origin,radial_alignment_to_origin_inward,transverse_fraction_origin,is_near_source,escaped,valid\n";
 
   std::size_t rows_written = 0;
@@ -2428,6 +2489,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         << p.xi_x_base << "," << p.xi_y_base << "," << p.xi_z_base << ","
         << p.xi_x_eff << "," << p.xi_y_eff << "," << p.xi_z_eff << ","
         << p.beta_rel << "," << p.gamma_rel << ","
+        << p.v_radial << "," << p.v_transverse << "," << p.beta_pass << "," << p.wake_gate << "," << p.beta_effective << ","
         << p.xi_kernel_factor_raw << "," << p.xi_kernel_metric_scale << ","
         << kernel_mode << "," << temporal_mode << ","
         << p.theta_trace_4d << "," << p.invariant_I_4d << ","

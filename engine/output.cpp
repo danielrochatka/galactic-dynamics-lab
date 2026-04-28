@@ -235,6 +235,11 @@ void write_run_info(const std::string& output_dir,
         f << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
         f << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
         f << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
+        f << "xi_kernel_label\t"
+          << ((config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
+                  ? "VDSG transverse wake Xi-kernel deformation"
+                  : "standard Xi-kernel deformation")
+          << "\n";
         f << "xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
         f << "xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
         f << "xi_kernel_metric_min\t" << config.tpf_4d_xi_kernel_metric_min << "\n";

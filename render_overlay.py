@@ -110,11 +110,16 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
         k_xi = _f(ri, "tpf_4d_xi_motion_readout_scale", 0.0)
         kernel_mode = str(ri.get("tpf_4d_xi_kernel_mode", "unknown_kernel") or "unknown_kernel")
         kernel_coupling = _f(ri, "tpf_4d_xi_kernel_coupling", 0.0)
+        kernel_label = (
+            "VDSG transverse wake Xi-kernel deformation"
+            if kernel_mode == "metric_transverse_wake"
+            else "Xi-kernel deformation"
+        )
         return (
             "TPFCore: xi_kernel_deformed",
             (
                 "a=-K_xi*Xi_eff; "
-                f"K_xi={k_xi:.6g}; kernel={kernel_mode}; coupling={kernel_coupling:.6g}; "
+                f"K_xi={k_xi:.6g}; kernel={kernel_mode}; label={kernel_label}; coupling={kernel_coupling:.6g}; "
                 "VDSG/provisional/direct_tpf=off"
             ),
             (

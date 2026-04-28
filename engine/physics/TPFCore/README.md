@@ -95,12 +95,22 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 ### Stage 8A Xi-kernel deformation (benchmark-only)
 
-`GravityXiKernelDeformation_v1` adds an isolated, configurable kernel deformation stage inside `tpf_4d_xi_motion_probe_benchmark` before Xi acceleration readout. The benchmark now computes per-source Xi contributions, applies a configured deformation mode (`off`, `scalar_beta`, `metric_radial`, `metric_velocity`, `spacetime_metric`), sums `Xi_eff`, then reads acceleration strictly as `a=-K_xi*Xi_eff_spatial`.
+`GravityXiKernelDeformation_v1` adds an isolated, configurable kernel deformation stage inside `tpf_4d_xi_motion_probe_benchmark` before Xi acceleration readout. The benchmark now computes per-source Xi contributions, applies a configured deformation mode (`off`, `scalar_beta`, `metric_radial`, `metric_velocity`, `metric_transverse_wake`, `spacetime_metric`), sums `Xi_eff`, then reads acceleration strictly as `a=-K_xi*Xi_eff_spatial`.
 
 - `off` preserves Stage 7B behavior exactly (same Xi kernel and same readout equation).
+- `metric_transverse_wake` is the preferred VDSG ship-wake Xi-kernel mode: deformation axis is the transverse passing direction and coupling is wake-gated by radial pass state.
 - `spacetime_metric` can emit an `Xi_t`/Xi0 diagnostic (`tpf_4d_xi_temporal_mode=norm_scaled`) but does not feed Xi0 into acceleration in Stage 8A.
 - Active velocity-dependent kernel deformation (`tpf_4d_xi_kernel_mode!=off` with nonzero `tpf_4d_xi_kernel_coupling`) requires `tpf_4d_xi_motion_integrator=semi_implicit_euler`; `velocity_verlet` remains valid for off/identity (Stage 7B-equivalent) behavior.
 - This is distinct from older additive acceleration VDSG paths; Stage 8A deforms Xi kernel evaluation before readout and does not append acceleration terms.
+
+Suggested ship-wake config:
+
+```ini
+tpf_4d_xi_kernel_mode = metric_transverse_wake
+tpf_4d_xi_kernel_coupling = 3000
+tpf_4d_xi_kernel_metric_min = 0.5
+tpf_4d_xi_kernel_metric_max = 2.0
+```
 
 **Optional trajectory visualization PNGs** — `plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:
 `tpf_4d_xi_motion_probe_xy_trajectories.png`,
