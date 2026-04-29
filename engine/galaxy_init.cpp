@@ -548,6 +548,10 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
     audit.velocity_uses_star_mass = true;
     const double eps =
         (effective.tpfcore_source_softening > 0.0) ? effective.tpfcore_source_softening : effective.softening;
+    audit.velocity_formula = "derived_tpf_profile";
+    audit.velocity_softening_used = eps;
+    audit.velocity_softened_circular_speed = true;
+    audit.median_v_circ_softened_ratio_vs_unsoftened = 1.0;
     tpfcore::DerivedTpfPoissonConfig dcfg;
     dcfg.kappa = effective.tpf_kappa;
     dcfg.bins = effective.tpf_poisson_bins;
@@ -585,9 +589,15 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
   } else {
     constexpr double G_SI = 6.6743e-11;
     const bool include_enclosed_stars = effective.enable_star_star_gravity;
+    const double eps = std::max(0.0, effective.softening);
     audit.velocity_mass_model = include_enclosed_stars ? "bh_plus_enclosed_stars" : "bh_only";
     audit.velocity_uses_star_mass = include_enclosed_stars;
     audit.velocity_respects_star_star_flag = true;
+    audit.velocity_formula = "softened_enclosed_mass";
+    audit.velocity_softening_used = eps;
+    audit.velocity_softened_circular_speed = true;
+    std::vector<double> v_ratio;
+    v_ratio.reserve(n);
     for (int i = 0; i < n; ++i) {
       double r = radii[i];
       double th = theta[i];
@@ -597,7 +607,13 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
       if (include_enclosed_stars) {
         enclosed_mass += n_inside[i] * star_mass;
       }
-      double v_circ = std::sqrt((G_SI * enclosed_mass) / std::max(r, 1e-30));
+      const double r_safe = std::max(r, 1e-30);
+      const double r2_soft = r_safe * r_safe + eps * eps;
+      const double denom = r2_soft * std::sqrt(r2_soft);
+      const double a_radial_mag = (denom > 0.0) ? (G_SI * enclosed_mass * r_safe / denom) : 0.0;
+      double v_circ = std::sqrt(std::max(0.0, a_radial_mag * r_safe));
+      const double v_circ_unsoftened = std::sqrt((G_SI * enclosed_mass) / r_safe);
+      v_ratio.push_back((v_circ_unsoftened > 0.0) ? (v_circ / v_circ_unsoftened) : 1.0);
       double vx = -sin_t * v_circ;
       double vy = cos_t * v_circ;
 
@@ -616,6 +632,10 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
 
       state.vx[i] = effective.initial_velocity_scale * vx;
       state.vy[i] = effective.initial_velocity_scale * vy;
+    }
+    if (!v_ratio.empty()) {
+      std::sort(v_ratio.begin(), v_ratio.end());
+      audit.median_v_circ_softened_ratio_vs_unsoftened = v_ratio[v_ratio.size() / 2];
     }
   }
 
@@ -727,6 +747,12 @@ void write_galaxy_init_diagnostics(const std::string& output_dir,
   txt << "galaxy_init_velocity_uses_star_mass\t" << (audit.velocity_uses_star_mass ? 1 : 0) << "\n";
   txt << "galaxy_init_velocity_respects_star_star_flag\t"
       << (audit.velocity_respects_star_star_flag ? 1 : 0) << "\n";
+  txt << "galaxy_init_velocity_formula\t" << audit.velocity_formula << "\n";
+  txt << "galaxy_init_velocity_softening_used\t" << audit.velocity_softening_used << "\n";
+  txt << "galaxy_init_velocity_softened_circular_speed\t" << (audit.velocity_softened_circular_speed ? 1 : 0)
+      << "\n";
+  txt << "median_v_circ_softened_ratio_vs_unsoftened\t"
+      << audit.median_v_circ_softened_ratio_vs_unsoftened << "\n";
   txt << "master_chaos\t" << audit.master_chaos << "\n";
   txt << "eff_position_noise\t" << audit.eff_position_noise << "\n";
   txt << "eff_velocity_angle_noise_rad\t" << audit.eff_velocity_angle_noise_rad << "\n";
