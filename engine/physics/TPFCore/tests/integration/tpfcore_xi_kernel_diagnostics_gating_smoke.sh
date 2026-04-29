@@ -2,38 +2,58 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../../../.." && pwd)"
-SIM="$ROOT/engine/galaxy_sim"
-OUT0="$ROOT/engine/outputs/test_xi_diag_gate_off"
-OUT1="$ROOT/engine/outputs/test_xi_diag_gate_on"
+ENGINE="$ROOT/engine"
+SIM="$ENGINE/galaxy_sim"
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR"' EXIT
 
-rm -rf "$OUT0" "$OUT1"
+fail() {
+  echo "[FAIL] $*" >&2
+  exit 1
+}
 
-"$SIM" galaxy \
-  --physics_package=TPFCore \
-  --tpf_dynamics_mode=xi_kernel_deformed \
-  --tpfcore_enable_provisional_readout=true \
-  --tpf_4d_xi_kernel_mode=scalar_beta \
-  --tpf_4d_xi_kernel_coupling=0.01 \
-  --n_stars=8 --n_steps=2 --snapshot_every=1 \
-  --save_run_info=true \
-  --output_dir="$OUT0"
+[[ -x "$SIM" ]] || fail "Missing executable: $SIM (run: make -C engine -j4)"
 
-test ! -f "$OUT0/tpf_regime_diagnostics.txt"
-test ! -f "$OUT0/tpf_readout_debug.csv"
-grep -q $'^xi_runtime_theta_evaluations\t0$' "$OUT0/run_info.txt"
-grep -q $'^xi_runtime_invariant_I_evaluations\t0$' "$OUT0/run_info.txt"
-grep -q $'^xi_runtime_direct_tpf_evaluations\t0$' "$OUT0/run_info.txt"
-grep -q $'^xi_runtime_provisional_readout_evaluations\t0$' "$OUT0/run_info.txt"
+cd "$ENGINE"
 
-"$SIM" galaxy \
-  --physics_package=TPFCore \
-  --tpf_dynamics_mode=xi_kernel_deformed \
-  --tpfcore_enable_provisional_readout=true \
-  --tpf_4d_xi_kernel_mode=scalar_beta \
-  --tpf_4d_xi_kernel_coupling=0.01 \
+OUT0="$TMPDIR/xi_diag_gate_off"
+OUT1="$TMPDIR/xi_diag_gate_on"
+mkdir -p "$OUT0" "$OUT1"
+
+run_xi() {
+  local out_dir="$1"
+  shift
+  "$SIM" galaxy \
+    --physics_package=TPFCore \
+    --tpf_dynamics_mode=xi_kernel_deformed \
+    --tpf_4d_xi_kernel_mode=scalar_beta \
+    --tpf_4d_xi_kernel_coupling=0.01 \
+    --n_stars=8 --n_steps=2 --snapshot_every=1 \
+    --save_run_info=true \
+    --output_dir="$out_dir" \
+    "$@"
+}
+
+echo "[INFO] Running default-off Xi diagnostics case..."
+run_xi "$OUT0"
+
+[[ ! -f "$OUT0/tpf_regime_diagnostics.txt" ]] || fail "default-off unexpectedly wrote tpf_regime_diagnostics.txt"
+[[ ! -f "$OUT0/tpf_readout_debug.csv" ]] || fail "default-off unexpectedly wrote tpf_readout_debug.csv"
+
+grep -q $'^xi_runtime_theta_evaluations\t0$' "$OUT0/run_info.txt" || fail "theta counter was not zero"
+grep -q $'^xi_runtime_invariant_I_evaluations\t0$' "$OUT0/run_info.txt" || fail "invariant_I counter was not zero"
+grep -q $'^xi_runtime_direct_tpf_evaluations\t0$' "$OUT0/run_info.txt" || fail "direct_tpf counter was not zero"
+grep -q $'^xi_runtime_provisional_readout_evaluations\t0$' "$OUT0/run_info.txt" || fail "provisional_readout counter was not zero"
+grep -Eq $'^xi_last_call_pair_evaluations\t[1-9][0-9]*$' "$OUT0/run_info.txt" || fail "xi_last_call_pair_evaluations was not > 0"
+grep -Eq $'^xi_total_pair_evaluations\t[1-9][0-9]*$' "$OUT0/run_info.txt" || fail "xi_total_pair_evaluations was not > 0"
+
+echo "[INFO] Running opt-in Xi diagnostics case..."
+run_xi "$OUT1" \
   --tpf_xi_kernel_dump_field_diagnostics=true \
-  --n_stars=8 --n_steps=2 --snapshot_every=1 \
-  --save_run_info=true \
-  --output_dir="$OUT1"
+  --tpfcore_enable_provisional_readout=true \
+  --tpfcore_dump_readout_debug=true
 
-test -f "$OUT1/tpf_regime_diagnostics.txt"
+[[ -f "$OUT1/tpf_regime_diagnostics.txt" ]] || fail "opt-in did not produce tpf_regime_diagnostics.txt"
+[[ -f "$OUT1/tpf_readout_debug.csv" ]] || fail "opt-in did not produce tpf_readout_debug.csv"
+
+echo "[PASS] xi_kernel_deformed diagnostics gating smoke test passed."

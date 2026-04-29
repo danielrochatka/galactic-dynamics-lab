@@ -107,7 +107,8 @@ class TPFCorePackage : public PhysicsPackage {
     std::uint64_t invariant_I_evaluations = 0;
     std::uint64_t direct_tpf_evaluations = 0;
     std::uint64_t provisional_readout_evaluations = 0;
-    std::uint64_t xi_pair_evaluations = 0;
+    std::uint64_t xi_last_call_pair_evaluations = 0;
+    std::uint64_t xi_total_pair_evaluations = 0;
   };
   XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
 

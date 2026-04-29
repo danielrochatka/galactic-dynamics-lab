@@ -1524,7 +1524,8 @@ int main(int argc, char** argv) {
             rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
             rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
             rf << "xi_runtime_provisional_readout_evaluations\t" << counters.provisional_readout_evaluations << "\n";
-            rf << "xi_runtime_xi_pair_evaluations\t" << counters.xi_pair_evaluations << "\n";
+            rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
+            rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
           }
         }
       }

@@ -648,7 +648,8 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     double xi_x_eff = 0.0;
     double xi_y_eff = 0.0;
     for (std::size_t si = 0; si < sources.size(); ++si) {
-      ++xi_runtime_counters_.xi_pair_evaluations;
+      ++xi_runtime_counters_.xi_last_call_pair_evaluations;
+      ++xi_runtime_counters_.xi_total_pair_evaluations;
       const XiKernelRuntimeSource& src = sources[si];
       // Sign convention (source-target geometry):
       //   d = target - source
@@ -753,7 +754,7 @@ void TPFCorePackage::compute_accelerations(const State& state,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
   if (tpf_dynamics_mode_ == "xi_kernel_deformed") {
-    xi_runtime_counters_ = XiRuntimeCounters{};
+    xi_runtime_counters_.xi_last_call_pair_evaluations = 0;
     compute_xi_kernel_deformed_accelerations(state, bh_mass, softening, star_star, ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
