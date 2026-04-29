@@ -1021,8 +1021,7 @@ TEST_CASE("4d xi motion probe benchmark metric_velocity deforms Xi when relative
     CHECK(std::isfinite(xi_z_eff));
     CHECK(std::isfinite(metric));
     CHECK(std::isfinite(ax));
-    if (std::fabs(factor) > 0.0) {
-      CHECK(metric != doctest::Approx(1.0));
+    if (std::fabs(factor) > 1e-12 && std::fabs(metric - 1.0) > 1e-12) {
       saw_nontrivial_metric = true;
     }
     const double delta_norm = std::sqrt((xi_x_eff - xi_x_base) * (xi_x_eff - xi_x_base) +
@@ -1134,7 +1133,7 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake keeps beta_effect
   CHECK(x_axis_rows >= 2);
 }
 
-TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_effective for pure transverse passing") {
+TEST_CASE("4d xi motion probe benchmark metric_transverse_wake keeps wake gate near zero for pure transverse orbiting") {
   char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_transverse_wake_transverse_XXXXXX";
   char* out_dir = mkdtemp(dir_template);
   REQUIRE(out_dir != nullptr);
@@ -1166,7 +1165,7 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_
   const int wake_col = find_csv_col(header, "wake_gate");
   REQUIRE(beta_eff_col >= 0);
 
-  bool saw_nonzero = false;
+  bool saw_near_zero = false;
   while (std::getline(in, line)) {
     if (line.empty()) continue;
     const std::vector<std::string> cols = split_csv_line(line);
@@ -1179,10 +1178,11 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_
     const double beta_eff = std::atof(cols[beta_eff_col].c_str());
     const double wake_gate = std::atof(cols[wake_col].c_str());
     CHECK(beta_pass > 0.0);
-    CHECK(wake_gate == doctest::Approx(0.5).epsilon(1e-10));
-    if (beta_eff > 0.0) saw_nonzero = true;
+    CHECK(wake_gate < 0.03);
+    CHECK(beta_eff < 0.03 * beta_pass);
+    if (beta_eff < 0.03 * beta_pass) saw_near_zero = true;
   }
-  CHECK(saw_nonzero);
+  CHECK(saw_near_zero);
 }
 
 TEST_CASE("4d xi motion probe benchmark metric_transverse_wake wake gate is higher for separating than approaching") {
@@ -1313,7 +1313,10 @@ TEST_CASE("compute_xi_wake_kinematics follows the same per-interaction formula u
   const double vtz = vz_rel - v_rad * rz;
   const double vt = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
   const double beta_pass = vt / 299792458.0;
-  const double wake_gate = 0.5 * (1.0 + std::tanh(v_rad / std::max(vt, 1.0e-30)));
+  constexpr double wake_threshold = 0.10;
+  constexpr double wake_width = 0.05;
+  const double radial_ratio = v_rad / std::max(vt, 1.0e-30);
+  const double wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - wake_threshold) / wake_width));
   const double beta_effective = beta_pass * wake_gate;
 
   CHECK(k.v_radial == doctest::Approx(v_rad));

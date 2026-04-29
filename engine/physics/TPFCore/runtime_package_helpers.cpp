@@ -28,7 +28,10 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
   const double vtz = vz_rel - k.v_radial * r_hat_z;
   k.v_transverse = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
   k.beta_pass = k.v_transverse / c_light;
-  k.wake_gate = 0.5 * (1.0 + std::tanh(k.v_radial / std::max(k.v_transverse, 1.0e-30)));
+  constexpr double kWakeGateThreshold = 0.10;
+  constexpr double kWakeGateWidth = 0.05;
+  const double radial_ratio = k.v_radial / std::max(k.v_transverse, 1.0e-30);
+  k.wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - kWakeGateThreshold) / kWakeGateWidth));
   k.beta_effective = k.beta_pass * k.wake_gate;
   if (k.v_transverse > 1.0e-30) {
     const double inv_vt = 1.0 / k.v_transverse;
