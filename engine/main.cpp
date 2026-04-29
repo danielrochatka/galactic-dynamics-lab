@@ -11,6 +11,7 @@
 #include "progress_time.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
+#include "physics/Newtonian/newtonian.hpp"
 #include "physics/TPFCore/v11_weak_field_correspondence.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
@@ -56,6 +57,32 @@ std::string run_id_from_time() {
 
 bool ensure_dir(const std::string& path) {
   return MKDIR(path.c_str(), 0755) == 0 || errno == EEXIST;
+}
+
+void write_softening_audit_file_and_runinfo(const galaxy::Config& cfg, galaxy::PhysicsPackage* physics) {
+  if (!cfg.softening_audit_enable) return;
+  galaxy::SofteningAuditRunStats st{};
+  if (auto* n = dynamic_cast<galaxy::NewtonianPackage*>(physics)) st = n->softening_audit_stats();
+  else if (auto* t = dynamic_cast<galaxy::TPFCorePackage*>(physics)) st = t->softening_audit_stats();
+  else return;
+  std::ofstream af(cfg.output_dir + "/softening_audit.txt");
+  if (!af) return;
+  af << "softening_factor_audit_scope\tsoftening_factor_invariant_only\n"
+     << "softening_audit_call_count\t" << st.call_count << "\n"
+     << "softening_audit_run_total_pair_count\t" << st.run_total_pair_count << "\n"
+     << "softening_audit_run_total_bh_pair_count\t" << st.run_total_bh_pair_count << "\n"
+     << "softening_audit_run_total_star_pair_count\t" << st.run_total_star_pair_count << "\n"
+     << "softening_audit_run_total_violation_count\t" << st.run_total_violation_count << "\n"
+     << "softening_audit_run_max_softened_over_unsoftened_ratio\t" << st.run_max_ratio << "\n"
+     << "softening_audit_run_max_ratio_pair_distance\t" << st.run_max_ratio_r << "\n"
+     << "softening_audit_run_min_pair_distance\t" << st.run_min_r << "\n"
+     << "softening_audit_last_call_median_pair_distance\t" << st.last_call_median_r << "\n"
+     << "softening_audit_eps_used\t" << st.eps_used << "\n"
+     << "softening_audit_xi_metric_deformation_max_ratio\t" << st.xi_metric_max_ratio << "\n";
+  if (cfg.save_run_info) {
+    std::ofstream rf(cfg.output_dir + "/run_info.txt", std::ios::app);
+    if (rf) rf << "softening_audit_enable\t1\nsoftening_audit_run_total_violation_count\t" << st.run_total_violation_count << "\n";
+  }
 }
 
 std::string shell_single_quote(const std::string& raw) {
@@ -1252,6 +1279,7 @@ int main(int argc, char** argv) {
                                           static_cast<int>(side_snaps.size()), state.n(),
                                           &galaxy::last_galaxy_init_audit());
           }
+          write_softening_audit_file_and_runinfo(side_cfg, side_physics);
           if (side_cfg.save_snapshots)
             galaxy::write_snapshots(side_cfg.output_dir, side_snaps);
           write_resolved_artifacts(side_cfg);
@@ -1530,6 +1558,7 @@ int main(int argc, char** argv) {
       galaxy::write_snapshots(config.output_dir, snapshots);
       std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
     }
+    write_softening_audit_file_and_runinfo(config, physics);
 
     if (config.physics_package == "TPFCore") {
       galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
