@@ -1,4 +1,5 @@
 #include "galaxy_init.hpp"
+#include "physics/Newtonian/newtonian.hpp"
 #include "physics/TPFCore/derived_tpf_radial.hpp"
 #include <algorithm>
 #include <cctype>
@@ -110,6 +111,18 @@ double structured_w_max(const TemplateFlags& tf, const Config& cfg) {
   }
   if (tf.spiral) w *= 1.0 + std::abs(cfg.galaxy_init_spiral_amplitude);
   return std::max(w, kWeightFloor);
+}
+
+double enclosed_mass_vcirc(const std::vector<double>& radii, const std::vector<int>& n_inside,
+                           int i, double bh_mass, double star_mass, bool include_enclosed_stars, double eps) {
+  constexpr double G_SI = 6.6743e-11;
+  const double r_safe = std::max(radii[i], 1e-30);
+  double enclosed_mass = bh_mass;
+  if (include_enclosed_stars) enclosed_mass += n_inside[i] * star_mass;
+  const double r2_soft = r_safe * r_safe + eps * eps;
+  const double denom = r2_soft * std::sqrt(r2_soft);
+  const double a_radial_mag = (denom > 0.0) ? (G_SI * enclosed_mass * r_safe / denom) : 0.0;
+  return std::sqrt(std::max(0.0, a_radial_mag * r_safe));
 }
 
 const char* template_debug_name(GalaxyInitTemplate t) {
@@ -381,6 +394,7 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
   audit.galaxy_init_velocity_angle_noise_resolved = effective.galaxy_init_velocity_angle_noise;
   audit.galaxy_init_velocity_magnitude_noise_resolved = effective.galaxy_init_velocity_magnitude_noise;
   audit.velocity_noise_effective = effective.velocity_noise;
+  audit.galaxy_init_velocity_mode = effective.galaxy_init_velocity_mode;
 
   audit.eff_position_noise = effective.galaxy_init_position_noise * audit.master_chaos;
   audit.eff_velocity_angle_noise_rad = effective.galaxy_init_velocity_angle_noise * audit.master_chaos;
@@ -590,30 +604,46 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
     constexpr double G_SI = 6.6743e-11;
     const bool include_enclosed_stars = effective.enable_star_star_gravity;
     const double eps = std::max(0.0, effective.softening);
+    audit.galaxy_init_velocity_mode = effective.galaxy_init_velocity_mode;
+    const bool pairwise_mode = (effective.galaxy_init_velocity_mode == "pairwise_radial_equilibrium");
+    audit.pairwise_radial_equilibrium_used = pairwise_mode;
     audit.velocity_mass_model = include_enclosed_stars ? "bh_plus_enclosed_stars" : "bh_only";
     audit.velocity_uses_star_mass = include_enclosed_stars;
     audit.velocity_respects_star_star_flag = true;
-    audit.velocity_formula = "softened_enclosed_mass";
+    audit.velocity_formula = pairwise_mode ? "pairwise_radial_equilibrium" : "softened_enclosed_mass";
     audit.velocity_softening_used = eps;
     audit.velocity_softened_circular_speed = true;
     std::vector<double> v_ratio;
     v_ratio.reserve(n);
+    std::vector<double> ax, ay;
+    if (pairwise_mode) {
+      NewtonianPackage pkg;
+      pkg.compute_accelerations(state, bh_mass, eps, include_enclosed_stars, ax, ay);
+    }
+    std::vector<double> inward_radial_accel, v_circ_values, radial_after, tangential_frac_after;
     for (int i = 0; i < n; ++i) {
       double r = radii[i];
       double th = theta[i];
       double cos_t = std::cos(th);
       double sin_t = std::sin(th);
-      double enclosed_mass = bh_mass;
-      if (include_enclosed_stars) {
-        enclosed_mass += n_inside[i] * star_mass;
-      }
       const double r_safe = std::max(r, 1e-30);
-      const double r2_soft = r_safe * r_safe + eps * eps;
-      const double denom = r2_soft * std::sqrt(r2_soft);
-      const double a_radial_mag = (denom > 0.0) ? (G_SI * enclosed_mass * r_safe / denom) : 0.0;
-      double v_circ = std::sqrt(std::max(0.0, a_radial_mag * r_safe));
+      double v_circ = enclosed_mass_vcirc(radii, n_inside, i, bh_mass, star_mass, include_enclosed_stars, eps);
+      if (pairwise_mode) {
+        const double rhat_x = state.x[i] / r_safe;
+        const double rhat_y = state.y[i] / r_safe;
+        const double inward = -(ax[i] * rhat_x + ay[i] * rhat_y);
+        inward_radial_accel.push_back(inward);
+        if (inward > 0.0) {
+          v_circ = std::sqrt(inward * r_safe);
+        } else {
+          ++audit.pairwise_radial_equilibrium_fallback_count;
+          ++audit.pairwise_radial_equilibrium_negative_radial_accel_count;
+        }
+      }
+      double enclosed_mass = bh_mass + (include_enclosed_stars ? n_inside[i] * star_mass : 0.0);
       const double v_circ_unsoftened = std::sqrt((G_SI * enclosed_mass) / r_safe);
       v_ratio.push_back((v_circ_unsoftened > 0.0) ? (v_circ / v_circ_unsoftened) : 1.0);
+      v_circ_values.push_back(v_circ);
       double vx = -sin_t * v_circ;
       double vy = cos_t * v_circ;
 
@@ -632,11 +662,27 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
 
       state.vx[i] = effective.initial_velocity_scale * vx;
       state.vy[i] = effective.initial_velocity_scale * vy;
+      const double rv = (state.x[i] * state.vx[i] + state.y[i] * state.vy[i]) / r_safe;
+      radial_after.push_back(rv);
+      const double vmag = std::hypot(state.vx[i], state.vy[i]);
+      const double tv = (-sin_t * state.vx[i] + cos_t * state.vy[i]);
+      tangential_frac_after.push_back((vmag > 0.0) ? std::abs(tv) / vmag : 0.0);
     }
-    if (!v_ratio.empty()) {
-      std::sort(v_ratio.begin(), v_ratio.end());
-      audit.median_v_circ_softened_ratio_vs_unsoftened = v_ratio[v_ratio.size() / 2];
-    }
+    auto pct = [](std::vector<double>& v, double q) {
+      if (v.empty()) return 0.0;
+      std::sort(v.begin(), v.end());
+      const size_t idx = static_cast<size_t>(q * static_cast<double>(v.size() - 1));
+      return v[idx];
+    };
+    if (!v_ratio.empty()) audit.median_v_circ_softened_ratio_vs_unsoftened = pct(v_ratio, 0.5);
+    audit.initial_inward_radial_accel_p25 = pct(inward_radial_accel, 0.25);
+    audit.initial_inward_radial_accel_median = pct(inward_radial_accel, 0.5);
+    audit.initial_inward_radial_accel_p75 = pct(inward_radial_accel, 0.75);
+    audit.initial_v_circ_p25 = pct(v_circ_values, 0.25);
+    audit.initial_v_circ_median = pct(v_circ_values, 0.5);
+    audit.initial_v_circ_p75 = pct(v_circ_values, 0.75);
+    audit.initial_radial_velocity_median_after_noise = pct(radial_after, 0.5);
+    audit.initial_tangential_fraction_median_after_noise = pct(tangential_frac_after, 0.5);
   }
 
   g_last_audit = audit;
@@ -748,6 +794,20 @@ void write_galaxy_init_diagnostics(const std::string& output_dir,
   txt << "galaxy_init_velocity_respects_star_star_flag\t"
       << (audit.velocity_respects_star_star_flag ? 1 : 0) << "\n";
   txt << "galaxy_init_velocity_formula\t" << audit.velocity_formula << "\n";
+  txt << "galaxy_init_velocity_mode\t" << audit.galaxy_init_velocity_mode << "\n";
+  txt << "pairwise_radial_equilibrium_used\t" << (audit.pairwise_radial_equilibrium_used ? 1 : 0) << "\n";
+  txt << "pairwise_radial_equilibrium_fallback_count\t" << audit.pairwise_radial_equilibrium_fallback_count << "\n";
+  txt << "pairwise_radial_equilibrium_negative_radial_accel_count\t"
+      << audit.pairwise_radial_equilibrium_negative_radial_accel_count << "\n";
+  txt << "initial_inward_radial_accel_median\t" << audit.initial_inward_radial_accel_median << "\n";
+  txt << "initial_inward_radial_accel_p25\t" << audit.initial_inward_radial_accel_p25 << "\n";
+  txt << "initial_inward_radial_accel_p75\t" << audit.initial_inward_radial_accel_p75 << "\n";
+  txt << "initial_v_circ_median\t" << audit.initial_v_circ_median << "\n";
+  txt << "initial_v_circ_p25\t" << audit.initial_v_circ_p25 << "\n";
+  txt << "initial_v_circ_p75\t" << audit.initial_v_circ_p75 << "\n";
+  txt << "initial_radial_velocity_median_after_noise\t" << audit.initial_radial_velocity_median_after_noise << "\n";
+  txt << "initial_tangential_fraction_median_after_noise\t"
+      << audit.initial_tangential_fraction_median_after_noise << "\n";
   txt << "galaxy_init_velocity_softening_used\t" << audit.velocity_softening_used << "\n";
   txt << "galaxy_init_velocity_softened_circular_speed\t" << (audit.velocity_softened_circular_speed ? 1 : 0)
       << "\n";

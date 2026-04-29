@@ -406,6 +406,8 @@ struct Config {
    */
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
+  /** Galaxy init velocity mode: enclosed_mass (default) or pairwise_radial_equilibrium (runtime-force-consistent). */
+  std::string galaxy_init_velocity_mode = "enclosed_mass";
 
   bool save_snapshots = true;
   bool save_run_info = true;

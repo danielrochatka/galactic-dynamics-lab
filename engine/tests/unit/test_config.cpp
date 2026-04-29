@@ -71,6 +71,7 @@ TEST_CASE("config defaults") {
   CHECK(c.display_units_in_overlay == true);
   CHECK(c.display_show_unit_reference == true);
   CHECK(c.softening == doctest::Approx(0.0));
+  CHECK(c.galaxy_init_velocity_mode == "enclosed_mass");
 }
 
 TEST_CASE("physics_package_compare parsing") {
@@ -128,6 +129,11 @@ TEST_CASE("galaxy init keys") {
   CHECK(c.galaxy_init_seed == 424242u);
   CHECK(apply_config_kv("galaxy_init_master_chaos", "2.5", c));
   CHECK(c.galaxy_init_master_chaos == doctest::Approx(2.5));
+  CHECK(apply_config_kv("galaxy_init_velocity_mode", "enclosed_mass", c));
+  CHECK(c.galaxy_init_velocity_mode == "enclosed_mass");
+  CHECK(apply_config_kv("galaxy_init_velocity_mode", "pairwise_radial_equilibrium", c));
+  CHECK(c.galaxy_init_velocity_mode == "pairwise_radial_equilibrium");
+  CHECK_THROWS(apply_config_kv("galaxy_init_velocity_mode", "bad_mode", c));
 }
 
 TEST_CASE("explicit tpf_vdsg_coupling still works") {
