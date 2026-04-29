@@ -1515,20 +1515,6 @@ int main(int argc, char** argv) {
                                  : nullptr,
                              &cooling_audit,
                              tpf_pipeline_stats);
-      if (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "xi_kernel_deformed") {
-        if (auto* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(physics)) {
-          const auto counters = tpf_pkg->xi_runtime_counters();
-          std::ofstream rf(config.output_dir + "/run_info.txt", std::ios::app);
-          if (rf) {
-            rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
-            rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
-            rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
-            rf << "xi_runtime_provisional_readout_evaluations\t" << counters.provisional_readout_evaluations << "\n";
-            rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
-            rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
-          }
-        }
-      }
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {
@@ -1578,6 +1564,18 @@ int main(int argc, char** argv) {
         tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
         std::cout << "Wrote " << config.output_dir
                   << "/direct_tpf_step0_raw_accel_audit.csv, direct_tpf_step0_raw_accel_summary.txt\n";
+      }
+      if (config.save_run_info && config.tpf_dynamics_mode == "xi_kernel_deformed" && tpf) {
+        const auto counters = tpf->xi_runtime_counters();
+        std::ofstream rf(config.output_dir + "/run_info.txt", std::ios::app);
+        if (rf) {
+          rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
+          rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
+          rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
+          rf << "xi_runtime_provisional_readout_evaluations\t" << counters.provisional_readout_evaluations << "\n";
+          rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
+          rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
+        }
       }
     }
   }
