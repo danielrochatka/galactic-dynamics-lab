@@ -241,12 +241,14 @@ TEST_CASE("Newtonian BH-only softening factor audit finalizes and reports distan
   const double eps = 0.5;
   std::vector<double> ax, ay;
   n.compute_accelerations(st, 10.0, eps, false, ax, ay);
+  n.compute_accelerations(st, 10.0, eps, false, ax, ay);
   const auto& a = n.softening_audit_stats();
-  CHECK(a.pair_count > 0);
-  CHECK(a.bh_pair_count > 0);
-  CHECK(a.violation_count == 0);
-  CHECK(a.min_r > 0.0);
-  CHECK(a.median_r > 0.0);
+  CHECK(a.run_total_pair_count >= 4);
+  CHECK(a.run_total_bh_pair_count > 0);
+  CHECK(a.call_count == 2);
+  CHECK(a.run_total_violation_count == 0);
+  CHECK(a.run_min_r > 0.0);
+  CHECK(a.last_call_median_r > 0.0);
   CHECK(a.eps_used == doctest::Approx(eps));
 }
 
@@ -264,7 +266,9 @@ TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no 
   st.vy = {0.0, 0.0};
   std::vector<double> ax, ay;
   n.compute_accelerations(st, 0.0, 0.6, true, ax, ay);
+  n.compute_accelerations(st, 0.0, 0.6, true, ax, ay);
   const auto& a = n.softening_audit_stats();
-  CHECK(a.star_pair_count > 0);
-  CHECK(a.violation_count == 0);
+  CHECK(a.run_total_star_pair_count >= 4);
+  CHECK(a.call_count == 2);
+  CHECK(a.run_total_violation_count == 0);
 }

@@ -160,10 +160,12 @@ TEST_CASE("xi kernel deformed softening factor audit reports eps_used and no vio
   std::vector<double> ax, ay;
   const double eps = 0.2;
   p.compute_accelerations(s, 7.0, eps, true, ax, ay);
+  p.compute_accelerations(s, 7.0, eps, true, ax, ay);
   const auto& a = p.softening_audit_stats();
   CHECK(a.eps_used == doctest::Approx(eps));
-  CHECK(a.pair_count > 0);
-  CHECK(a.violation_count == 0);
+  CHECK(a.call_count == 2);
+  CHECK(a.run_total_pair_count > 0);
+  CHECK(a.run_total_violation_count == 0);
 }
 
 TEST_CASE("xi kernel deformed softening factor audit uses tpfcore_source_softening override") {
@@ -175,7 +177,9 @@ TEST_CASE("xi kernel deformed softening factor audit uses tpfcore_source_softeni
   auto s = three_body_state(2.0, 5.0);
   std::vector<double> ax, ay;
   p.compute_accelerations(s, 7.0, 0.1, true, ax, ay);
+  p.compute_accelerations(s, 7.0, 0.1, true, ax, ay);
   const auto& a = p.softening_audit_stats();
   CHECK(a.eps_used == doctest::Approx(0.75));
-  CHECK(a.pair_count > 0);
+  CHECK(a.call_count == 2);
+  CHECK(a.run_total_pair_count > 0);
 }

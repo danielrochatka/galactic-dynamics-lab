@@ -61,25 +61,28 @@ bool ensure_dir(const std::string& path) {
 
 void write_softening_audit_file_and_runinfo(const galaxy::Config& cfg, galaxy::PhysicsPackage* physics) {
   if (!cfg.softening_audit_enable) return;
-  galaxy::SofteningAuditStats st{};
+  galaxy::SofteningAuditRunStats st{};
   if (auto* n = dynamic_cast<galaxy::NewtonianPackage*>(physics)) st = n->softening_audit_stats();
   else if (auto* t = dynamic_cast<galaxy::TPFCorePackage*>(physics)) st = t->softening_audit_stats();
   else return;
   std::ofstream af(cfg.output_dir + "/softening_audit.txt");
   if (!af) return;
-  af << "softening_audit_pair_count\t" << st.pair_count << "\n"
-     << "softening_audit_scope\tsoftening_factor_invariant_only\n"
-     << "softening_audit_bh_pair_count\t" << st.bh_pair_count << "\n"
-     << "softening_audit_star_pair_count\t" << st.star_pair_count << "\n"
-     << "softening_audit_violation_count\t" << st.violation_count << "\n"
-     << "softening_audit_max_softened_over_unsoftened_ratio\t" << st.max_ratio << "\n"
-     << "softening_audit_max_softened_over_unsoftened_pair_distance\t" << st.max_ratio_r << "\n"
-     << "softening_audit_min_pair_distance\t" << st.min_r << "\n"
-     << "softening_audit_median_pair_distance\t" << st.median_r << "\n"
+  af << "softening_factor_audit_scope\tsoftening_factor_invariant_only\n"
+     << "softening_audit_call_count\t" << st.call_count << "\n"
+     << "softening_audit_run_total_pair_count\t" << st.run_total_pair_count << "\n"
+     << "softening_audit_run_total_bh_pair_count\t" << st.run_total_bh_pair_count << "\n"
+     << "softening_audit_run_total_star_pair_count\t" << st.run_total_star_pair_count << "\n"
+     << "softening_audit_run_total_violation_count\t" << st.run_total_violation_count << "\n"
+     << "softening_audit_run_max_softened_over_unsoftened_ratio\t" << st.run_max_ratio << "\n"
+     << "softening_audit_run_max_ratio_pair_distance\t" << st.run_max_ratio_r << "\n"
+     << "softening_audit_run_min_pair_distance\t" << st.run_min_r << "\n"
+     << "softening_audit_last_call_median_pair_distance\t" << st.last_call_median_r << "\n"
      << "softening_audit_eps_used\t" << st.eps_used << "\n"
      << "softening_audit_xi_metric_deformation_max_ratio\t" << st.xi_metric_max_ratio << "\n";
-  std::ofstream rf(cfg.output_dir + "/run_info.txt", std::ios::app);
-  if (rf) rf << "softening_audit_enable\t1\nsoftening_audit_violation_count\t" << st.violation_count << "\n";
+  if (cfg.save_run_info) {
+    std::ofstream rf(cfg.output_dir + "/run_info.txt", std::ios::app);
+    if (rf) rf << "softening_audit_enable\t1\nsoftening_audit_run_total_violation_count\t" << st.run_total_violation_count << "\n";
+  }
 }
 
 std::string shell_single_quote(const std::string& raw) {
