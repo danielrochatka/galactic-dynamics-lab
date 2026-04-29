@@ -27,6 +27,7 @@ from plot_cpp_compare import (
     binned_profile,
     _time_display_factor,
     _velocity_display_factor,
+    style_compare_diagnostic_axes,
 )
 from display_units import DisplayUnitConfig
 
@@ -93,6 +94,23 @@ def _write_run_info_new_schema(run_dir: Path, pkg: str, *, dyn: str = "direct_tp
 
 
 class TestPlotCppCompare(unittest.TestCase):
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_style_compare_diagnostic_axes_uses_light_theme(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1, 1)
+        style_compare_diagnostic_axes(ax)
+        self.assertEqual(ax.get_facecolor(), (1.0, 1.0, 1.0, 1.0))
+        self.assertEqual(ax.xaxis.label.get_color(), "black")
+        self.assertEqual(ax.yaxis.label.get_color(), "black")
+        self.assertEqual(ax.title.get_color(), "black")
+        for spine in ax.spines.values():
+            self.assertEqual(spine.get_edgecolor(), (0.35, 0.35, 0.35, 1.0))
+        plt.close(fig)
+
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
         "matplotlib/numpy not installed",
