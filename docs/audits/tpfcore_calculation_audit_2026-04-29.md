@@ -2,6 +2,7 @@
 
 ## Executive summary
 - `xi_kernel_deformed` runtime routing is isolated to `compute_xi_kernel_deformed_accelerations` and returns before legacy/direct/v11 paths.
+- This audit verifies selected runtime route contracts and adds regression tests; it is not a proof of the physical theory or a complete derivation audit.
 - Xi sign convention and readout sign match declared contract: `d = target-source`, `Xi_base = m*d/(|d|^2+eps^2)^(3/2)`, `a=-K_xi*Xi_eff`.
 - Wake/continuous transverse gates match documented formulas in code.
 - **Definite mismatch found:** derived radial path always includes enclosed stellar mass in `radial_acceleration_scalar_derived`, independent of `enable_star_star_gravity`; this requires metadata truth fix and theory decision on physics behavior.
@@ -21,8 +22,8 @@
 - scalar_beta: scales Xi magnitude by `1 + factor_raw`.
 - metric_radial: anisotropic metric along radial axis `n=r_hat`.
 - metric_velocity: anisotropic metric along relative velocity axis.
-- metric_transverse_wake: `beta_pass = |v_trans|/c`; gate `0.5*(1+tanh((v_rad/v_trans-0.10)/0.05))`.
-- metric_transverse_continuous: gate `0.5*(1+tanh(v_rad/v_trans))`.
+- metric_transverse_wake: `beta_pass = v_transverse/c`; gate `0.5*(1+tanh(((v_radial / max(v_transverse, eps)) - 0.10)/0.05))`.
+- metric_transverse_continuous: gate `0.5*(1+tanh(v_radial / max(v_transverse, eps)))`.
 - spacetime_metric: same kernel metric machinery plus temporal coupling branch.
 
 ## Config truth table (condensed)

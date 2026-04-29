@@ -32,7 +32,7 @@ galaxy::State three_body_state(double m1, double m2) {
 
 }
 
-TEST_CASE("xi off mode with K_xi=G matches Newtonian BH direction/sign with shared softening") {
+TEST_CASE("xi off mode with unit K_xi matches softened Newtonian shape/sign") {
   auto c = base_xi_cfg();
   c.tpf_4d_xi_motion_readout_scale = 1.0;
   galaxy::TPFCorePackage p;
