@@ -459,11 +459,8 @@ def binned_profile(x, y, bins=30):
 def save_compare_profile_plot(parent_dir, mode_name, alias_name, left_xy, right_xy, *, left_label, right_label, xlabel, ylabel, title, add_ref1=False):
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="black")
-    ax.set_facecolor("black")
-    ax.tick_params(colors="gray")
-    for s in ax.spines.values():
-        s.set_color("gray")
+    fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="white")
+    style_compare_diagnostic_axes(ax)
 
     def _draw(side_xy, label, color):
         if side_xy is None:
@@ -478,15 +475,35 @@ def save_compare_profile_plot(parent_dir, mode_name, alias_name, left_xy, right_
     _draw(left_xy, left_label, "tab:cyan")
     _draw(right_xy, right_label, "tab:orange")
     if add_ref1:
-        ax.axhline(1.0, color="white", lw=1, ls="--", alpha=0.7)
-    ax.set_xlabel(xlabel, color="white")
-    ax.set_ylabel(ylabel, color="white")
-    ax.set_title(title, color="white")
-    ax.legend(facecolor="black", edgecolor="gray")
+        ax.axhline(1.0, color="0.2", lw=1, ls="--", alpha=0.7)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    style_compare_diagnostic_legend(ax)
     fig.tight_layout()
     for nm in (mode_name, alias_name):
-        fig.savefig(parent_dir / nm, dpi=150, facecolor="black", edgecolor="none")
+        fig.savefig(parent_dir / nm, dpi=150, facecolor="white", edgecolor="none")
     plt.close(fig)
+
+
+def style_compare_diagnostic_axes(ax) -> None:
+    ax.set_facecolor("white")
+    ax.tick_params(colors="black")
+    ax.xaxis.label.set_color("black")
+    ax.yaxis.label.set_color("black")
+    ax.title.set_color("black")
+    for spine in ax.spines.values():
+        spine.set_color("0.35")
+    ax.grid(True, alpha=0.25, color="0.75")
+
+
+def style_compare_diagnostic_legend(ax) -> None:
+    handles, _ = ax.get_legend_handles_labels()
+    if not handles:
+        return
+    leg = ax.legend(facecolor="white", edgecolor="0.5")
+    for text in leg.get_texts():
+        text.set_color("black")
 
 
 def _time_display_factor(unit: str) -> float:
@@ -672,22 +689,21 @@ def render_compare(
         right_name = _slug(_physics_label(right.run_info))
         pref = f"galaxy_compare__{left_name}_vs_{right_name}__compare__"
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="black")
-        ax.set_facecolor("black")
-        ax.tick_params(colors="gray")
-        for s in ax.spines.values():
-            s.set_color("gray")
+        fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="white")
+        style_compare_diagnostic_axes(ax)
         if l_in is not None:
             ax.scatter(lk["radius"] * dist_scale, l_in, s=8, alpha=0.2, color="tab:cyan", label=left_panel_label)
         if r_in is not None:
             ax.scatter(rk["radius"] * dist_scale, r_in, s=8, alpha=0.2, color="tab:orange", label=right_panel_label)
-        ax.set_xlabel(f"radius [{dist_unit}]", color="white")
-        ax.set_ylabel("inward radial acceleration [m/s^2]", color="white")
-        ax.set_title("Final snapshot inward radial acceleration vs radius (raw)", color="white")
-        ax.legend(facecolor="black", edgecolor="gray")
+        ax.set_xlabel(f"radius [{dist_unit}]")
+        ax.set_ylabel("inward radial acceleration [m/s^2]")
+        ax.set_title("Final snapshot inward radial acceleration vs radius (raw)")
+        leg = ax.legend(facecolor="white", edgecolor="0.5")
+        for text in leg.get_texts():
+            text.set_color("black")
         fig.tight_layout()
-        fig.savefig(parent_dir / (pref + "radial_acceleration_vs_radius_final.png"), dpi=150, facecolor="black", edgecolor="none")
-        fig.savefig(parent_dir / "compare_radial_acceleration_vs_radius_final.png", dpi=150, facecolor="black", edgecolor="none")
+        fig.savefig(parent_dir / (pref + "radial_acceleration_vs_radius_final.png"), dpi=150, facecolor="white", edgecolor="none")
+        fig.savefig(parent_dir / "compare_radial_acceleration_vs_radius_final.png", dpi=150, facecolor="white", edgecolor="none")
         plt.close(fig)
         save_compare_profile_plot(parent_dir, pref+"binned_inward_acceleration_vs_radius_final.png", "compare_binned_inward_acceleration_vs_radius_final.png", (lk["radius"]*dist_scale, l_in) if l_in is not None else None, (rk["radius"]*dist_scale, r_in) if r_in is not None else None, left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="inward radial acceleration [m/s^2]", title="Binned inward radial acceleration vs radius")
         save_compare_profile_plot(parent_dir, pref+"rotation_curve_final.png", "compare_rotation_curve_final.png", (lk["radius"]*dist_scale, lk["v_t"] * vel_scale), (rk["radius"]*dist_scale, rk["v_t"] * vel_scale), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel=f"tangential speed [{vel_unit}]", title="Rotation curve (final snapshot)")
@@ -703,12 +719,14 @@ def render_compare(
             tvals.append(float(ls.time))
             lmed.append(np.median(lr)); lp25.append(np.percentile(lr,25)); lp75.append(np.percentile(lr,75))
             rmed.append(np.median(rr)); rp25.append(np.percentile(rr,25)); rp75.append(np.percentile(rr,75))
-        fig, ax = plt.subplots(1,1,figsize=(9,6),facecolor='black'); ax.set_facecolor('black'); ax.tick_params(colors='gray')
-        for s in ax.spines.values(): s.set_color('gray')
+        fig, ax = plt.subplots(1,1,figsize=(9,6),facecolor='white')
+        style_compare_diagnostic_axes(ax)
         t=np.asarray(tvals) * time_scale; ax.plot(t,lmed,color='tab:cyan',label=left_panel_label); ax.fill_between(t,lp25,lp75,color='tab:cyan',alpha=0.2)
         ax.plot(t,rmed,color='tab:orange',label=right_panel_label); ax.fill_between(t,rp25,rp75,color='tab:orange',alpha=0.2)
-        ax.set_xlabel(f"time [{shared_display.active_time_unit}]", color='white'); ax.set_ylabel(f"radius [{dist_unit}]", color='white'); ax.set_title('Radius percentiles over time', color='white'); ax.legend(facecolor='black',edgecolor='gray'); fig.tight_layout()
-        fig.savefig(parent_dir/(pref+"radius_percentiles_over_time.png"),dpi=150,facecolor='black',edgecolor='none'); fig.savefig(parent_dir/"compare_radius_percentiles_over_time.png",dpi=150,facecolor='black',edgecolor='none'); plt.close(fig)
+        ax.set_xlabel(f"time [{shared_display.active_time_unit}]"); ax.set_ylabel(f"radius [{dist_unit}]"); ax.set_title('Radius percentiles over time')
+        style_compare_diagnostic_legend(ax)
+        fig.tight_layout()
+        fig.savefig(parent_dir/(pref+"radius_percentiles_over_time.png"),dpi=150,facecolor='white',edgecolor='none'); fig.savefig(parent_dir/"compare_radius_percentiles_over_time.png",dpi=150,facecolor='white',edgecolor='none'); plt.close(fig)
 
         if l_in is not None and r_in is not None:
             l_x, l_med, _, _ = binned_profile(lk["radius"] * dist_scale, l_in, bins=30)
