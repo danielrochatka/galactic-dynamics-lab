@@ -99,6 +99,10 @@ struct GalaxyInitAudit {
   std::string velocity_mass_model = "bh_plus_enclosed_stars";
   bool velocity_uses_star_mass = true;
   bool velocity_respects_star_star_flag = true;
+  std::string velocity_formula = "legacy_unsoftened_enclosed_mass";
+  double velocity_softening_used = 0.0;
+  bool velocity_softened_circular_speed = false;
+  double median_v_circ_softened_ratio_vs_unsoftened = 1.0;
 
   double weight_w_max = 1.0;
   int rejection_fallbacks = 0;
