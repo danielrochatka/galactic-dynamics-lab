@@ -10,6 +10,7 @@
  * - xi_kernel_deformed: runtime Xi-kernel route; computes Xi-based acceleration without Theta/I in its default
  *   acceleration path, can apply optional Xi-kernel deformation before readout, and reads acceleration as
  *   a = -K_xi * Xi_eff_spatial. The old additive VDSG acceleration modifier is not used on this route.
+ *   Optional diagnostics can still compute Theta/I/provisional quantities when explicitly enabled.
  */
 
 #include "tpf_core_package.hpp"

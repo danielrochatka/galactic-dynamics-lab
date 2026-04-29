@@ -54,7 +54,7 @@ There are two distinct VDSG families in current code:
    Controlled by **`tpf_vdsg_coupling`** on legacy/additive routes where applicable (not `xi_kernel_deformed`). It adds an acceleration modifier after baseline readout via `accumulate_vdsg_velocity_modifier`.
 
 2. **Xi-kernel VDSG deformation**  
-   Controlled by **`tpf_4d_xi_kernel_mode`** and **`tpf_4d_xi_kernel_coupling`** in **`tpf_dynamics_mode=xi_kernel_deformed`**. It deforms Xi before readout, then acceleration remains
+   Controlled by **`tpf_4d_xi_kernel_mode`**, **`tpf_4d_xi_kernel_coupling`**, **`tpf_4d_xi_kernel_factor_mode`**, **`tpf_4d_xi_kernel_beta_power`**, **`tpf_4d_xi_kernel_metric_min`**, and **`tpf_4d_xi_kernel_metric_max`** in **`tpf_dynamics_mode=xi_kernel_deformed`**. It deforms Xi before readout, then acceleration remains
    **`a = -K_xi * Xi_eff_spatial`**.
    This is **not** an additive acceleration term.
 
@@ -110,38 +110,39 @@ For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **n
 
 **`tpf_4d_xi_motion_probe_summary.txt`**, **`tpf_4d_xi_motion_probe_trajectories.csv`**, **`tpf_4d_xi_motion_probe_initial_readout.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_xi_motion_probe_benchmark`. This path advances dynamic probes with `GravityXiMotionReadout_v1` (`a=-K_xi*Xi_spatial`) using fixed-source Stage 7B field evaluation and writes trajectory readout samples for each probe over time.
 
-### Xi-kernel deformation modes (runtime `xi_kernel_deformed` + Stage 8A benchmark)
+### Xi-kernel deformation modes (runtime `xi_kernel_deformed` + Stage 8A probe benchmark)
 
-`GravityXiKernelDeformation_v1` defines kernel deformation modes used conceptually in both runtime Xi-kernel dynamics and the Stage 8A benchmark path. The benchmark exercises these modes in controlled probe setups and emits benchmark CSV diagnostics; runtime galaxy dynamics are route-dependent and use `tpf_dynamics_mode=xi_kernel_deformed` for the Xi-kernel runtime path.
+`GravityXiKernelDeformation_v1` defines kernel deformation modes used conceptually in both runtime Xi-kernel dynamics and the Stage 8A benchmark path. Runtime galaxy dynamics can use the implemented `tpf_dynamics_mode=xi_kernel_deformed` route. The Stage 8A benchmark is a controlled probe/diagnostic environment for the same conceptual modes; its CSV outputs are benchmark artifacts and are not necessarily emitted by runtime galaxy routes.
 
 `xi_kernel_deformed` (runtime closure route):
 - Computes per-source `Xi_base = m_source * d / |d|^3` using `d = target - source`.
+- Uses the implemented kernel softening in that per-source Xi evaluation.
 - Optionally applies Xi-kernel deformation modes per source.
 - Sums `Xi_eff`.
-- Reads acceleration as `a = -K_xi * Xi_eff_spatial`.
-- Does not compute Theta/I/direct_tpf/provisional fields by default.
-- Expensive field diagnostics are gated by `tpf_xi_kernel_dump_field_diagnostics=true`.
+- Reads acceleration as `a = -K_xi * Xi_eff_spatial` where `K_xi = tpf_4d_xi_motion_readout_scale`.
+- The default acceleration path does not compute Theta/I/direct_tpf/provisional readout fields.
+- Optional field diagnostics can compute expensive Theta/I/provisional quantities only when explicitly enabled (for example `tpf_xi_kernel_dump_field_diagnostics=true`).
 
 Mode details:
 - `off`: baseline Xi with no deformation.
 - `scalar_beta`: scales Xi by a beta-derived factor (exploratory).
 - `metric_radial`: metric-style deformation along source-target radial direction.
 - `metric_velocity`: metric-style deformation using total relative speed/direction (exploratory).
-- `metric_transverse_wake`: preferred VDSG ship-wake mode requiring transverse passing motion and post-pass/separating geometry. Uses  
+- `metric_transverse_wake`: preferred current VDSG ship-wake **candidate** mode requiring transverse passing motion and post-pass/separating geometry. Current implemented gate uses  
   `beta_pass = v_transverse / c`,  
   `radial_ratio = v_radial / max(v_transverse, eps)`,  
   `wake_gate = 0.5 * (1 + tanh((radial_ratio - 0.10) / 0.05))`,  
   `beta_effective = beta_pass * wake_gate`.  
-  Circular/orbiting transverse motion has near-zero activation; intended solar-system-safe/null behavior.
+  Circular/pure transverse orbiting geometry is tested to keep wake activation near null in this mode, consistent with an intended circular-orbit/null correspondence behavior. This is a tested runtime behavior and candidate interpretation, not yet an empirical validation claim.
 - `metric_transverse_continuous`: experimental orbit-active transverse mode preserving older behavior with  
   `wake_gate = 0.5 * (1 + tanh(v_radial / max(v_transverse, eps)))`.  
-  At circular/closest-pass (`v_radial≈0`), `wake_gate≈0.5`. Use to test continuous transverse spacetime distortion hypotheses.
+  At circular/closest-pass (`v_radial≈0`) with transverse motion, `wake_gate≈0.5`. This mode is useful for testing whether continuous transverse spacetime/Xi deformation is needed; it is experimental and not yet validated.
 - `spacetime_metric`: Xi0/Xi_t diagnostic mode where configured; Xi0 does not feed spatial acceleration unless explicitly implemented later.
 
 Factor modes and clamps:
 - `beta_power`: `factor_raw = coupling * beta_effective^beta_power`.
 - `gamma_minus_one`: `factor_raw = coupling * (gamma(beta_effective) - 1)`; typically very weak at galactic beta unless coupling is large.
-- `tpf_4d_xi_kernel_metric_min` / `tpf_4d_xi_kernel_metric_max` clamp `metric_scale`.
+- `tpf_4d_xi_kernel_metric_min` / `tpf_4d_xi_kernel_metric_max` clamp `metric_scale` as numerical/experimental bounds (not physical-constant claims).
 - In corrected compressive transverse-wake mapping, positive coupling compresses `metric_scale` below 1.
 - `metric_min` limits maximum strengthening. Lowering `metric_min` allows stronger visible VDSG; raising coupling alone can saturate against the clamp.
 - For `metric_transverse_wake`, use `beta_effective` terminology (not `beta_rel`) because wake coupling is `beta_pass * wake_gate`.

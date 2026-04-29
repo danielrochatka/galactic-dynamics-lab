@@ -32,7 +32,7 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
   const double vt_eps = std::max(k.v_transverse, 1.0e-30);
   if (post_pass_gate) {
     // Post-pass wake mode constants:
-    // threshold = 0.10, width = 0.05.
+    // threshold = 0.10, width = 0.05 (current implementation settings, not physical constants).
     // Circular/orbiting motion with radial_ratio ~= 0 is intentionally near-null here.
     // Activation requires separating/post-pass geometry with radial_ratio above threshold.
     constexpr double kWakeGateThreshold = 0.10;
