@@ -39,7 +39,7 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 
 The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`** (computed in **`render_audit.cpp`**):
 
-- **`active_dynamics_branch`** — runtime branch identity (`direct_tpf` tensor principal-part route vs `v11_weak_field_truncation` correspondence helper vs `legacy_readout` provisional path).
+- **`active_dynamics_branch`** — runtime branch identity (`direct_tpf` tensor principal-part route vs `v11_weak_field_truncation` correspondence helper vs `legacy_readout` provisional path vs `xi_kernel_deformed` Xi-kernel route).
 - **`active_metrics_branch`** — matching metrics branch identity for that runtime route.
 
 **Integrator accelerations** depend on routing: **`direct_tpf`** uses the tensor principal-part Theta/I/kappa baseline (DeltaC omitted in current implementation scope; legacy additive VDSG optional extension; readout/shunt/cooling rejected), **`v11_weak_field_truncation`** is the weak-field correspondence helper (alpha_si path, legacy/benchmark compatibility), **`legacy_readout`** uses baseline readout + optional legacy additive VDSG + optional global shunt, and **`xi_kernel_deformed`** uses Xi-kernel evaluation plus optional Xi-kernel deformation with acceleration readout `a = -K_xi * Xi_eff_spatial`.
@@ -58,7 +58,7 @@ There are two distinct VDSG families in current code:
    **`a = -K_xi * Xi_eff_spatial`**.
    This is **not** an additive acceleration term.
 
-For legacy additive VDSG, per interaction **doppler_scale = 1 + λ_eff |v_rel| / c** and excess **a_N (doppler_scale − 1)** is added along the Newtonian line on top of the readout baseline. **`apply_global_accel_magnitude_shunt`** runs after every TPFCore acceleration evaluation (same for λ = 0 and λ ≠ 0). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; **`acceleration_code_path`** lists the full pipeline.
+For legacy additive VDSG, per interaction **doppler_scale = 1 + λ_eff |v_rel| / c** and excess **a_N (doppler_scale − 1)** is added along the Newtonian line on top of the readout baseline. On legacy readout/additive routes where shunt is enabled, **`apply_global_accel_magnitude_shunt`** runs after baseline + additive modifier evaluation; it is not part of `xi_kernel_deformed`. **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; **`acceleration_code_path`** lists the full pipeline.
 
 **Legacy alias (once):** the parser accepts **`tpf_gdd_coupling`** as an alias for **`tpf_vdsg_coupling`** (historical name). **Canonical key:** **`tpf_vdsg_coupling`**. Manifests note the rename for audit.
 
@@ -80,7 +80,7 @@ In **`legacy_readout`**, **`compute_accelerations`** adds the VDSG modifier vect
 
 Package defaults live in **`defaults.cfg`** in this directory. Important keys (non-exhaustive; see file and `config.hpp`):
 
-- **`tpfcore_enable_provisional_readout`** — Required for dynamical modes with TPFCore.
+- **`tpfcore_enable_provisional_readout`** — Required for legacy/provisional readout routes and related diagnostics; not required for `xi_kernel_deformed` runtime acceleration.
 - **`tpfcore_readout_mode`**, **`tpfcore_readout_scale`**, **`tpfcore_theta_tt_scale`**, **`tpfcore_theta_tr_scale`**
 - **`tpf_kappa`**, **`tpf_poisson_bins`**, **`tpf_poisson_max_radius`**, **`tpf_cooling_fraction`**
 - **`tpf_vdsg_coupling`**, **`tpf_vdsg_mass_baseline_kg`**
@@ -112,10 +112,10 @@ For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **n
 
 ### Xi-kernel deformation modes (runtime `xi_kernel_deformed` + Stage 8A probe benchmark)
 
-`GravityXiKernelDeformation_v1` defines kernel deformation modes used conceptually in both runtime Xi-kernel dynamics and the Stage 8A benchmark path. Runtime galaxy dynamics can use the implemented `tpf_dynamics_mode=xi_kernel_deformed` route. The Stage 8A benchmark is a controlled probe/diagnostic environment for the same conceptual modes; its CSV outputs are benchmark artifacts and are not necessarily emitted by runtime galaxy routes.
+`GravityXiKernelDeformation_v1` names the Xi-kernel deformation family implemented by the runtime `xi_kernel_deformed` route and exercised in the Stage 8A probe benchmark. Runtime galaxy dynamics use these modes when `tpf_dynamics_mode=xi_kernel_deformed` is selected. The Stage 8A benchmark is a controlled probe environment for the same named mode family; its CSV outputs are benchmark artifacts and are not necessarily emitted by runtime galaxy routes.
 
 `xi_kernel_deformed` (runtime closure route):
-- Computes per-source `Xi_base = m_source * d / |d|^3` using `d = target - source`.
+- Computes per-source `Xi_base = m_source * d / (|d|^2 + eps^2)^(3/2)` using `d = target - source` (implemented softened Xi denominator).
 - Uses the implemented kernel softening in that per-source Xi evaluation.
 - Optionally applies Xi-kernel deformation modes per source.
 - Sums `Xi_eff`.
