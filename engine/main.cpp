@@ -8,6 +8,7 @@
 #include "render_audit.hpp"
 #include "resolved_scenario.hpp"
 #include "output.hpp"
+#include "progress_time.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
 #include "physics/TPFCore/v11_weak_field_correspondence.hpp"
@@ -135,8 +136,9 @@ bool compare_dual_line_progress_enabled(bool progress_to_terminal, const std::st
 galaxy::ProgressCallback make_galaxy_step_progress_callback(
     std::chrono::steady_clock::time_point start_wall,
     bool progress_to_terminal,
-    const std::string& stage_tag) {
-  return [start_wall, progress_to_terminal, stage_tag](int step, int n_steps, double sim_time) {
+    const std::string& stage_tag,
+    const std::string& display_time_unit) {
+  return [start_wall, progress_to_terminal, stage_tag, display_time_unit](int step, int n_steps, double sim_time) {
     auto now = std::chrono::steady_clock::now();
     double elapsed_sec =
         1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
@@ -145,6 +147,8 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
     double pct = 100.0 * step / n_steps;
     const bool compare_dual_line_mode =
         compare_dual_line_progress_enabled(progress_to_terminal, stage_tag);
+    const std::string formatted_sim_time =
+        galaxy::format_sim_time_for_progress(sim_time, display_time_unit);
     const bool single_line_terminal_progress = progress_to_terminal;
     if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
@@ -158,7 +162,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
       }
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << "step " << step << "/" << n_steps << ", sim t=" << formatted_sim_time
                 << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec);
       if (compare_dual_line_mode) {
         if (stage_tag == "left")
@@ -172,7 +176,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
       std::cout << "[ ";
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << "step " << step << "/" << n_steps << ", sim t=" << formatted_sim_time
                 << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec) << "\n"
                 << std::flush;
     }
@@ -1271,7 +1275,7 @@ int main(int argc, char** argv) {
           const bool progress_to_terminal = IS_STDOUT_TERMINAL();
           auto start_wall = std::chrono::steady_clock::now();
           galaxy::ProgressCallback side_progress =
-              make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag);
+              make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag, side_cfg.display_time_unit);
           auto side_snapshots = galaxy::run_simulation(side_cfg, side_state, side_physics,
                                                        n_steps, snapshot_every, side_progress,
                                                        compare_progress_interval);
@@ -1457,7 +1461,7 @@ int main(int argc, char** argv) {
     progress_interval = std::max(1, std::min(1000, n_steps / 100));
     auto start_wall = std::chrono::steady_clock::now();
     progress_to_terminal = IS_STDOUT_TERMINAL();
-    progress_callback = make_galaxy_step_progress_callback(start_wall, progress_to_terminal, "");
+    progress_callback = make_galaxy_step_progress_callback(start_wall, progress_to_terminal, "", config.display_time_unit);
   }
 
   auto run_start = std::chrono::steady_clock::now();
