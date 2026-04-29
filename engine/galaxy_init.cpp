@@ -535,9 +535,17 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
        tpfcore::is_derived_tpf_radial_readout_mode(effective.tpfcore_readout_mode));
 
   if (use_derived_tpf_init) {
-    audit.velocity_mass_model = "derived_tpf_profile";
+    if (effective.enable_star_star_gravity) {
+      audit.velocity_mass_model = "derived_tpf_profile_includes_stars";
+      audit.velocity_respects_star_star_flag = true;
+    } else {
+      audit.velocity_mass_model = "derived_tpf_profile_includes_stars_toggle_not_applied";
+      audit.velocity_respects_star_star_flag = false;
+      audit.template_defaults_log.warnings.push_back(
+          "derived_tpf_profile initializer currently includes enclosed stellar mass even when "
+          "enable_star_star_gravity=false");
+    }
     audit.velocity_uses_star_mass = true;
-    audit.velocity_respects_star_star_flag = true;
     const double eps =
         (effective.tpfcore_source_softening > 0.0) ? effective.tpfcore_source_softening : effective.softening;
     tpfcore::DerivedTpfPoissonConfig dcfg;

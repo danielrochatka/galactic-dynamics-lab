@@ -123,3 +123,33 @@ TEST_CASE("initializer includes enclosed stellar mass when star-star gravity ena
   }
   CHECK(found_velocity_difference);
 }
+
+TEST_CASE("derived TPF initializer audit truthfully reports star-mass usage vs toggle state") {
+  galaxy::Config c;
+  c.galaxy_init_template = "preformed_spiral";
+  c.physics_package = "TPFCore";
+  c.tpfcore_enable_provisional_readout = true;
+  c.tpfcore_readout_mode = "derived_tpf_radial_readout";
+  c.galaxy_init_seed = 2026u;
+  c.n_stars = 24;
+  c.galaxy_radius = 100.0;
+  c.galaxy_init_position_noise = 0.0;
+  c.galaxy_init_velocity_angle_noise = 0.0;
+  c.galaxy_init_velocity_magnitude_noise = 0.0;
+  c.velocity_noise = 0.0;
+
+  galaxy::State s_false, s_true;
+  galaxy::GalaxyInitAudit a_false, a_true;
+
+  c.enable_star_star_gravity = false;
+  galaxy::initialize_galaxy_disk(c, s_false, &a_false);
+  CHECK(a_false.velocity_uses_star_mass == true);
+  CHECK(a_false.velocity_respects_star_star_flag == false);
+  CHECK(a_false.velocity_mass_model == "derived_tpf_profile_includes_stars_toggle_not_applied");
+
+  c.enable_star_star_gravity = true;
+  galaxy::initialize_galaxy_disk(c, s_true, &a_true);
+  CHECK(a_true.velocity_uses_star_mass == true);
+  CHECK(a_true.velocity_respects_star_star_flag == true);
+  CHECK(a_true.velocity_mass_model == "derived_tpf_profile_includes_stars");
+}
