@@ -30,8 +30,8 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional additive VDSG extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. Modifier uses **doppler_scale = 1 + λ_eff |v_rel|/c** per interaction. |
-| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). **VDSG** contributes an additive SI excess on top of that baseline, not a replacement readout. |
+| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional **legacy additive VDSG** extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. **`xi_kernel_deformed`** is a runtime Xi-kernel route: per-source Xi is computed, optional Xi-kernel deformation is applied, `Xi_eff` is summed, and acceleration is read as `a = -K_xi * Xi_eff_spatial` (no additive VDSG term appended). |
+| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). Legacy additive VDSG contributes an additive SI excess on applicable legacy routes, while Xi-kernel deformation modifies Xi before readout in `xi_kernel_deformed`. |
 
 ---
 
@@ -42,13 +42,23 @@ The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_m
 - **`active_dynamics_branch`** — runtime branch identity (`direct_tpf` tensor principal-part route vs `v11_weak_field_truncation` correspondence helper vs `legacy_readout` provisional path).
 - **`active_metrics_branch`** — matching metrics branch identity for that runtime route.
 
-**Integrator accelerations** depend on routing: **`direct_tpf`** uses the tensor principal-part Theta/I/kappa baseline (DeltaC omitted in current implementation scope; VDSG optional additive extension; readout/shunt/cooling rejected), **`v11_weak_field_truncation`** is the weak-field correspondence helper (alpha_si path, legacy/benchmark compatibility), while **`legacy_readout`** uses baseline readout + optional VDSG + optional global shunt.
+**Integrator accelerations** depend on routing: **`direct_tpf`** uses the tensor principal-part Theta/I/kappa baseline (DeltaC omitted in current implementation scope; legacy additive VDSG optional extension; readout/shunt/cooling rejected), **`v11_weak_field_truncation`** is the weak-field correspondence helper (alpha_si path, legacy/benchmark compatibility), **`legacy_readout`** uses baseline readout + optional legacy additive VDSG + optional global shunt, and **`xi_kernel_deformed`** uses Xi-kernel evaluation plus optional Xi-kernel deformation with acceleration readout `a = -K_xi * Xi_eff_spatial`.
 
 ---
 
 ## VDSG (Velocity-Deformed Spacetime Gradient)
 
-**VDSG** (**Velocity-Deformed Spacetime Gradient**) is an **exploratory**, **velocity-dependent** **additive** correction: per interaction, **doppler_scale = 1 + λ_eff |v_rel| / c** (relative speed of the interaction, not **v·r̂** — so tangential / circular motion still couples); excess **a_N (doppler_scale − 1)** is added along the Newtonian line on top of the **TPF readout baseline** (see **`accumulate_vdsg_velocity_modifier`** in `tpf_core_package.cpp`). **`apply_global_accel_magnitude_shunt`** runs **after** every TPFCore acceleration evaluation (**same for λ = 0 and λ ≠ 0**). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; **`acceleration_code_path`** lists the full pipeline.
+There are two distinct VDSG families in current code:
+
+1. **Legacy additive VDSG**  
+   Controlled by **`tpf_vdsg_coupling`** on legacy/additive routes where applicable (not `xi_kernel_deformed`). It adds an acceleration modifier after baseline readout via `accumulate_vdsg_velocity_modifier`.
+
+2. **Xi-kernel VDSG deformation**  
+   Controlled by **`tpf_4d_xi_kernel_mode`** and **`tpf_4d_xi_kernel_coupling`** in **`tpf_dynamics_mode=xi_kernel_deformed`**. It deforms Xi before readout, then acceleration remains
+   **`a = -K_xi * Xi_eff_spatial`**.
+   This is **not** an additive acceleration term.
+
+For legacy additive VDSG, per interaction **doppler_scale = 1 + λ_eff |v_rel| / c** and excess **a_N (doppler_scale − 1)** is added along the Newtonian line on top of the readout baseline. **`apply_global_accel_magnitude_shunt`** runs after every TPFCore acceleration evaluation (same for λ = 0 and λ ≠ 0). **`active_dynamics_branch`** stays **`TPF_readout_acceleration:<mode>`**; **`acceleration_code_path`** lists the full pipeline.
 
 **Legacy alias (once):** the parser accepts **`tpf_gdd_coupling`** as an alias for **`tpf_vdsg_coupling`** (historical name). **Canonical key:** **`tpf_vdsg_coupling`**. Manifests note the rename for audit.
 
@@ -74,8 +84,15 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 - **`tpfcore_readout_mode`**, **`tpfcore_readout_scale`**, **`tpfcore_theta_tt_scale`**, **`tpfcore_theta_tr_scale`**
 - **`tpf_kappa`**, **`tpf_poisson_bins`**, **`tpf_poisson_max_radius`**, **`tpf_cooling_fraction`**
 - **`tpf_vdsg_coupling`**, **`tpf_vdsg_mass_baseline_kg`**
+- **`tpf_4d_xi_motion_readout_scale`**
+- **`tpf_4d_xi_kernel_mode`**, **`tpf_4d_xi_kernel_coupling`**, **`tpf_4d_xi_kernel_factor_mode`**, **`tpf_4d_xi_kernel_beta_power`**
+- **`tpf_4d_xi_kernel_metric_min`**, **`tpf_4d_xi_kernel_metric_max`**
+- **`tpf_4d_xi_temporal_mode`**, **`tpf_4d_xi_temporal_coupling`**
+- **`tpf_xi_kernel_dump_field_diagnostics`**
 - **`tpf_global_accel_shunt_enable`**, **`tpf_global_accel_shunt_fraction`**, **`tpf_accel_pipeline_diagnostics_csv`**
 - Inspection: **`tpfcore_probe_radius_*`**, **`tpfcore_dump_*`**, **`tpfcore_source_softening`**
+
+For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **not** the active Xi-kernel deformation knob.
 
 **Simulation-wide** keys (galaxy ICs, validation scenario ICs, softening, `n_stars`, etc.) belong to the **application** config + scenario resolver (`engine/scenario_defaults.cpp`, `engine/resolved_scenario.cpp`), not this file alone — see **[../../README.md](../../README.md)**.
 
@@ -93,16 +110,44 @@ Package defaults live in **`defaults.cfg`** in this directory. Important keys (n
 
 **`tpf_4d_xi_motion_probe_summary.txt`**, **`tpf_4d_xi_motion_probe_trajectories.csv`**, **`tpf_4d_xi_motion_probe_initial_readout.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_xi_motion_probe_benchmark`. This path advances dynamic probes with `GravityXiMotionReadout_v1` (`a=-K_xi*Xi_spatial`) using fixed-source Stage 7B field evaluation and writes trajectory readout samples for each probe over time.
 
-### Stage 8A Xi-kernel deformation (benchmark-only)
+### Xi-kernel deformation modes (runtime `xi_kernel_deformed` + Stage 8A benchmark)
 
-`GravityXiKernelDeformation_v1` adds an isolated, configurable kernel deformation stage inside `tpf_4d_xi_motion_probe_benchmark` before Xi acceleration readout. The benchmark now computes per-source Xi contributions, applies a configured deformation mode (`off`, `scalar_beta`, `metric_radial`, `metric_velocity`, `metric_transverse_wake`, `metric_transverse_continuous`, `spacetime_metric`), sums `Xi_eff`, then reads acceleration strictly as `a=-K_xi*Xi_eff_spatial`.
+`GravityXiKernelDeformation_v1` defines kernel deformation modes used conceptually in both runtime Xi-kernel dynamics and the Stage 8A benchmark path. The benchmark exercises these modes in controlled probe setups and emits benchmark CSV diagnostics; runtime galaxy dynamics are route-dependent and use `tpf_dynamics_mode=xi_kernel_deformed` for the Xi-kernel runtime path.
 
-- `off` preserves Stage 7B behavior exactly (same Xi kernel and same readout equation).
-- `metric_transverse_wake` is the preferred VDSG post-pass transverse wake Xi-kernel mode: coupling is wake-gated by transverse passing only after separation beyond a smooth radial-ratio threshold, while deformation remains along source-target (radial) geometry.
-- `metric_transverse_continuous` is an experimental continuous transverse VDSG mode that preserves prior behavior where orbiting transverse motion can activate deformation (including near `v_radial≈0`).
-- `spacetime_metric` can emit an `Xi_t`/Xi0 diagnostic (`tpf_4d_xi_temporal_mode=norm_scaled`) but does not feed Xi0 into acceleration in Stage 8A.
+`xi_kernel_deformed` (runtime closure route):
+- Computes per-source `Xi_base = m_source * d / |d|^3` using `d = target - source`.
+- Optionally applies Xi-kernel deformation modes per source.
+- Sums `Xi_eff`.
+- Reads acceleration as `a = -K_xi * Xi_eff_spatial`.
+- Does not compute Theta/I/direct_tpf/provisional fields by default.
+- Expensive field diagnostics are gated by `tpf_xi_kernel_dump_field_diagnostics=true`.
+
+Mode details:
+- `off`: baseline Xi with no deformation.
+- `scalar_beta`: scales Xi by a beta-derived factor (exploratory).
+- `metric_radial`: metric-style deformation along source-target radial direction.
+- `metric_velocity`: metric-style deformation using total relative speed/direction (exploratory).
+- `metric_transverse_wake`: preferred VDSG ship-wake mode requiring transverse passing motion and post-pass/separating geometry. Uses  
+  `beta_pass = v_transverse / c`,  
+  `radial_ratio = v_radial / max(v_transverse, eps)`,  
+  `wake_gate = 0.5 * (1 + tanh((radial_ratio - 0.10) / 0.05))`,  
+  `beta_effective = beta_pass * wake_gate`.  
+  Circular/orbiting transverse motion has near-zero activation; intended solar-system-safe/null behavior.
+- `metric_transverse_continuous`: experimental orbit-active transverse mode preserving older behavior with  
+  `wake_gate = 0.5 * (1 + tanh(v_radial / max(v_transverse, eps)))`.  
+  At circular/closest-pass (`v_radial≈0`), `wake_gate≈0.5`. Use to test continuous transverse spacetime distortion hypotheses.
+- `spacetime_metric`: Xi0/Xi_t diagnostic mode where configured; Xi0 does not feed spatial acceleration unless explicitly implemented later.
+
+Factor modes and clamps:
+- `beta_power`: `factor_raw = coupling * beta_effective^beta_power`.
+- `gamma_minus_one`: `factor_raw = coupling * (gamma(beta_effective) - 1)`; typically very weak at galactic beta unless coupling is large.
+- `tpf_4d_xi_kernel_metric_min` / `tpf_4d_xi_kernel_metric_max` clamp `metric_scale`.
+- In corrected compressive transverse-wake mapping, positive coupling compresses `metric_scale` below 1.
+- `metric_min` limits maximum strengthening. Lowering `metric_min` allows stronger visible VDSG; raising coupling alone can saturate against the clamp.
+- For `metric_transverse_wake`, use `beta_effective` terminology (not `beta_rel`) because wake coupling is `beta_pass * wake_gate`.
+
 - Active velocity-dependent kernel deformation (`tpf_4d_xi_kernel_mode!=off` with nonzero `tpf_4d_xi_kernel_coupling`) requires `tpf_4d_xi_motion_integrator=semi_implicit_euler`; `velocity_verlet` remains valid for off/identity (Stage 7B-equivalent) behavior.
-- This is distinct from older additive acceleration VDSG paths; Stage 8A deforms Xi kernel evaluation before readout and does not append acceleration terms.
+- This is distinct from legacy additive acceleration VDSG paths; Xi-kernel routes deform Xi kernel evaluation before readout and do not append additive acceleration terms.
 
 Suggested ship-wake config:
 

@@ -7,6 +7,9 @@
  *   optional additive VDSG extension on top of that baseline.
  * - v11_weak_field_truncation: correspondence implementation using tpf_weak_field_correspondence_alpha_si.
  * - legacy_readout: provisional readout-based implementation + optional VDSG modifier + optional global |a| shunt.
+ * - xi_kernel_deformed: runtime Xi-kernel route; computes Xi-based acceleration without Theta/I in its default
+ *   acceleration path, can apply optional Xi-kernel deformation before readout, and reads acceleration as
+ *   a = -K_xi * Xi_eff_spatial. The old additive VDSG acceleration modifier is not used on this route.
  */
 
 #include "tpf_core_package.hpp"

@@ -31,11 +31,17 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
   k.beta_pass = k.v_transverse / c_light;
   const double vt_eps = std::max(k.v_transverse, 1.0e-30);
   if (post_pass_gate) {
+    // Post-pass wake mode constants:
+    // threshold = 0.10, width = 0.05.
+    // Circular/orbiting motion with radial_ratio ~= 0 is intentionally near-null here.
+    // Activation requires separating/post-pass geometry with radial_ratio above threshold.
     constexpr double kWakeGateThreshold = 0.10;
     constexpr double kWakeGateWidth = 0.05;
     const double radial_ratio = k.v_radial / vt_eps;
     k.wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - kWakeGateThreshold) / kWakeGateWidth));
   } else {
+    // Continuous transverse mode preserves older behavior:
+    // v_radial ~= 0 gives wake_gate ~= 0.5 (orbit-active, including near closest-pass geometry).
     k.wake_gate = 0.5 * (1.0 + std::tanh(k.v_radial / vt_eps));
   }
   k.beta_effective = k.beta_pass * k.wake_gate;
