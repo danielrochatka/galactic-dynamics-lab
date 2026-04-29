@@ -420,9 +420,15 @@ void write_run_info(const std::string& output_dir,
     f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
     f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
     f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
-    f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
-    f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
-    f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
+    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+      if (config.tpf_xi_kernel_dump_field_diagnostics) {
+        f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (xi diagnostic override enabled)\n";
+      }
+    } else {
+      f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
+      f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
+      f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
+    }
     if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep)
       f << "tpf_sweep_summary\tsee tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
     if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation)

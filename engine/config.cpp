@@ -296,6 +296,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_dump_theta_profile = parse_bool(val);
     return true;
   }
+  if (key == "tpf_xi_kernel_dump_field_diagnostics") {
+    config.tpf_xi_kernel_dump_field_diagnostics = parse_bool(val);
+    return true;
+  }
   if (key == "tpfcore_source_softening") {
     config.tpfcore_source_softening = std::stod(val);
     config.explicit_overrides.tpfcore_source_softening = true;
@@ -898,6 +902,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpfcore_probe_samples", i(config.tpfcore_probe_samples));
   kv.emplace_back("tpfcore_dump_invariant_profile", b(config.tpfcore_dump_invariant_profile));
   kv.emplace_back("tpfcore_dump_theta_profile", b(config.tpfcore_dump_theta_profile));
+  kv.emplace_back("tpf_xi_kernel_dump_field_diagnostics", b(config.tpf_xi_kernel_dump_field_diagnostics));
   kv.emplace_back("tpfcore_source_softening", d(config.tpfcore_source_softening));
   kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
   kv.emplace_back("tpf_source_benchmark_shape", config.tpf_source_benchmark_shape);

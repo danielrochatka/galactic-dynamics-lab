@@ -251,6 +251,8 @@ struct Config {
   bool tpfcore_dump_invariant_profile = true;
   /** TPFCore inspection: write theta_profile.csv. */
   bool tpfcore_dump_theta_profile = true;
+  /** Xi-kernel route: allow expensive field diagnostics (Theta/I/provisional readout) when explicitly enabled. */
+  bool tpf_xi_kernel_dump_field_diagnostics = false;
   /** TPFCore source ansatz: softening for Phi. If <= 0, use global softening. */
   double tpfcore_source_softening = 0.0;
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
