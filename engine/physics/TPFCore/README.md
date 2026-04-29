@@ -30,7 +30,7 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional **legacy additive VDSG** extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when λ = 0), then optional **`apply_global_accel_magnitude_shunt`**. **`xi_kernel_deformed`** is a runtime Xi-kernel route: per-source Xi is computed, optional Xi-kernel deformation is applied, `Xi_eff` is summed, and acceleration is read as `a = -K_xi * Xi_eff_spatial` (no additive VDSG term appended). |
+| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional **legacy additive VDSG** extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when `tpf_vdsg_coupling = 0`), then optional **`apply_global_accel_magnitude_shunt`**. **`xi_kernel_deformed`** is a runtime Xi-kernel route: per-source Xi is computed, optional Xi-kernel deformation is applied, `Xi_eff` is summed, and acceleration is read as `a = -K_xi * Xi_eff_spatial` (no additive VDSG term appended). |
 | **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). Legacy additive VDSG contributes an additive SI excess on applicable legacy routes, while Xi-kernel deformation modifies Xi before readout in `xi_kernel_deformed`. |
 
 ---
@@ -72,7 +72,7 @@ Details and column semantics: **`provisional_readout.cpp`**, **`TPF_PAPER_V11_SC
 - **`derived_tpf_radial_readout`**, **`tr_coherence_readout`** — **Current code:** both match **`is_derived_tpf_radial_readout_mode`** (`derived_tpf_radial.hpp`) and call **`apply_derived_tpf_radial_readout_closure`**. **Particle accelerations** are **purely radial**: `ax = a_s (x/r)`, `ay = a_s (y/r)` with **`a_s`** from **`radial_acceleration_scalar_derived`**. **theta_tt**, **theta_tr**, and **provisional_tangential_readout** are computed **only** into **`ReadoutDiagnostics`** (and related diagnostics); they are **not** added to **ax, ay** on this path.
 - **`experimental_radial_r_scaling`** — Separate closure (**`apply_experimental_radial_r_scaling_closure`**); see scope doc.
 
-In **`legacy_readout`**, **`compute_accelerations`** adds the VDSG modifier vector (zeros if λ = 0) and can apply optional global **`|a|` shunt** (off by default). In canonical **`direct_tpf`**, those exploratory/stabilizer knobs are rejected.
+In **`legacy_readout`**, **`compute_accelerations`** adds the VDSG modifier vector (zero when the legacy additive VDSG coupling `tpf_vdsg_coupling = 0`) and can apply optional global **`|a|` shunt** (off by default). In canonical **`direct_tpf`**, those exploratory/stabilizer knobs are rejected.
 
 ---
 
@@ -102,7 +102,7 @@ For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **n
 
 **`theta_profile.csv`**, **`invariant_profile.csv`**, **`field_summary.txt`** — produced in **inspection** modes (`tpf_single_source_inspect`, …). Column tables and symmetry expectations were in previous versions of this README; the **authoritative** column definitions are in code comments and CSV headers. Symmetry: e.g. **residual_y ≈ 0** on the +x axis for single-source at origin.
 
-**`tpf_readout_debug.csv`** — Dynamical runs when **`tpfcore_dump_readout_debug`**: mode-dependent columns for diagnosing radial vs tangential acceleration components.
+**`tpf_readout_debug.csv`** — Produced for supported readout/diagnostic paths when the relevant dump flag and route gates are enabled; for `xi_kernel_deformed`, expensive field/readout diagnostics are opt-in through `tpf_xi_kernel_dump_field_diagnostics`.
 
 **`tpf_4d_static_residual_summary.txt`**, **`tpf_4d_static_residual_slice.csv`**, **`tpf_4d_static_residual_slice_xy.csv`**, **`tpf_4d_static_residual_slice_xz.csv`**, **`tpf_4d_static_residual_slice_yz.csv`**, **`tpf_4d_static_residual_sources.csv`**, **`tpf_4d_static_residual_bins_nearest_source.csv`**, **`tpf_4d_static_residual_bins_origin.csv`** — benchmark artifacts from `simulation_mode=tpf_4d_static_residual_benchmark`. The static residual computation evaluates full 4D tensor objects over 3D spatial support; slice CSVs are central view-plane diagnostic renderings from that full spatial-support evaluation, and bin CSVs are derived quantitative summaries of the static 4D residual benchmark.
 
@@ -147,7 +147,7 @@ Factor modes and clamps:
 - `metric_min` limits maximum strengthening. Lowering `metric_min` allows stronger visible VDSG; raising coupling alone can saturate against the clamp.
 - For `metric_transverse_wake`, use `beta_effective` terminology (not `beta_rel`) because wake coupling is `beta_pass * wake_gate`.
 
-- Active velocity-dependent kernel deformation (`tpf_4d_xi_kernel_mode!=off` with nonzero `tpf_4d_xi_kernel_coupling`) requires `tpf_4d_xi_motion_integrator=semi_implicit_euler`; `velocity_verlet` remains valid for off/identity (Stage 7B-equivalent) behavior.
+- In the Stage 8A Xi motion probe benchmark, active velocity-dependent kernel deformation (`tpf_4d_xi_kernel_mode!=off` with nonzero `tpf_4d_xi_kernel_coupling`) requires `tpf_4d_xi_motion_integrator=semi_implicit_euler`; `velocity_verlet` remains valid for off/identity benchmark behavior.
 - This is distinct from legacy additive acceleration VDSG paths; Xi-kernel routes deform Xi kernel evaluation before readout and do not append additive acceleration terms.
 
 Suggested ship-wake config:
