@@ -271,4 +271,25 @@ TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no 
   CHECK(a.run_total_star_pair_count >= 4);
   CHECK(a.call_count == 2);
   CHECK(a.run_total_violation_count == 0);
+  CHECK(a.run_total_force_vector_pair_hardening_count == 0);
+  CHECK(a.run_total_force_vector_pair_direction_flip_count == 0);
+  CHECK(a.run_total_force_vector_pair_nan_inf_count == 0);
+  CHECK(a.run_total_force_vector_pair_inward_bh_violation_count == 0);
+  CHECK(std::isfinite(a.net_ratio_median));
+  CHECK(std::isfinite(a.net_ratio_p95));
+  CHECK(std::isfinite(a.net_ratio_max));
+}
+
+TEST_CASE("Newtonian BH exact sign/magnitude softened vs unsoftened") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st; st.resize(1);
+  const double r = 5.0, bh = 2.0e9;
+  st.x[0] = r; st.y[0] = 0.0; st.mass[0] = 1.0; st.vx[0] = st.vy[0] = 0.0;
+  std::vector<double> ax0, ay0, ax1, ay1;
+  n.compute_accelerations(st, bh, 0.0, false, ax0, ay0);
+  n.compute_accelerations(st, bh, 1.2, false, ax1, ay1);
+  CHECK(ax0[0] == doctest::Approx(-G_SI * bh / (r * r)).epsilon(1e-12));
+  CHECK(ax1[0] == doctest::Approx(-G_SI * bh * r / std::pow(r * r + 1.44, 1.5)).epsilon(1e-12));
+  CHECK(ax1[0] < 0.0); CHECK(std::fabs(ay1[0]) < 1e-20);
+  CHECK(std::fabs(ax1[0]) <= std::fabs(ax0[0]));
 }
