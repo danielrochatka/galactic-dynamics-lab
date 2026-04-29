@@ -589,6 +589,15 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.initial_velocity_scale = std::stod(val);
     return true;
   }
+  if (key == "galaxy_init_velocity_mode") {
+    const std::string mode = trim(val);
+    if (mode != "enclosed_mass" && mode != "pairwise_radial_equilibrium") {
+      throw std::runtime_error(
+          "galaxy_init_velocity_mode must be enclosed_mass or pairwise_radial_equilibrium, got: " + val);
+    }
+    config.galaxy_init_velocity_mode = mode;
+    return true;
+  }
   if (key == "save_snapshots") {
     config.save_snapshots = parse_bool(val);
     return true;
@@ -973,6 +982,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("galaxy_init_master_chaos", d(config.galaxy_init_master_chaos));
   kv.emplace_back("velocity_noise", d(config.velocity_noise));
   kv.emplace_back("initial_velocity_scale", d(config.initial_velocity_scale));
+  kv.emplace_back("galaxy_init_velocity_mode", config.galaxy_init_velocity_mode);
   kv.emplace_back("save_snapshots", b(config.save_snapshots));
   kv.emplace_back("save_run_info", b(config.save_run_info));
   kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));

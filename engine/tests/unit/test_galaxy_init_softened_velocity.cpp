@@ -85,6 +85,24 @@ TEST_CASE("galaxy init single-BH circular speed matches runtime softened radial 
   CHECK((v * v / r) == doctest::Approx(ar).epsilon(1e-12));
 }
 
+TEST_CASE("pairwise_radial_equilibrium BH-only matches runtime softened BH circular speed") {
+  Config c = base_config();
+  c.softening = 50.0;
+  c.enable_star_star_gravity = false;
+  c.galaxy_init_velocity_mode = "pairwise_radial_equilibrium";
+  State s;
+  galaxy::GalaxyInitAudit audit;
+  galaxy::initialize_galaxy_disk(c, s, &audit);
+  CHECK(audit.pairwise_radial_equilibrium_used == true);
+  CHECK(audit.pairwise_radial_equilibrium_fallback_count == 0);
+  std::vector<double> ax, ay;
+  galaxy::NewtonianPackage pkg;
+  pkg.compute_accelerations(s, c.bh_mass, c.softening, false, ax, ay);
+  const double r = radius0(s);
+  const double inward = -((s.x[0] * ax[0] + s.y[0] * ay[0]) / std::max(r, 1e-30));
+  CHECK((speed0(s) * speed0(s) / r) == doctest::Approx(inward).epsilon(1e-12));
+}
+
 TEST_CASE("galaxy init preserves PR109 star-star toggle semantics") {
   Config c = base_config();
   c.n_stars = 5;
@@ -115,6 +133,29 @@ TEST_CASE("galaxy init preserves PR109 star-star toggle semantics") {
   CHECK(found_diff);
 }
 
+TEST_CASE("pairwise_radial_equilibrium star-star toggle semantics") {
+  Config c = base_config();
+  c.n_stars = 8;
+  c.softening = 20.0;
+  c.galaxy_init_velocity_mode = "pairwise_radial_equilibrium";
+  State s_false_a, s_false_b;
+  c.enable_star_star_gravity = false;
+  c.star_mass = 1.0e20;
+  galaxy::initialize_galaxy_disk(c, s_false_a, nullptr);
+  c.star_mass = 1.0e35;
+  galaxy::initialize_galaxy_disk(c, s_false_b, nullptr);
+  for (int i = 0; i < c.n_stars; ++i) CHECK(std::hypot(s_false_a.vx[i], s_false_a.vy[i]) == doctest::Approx(std::hypot(s_false_b.vx[i], s_false_b.vy[i])).epsilon(1e-12));
+  State s_true_a, s_true_b;
+  c.enable_star_star_gravity = true;
+  c.star_mass = 1.0e20;
+  galaxy::initialize_galaxy_disk(c, s_true_a, nullptr);
+  c.star_mass = 1.0e35;
+  galaxy::initialize_galaxy_disk(c, s_true_b, nullptr);
+  bool found_diff = false;
+  for (int i = 0; i < c.n_stars; ++i) if (std::abs(std::hypot(s_true_a.vx[i], s_true_a.vy[i]) - std::hypot(s_true_b.vx[i], s_true_b.vy[i])) > 1e-6) { found_diff = true; break; }
+  CHECK(found_diff);
+}
+
 TEST_CASE("galaxy init softened speed finite at tiny radius") {
   Config c = base_config();
   c.softening = 100.0;
@@ -122,4 +163,27 @@ TEST_CASE("galaxy init softened speed finite at tiny radius") {
   State s;
   galaxy::initialize_galaxy_disk(c, s, nullptr);
   CHECK(std::isfinite(speed0(s)));
+}
+
+TEST_CASE("pairwise_radial_equilibrium enforces v^2/r against runtime radial acceleration for multi-particle disk") {
+  Config c = base_config();
+  c.n_stars = 16;
+  c.enable_star_star_gravity = true;
+  c.softening = 10.0;
+  c.galaxy_init_velocity_mode = "pairwise_radial_equilibrium";
+  c.velocity_noise = 0.0;
+  State s;
+  galaxy::GalaxyInitAudit audit;
+  galaxy::initialize_galaxy_disk(c, s, &audit);
+  std::vector<double> ax, ay;
+  galaxy::NewtonianPackage pkg;
+  pkg.compute_accelerations(s, c.bh_mass, c.softening, true, ax, ay);
+  for (int i = 0; i < s.n(); ++i) {
+    const double r = std::hypot(s.x[i], s.y[i]);
+    const double r_safe = std::max(r, 1e-30);
+    const double inward = -((s.x[i] * ax[i] + s.y[i] * ay[i]) / r_safe);
+    const double v_t = (-s.y[i] * s.vx[i] + s.x[i] * s.vy[i]) / r_safe;
+    CHECK((v_t * v_t / r_safe) == doctest::Approx(inward).epsilon(1e-7));
+  }
+  CHECK(audit.pairwise_radial_equilibrium_fallback_count == 0);
 }
