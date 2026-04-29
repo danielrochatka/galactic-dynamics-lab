@@ -23,9 +23,21 @@ import csv, math, pathlib, statistics, sys
 root = pathlib.Path(sys.argv[1])
 
 def load_snap(p):
-    with p.open() as f:
-        r=csv.DictReader(f)
-        rows=[{k:float(v) if k!='i' else int(v) for k,v in row.items()} for row in r]
+    lines=p.read_text().splitlines()
+    hdr=None
+    for i,line in enumerate(lines):
+        cols=[c.strip().lower() for c in line.split(',')]
+        if {'i','x','y','vx','vy','mass'}.issubset(set(cols)):
+            hdr=i
+            break
+    if hdr is None:
+        raise RuntimeError(f'missing header in {p}')
+    rows=[]
+    import io
+    buf=io.StringIO('\n'.join(lines[hdr:]))
+    r=csv.DictReader(buf)
+    for row in r:
+        rows.append({k: (int(v) if k=='i' else float(v)) for k,v in row.items()})
     return rows
 
 def metrics(run_dir):
