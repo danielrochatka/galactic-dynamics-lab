@@ -606,6 +606,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.save_run_info = parse_bool(val);
     return true;
   }
+  if (key == "softening_audit_enable") {
+    config.softening_audit_enable = parse_bool(val);
+    return true;
+  }
   if (key == "plot_animation_dynamic_zoom") {
     config.plot_animation_dynamic_zoom = parse_bool(val);
     return true;
@@ -985,6 +989,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("galaxy_init_velocity_mode", config.galaxy_init_velocity_mode);
   kv.emplace_back("save_snapshots", b(config.save_snapshots));
   kv.emplace_back("save_run_info", b(config.save_run_info));
+  kv.emplace_back("softening_audit_enable", b(config.softening_audit_enable));
   kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));
   kv.emplace_back("plot_compare_smart_zoom_coverage", d(config.plot_compare_smart_zoom_coverage));
   kv.emplace_back("plot_skip_initial_steps", i(config.plot_skip_initial_steps));

@@ -411,6 +411,7 @@ struct Config {
 
   bool save_snapshots = true;
   bool save_run_info = true;
+  bool softening_audit_enable = false;
   /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
   bool plot_animation_dynamic_zoom = false;
   /** plot_cpp_compare.py: per-frame pooled-star coverage fraction for fixed shared compare viewport. */
