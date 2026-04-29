@@ -150,10 +150,19 @@ void NewtonianPackage::compute_accelerations(const State& state,
       if (ratio > (1.0 + tol)) ++softening_audit_last_call_stats_.net_hardening_count;
       if (ax[i] * ax_u[i] + ay[i] * ay_u[i] < 0.0) ++softening_audit_last_call_stats_.net_direction_flip_count;
     }
-    std::sort(ratios.begin(), ratios.end());
-    softening_audit_last_call_stats_.net_ratio_median = ratios[ratios.size() / 2];
-    softening_audit_last_call_stats_.net_ratio_p95 = ratios[static_cast<std::size_t>(0.95 * (ratios.size() - 1))];
-    softening_audit_last_call_stats_.net_ratio_max = ratios.back();
+    if (ratios.empty()) {
+      softening_audit_last_call_stats_.net_particle_count = 0;
+      softening_audit_last_call_stats_.net_hardening_count = 0;
+      softening_audit_last_call_stats_.net_direction_flip_count = 0;
+      softening_audit_last_call_stats_.net_ratio_median = 0.0;
+      softening_audit_last_call_stats_.net_ratio_p95 = 0.0;
+      softening_audit_last_call_stats_.net_ratio_max = 0.0;
+    } else {
+      std::sort(ratios.begin(), ratios.end());
+      softening_audit_last_call_stats_.net_ratio_median = ratios[ratios.size() / 2];
+      softening_audit_last_call_stats_.net_ratio_p95 = ratios[static_cast<std::size_t>(0.95 * (ratios.size() - 1))];
+      softening_audit_last_call_stats_.net_ratio_max = ratios.back();
+    }
   }
   if (softening_audit_enable_) {
     softening_audit_finalize(softening_audit_last_call_stats_);

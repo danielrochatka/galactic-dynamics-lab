@@ -351,3 +351,19 @@ TEST_CASE("Newtonian two-body star-star exact vector signs/magnitudes (independe
   run_case(/*eps=*/0.0);
   run_case(/*eps=*/1.3);
 }
+
+TEST_CASE("Newtonian net A/B audit handles empty state without ratio indexing") {
+  galaxy::Config c;
+  c.softening_audit_enable = true;
+  galaxy::NewtonianPackage n;
+  n.init_from_config(c);
+  galaxy::State st;
+  st.resize(0);
+  std::vector<double> ax, ay;
+  CHECK_NOTHROW(n.compute_accelerations(st, /*bh_mass=*/0.0, /*softening=*/0.7, /*star_star=*/true, ax, ay));
+  const auto& a = n.softening_audit_stats();
+  CHECK(a.net_particle_count == 0);
+  CHECK(std::isfinite(a.net_ratio_median));
+  CHECK(std::isfinite(a.net_ratio_p95));
+  CHECK(std::isfinite(a.net_ratio_max));
+}
