@@ -15,7 +15,8 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
                                             double vx_rel,
                                             double vy_rel,
                                             double vz_rel,
-                                            double c_light) {
+                                            double c_light,
+                                            bool post_pass_gate) {
   XiWakeKinematics k;
   const double r_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
   const double inv_r = (r_norm > 1.0e-30) ? (1.0 / r_norm) : 0.0;
@@ -28,7 +29,15 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
   const double vtz = vz_rel - k.v_radial * r_hat_z;
   k.v_transverse = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
   k.beta_pass = k.v_transverse / c_light;
-  k.wake_gate = 0.5 * (1.0 + std::tanh(k.v_radial / std::max(k.v_transverse, 1.0e-30)));
+  const double vt_eps = std::max(k.v_transverse, 1.0e-30);
+  if (post_pass_gate) {
+    constexpr double kWakeGateThreshold = 0.10;
+    constexpr double kWakeGateWidth = 0.05;
+    const double radial_ratio = k.v_radial / vt_eps;
+    k.wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - kWakeGateThreshold) / kWakeGateWidth));
+  } else {
+    k.wake_gate = 0.5 * (1.0 + std::tanh(k.v_radial / vt_eps));
+  }
   k.beta_effective = k.beta_pass * k.wake_gate;
   if (k.v_transverse > 1.0e-30) {
     const double inv_vt = 1.0 / k.v_transverse;

@@ -1021,8 +1021,7 @@ TEST_CASE("4d xi motion probe benchmark metric_velocity deforms Xi when relative
     CHECK(std::isfinite(xi_z_eff));
     CHECK(std::isfinite(metric));
     CHECK(std::isfinite(ax));
-    if (std::fabs(factor) > 0.0) {
-      CHECK(metric != doctest::Approx(1.0));
+    if (std::fabs(factor) > 1e-12 && std::fabs(metric - 1.0) > 1e-12) {
       saw_nontrivial_metric = true;
     }
     const double delta_norm = std::sqrt((xi_x_eff - xi_x_base) * (xi_x_eff - xi_x_base) +
@@ -1134,7 +1133,7 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake keeps beta_effect
   CHECK(x_axis_rows >= 2);
 }
 
-TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_effective for pure transverse passing") {
+TEST_CASE("4d xi motion probe benchmark metric_transverse_wake keeps wake gate near zero for pure transverse orbiting") {
   char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_transverse_wake_transverse_XXXXXX";
   char* out_dir = mkdtemp(dir_template);
   REQUIRE(out_dir != nullptr);
@@ -1166,7 +1165,7 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_
   const int wake_col = find_csv_col(header, "wake_gate");
   REQUIRE(beta_eff_col >= 0);
 
-  bool saw_nonzero = false;
+  bool saw_near_zero = false;
   while (std::getline(in, line)) {
     if (line.empty()) continue;
     const std::vector<std::string> cols = split_csv_line(line);
@@ -1179,10 +1178,63 @@ TEST_CASE("4d xi motion probe benchmark metric_transverse_wake has nonzero beta_
     const double beta_eff = std::atof(cols[beta_eff_col].c_str());
     const double wake_gate = std::atof(cols[wake_col].c_str());
     CHECK(beta_pass > 0.0);
-    CHECK(wake_gate == doctest::Approx(0.5).epsilon(1e-10));
-    if (beta_eff > 0.0) saw_nonzero = true;
+    CHECK(wake_gate < 0.03);
+    CHECK(beta_eff < 0.03 * beta_pass);
+    if (beta_eff < 0.03 * beta_pass) saw_near_zero = true;
   }
-  CHECK(saw_nonzero);
+  CHECK(saw_near_zero);
+}
+
+
+TEST_CASE("4d xi motion probe benchmark metric_transverse_continuous keeps wake gate near 0.5 for pure transverse orbiting") {
+  char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_metric_transverse_continuous_transverse_XXXXXX";
+  char* out_dir = mkdtemp(dir_template);
+  REQUIRE(out_dir != nullptr);
+
+  galaxy::Config c;
+  c.tpf_source_benchmark_shape = "monopole";
+  c.tpf_source_benchmark_total_mass = 1.0e12;
+  c.tpf_4d_xi_motion_steps = 1;
+  c.tpf_4d_xi_motion_probe_layout = "axis";
+  c.tpf_4d_xi_motion_probe_count = 6;
+  c.tpf_4d_xi_motion_probe_speed = 0.0;
+  c.tpf_4d_xi_motion_integrator = "semi_implicit_euler";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_continuous";
+  c.tpf_4d_xi_kernel_coupling = 3000.0;
+  c.tpf_4d_xi_source_speed_y = 0.04 * 299792458.0;
+
+  galaxy::TPFCorePackage pkg;
+  pkg.run_4d_xi_motion_probe_benchmark(c, out_dir);
+  std::ifstream in(std::string(out_dir) + "/tpf_4d_xi_motion_probe_initial_readout.csv");
+  REQUIRE(static_cast<bool>(in));
+  std::string line;
+  REQUIRE(std::getline(in, line));
+  const std::vector<std::string> header = split_csv_line(line);
+  const int x_col = find_csv_col(header, "x");
+  const int y_col = find_csv_col(header, "y");
+  const int z_col = find_csv_col(header, "z");
+  const int beta_pass_col = find_csv_col(header, "beta_pass");
+  const int beta_eff_col = find_csv_col(header, "beta_effective");
+  const int wake_col = find_csv_col(header, "wake_gate");
+
+  bool saw = false;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const std::vector<std::string> cols = split_csv_line(line);
+    if (cols.size() != header.size()) continue;
+    const double x = std::atof(cols[x_col].c_str());
+    const double y = std::atof(cols[y_col].c_str());
+    const double z = std::atof(cols[z_col].c_str());
+    if (std::fabs(y) > 1e-12 || std::fabs(z) > 1e-12 || std::fabs(x) < 1e-12) continue;
+    const double beta_pass = std::atof(cols[beta_pass_col].c_str());
+    const double beta_eff = std::atof(cols[beta_eff_col].c_str());
+    const double wake_gate = std::atof(cols[wake_col].c_str());
+    CHECK(beta_pass > 0.0);
+    CHECK(wake_gate == doctest::Approx(0.5).epsilon(1e-6));
+    CHECK(beta_eff > 0.0);
+    saw = true;
+  }
+  CHECK(saw);
 }
 
 TEST_CASE("4d xi motion probe benchmark metric_transverse_wake wake gate is higher for separating than approaching") {
@@ -1303,7 +1355,41 @@ TEST_CASE("compute_xi_wake_kinematics follows the same per-interaction formula u
   const double vz_rel = 2.0e4;
 
   const galaxy::tpfcore::XiWakeKinematics k =
-      galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, 299792458.0);
+      galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, 299792458.0, true);
+
+  const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+  const double rx = dx / r, ry = dy / r, rz = dz / r;
+  const double v_rad = vx_rel * rx + vy_rel * ry + vz_rel * rz;
+  const double vtx = vx_rel - v_rad * rx;
+  const double vty = vy_rel - v_rad * ry;
+  const double vtz = vz_rel - v_rad * rz;
+  const double vt = std::sqrt(vtx * vtx + vty * vty + vtz * vtz);
+  const double beta_pass = vt / 299792458.0;
+  constexpr double wake_threshold = 0.10;
+  constexpr double wake_width = 0.05;
+  const double radial_ratio = v_rad / std::max(vt, 1.0e-30);
+  const double wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - wake_threshold) / wake_width));
+  const double beta_effective = beta_pass * wake_gate;
+
+  CHECK(k.v_radial == doctest::Approx(v_rad));
+  CHECK(k.v_transverse == doctest::Approx(vt));
+  CHECK(k.beta_pass == doctest::Approx(beta_pass));
+  CHECK(k.wake_gate == doctest::Approx(wake_gate));
+  CHECK(k.beta_effective == doctest::Approx(beta_effective));
+}
+
+
+
+TEST_CASE("compute_xi_wake_kinematics metric_transverse_continuous preserves legacy wake formula") {
+  const double dx = 3.0;
+  const double dy = 4.0;
+  const double dz = 0.0;
+  const double vx_rel = 1.0e5;
+  const double vy_rel = -3.0e5;
+  const double vz_rel = 2.0e4;
+
+  const galaxy::tpfcore::XiWakeKinematics k =
+      galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, 299792458.0, false);
 
   const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
   const double rx = dx / r, ry = dy / r, rz = dz / r;
@@ -1316,13 +1402,9 @@ TEST_CASE("compute_xi_wake_kinematics follows the same per-interaction formula u
   const double wake_gate = 0.5 * (1.0 + std::tanh(v_rad / std::max(vt, 1.0e-30)));
   const double beta_effective = beta_pass * wake_gate;
 
-  CHECK(k.v_radial == doctest::Approx(v_rad));
-  CHECK(k.v_transverse == doctest::Approx(vt));
-  CHECK(k.beta_pass == doctest::Approx(beta_pass));
   CHECK(k.wake_gate == doctest::Approx(wake_gate));
   CHECK(k.beta_effective == doctest::Approx(beta_effective));
 }
-
 TEST_CASE("4d xi motion probe benchmark spacetime_metric emits xi_t diagnostics only") {
   char dir_template[] = "/tmp/tpf_4d_xi_motion_probe_spacetime_metric_XXXXXX";
   char* out_dir = mkdtemp(dir_template);

@@ -181,7 +181,11 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake positive coupling maps to c
   c.tpf_4d_xi_kernel_factor_mode = "beta_power";
 
   const double beta_pass = 1.0e7 / 299792458.0;
-  const double beta_effective = 0.5 * beta_pass;
+  constexpr double wake_threshold = 0.10;
+  constexpr double wake_width = 0.05;
+  const double radial_ratio = 0.20;
+  const double wake_gate = 0.5 * (1.0 + std::tanh((radial_ratio - wake_threshold) / wake_width));
+  const double beta_effective = wake_gate * beta_pass;
   const double factor_raw = c.tpf_4d_xi_kernel_coupling * beta_effective;
   const double metric_scale = std::max(c.tpf_4d_xi_kernel_metric_min,
                                        std::min(c.tpf_4d_xi_kernel_metric_max, 1.0 / (1.0 + factor_raw)));
@@ -202,7 +206,7 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake positive coupling strengthe
   s.resize(1);
   s.x[0] = 2.0;
   s.y[0] = 0.0;
-  s.vx[0] = 0.0;
+  s.vx[0] = 2.0e6;
   s.vy[0] = 1.0e7;
   s.mass[0] = 1.0;
 
@@ -241,7 +245,7 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake stronger positive coupling 
   s.resize(1);
   s.x[0] = 2.0;
   s.y[0] = 0.0;
-  s.vx[0] = 0.0;
+  s.vx[0] = 2.0e6;
   s.vy[0] = 1.0e7;
   s.mass[0] = 1.0;
 
@@ -274,7 +278,7 @@ TEST_CASE("xi_kernel_deformed metric_transverse_wake negative coupling weakens X
   s.resize(1);
   s.x[0] = 2.0;
   s.y[0] = 0.0;
-  s.vx[0] = 0.0;
+  s.vx[0] = 2.0e6;
   s.vy[0] = 1.0e7;
   s.mass[0] = 1.0;
 

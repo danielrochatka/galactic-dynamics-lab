@@ -25,7 +25,8 @@ XiWakeKinematics compute_xi_wake_kinematics(double dx,
                                             double vx_rel,
                                             double vy_rel,
                                             double vz_rel,
-                                            double c_light);
+                                            double c_light,
+                                            bool post_pass_gate);
 
 unsigned apply_global_accel_magnitude_shunt(const State& state,
                                             double dt,
