@@ -86,6 +86,7 @@ void write_softening_audit_file_and_runinfo(const galaxy::Config& cfg, galaxy::P
   std::ofstream vf(cfg.output_dir + "/softening_force_vector_audit.txt");
   if (!vf) return;
   vf << "softening_force_vector_scope\tactual_force_vector_audit\n"
+     << "softening_force_vector_audit_cost_note\trecomputes_unsoftened_net_acceleration_in_audit_mode__expensive_for_star_star_true_O_n2_runs\n"
      << "force_vector_pair_count\t" << st.run_total_pair_count << "\n"
      << "force_vector_bh_pair_count\t" << st.run_total_bh_pair_count << "\n"
      << "force_vector_star_pair_count\t" << st.run_total_star_pair_count << "\n"

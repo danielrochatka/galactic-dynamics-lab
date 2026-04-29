@@ -227,6 +227,8 @@ TEST_CASE("Newtonian softening limits are finite and monotone") {
 }
 
 TEST_CASE("Newtonian BH-only softening factor audit finalizes and reports distances") {
+  // Audit counter plumbing check: verifies instrumentation population/reporting.
+  // Exact force correctness is covered by independent closed-form tests above/below.
   galaxy::Config c;
   c.softening_audit_enable = true;
   galaxy::NewtonianPackage n;
@@ -253,6 +255,8 @@ TEST_CASE("Newtonian BH-only softening factor audit finalizes and reports distan
 }
 
 TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no violations") {
+  // Audit counter plumbing check: verifies instrumentation reports no violations
+  // for this controlled case. Exact force correctness is covered by independent formula tests.
   galaxy::Config c;
   c.softening_audit_enable = true;
   galaxy::NewtonianPackage n;
@@ -280,6 +284,24 @@ TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no 
   CHECK(std::isfinite(a.net_ratio_max));
 }
 
+TEST_CASE("Softening audit counter merge preserves synthetic vector-violation counts") {
+  galaxy::SofteningAuditCallStats call;
+  call.force_vector_pair_hardening_count = 2;
+  call.force_vector_pair_direction_flip_count = 3;
+  call.force_vector_pair_inward_bh_violation_count = 4;
+  call.force_vector_pair_nan_inf_count = 5;
+  call.force_vector_max_soft_over_unsoft_ratio = 1.25;
+  call.force_vector_max_ratio_distance = 7.0;
+  galaxy::SofteningAuditRunStats run;
+  galaxy::softening_audit_merge_run(run, call);
+  CHECK(run.run_total_force_vector_pair_hardening_count == 2);
+  CHECK(run.run_total_force_vector_pair_direction_flip_count == 3);
+  CHECK(run.run_total_force_vector_pair_inward_bh_violation_count == 4);
+  CHECK(run.run_total_force_vector_pair_nan_inf_count == 5);
+  CHECK(run.force_vector_max_soft_over_unsoft_ratio == doctest::Approx(1.25));
+  CHECK(run.force_vector_max_ratio_distance == doctest::Approx(7.0));
+}
+
 TEST_CASE("Newtonian BH exact sign/magnitude softened vs unsoftened") {
   galaxy::NewtonianPackage n;
   galaxy::State st; st.resize(1);
@@ -292,4 +314,40 @@ TEST_CASE("Newtonian BH exact sign/magnitude softened vs unsoftened") {
   CHECK(ax1[0] == doctest::Approx(-G_SI * bh * r / std::pow(r * r + 1.44, 1.5)).epsilon(1e-12));
   CHECK(ax1[0] < 0.0); CHECK(std::fabs(ay1[0]) < 1e-20);
   CHECK(std::fabs(ax1[0]) <= std::fabs(ax0[0]));
+}
+
+TEST_CASE("Newtonian two-body star-star exact vector signs/magnitudes (independent formula, unequal masses)") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st; st.resize(2);
+  const double r = 10.0;
+  const double mA = 3.0;
+  const double mB = 11.0;
+  st.x[0] = -0.5 * r; st.y[0] = 0.0; st.mass[0] = mA;
+  st.x[1] =  0.5 * r; st.y[1] = 0.0; st.mass[1] = mB;
+  st.vx[0] = st.vy[0] = st.vx[1] = st.vy[1] = 0.0;
+
+  auto run_case = [&](double eps) {
+    std::vector<double> ax, ay;
+    n.compute_accelerations(st, /*bh_mass=*/0.0, eps, /*star_star=*/true, ax, ay);
+
+    const double denom = std::pow(r * r + eps * eps, 1.5);
+    const double expected_ax_A = G_SI * mB * r / denom;
+    const double expected_ax_B = -G_SI * mA * r / denom;
+    const double unsoft_A = G_SI * mB / (r * r);
+    const double unsoft_B = G_SI * mA / (r * r);
+
+    CHECK(ax[0] > 0.0);
+    CHECK(ax[1] < 0.0);
+    CHECK(std::fabs(ay[0]) < 1e-20);
+    CHECK(std::fabs(ay[1]) < 1e-20);
+    CHECK(ax[0] == doctest::Approx(expected_ax_A).epsilon(1e-13));
+    CHECK(ax[1] == doctest::Approx(expected_ax_B).epsilon(1e-13));
+    CHECK(std::fabs(ax[0]) <= unsoft_A * (1.0 + 1e-14));
+    CHECK(std::fabs(ax[1]) <= unsoft_B * (1.0 + 1e-14));
+    CHECK(std::fabs(mA * ax[0] + mB * ax[1]) < 1e-20);
+    CHECK(std::fabs(mA * ay[0] + mB * ay[1]) < 1e-20);
+  };
+
+  run_case(/*eps=*/0.0);
+  run_case(/*eps=*/1.3);
 }
