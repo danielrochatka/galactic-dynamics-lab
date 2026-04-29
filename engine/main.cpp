@@ -68,6 +68,7 @@ void write_softening_audit_file_and_runinfo(const galaxy::Config& cfg, galaxy::P
   std::ofstream af(cfg.output_dir + "/softening_audit.txt");
   if (!af) return;
   af << "softening_audit_pair_count\t" << st.pair_count << "\n"
+     << "softening_audit_scope\tsoftening_factor_invariant_only\n"
      << "softening_audit_bh_pair_count\t" << st.bh_pair_count << "\n"
      << "softening_audit_star_pair_count\t" << st.star_pair_count << "\n"
      << "softening_audit_violation_count\t" << st.violation_count << "\n"

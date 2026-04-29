@@ -628,6 +628,8 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  softening_audit_stats_ = SofteningAuditStats{};
+  softening_audit_stats_.eps_used = eps;
   const double eps2 = eps * eps;
   for (int i = 0; i < n; ++i) {
     std::vector<XiKernelRuntimeSource> sources;

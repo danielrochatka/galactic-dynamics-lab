@@ -11,6 +11,8 @@ struct SofteningAuditStats {
   std::vector<double> distances;
 };
 inline void softening_audit_pair(SofteningAuditStats& s, double r, double eps, bool bh, double tol = 1e-12) {
+  // Scalar-factor invariant audit only: checks Plummer softened-vs-unsoftened 1/r^3 magnitude factor.
+  // This does not by itself prove full acceleration vector sign correctness.
   if (r <= 0.0) return;
   ++s.pair_count; if (bh) ++s.bh_pair_count; else ++s.star_pair_count;
   s.distances.push_back(r);

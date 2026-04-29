@@ -43,7 +43,10 @@ void NewtonianPackage::compute_accelerations(const State& state,
     ay[i] -= acc_mag * ry;
   }
 
-  if (!star_star) return;
+  if (!star_star) {
+    if (softening_audit_enable_) softening_audit_finalize(softening_audit_stats_);
+    return;
+  }
 
   // Pairwise star-star (O(n^2))
   for (int i = 0; i < n; ++i) {
