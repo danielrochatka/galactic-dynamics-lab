@@ -83,6 +83,28 @@ void write_softening_audit_file_and_runinfo(const galaxy::Config& cfg, galaxy::P
     std::ofstream rf(cfg.output_dir + "/run_info.txt", std::ios::app);
     if (rf) rf << "softening_audit_enable\t1\nsoftening_audit_run_total_violation_count\t" << st.run_total_violation_count << "\n";
   }
+  std::ofstream vf(cfg.output_dir + "/softening_force_vector_audit.txt");
+  if (!vf) return;
+  vf << "softening_force_vector_scope\tactual_force_vector_audit\n"
+     << "softening_force_vector_audit_cost_note\trecomputes_unsoftened_net_acceleration_in_audit_mode__expensive_for_star_star_true_O_n2_runs\n"
+     << "force_vector_pair_count\t" << st.run_total_pair_count << "\n"
+     << "force_vector_bh_pair_count\t" << st.run_total_bh_pair_count << "\n"
+     << "force_vector_star_pair_count\t" << st.run_total_star_pair_count << "\n"
+     << "force_vector_pair_hardening_count\t" << st.run_total_force_vector_pair_hardening_count << "\n"
+     << "force_vector_pair_direction_flip_count\t" << st.run_total_force_vector_pair_direction_flip_count << "\n"
+     << "force_vector_pair_inward_bh_violation_count\t" << st.run_total_force_vector_pair_inward_bh_violation_count << "\n"
+     << "force_vector_pair_nan_inf_count\t" << st.run_total_force_vector_pair_nan_inf_count << "\n"
+     << "force_vector_max_soft_over_unsoft_ratio\t" << st.force_vector_max_soft_over_unsoft_ratio << "\n"
+     << "force_vector_max_ratio_distance\t" << st.force_vector_max_ratio_distance << "\n"
+     << "force_vector_min_pair_distance\t" << st.run_min_r << "\n"
+     << "force_vector_last_call_median_pair_distance\t" << st.last_call_median_r << "\n"
+     << "force_vector_eps_used\t" << st.eps_used << "\n"
+     << "net_particle_count\t" << st.net_particle_count << "\n"
+     << "net_hardening_count\t" << st.net_hardening_count << "\n"
+     << "net_direction_flip_count\t" << st.net_direction_flip_count << "\n"
+     << "net_ratio_median\t" << st.net_ratio_median << "\n"
+     << "net_ratio_p95\t" << st.net_ratio_p95 << "\n"
+     << "net_ratio_max\t" << st.net_ratio_max << "\n";
 }
 
 std::string shell_single_quote(const std::string& raw) {
