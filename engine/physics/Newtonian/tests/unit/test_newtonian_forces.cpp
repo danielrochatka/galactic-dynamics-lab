@@ -99,3 +99,129 @@ TEST_CASE("Newtonian symmetry: opposite points have opposite ax") {
   CHECK(ax[0] == doctest::Approx(-ax[1]));
   CHECK(ay[0] == doctest::Approx(-ay[1]));
 }
+
+TEST_CASE("Newtonian softened BH acceleration matches analytic formula exactly") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st;
+  st.resize(1);
+  st.x[0] = 3.0;
+  st.y[0] = -4.0;
+  st.vx[0] = st.vy[0] = 0.0;
+  st.mass[0] = 1.0;
+  const double bh_mass = 9.0e10;
+  const double eps = 0.7;
+
+  std::vector<double> ax, ay;
+  n.compute_accelerations(st, bh_mass, eps, false, ax, ay);
+
+  const double r2 = st.x[0] * st.x[0] + st.y[0] * st.y[0] + eps * eps;
+  const double inv_r3 = 1.0 / (r2 * std::sqrt(r2));
+  CHECK(ax[0] == doctest::Approx(-G_SI * bh_mass * st.x[0] * inv_r3).epsilon(1e-14));
+  CHECK(ay[0] == doctest::Approx(-G_SI * bh_mass * st.y[0] * inv_r3).epsilon(1e-14));
+}
+
+TEST_CASE("Newtonian potential gradient matches acceleration (BH-only finite-difference)") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st;
+  st.resize(1);
+  st.x[0] = 2.3;
+  st.y[0] = -1.7;
+  st.vx[0] = st.vy[0] = 0.0;
+  st.mass[0] = 5.0;
+  const double bh_mass = 2.0e6;
+  const double eps = 0.25;
+  const double h = 1.0e-6;
+
+  std::vector<double> ax, ay;
+  n.compute_accelerations(st, bh_mass, eps, false, ax, ay);
+
+  auto pe_at = [&](double x, double y) {
+    galaxy::State t = st;
+    t.x[0] = x;
+    t.y[0] = y;
+    return n.compute_potential_energy(t, bh_mass, eps, false);
+  };
+  const double dUdx = (pe_at(st.x[0] + h, st.y[0]) - pe_at(st.x[0] - h, st.y[0])) / (2.0 * h);
+  const double dUdy = (pe_at(st.x[0], st.y[0] + h) - pe_at(st.x[0], st.y[0] - h)) / (2.0 * h);
+
+  CHECK(ax[0] == doctest::Approx(-dUdx / st.mass[0]).epsilon(1e-7));
+  CHECK(ay[0] == doctest::Approx(-dUdy / st.mass[0]).epsilon(1e-7));
+}
+
+TEST_CASE("Newtonian potential gradient matches acceleration (star-star finite-difference)") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st;
+  st.resize(2);
+  st.x[0] = -0.8; st.y[0] = 0.4; st.mass[0] = 2.0;
+  st.x[1] = 1.2; st.y[1] = -0.1; st.mass[1] = 7.0;
+  st.vx[0] = st.vy[0] = st.vx[1] = st.vy[1] = 0.0;
+  const double eps = 0.3;
+  const double h = 1.0e-6;
+
+  std::vector<double> ax, ay;
+  n.compute_accelerations(st, 0.0, eps, true, ax, ay);
+
+  auto pe_at = [&](double x0, double y0) {
+    galaxy::State t = st;
+    t.x[0] = x0;
+    t.y[0] = y0;
+    return n.compute_potential_energy(t, 0.0, eps, true);
+  };
+  const double dUdx0 = (pe_at(st.x[0] + h, st.y[0]) - pe_at(st.x[0] - h, st.y[0])) / (2.0 * h);
+  const double dUdy0 = (pe_at(st.x[0], st.y[0] + h) - pe_at(st.x[0], st.y[0] - h)) / (2.0 * h);
+
+  CHECK(ax[0] == doctest::Approx(-dUdx0 / st.mass[0]).epsilon(1e-7));
+  CHECK(ay[0] == doctest::Approx(-dUdy0 / st.mass[0]).epsilon(1e-7));
+}
+
+TEST_CASE("Newtonian star-star pair force conserves total momentum (unequal masses, eps>0)") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st;
+  st.resize(2);
+  st.x[0] = -1.3; st.y[0] = 0.2; st.mass[0] = 3.0;
+  st.x[1] = 2.1; st.y[1] = -0.4; st.mass[1] = 11.0;
+  st.vx[0] = st.vy[0] = st.vx[1] = st.vy[1] = 0.0;
+
+  std::vector<double> ax, ay;
+  n.compute_accelerations(st, 0.0, 0.6, true, ax, ay);
+  const double px_dot = st.mass[0] * ax[0] + st.mass[1] * ax[1];
+  const double py_dot = st.mass[0] * ay[0] + st.mass[1] * ay[1];
+  CHECK(std::fabs(px_dot) < 1e-20);
+  CHECK(std::fabs(py_dot) < 1e-20);
+}
+
+TEST_CASE("Newtonian softening limits are finite and monotone") {
+  galaxy::NewtonianPackage n;
+  galaxy::State st;
+  st.resize(1);
+  st.x[0] = 1.5;
+  st.y[0] = 0.0;
+  st.mass[0] = 1.0;
+  st.vx[0] = st.vy[0] = 0.0;
+  const double bh = 5.0e8;
+
+  std::vector<double> ax0, ay0, ax1, ay1, ax2, ay2;
+  n.compute_accelerations(st, bh, 0.0, false, ax0, ay0);
+  n.compute_accelerations(st, bh, 0.5, false, ax1, ay1);
+  n.compute_accelerations(st, bh, 5.0, false, ax2, ay2);
+
+  const double mag0 = std::hypot(ax0[0], ay0[0]);
+  const double mag1 = std::hypot(ax1[0], ay1[0]);
+  const double mag2 = std::hypot(ax2[0], ay2[0]);
+  CHECK(mag0 > mag1);
+  CHECK(mag1 > mag2);
+  CHECK(std::isfinite(mag2));
+
+  // eps=0 case should recover inverse-square exactly for this axis-aligned setup.
+  const double expected = G_SI * bh / (st.x[0] * st.x[0]);
+  CHECK(std::fabs(ax0[0] + expected) < 1e-12 * expected);
+
+  // r=0 with eps>0 should be finite and exactly zero vector by symmetry.
+  st.x[0] = 0.0;
+  st.y[0] = 0.0;
+  n.compute_accelerations(st, bh, 2.0, false, ax2, ay2);
+  CHECK(std::isfinite(ax2[0]));
+  CHECK(std::isfinite(ay2[0]));
+  CHECK(ax2[0] == doctest::Approx(0.0));
+  CHECK(ay2[0] == doctest::Approx(0.0));
+}

@@ -624,7 +624,8 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   const int n = state.n();
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
-  const double eps2 = softening * softening;
+  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  const double eps2 = eps * eps;
   for (int i = 0; i < n; ++i) {
     std::vector<XiKernelRuntimeSource> sources;
     if (bh_mass > 0.0) {
