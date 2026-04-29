@@ -535,6 +535,17 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
        tpfcore::is_derived_tpf_radial_readout_mode(effective.tpfcore_readout_mode));
 
   if (use_derived_tpf_init) {
+    if (effective.enable_star_star_gravity) {
+      audit.velocity_mass_model = "derived_tpf_profile_includes_stars";
+      audit.velocity_respects_star_star_flag = true;
+    } else {
+      audit.velocity_mass_model = "derived_tpf_profile_includes_stars_toggle_not_applied";
+      audit.velocity_respects_star_star_flag = false;
+      audit.template_defaults_log.warnings.push_back(
+          "derived_tpf_profile initializer currently includes enclosed stellar mass even when "
+          "enable_star_star_gravity=false");
+    }
+    audit.velocity_uses_star_mass = true;
     const double eps =
         (effective.tpfcore_source_softening > 0.0) ? effective.tpfcore_source_softening : effective.softening;
     tpfcore::DerivedTpfPoissonConfig dcfg;
@@ -573,12 +584,19 @@ void initialize_galaxy_disk(const Config& config, State& state, GalaxyInitAudit*
     }
   } else {
     constexpr double G_SI = 6.6743e-11;
+    const bool include_enclosed_stars = effective.enable_star_star_gravity;
+    audit.velocity_mass_model = include_enclosed_stars ? "bh_plus_enclosed_stars" : "bh_only";
+    audit.velocity_uses_star_mass = include_enclosed_stars;
+    audit.velocity_respects_star_star_flag = true;
     for (int i = 0; i < n; ++i) {
       double r = radii[i];
       double th = theta[i];
       double cos_t = std::cos(th);
       double sin_t = std::sin(th);
-      double enclosed_mass = bh_mass + n_inside[i] * star_mass;
+      double enclosed_mass = bh_mass;
+      if (include_enclosed_stars) {
+        enclosed_mass += n_inside[i] * star_mass;
+      }
       double v_circ = std::sqrt((G_SI * enclosed_mass) / std::max(r, 1e-30));
       double vx = -sin_t * v_circ;
       double vy = cos_t * v_circ;
@@ -705,6 +723,10 @@ void write_galaxy_init_diagnostics(const std::string& output_dir,
   txt << "--- Audit ---\n";
   txt << "used_new_state_noise\t" << (audit.used_new_state_noise ? 1 : 0) << "\n";
   txt << "used_legacy_velocity_noise\t" << (audit.used_legacy_velocity_noise ? 1 : 0) << "\n";
+  txt << "galaxy_init_velocity_mass_model\t" << audit.velocity_mass_model << "\n";
+  txt << "galaxy_init_velocity_uses_star_mass\t" << (audit.velocity_uses_star_mass ? 1 : 0) << "\n";
+  txt << "galaxy_init_velocity_respects_star_star_flag\t"
+      << (audit.velocity_respects_star_star_flag ? 1 : 0) << "\n";
   txt << "master_chaos\t" << audit.master_chaos << "\n";
   txt << "eff_position_noise\t" << audit.eff_position_noise << "\n";
   txt << "eff_velocity_angle_noise_rad\t" << audit.eff_velocity_angle_noise_rad << "\n";

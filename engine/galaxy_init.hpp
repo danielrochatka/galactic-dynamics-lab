@@ -96,6 +96,9 @@ struct GalaxyInitAudit {
 
   bool template_defaults_used = false;
   GalaxyInitTemplateDefaultsLog template_defaults_log;
+  std::string velocity_mass_model = "bh_plus_enclosed_stars";
+  bool velocity_uses_star_mass = true;
+  bool velocity_respects_star_star_flag = true;
 
   double weight_w_max = 1.0;
   int rejection_fallbacks = 0;
