@@ -133,6 +133,12 @@ struct Config {
   int snapshot_every = 50;
 
   double softening = 0.0;
+  std::string softening_mode = "manual"; /* off | manual | auto */
+  std::string softening_auto_profile = "stellar_physical"; /* collisionless | stellar_physical | nuclear_cluster */
+  double auto_softening_factor = 0.0;
+  int auto_softening_dimension = 0;
+  double auto_softening_min = 0.0;
+  double auto_softening_max = 0.0;
   bool enable_star_star_gravity = true;
 
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
@@ -411,7 +417,6 @@ struct Config {
 
   bool save_snapshots = true;
   bool save_run_info = true;
-  bool softening_audit_enable = false;
   /** Post-process hint for plot_cpp_run.py: smooth animation viewport vs per-frame target (velocity-gated). */
   bool plot_animation_dynamic_zoom = false;
   /** plot_cpp_compare.py: per-frame pooled-star coverage fraction for fixed shared compare viewport. */

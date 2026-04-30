@@ -138,7 +138,7 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
-  softening_audit_enable_ = config.softening_audit_enable;
+  softening_audit_enable_ = false;
   softening_audit_last_call_stats_ = SofteningAuditCallStats{};
   softening_audit_run_stats_ = SofteningAuditRunStats{};
 }

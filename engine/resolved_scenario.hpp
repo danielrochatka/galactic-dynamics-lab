@@ -2,6 +2,7 @@
 #define GALAXY_RESOLVED_SCENARIO_HPP
 
 #include "config.hpp"
+#include "softening_policy.hpp"
 #include "types.hpp"
 #include <string>
 #include <utility>
@@ -19,6 +20,7 @@ struct ResolvedScenario {
   double effective_total_sim_time = 0.0;
   std::string timing_policy;
   std::string softening_policy;
+  ResolvedSoftening softening;
 };
 
 ResolvedScenario resolve_scenario(const Config& input);

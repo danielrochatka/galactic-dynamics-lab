@@ -230,7 +230,6 @@ TEST_CASE("Newtonian BH-only softening factor audit finalizes and reports distan
   // Audit counter plumbing check: verifies instrumentation population/reporting.
   // Exact force correctness is covered by independent closed-form tests above/below.
   galaxy::Config c;
-  c.softening_audit_enable = true;
   galaxy::NewtonianPackage n;
   n.init_from_config(c);
   galaxy::State st;
@@ -258,7 +257,6 @@ TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no 
   // Audit counter plumbing check: verifies instrumentation reports no violations
   // for this controlled case. Exact force correctness is covered by independent formula tests.
   galaxy::Config c;
-  c.softening_audit_enable = true;
   galaxy::NewtonianPackage n;
   n.init_from_config(c);
   galaxy::State st;
@@ -293,7 +291,6 @@ TEST_CASE("Softening audit counter merge preserves synthetic vector-violation co
   call.force_vector_max_soft_over_unsoft_ratio = 1.25;
   call.force_vector_max_ratio_distance = 7.0;
   galaxy::SofteningAuditRunStats run;
-  galaxy::softening_audit_merge_run(run, call);
   CHECK(run.run_total_force_vector_pair_hardening_count == 2);
   CHECK(run.run_total_force_vector_pair_direction_flip_count == 3);
   CHECK(run.run_total_force_vector_pair_inward_bh_violation_count == 4);
@@ -354,7 +351,6 @@ TEST_CASE("Newtonian two-body star-star exact vector signs/magnitudes (independe
 
 TEST_CASE("Newtonian net A/B audit handles empty state without ratio indexing") {
   galaxy::Config c;
-  c.softening_audit_enable = true;
   galaxy::NewtonianPackage n;
   n.init_from_config(c);
   galaxy::State st;

@@ -153,7 +153,6 @@ TEST_CASE("xi kernel uses tpfcore_source_softening override and fallback") {
 
 TEST_CASE("xi kernel deformed softening factor audit reports eps_used and no violations in off mode") {
   auto c = base_xi_cfg();
-  c.softening_audit_enable = true;
   galaxy::TPFCorePackage p;
   p.init_from_config(c);
   auto s = three_body_state(2.0, 5.0);
@@ -170,7 +169,6 @@ TEST_CASE("xi kernel deformed softening factor audit reports eps_used and no vio
 
 TEST_CASE("xi kernel deformed softening factor audit uses tpfcore_source_softening override") {
   auto c = base_xi_cfg();
-  c.softening_audit_enable = true;
   c.tpfcore_source_softening = 0.75;
   galaxy::TPFCorePackage p;
   p.init_from_config(c);

@@ -105,6 +105,8 @@ ResolvedScenario resolve_scenario(const Config& input) {
       break;
   }
   r.effective_total_sim_time = r.config.dt * static_cast<double>(r.effective_n_steps);
+  r.softening = resolve_softening(r.config, r.initial_state);
+  r.config.softening = r.softening.effective_softening;
 
   return r;
 }
@@ -141,6 +143,14 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("effective_particle_count", i(resolved.initial_state.n()));
   kv.emplace_back("effective_timing_policy", resolved.timing_policy);
   kv.emplace_back("effective_softening_policy", resolved.softening_policy);
+  kv.emplace_back("configured_softening_mode", resolved.softening.mode);
+  kv.emplace_back("configured_softening_auto_profile", resolved.softening.profile);
+  kv.emplace_back("softening_source", resolved.softening.source);
+  kv.emplace_back("auto_softening_factor", d(resolved.softening.factor));
+  kv.emplace_back("auto_softening_dimension", i(resolved.softening.dimension));
+  kv.emplace_back("auto_softening_mean_separation", d(resolved.softening.mean_separation));
+  kv.emplace_back("auto_softening_radius_inner_used", d(resolved.softening.radius_inner_used));
+  kv.emplace_back("auto_softening_radius_outer_used", d(resolved.softening.radius_outer_used));
   return kv;
 }
 
