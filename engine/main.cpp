@@ -1093,6 +1093,7 @@ int main(int argc, char** argv) {
   galaxy::GalaxyPreflightSummary galaxy_preflight;
   if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
     galaxy_preflight = galaxy::build_galaxy_preflight_summary(config, resolved);
+    galaxy::print_galaxy_preflight_summary(galaxy_preflight);
     if (!galaxy_preflight.warnings.empty()) {
       std::cout << "Galaxy preflight warnings:\n";
       for (std::size_t i = 0; i < galaxy_preflight.warnings.size(); ++i)
