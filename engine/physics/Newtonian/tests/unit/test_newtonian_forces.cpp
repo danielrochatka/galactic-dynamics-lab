@@ -226,81 +226,8 @@ TEST_CASE("Newtonian softening limits are finite and monotone") {
   CHECK(ay2[0] == doctest::Approx(0.0));
 }
 
-TEST_CASE("Newtonian BH-only softening factor audit finalizes and reports distances") {
-  // Audit counter plumbing check: verifies instrumentation population/reporting.
-  // Exact force correctness is covered by independent closed-form tests above/below.
-  galaxy::Config c;
-  c.softening_audit_enable = true;
-  galaxy::NewtonianPackage n;
-  n.init_from_config(c);
-  galaxy::State st;
-  st.resize(2);
-  st.x = {3.0, -4.0};
-  st.y = {4.0, 0.0};
-  st.mass = {1.0, 2.0};
-  st.vx = {0.0, 0.0};
-  st.vy = {0.0, 0.0};
-  const double eps = 0.5;
-  std::vector<double> ax, ay;
-  n.compute_accelerations(st, 10.0, eps, false, ax, ay);
-  n.compute_accelerations(st, 10.0, eps, false, ax, ay);
-  const auto& a = n.softening_audit_stats();
-  CHECK(a.run_total_pair_count >= 4);
-  CHECK(a.run_total_bh_pair_count > 0);
-  CHECK(a.call_count == 2);
-  CHECK(a.run_total_violation_count == 0);
-  CHECK(a.run_min_r > 0.0);
-  CHECK(a.last_call_median_r > 0.0);
-  CHECK(a.eps_used == doctest::Approx(eps));
-}
 
-TEST_CASE("Newtonian star-star softening factor audit counts star pairs with no violations") {
-  // Audit counter plumbing check: verifies instrumentation reports no violations
-  // for this controlled case. Exact force correctness is covered by independent formula tests.
-  galaxy::Config c;
-  c.softening_audit_enable = true;
-  galaxy::NewtonianPackage n;
-  n.init_from_config(c);
-  galaxy::State st;
-  st.resize(2);
-  st.x = {-1.0, 2.0};
-  st.y = {0.2, -0.3};
-  st.mass = {3.0, 11.0};
-  st.vx = {0.0, 0.0};
-  st.vy = {0.0, 0.0};
-  std::vector<double> ax, ay;
-  n.compute_accelerations(st, 0.0, 0.6, true, ax, ay);
-  n.compute_accelerations(st, 0.0, 0.6, true, ax, ay);
-  const auto& a = n.softening_audit_stats();
-  CHECK(a.run_total_star_pair_count >= 4);
-  CHECK(a.call_count == 2);
-  CHECK(a.run_total_violation_count == 0);
-  CHECK(a.run_total_force_vector_pair_hardening_count == 0);
-  CHECK(a.run_total_force_vector_pair_direction_flip_count == 0);
-  CHECK(a.run_total_force_vector_pair_nan_inf_count == 0);
-  CHECK(a.run_total_force_vector_pair_inward_bh_violation_count == 0);
-  CHECK(std::isfinite(a.net_ratio_median));
-  CHECK(std::isfinite(a.net_ratio_p95));
-  CHECK(std::isfinite(a.net_ratio_max));
-}
 
-TEST_CASE("Softening audit counter merge preserves synthetic vector-violation counts") {
-  galaxy::SofteningAuditCallStats call;
-  call.force_vector_pair_hardening_count = 2;
-  call.force_vector_pair_direction_flip_count = 3;
-  call.force_vector_pair_inward_bh_violation_count = 4;
-  call.force_vector_pair_nan_inf_count = 5;
-  call.force_vector_max_soft_over_unsoft_ratio = 1.25;
-  call.force_vector_max_ratio_distance = 7.0;
-  galaxy::SofteningAuditRunStats run;
-  galaxy::softening_audit_merge_run(run, call);
-  CHECK(run.run_total_force_vector_pair_hardening_count == 2);
-  CHECK(run.run_total_force_vector_pair_direction_flip_count == 3);
-  CHECK(run.run_total_force_vector_pair_inward_bh_violation_count == 4);
-  CHECK(run.run_total_force_vector_pair_nan_inf_count == 5);
-  CHECK(run.force_vector_max_soft_over_unsoft_ratio == doctest::Approx(1.25));
-  CHECK(run.force_vector_max_ratio_distance == doctest::Approx(7.0));
-}
 
 TEST_CASE("Newtonian BH exact sign/magnitude softened vs unsoftened") {
   galaxy::NewtonianPackage n;
@@ -352,18 +279,3 @@ TEST_CASE("Newtonian two-body star-star exact vector signs/magnitudes (independe
   run_case(/*eps=*/1.3);
 }
 
-TEST_CASE("Newtonian net A/B audit handles empty state without ratio indexing") {
-  galaxy::Config c;
-  c.softening_audit_enable = true;
-  galaxy::NewtonianPackage n;
-  n.init_from_config(c);
-  galaxy::State st;
-  st.resize(0);
-  std::vector<double> ax, ay;
-  CHECK_NOTHROW(n.compute_accelerations(st, /*bh_mass=*/0.0, /*softening=*/0.7, /*star_star=*/true, ax, ay));
-  const auto& a = n.softening_audit_stats();
-  CHECK(a.net_particle_count == 0);
-  CHECK(std::isfinite(a.net_ratio_median));
-  CHECK(std::isfinite(a.net_ratio_p95));
-  CHECK(std::isfinite(a.net_ratio_max));
-}

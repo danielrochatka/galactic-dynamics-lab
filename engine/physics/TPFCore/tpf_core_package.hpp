@@ -20,7 +20,6 @@
  */
 
 #include "../../accel_pipeline_stats.hpp"
-#include "../../softening_audit.hpp"
 #include "../../types.hpp"
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
@@ -112,7 +111,6 @@ class TPFCorePackage : public PhysicsPackage {
     std::uint64_t xi_total_pair_evaluations = 0;
   };
   XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
-  const SofteningAuditRunStats& softening_audit_stats() const { return softening_audit_run_stats_; }
 
   /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -215,9 +213,6 @@ class TPFCorePackage : public PhysicsPackage {
   double xi_source_speed_y_;
   double xi_source_speed_z_;
   mutable XiRuntimeCounters xi_runtime_counters_;
-  bool softening_audit_enable_ = false;
-  mutable SofteningAuditCallStats softening_audit_last_call_stats_;
-  mutable SofteningAuditRunStats softening_audit_run_stats_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */
