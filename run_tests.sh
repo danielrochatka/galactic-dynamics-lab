@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
-# Run the full repository test suite (C++ unit/regression + integration + Python unittest).
+# Run full repository test harness via explicit unit + integration entrypoints.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-echo "=== engine (make test) ==="
-(cd "$ROOT/engine" && make test)
-
-echo ""
-echo "=== python_tests (unittest) ==="
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-python3 -m unittest discover -s python_tests/unit -p 'test_*.py' -v
-python3 -m unittest discover -s python_tests/integration -p 'test_*.py' -v
+./run_unit_tests.sh
+./run_integration_tests.sh
 
 echo ""
 echo "All tests finished OK."

@@ -5,6 +5,18 @@ ROOT_DIR=$(cd "$(dirname "$0")/../../.." && pwd)
 OUT_DIR=$(mktemp -d)
 trap 'rm -rf "$OUT_DIR"' EXIT
 
+if ! python3 - <<'PY'
+import importlib.util
+
+mods = ("matplotlib", "numpy", "pandas")
+missing = [m for m in mods if importlib.util.find_spec(m) is None]
+raise SystemExit(1 if missing else 0)
+PY
+then
+  echo "plotting dependencies unavailable; skipping" >&2
+  exit 0
+fi
+
 cat >"$OUT_DIR/tpf_4d_static_residual_sources.csv" <<'CSV'
 x,y,z
 0,0,0
