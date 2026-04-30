@@ -14,6 +14,9 @@ struct ResolvedSoftening {
   int dimension = 0;
   double factor = 0.0;
   std::string source;
+  bool max_capped = false;
+  bool min_floored = false;
+  std::string max_cap_source;
 };
 ResolvedSoftening resolve_softening(const Config& cfg, const State& state);
 
