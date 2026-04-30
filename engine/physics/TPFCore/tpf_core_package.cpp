@@ -693,6 +693,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       const double r2 = dx * dx + dy * dy + dz * dz;
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+      double r_sq_basis = r2;
       double xi_sx = src.mass * dx * inv_r3;
       double xi_sy = src.mass * dy * inv_r3;
       if (xi_kernel_mode_ == "off") {
@@ -727,13 +728,16 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         const double r_eff2 = dx * gx + dy * gy + dz * gz;
         const double r_eff = std::sqrt(r_eff2);
         const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
+        r_sq_basis = r_eff2;
         xi_sx = src.mass * gx * inv_r_eff3;
         xi_sy = src.mass * gy * inv_r_eff3;
         const double base_ratio = (inv_r3 > 0.0) ? (inv_r_eff3 / inv_r3) : 1.0;
       }
       double dax = -xi_motion_readout_scale_ * xi_sx;
       double day = -xi_motion_readout_scale_ * xi_sy;
-      apply_plummer_softening(dx, dy, eps, dax, day);
+      const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
+      dax *= softening_scale;
+      day *= softening_scale;
       ax_i += dax;
       ay_i += day;
     }
