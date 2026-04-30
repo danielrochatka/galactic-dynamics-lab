@@ -650,8 +650,8 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       }
     }
 
-    double xi_x_eff = 0.0;
-    double xi_y_eff = 0.0;
+    double ax_i = 0.0;
+    double ay_i = 0.0;
     for (std::size_t si = 0; si < sources.size(); ++si) {
       ++xi_runtime_counters_.xi_last_call_pair_evaluations;
       ++xi_runtime_counters_.xi_total_pair_evaluations;
@@ -693,15 +693,13 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       const double r2 = dx * dx + dy * dy + dz * dz;
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
-      const double xi_sx = src.mass * dx * inv_r3;
-      const double xi_sy = src.mass * dy * inv_r3;
+      double xi_sx = src.mass * dx * inv_r3;
+      double xi_sy = src.mass * dy * inv_r3;
       if (xi_kernel_mode_ == "off") {
-        xi_x_eff += xi_sx;
-        xi_y_eff += xi_sy;
       } else if (xi_kernel_mode_ == "scalar_beta") {
         const double scalar = 1.0 + factor_raw;
-        xi_x_eff += xi_sx * scalar;
-        xi_y_eff += xi_sy * scalar;
+        xi_sx *= scalar;
+        xi_sy *= scalar;
       } else {
         double nx = 0.0, ny = 0.0, nz = 0.0;
         double n_norm = 0.0;
@@ -729,14 +727,18 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         const double r_eff2 = dx * gx + dy * gy + dz * gz;
         const double r_eff = std::sqrt(r_eff2);
         const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
-        xi_x_eff += src.mass * gx * inv_r_eff3;
-        xi_y_eff += src.mass * gy * inv_r_eff3;
+        xi_sx = src.mass * gx * inv_r_eff3;
+        xi_sy = src.mass * gy * inv_r_eff3;
         const double base_ratio = (inv_r3 > 0.0) ? (inv_r_eff3 / inv_r3) : 1.0;
       }
+      double dax = -xi_motion_readout_scale_ * xi_sx;
+      double day = -xi_motion_readout_scale_ * xi_sy;
+      apply_plummer_softening(dx, dy, eps, dax, day);
+      ax_i += dax;
+      ay_i += day;
     }
-    ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
-    ay[i] = -xi_motion_readout_scale_ * xi_y_eff;
-    apply_plummer_softening(state.x[i], state.y[i], eps, ax[i], ay[i]);
+    ax[i] = ax_i;
+    ay[i] = ay_i;
 
     // BH-only sign audit: for particles away from the origin, Xi-kernel readout must point inward
     // toward the central BH when K_xi is positive.
