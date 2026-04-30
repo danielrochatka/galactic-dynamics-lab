@@ -676,9 +676,11 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     } else {
       metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
     }
+    constexpr double k_runtime_pair_tiny = 1.0e-30;
     const double r2 = dx * dx + dy * dy + dz * dz;
+    if (!std::isfinite(r2) || r2 <= k_runtime_pair_tiny) return;
     const double r = std::sqrt(r2);
-    const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+    const double inv_r3 = 1.0 / (r2 * r);
     double r_sq_basis = r2;
     double xi_sx = src.mass * dx * inv_r3;
     double xi_sy = src.mass * dy * inv_r3;
@@ -696,7 +698,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
       } else if (xi_kernel_mode_ == "metric_transverse_wake" || xi_kernel_mode_ == "metric_transverse_continuous") {
         n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
-        if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake/metric_transverse_continuous Xi kernel mode");
+        if (n_norm <= k_runtime_pair_tiny) return;
         nx = dx / n_norm;
         ny = dy / n_norm;
         nz = dz / n_norm;
@@ -712,11 +714,13 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       const double gy = dy + alpha * ny * nd;
       const double gz = dz + alpha * nz * nd;
       const double r_eff2 = dx * gx + dy * gy + dz * gz;
-      const double r_eff = std::sqrt(r_eff2);
-      const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
-      r_sq_basis = r_eff2;
-      xi_sx = src.mass * gx * inv_r_eff3;
-      xi_sy = src.mass * gy * inv_r_eff3;
+      if (std::isfinite(r_eff2) && r_eff2 > k_runtime_pair_tiny) {
+        const double r_eff = std::sqrt(r_eff2);
+        const double inv_r_eff3 = 1.0 / (r_eff2 * r_eff);
+        r_sq_basis = r_eff2;
+        xi_sx = src.mass * gx * inv_r_eff3;
+        xi_sy = src.mass * gy * inv_r_eff3;
+      }
     }
     double dax = -xi_motion_readout_scale_ * xi_sx;
     double day = -xi_motion_readout_scale_ * xi_sy;
@@ -2365,9 +2369,11 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
       wake_gate_max = std::max(wake_gate_max, wake.wake_gate);
       ++wake_sample_count;
 
+      constexpr double k_probe_pair_tiny = 1.0e-30;
       const double r2 = dx * dx + dy * dy + dz * dz + field_softening * field_softening;
+      if (!std::isfinite(r2) || r2 <= k_probe_pair_tiny) continue;
       const double r = std::sqrt(r2);
-      const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+      const double inv_r3 = 1.0 / (r2 * r);
       const double xi_sx = source_specs[si].m * dx * inv_r3;
       const double xi_sy = source_specs[si].m * dy * inv_r3;
       const double xi_sz = source_specs[si].m * dz * inv_r3;
@@ -2395,7 +2401,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
           nz = dz / n_norm;
         } else if (kernel_mode == "metric_transverse_wake" || kernel_mode == "metric_transverse_continuous") {
           n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
-          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake/metric_transverse_continuous Xi kernel mode");
+          if (n_norm <= k_probe_pair_tiny) continue;
           nx = dx / n_norm;
           ny = dy / n_norm;
           nz = dz / n_norm;
@@ -2414,11 +2420,17 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
         const double gy = dy + alpha * ny * nd;
         const double gz = dz + alpha * nz * nd;
         const double r_eff2 = dx * gx + dy * gy + dz * gz + field_softening * field_softening;
-        const double r_eff = std::sqrt(r_eff2);
-        const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
-        xi_eff_x += source_specs[si].m * gx * inv_r_eff3;
-        xi_eff_y += source_specs[si].m * gy * inv_r_eff3;
-        xi_eff_z += source_specs[si].m * gz * inv_r_eff3;
+        if (std::isfinite(r_eff2) && r_eff2 > k_probe_pair_tiny) {
+          const double r_eff = std::sqrt(r_eff2);
+          const double inv_r_eff3 = 1.0 / (r_eff2 * r_eff);
+          xi_eff_x += source_specs[si].m * gx * inv_r_eff3;
+          xi_eff_y += source_specs[si].m * gy * inv_r_eff3;
+          xi_eff_z += source_specs[si].m * gz * inv_r_eff3;
+        } else {
+          xi_eff_x += xi_sx;
+          xi_eff_y += xi_sy;
+          xi_eff_z += xi_sz;
+        }
       }
     }
 
