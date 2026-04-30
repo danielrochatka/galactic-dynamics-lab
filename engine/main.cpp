@@ -8,6 +8,7 @@
 #include "render_audit.hpp"
 #include "resolved_scenario.hpp"
 #include "output.hpp"
+#include "preflight.hpp"
 #include "progress_time.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
@@ -36,12 +37,14 @@
 #include <io.h>
 #define MKDIR(path, mode) _mkdir(path)
 #define IS_STDOUT_TERMINAL() (_isatty(_fileno(stdout)) != 0)
+#define IS_STDIN_TERMINAL() (_isatty(_fileno(stdin)) != 0)
 #else
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #define MKDIR(path, mode) mkdir(path, mode)
 #define IS_STDOUT_TERMINAL() (isatty(STDOUT_FILENO) != 0)
+#define IS_STDIN_TERMINAL() (isatty(STDIN_FILENO) != 0)
 #endif
 
 namespace {
@@ -383,9 +386,12 @@ int main(int argc, char** argv) {
   config.output_dir = "../outputs/" + config.run_id;
 
   bool auto_plot = false;
+  bool assume_yes = false;
   for (int i = 1; i < argc; ++i) {
     if (std::string(argv[i]) == "--plot")
       auto_plot = true;
+    if (std::string(argv[i]) == "--yes")
+      assume_yes = true;
   }
 
   /* First positional is the simulation mode only when it is not a long option (--key=value).
@@ -417,7 +423,7 @@ int main(int argc, char** argv) {
 
   for (int i = first_cli_config_idx; i < argc; ++i) {
     std::string a = argv[i];
-    if (a == "--plot") continue;
+    if (a == "--plot" || a == "--yes") continue;
     if (a.size() < 4 || a.substr(0, 2) != "--") continue;
     std::size_t eq = a.find('=');
     if (eq == std::string::npos) {
@@ -1084,6 +1090,28 @@ int main(int argc, char** argv) {
   int n_steps = resolved.effective_n_steps;
   int snapshot_every = resolved.effective_snapshot_every;
 
+  galaxy::GalaxyPreflightSummary galaxy_preflight;
+  if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
+    galaxy_preflight = galaxy::build_galaxy_preflight_summary(config, resolved);
+    galaxy::print_galaxy_preflight_summary(galaxy_preflight);
+    if (!galaxy_preflight.warnings.empty()) {
+      std::cout << "Galaxy preflight warnings:\n";
+      for (std::size_t i = 0; i < galaxy_preflight.warnings.size(); ++i)
+        std::cout << "  - " << galaxy_preflight.warnings[i] << "\n";
+
+      const bool interactive = IS_STDOUT_TERMINAL() && IS_STDIN_TERMINAL();
+      if (interactive && !assume_yes) {
+        std::cout << "Continue anyway? [y/N] ";
+        std::string ans;
+        std::getline(std::cin, ans);
+        if (!(ans == "y" || ans == "Y")) {
+          std::cerr << "Aborting due to preflight warnings.\n";
+          return 1;
+        }
+      }
+    }
+  }
+
   if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
     galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
                                           galaxy::last_galaxy_init_audit());
@@ -1522,6 +1550,8 @@ int main(int argc, char** argv) {
                                  : nullptr,
                              &cooling_audit,
                              tpf_pipeline_stats);
+      if (config.simulation_mode == galaxy::SimulationMode::galaxy)
+        galaxy::append_galaxy_preflight_to_run_info(config.output_dir, galaxy_preflight);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {

@@ -22,20 +22,20 @@ COMMON_ARGS=(
 
 SINGLE="$OUT/single"
 COMPARE="$OUT/compare"
-./galaxy_sim galaxy --output_dir="$SINGLE" --physics_package=Newtonian "${COMMON_ARGS[@]}" >/dev/null
-./galaxy_sim galaxy --output_dir="$COMPARE" --physics_package=Newtonian --physics_package_compare=TPFCore --tpfcore_enable_provisional_readout=true "${COMMON_ARGS[@]}" >/dev/null
+./galaxy_sim galaxy --output_dir="$SINGLE" --physics_package=Newtonian "${COMMON_ARGS[@]}" --yes >/dev/null
+./galaxy_sim galaxy --output_dir="$COMPARE" --physics_package=Newtonian --physics_package_compare=TPFCore --tpfcore_enable_provisional_readout=true "${COMMON_ARGS[@]}" --yes >/dev/null
 
 IMMUNE_A="$OUT/newtonian_tpf_neutral"
 IMMUNE_B="$OUT/newtonian_tpf_extreme"
-./galaxy_sim galaxy --output_dir="$IMMUNE_A" --physics_package=Newtonian "${COMMON_ARGS[@]}" \
+./galaxy_sim galaxy --output_dir="$IMMUNE_A" --physics_package=Newtonian "${COMMON_ARGS[@]}" --yes \
   --tpf_vdsg_coupling=0 --tpf_4d_xi_kernel_mode=off --tpf_4d_xi_kernel_coupling=0 \
-  --tpf_global_accel_shunt_enable=false --tpf_cooling_fraction=0 >/dev/null
-./galaxy_sim galaxy --output_dir="$IMMUNE_B" --physics_package=Newtonian "${COMMON_ARGS[@]}" \
+  --tpf_global_accel_shunt_enable=false --tpf_cooling_fraction=0 --yes >/dev/null
+./galaxy_sim galaxy --output_dir="$IMMUNE_B" --physics_package=Newtonian "${COMMON_ARGS[@]}" --yes \
   --tpf_vdsg_coupling=1e99 --tpf_4d_xi_kernel_mode=metric_transverse_wake --tpf_4d_xi_kernel_coupling=1e99 \
   --tpf_4d_xi_kernel_metric_min=1e-9 --tpf_4d_xi_kernel_metric_max=1e9 --tpf_4d_xi_temporal_mode=norm_scaled \
   --tpf_4d_xi_temporal_coupling=1e99 --tpf_global_accel_shunt_enable=true --tpf_global_accel_shunt_fraction=1e-9 \
   --tpf_cooling_fraction=0.99 --tpfcore_enable_provisional_readout=true --tpfcore_dump_readout_debug=true \
-  --tpf_xi_kernel_dump_field_diagnostics=true >/dev/null
+  --tpf_xi_kernel_dump_field_diagnostics=true --yes >/dev/null
 
 python3 - <<'PY' "$SINGLE" "$COMPARE" "$IMMUNE_A" "$IMMUNE_B"
 import csv, json, pathlib, re, sys
