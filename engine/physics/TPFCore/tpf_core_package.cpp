@@ -16,6 +16,7 @@
 #include "tpf_core_package.hpp"
 #include "../../accel_pipeline_stats.hpp"
 #include "../../config.hpp"
+#include "../../softening_policy.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
@@ -625,7 +626,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  const double eps2 = eps * eps;
   for (int i = 0; i < n; ++i) {
     std::vector<XiKernelRuntimeSource> sources;
     if (bh_mass > 0.0) {
@@ -690,7 +690,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       } else {
         metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
       }
-      const double r2 = dx * dx + dy * dy + dz * dz + eps2;
+      const double r2 = dx * dx + dy * dy + dz * dz;
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
       const double xi_sx = src.mass * dx * inv_r3;
@@ -726,7 +726,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         const double gx = dx + alpha * nx * nd;
         const double gy = dy + alpha * ny * nd;
         const double gz = dz + alpha * nz * nd;
-        const double r_eff2 = dx * gx + dy * gy + dz * gz + eps2;
+        const double r_eff2 = dx * gx + dy * gy + dz * gz;
         const double r_eff = std::sqrt(r_eff2);
         const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
         xi_x_eff += src.mass * gx * inv_r_eff3;
@@ -736,6 +736,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     }
     ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
     ay[i] = -xi_motion_readout_scale_ * xi_y_eff;
+    apply_plummer_softening(state.x[i], state.y[i], eps, ax[i], ay[i]);
 
     // BH-only sign audit: for particles away from the origin, Xi-kernel readout must point inward
     // toward the central BH when K_xi is positive.
