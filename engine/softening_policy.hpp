@@ -16,5 +16,12 @@ struct ResolvedSoftening {
   std::string source;
 };
 ResolvedSoftening resolve_softening(const Config& cfg, const State& state);
+
+double plummer_softening_scale(double r_sq, double softening);
+void apply_plummer_softening(double dx,
+                             double dy,
+                             double softening,
+                             double& ax,
+                             double& ay);
 }
 #endif
