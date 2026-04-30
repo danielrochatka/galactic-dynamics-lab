@@ -98,7 +98,8 @@ TPFCorePackage::TPFCorePackage()
       xi_temporal_coupling_(0.0),
       xi_source_speed_x_(0.0),
       xi_source_speed_y_(0.0),
-      xi_source_speed_z_(0.0) {}
+      xi_source_speed_z_(0.0),
+      xi_runtime_pair_counters_enabled_(false) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
@@ -139,6 +140,7 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
+  xi_runtime_pair_counters_enabled_ = config.tpf_xi_kernel_dump_field_diagnostics;
 }
 
 namespace {
@@ -626,126 +628,127 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  for (int i = 0; i < n; ++i) {
-    std::vector<XiKernelRuntimeSource> sources;
-    if (bh_mass > 0.0) {
-      XiKernelRuntimeSource s;
-      s.mass = bh_mass;
-      s.vx = xi_source_speed_x_;
-      s.vy = xi_source_speed_y_;
-      s.vz = xi_source_speed_z_;
-      sources.push_back(s);
-    }
-    if (star_star) {
-      sources.reserve(sources.size() + static_cast<std::size_t>(std::max(0, n - 1)));
-      for (int j = 0; j < n; ++j) {
-        if (j == i) continue;
-        XiKernelRuntimeSource s;
-        s.x = state.x[j];
-        s.y = state.y[j];
-        s.vx = state.vx[j];
-        s.vy = state.vy[j];
-        s.mass = state.mass[j];
-        sources.push_back(s);
-      }
-    }
 
-    double ax_i = 0.0;
-    double ay_i = 0.0;
-    for (std::size_t si = 0; si < sources.size(); ++si) {
+  std::vector<XiKernelRuntimeSource> star_sources;
+  if (star_star) {
+    star_sources.reserve(static_cast<std::size_t>(std::max(0, n)));
+    for (int j = 0; j < n; ++j) {
+      XiKernelRuntimeSource s;
+      s.x = state.x[j];
+      s.y = state.y[j];
+      s.vx = state.vx[j];
+      s.vy = state.vy[j];
+      s.mass = state.mass[j];
+      star_sources.push_back(s);
+    }
+  }
+
+  auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, double& ax_i, double& ay_i) {
+    if (xi_runtime_pair_counters_enabled_) {
       ++xi_runtime_counters_.xi_last_call_pair_evaluations;
       ++xi_runtime_counters_.xi_total_pair_evaluations;
-      const XiKernelRuntimeSource& src = sources[si];
-      // Sign convention (source-target geometry):
-      //   d = target - source
-      //   Xi_base = source_mass * d / |d|^3
-      //   acceleration readout = -K_xi * Xi_eff_spatial
-      // This keeps BH attraction inward for positive K_xi.
-      const double dx = state.x[i] - src.x;
-      const double dy = state.y[i] - src.y;
-      const double dz = 0.0;
-      const double vx_rel = state.vx[i] - src.vx;
-      const double vy_rel = state.vy[i] - src.vy;
-      const double vz_rel = 0.0 - src.vz;
-      const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
-      const double beta_rel = v_rel_norm / C_SI_LIGHT;
-      if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
-      if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
-      const tpfcore::XiWakeKinematics wake =
-          tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, C_SI_LIGHT,
-                                              xi_kernel_mode_ == "metric_transverse_wake");
-      const double beta_effective = wake.beta_effective;
-      const double beta_for_gamma = std::min(beta_effective, 1.0 - 1.0e-12);
-      const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
-      double factor_raw = 0.0;
-      if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_effective, xi_kernel_beta_power_);
-      else factor_raw = xi_kernel_coupling_ * (gamma_rel - 1.0);
-      double metric_scale = 1.0;
-      if (xi_kernel_mode_ == "metric_transverse_wake" || xi_kernel_mode_ == "metric_transverse_continuous") {
-        constexpr double k_factor_floor_eps = 1.0e-12;
-        const double denom_floor = -1.0 + k_factor_floor_eps;
-        const double guarded_factor = std::max(factor_raw, denom_floor);
-        metric_scale = std::max(xi_kernel_metric_min_,
-                                std::min(xi_kernel_metric_max_, 1.0 / (1.0 + guarded_factor)));
+    }
+    const double dx = state.x[i] - src.x;
+    const double dy = state.y[i] - src.y;
+    const double dz = 0.0;
+    const double vx_rel = state.vx[i] - src.vx;
+    const double vy_rel = state.vy[i] - src.vy;
+    const double vz_rel = 0.0 - src.vz;
+    const double v_rel_norm = std::sqrt(vx_rel * vx_rel + vy_rel * vy_rel + vz_rel * vz_rel);
+    const double beta_rel = v_rel_norm / C_SI_LIGHT;
+    if (!std::isfinite(beta_rel)) throw std::runtime_error("non-finite beta_rel in Xi kernel deformation");
+    if (beta_rel >= 1.0) throw std::runtime_error("beta_rel must be < 1.0 in Xi kernel deformation");
+    const tpfcore::XiWakeKinematics wake =
+        tpfcore::compute_xi_wake_kinematics(dx, dy, dz, vx_rel, vy_rel, vz_rel, C_SI_LIGHT,
+                                            xi_kernel_mode_ == "metric_transverse_wake");
+    const double beta_effective = wake.beta_effective;
+    const double beta_for_gamma = std::min(beta_effective, 1.0 - 1.0e-12);
+    const double gamma_rel = 1.0 / std::sqrt(1.0 - beta_for_gamma * beta_for_gamma);
+    double factor_raw = 0.0;
+    if (xi_kernel_factor_mode_ == "beta_power") factor_raw = xi_kernel_coupling_ * std::pow(beta_effective, xi_kernel_beta_power_);
+    else factor_raw = xi_kernel_coupling_ * (gamma_rel - 1.0);
+    double metric_scale = 1.0;
+    if (xi_kernel_mode_ == "metric_transverse_wake" || xi_kernel_mode_ == "metric_transverse_continuous") {
+      constexpr double k_factor_floor_eps = 1.0e-12;
+      const double denom_floor = -1.0 + k_factor_floor_eps;
+      const double guarded_factor = std::max(factor_raw, denom_floor);
+      metric_scale = std::max(xi_kernel_metric_min_,
+                              std::min(xi_kernel_metric_max_, 1.0 / (1.0 + guarded_factor)));
+    } else {
+      metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
+    }
+    const double r2 = dx * dx + dy * dy + dz * dz;
+    const double r = std::sqrt(r2);
+    const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
+    double r_sq_basis = r2;
+    double xi_sx = src.mass * dx * inv_r3;
+    double xi_sy = src.mass * dy * inv_r3;
+    if (xi_kernel_mode_ == "off") {
+    } else if (xi_kernel_mode_ == "scalar_beta") {
+      const double scalar = 1.0 + factor_raw;
+      xi_sx *= scalar;
+      xi_sy *= scalar;
+    } else {
+      double nx = 0.0, ny = 0.0, nz = 0.0;
+      double n_norm = 0.0;
+      if (xi_kernel_mode_ == "metric_radial") {
+        n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
+        nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
+      } else if (xi_kernel_mode_ == "metric_transverse_wake" || xi_kernel_mode_ == "metric_transverse_continuous") {
+        n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake/metric_transverse_continuous Xi kernel mode");
+        nx = dx / n_norm;
+        ny = dy / n_norm;
+        nz = dz / n_norm;
       } else {
-        metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
-      }
-      const double r2 = dx * dx + dy * dy + dz * dz;
-      const double r = std::sqrt(r2);
-      const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
-      double r_sq_basis = r2;
-      double xi_sx = src.mass * dx * inv_r3;
-      double xi_sy = src.mass * dy * inv_r3;
-      if (xi_kernel_mode_ == "off") {
-      } else if (xi_kernel_mode_ == "scalar_beta") {
-        const double scalar = 1.0 + factor_raw;
-        xi_sx *= scalar;
-        xi_sy *= scalar;
-      } else {
-        double nx = 0.0, ny = 0.0, nz = 0.0;
-        double n_norm = 0.0;
-        if (xi_kernel_mode_ == "metric_radial") {
-          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
-          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_radial Xi kernel mode");
-          nx = dx / n_norm; ny = dy / n_norm; nz = dz / n_norm;
-        } else if (xi_kernel_mode_ == "metric_transverse_wake" || xi_kernel_mode_ == "metric_transverse_continuous") {
-          n_norm = std::sqrt(dx * dx + dy * dy + dz * dz);
-          if (n_norm <= 1.0e-30) throw std::runtime_error("near-source invalid radial direction in metric_transverse_wake/metric_transverse_continuous Xi kernel mode");
-          nx = dx / n_norm;
-          ny = dy / n_norm;
-          nz = dz / n_norm;
-        } else {
-          n_norm = v_rel_norm;
-          if (n_norm > 1.0e-30) {
-            nx = vx_rel / n_norm; ny = vy_rel / n_norm; nz = vz_rel / n_norm;
-          }
+        n_norm = v_rel_norm;
+        if (n_norm > 1.0e-30) {
+          nx = vx_rel / n_norm; ny = vy_rel / n_norm; nz = vz_rel / n_norm;
         }
-        const double alpha = (n_norm > 1.0e-30) ? (metric_scale - 1.0) : 0.0;
-        const double nd = nx * dx + ny * dy + nz * dz;
-        const double gx = dx + alpha * nx * nd;
-        const double gy = dy + alpha * ny * nd;
-        const double gz = dz + alpha * nz * nd;
-        const double r_eff2 = dx * gx + dy * gy + dz * gz;
-        const double r_eff = std::sqrt(r_eff2);
-        const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
-        r_sq_basis = r_eff2;
-        xi_sx = src.mass * gx * inv_r_eff3;
-        xi_sy = src.mass * gy * inv_r_eff3;
-        const double base_ratio = (inv_r3 > 0.0) ? (inv_r_eff3 / inv_r3) : 1.0;
       }
-      double dax = -xi_motion_readout_scale_ * xi_sx;
-      double day = -xi_motion_readout_scale_ * xi_sy;
-      const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
-      dax *= softening_scale;
-      day *= softening_scale;
-      ax_i += dax;
-      ay_i += day;
+      const double alpha = (n_norm > 1.0e-30) ? (metric_scale - 1.0) : 0.0;
+      const double nd = nx * dx + ny * dy + nz * dz;
+      const double gx = dx + alpha * nx * nd;
+      const double gy = dy + alpha * ny * nd;
+      const double gz = dz + alpha * nz * nd;
+      const double r_eff2 = dx * gx + dy * gy + dz * gz;
+      const double r_eff = std::sqrt(r_eff2);
+      const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
+      r_sq_basis = r_eff2;
+      xi_sx = src.mass * gx * inv_r_eff3;
+      xi_sy = src.mass * gy * inv_r_eff3;
+    }
+    double dax = -xi_motion_readout_scale_ * xi_sx;
+    double day = -xi_motion_readout_scale_ * xi_sy;
+    const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
+    dax *= softening_scale;
+    day *= softening_scale;
+    ax_i += dax;
+    ay_i += day;
+  };
+
+  XiKernelRuntimeSource bh_src;
+  bh_src.mass = bh_mass;
+  bh_src.vx = xi_source_speed_x_;
+  bh_src.vy = xi_source_speed_y_;
+  bh_src.vz = xi_source_speed_z_;
+
+  for (int i = 0; i < n; ++i) {
+    double ax_i = 0.0;
+    double ay_i = 0.0;
+    if (bh_mass > 0.0) {
+      accumulate_source(i, bh_src, ax_i, ay_i);
+    }
+    if (star_star) {
+      for (int j = 0; j < n; ++j) {
+        if (j == i) continue;
+        accumulate_source(i, star_sources[static_cast<std::size_t>(j)], ax_i, ay_i);
+      }
     }
     ax[i] = ax_i;
     ay[i] = ay_i;
 
-    // BH-only sign audit: for particles away from the origin, Xi-kernel readout must point inward
-    // toward the central BH when K_xi is positive.
     if (bh_mass > 0.0 && !star_star && xi_motion_readout_scale_ > 0.0) {
       const double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i]);
       const double a_norm = std::sqrt(ax[i] * ax[i] + ay[i] * ay[i]);

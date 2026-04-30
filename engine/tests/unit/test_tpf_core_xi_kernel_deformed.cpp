@@ -425,3 +425,74 @@ TEST_CASE("xi_kernel_deformed source_softening override wins and star_star toggl
   const double star_term = 3.0 / std::pow(1.0 + 4.0, 1.5);
   CHECK(ax_true[0] == doctest::Approx(ax_false[0] + star_term));
 }
+
+TEST_CASE("xi_kernel_deformed refactor preserves BH-only and star_star=true accelerations") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 7.5;
+  c.tpf_4d_xi_kernel_beta_power = 1.25;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 2.5e-12;
+
+  galaxy::State s;
+  s.resize(3);
+  s.x[0] = 2.0;  s.y[0] = 1.0;  s.vx[0] = 1.2e6;  s.vy[0] = -2.5e6; s.mass[0] = 2.0;
+  s.x[1] = -1.0; s.y[1] = 2.5;  s.vx[1] = -0.8e6; s.vy[1] = 0.9e6;  s.mass[1] = 3.5;
+  s.x[2] = 0.5;  s.y[2] = -1.5; s.vx[2] = 0.7e6;  s.vy[2] = 1.1e6;  s.mass[2] = 1.5;
+
+  auto compute_reference = [&](bool star_star, std::vector<double>& ax_out, std::vector<double>& ay_out) {
+    const double c_light = 299792458.0;
+    ax_out.assign(3, 0.0);
+    ay_out.assign(3, 0.0);
+    for (int i = 0; i < 3; ++i) {
+      auto accumulate = [&](double sx, double sy, double svx, double svy, double mass) {
+        const double dx = s.x[i] - sx;
+        const double dy = s.y[i] - sy;
+        const double vx_rel = s.vx[i] - svx;
+        const double vy_rel = s.vy[i] - svy;
+        const galaxy::tpfcore::XiWakeKinematics wake =
+            galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, 0.0, vx_rel, vy_rel, 0.0, c_light, true);
+        const double factor = c.tpf_4d_xi_kernel_coupling * std::pow(wake.beta_effective, c.tpf_4d_xi_kernel_beta_power);
+        const double metric_scale =
+            std::max(c.tpf_4d_xi_kernel_metric_min, std::min(c.tpf_4d_xi_kernel_metric_max, 1.0 / (1.0 + factor)));
+        const double r = std::sqrt(dx * dx + dy * dy);
+        const double nx = dx / r;
+        const double ny = dy / r;
+        const double alpha = metric_scale - 1.0;
+        const double nd = nx * dx + ny * dy;
+        const double gx = dx + alpha * nx * nd;
+        const double gy = dy + alpha * ny * nd;
+        const double r_eff2 = dx * gx + dy * gy;
+        const double inv_r_eff3 = 1.0 / (r_eff2 * std::sqrt(r_eff2));
+        ax_out[i] += -c.tpf_4d_xi_motion_readout_scale * mass * gx * inv_r_eff3;
+        ay_out[i] += -c.tpf_4d_xi_motion_readout_scale * mass * gy * inv_r_eff3;
+      };
+      accumulate(0.0, 0.0, 0.0, 0.0, 6.0);
+      if (star_star) {
+        for (int j = 0; j < 3; ++j) {
+          if (j == i) continue;
+          accumulate(s.x[j], s.y[j], s.vx[j], s.vy[j], s.mass[j]);
+        }
+      }
+    }
+  };
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  std::vector<double> ax_bh, ay_bh, ax_ss, ay_ss;
+  p.compute_accelerations(s, /*bh_mass=*/6.0, /*softening=*/0.0, /*star_star=*/false, ax_bh, ay_bh);
+  p.compute_accelerations(s, /*bh_mass=*/6.0, /*softening=*/0.0, /*star_star=*/true, ax_ss, ay_ss);
+
+  std::vector<double> ax_bh_ref, ay_bh_ref, ax_ss_ref, ay_ss_ref;
+  compute_reference(false, ax_bh_ref, ay_bh_ref);
+  compute_reference(true, ax_ss_ref, ay_ss_ref);
+
+  for (int i = 0; i < 3; ++i) {
+    CHECK(ax_bh[i] == doctest::Approx(ax_bh_ref[i]));
+    CHECK(ay_bh[i] == doctest::Approx(ay_bh_ref[i]));
+    CHECK(ax_ss[i] == doctest::Approx(ax_ss_ref[i]));
+    CHECK(ay_ss[i] == doctest::Approx(ay_ss_ref[i]));
+  }
+}

@@ -212,6 +212,7 @@ class TPFCorePackage : public PhysicsPackage {
   double xi_source_speed_x_;
   double xi_source_speed_y_;
   double xi_source_speed_z_;
+  bool xi_runtime_pair_counters_enabled_;
   mutable XiRuntimeCounters xi_runtime_counters_;
 };
 
