@@ -1100,11 +1100,7 @@ int main(int argc, char** argv) {
         std::cout << "  - " << galaxy_preflight.warnings[i] << "\n";
 
       const bool interactive = IS_STDOUT_TERMINAL() && IS_STDIN_TERMINAL();
-      if (!assume_yes) {
-        if (!interactive) {
-          std::cerr << "Preflight warnings found in non-interactive mode. Re-run with --yes to continue.\n";
-          return 1;
-        }
+      if (interactive && !assume_yes) {
         std::cout << "Continue anyway? [y/N] ";
         std::string ans;
         std::getline(std::cin, ans);
