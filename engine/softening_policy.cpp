@@ -9,7 +9,8 @@ double plummer_softening_scale(double r_sq, double softening) {
   const double eps2 = softening * softening;
   const double softened = r_sq + eps2;
   if (r_sq <= 0.0 || softened <= 0.0) return 0.0;
-  return std::pow(r_sq / softened, 1.5);
+  const double ratio = r_sq / softened;
+  return ratio * std::sqrt(ratio);
 }
 
 void apply_plummer_softening(double dx,
@@ -29,7 +30,7 @@ ResolvedSoftening resolve_softening(const Config& cfg, const State& state) {
   if (r.mode != "auto") throw std::runtime_error("invalid softening_mode");
   if (r.profile.empty()) r.profile = "collisionless";
   if (r.profile == "collisionless") {
-    const int dim = (cfg.auto_softening_dimension > 0) ? cfg.auto_softening_dimension : 4;
+    const int dim = (cfg.auto_softening_dimension > 0) ? cfg.auto_softening_dimension : 2;
     if (dim <= 0) throw std::runtime_error("auto_softening_dimension must be > 0");
     const double fac = (cfg.auto_softening_factor > 0.0) ? cfg.auto_softening_factor : 1.8;
     if (!(fac > 0.0)) throw std::runtime_error("auto_softening_factor must be > 0 for collisionless");
