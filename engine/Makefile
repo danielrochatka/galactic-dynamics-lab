@@ -73,9 +73,7 @@ test_integration: $(TARGET)
 	./tests/run_integration.sh
 
 # Full C++ suite: unit/regression binary + integration shell scripts (requires galaxy_sim).
-test: $(TARGET) $(TEST_TARGET)
-	./$(TEST_TARGET)
-	./tests/run_integration.sh
+test: test_unit test_integration
 check: test
 
 clean:
