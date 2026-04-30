@@ -152,6 +152,9 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("auto_softening_mean_separation", d(resolved.softening.mean_separation));
   kv.emplace_back("auto_softening_radius_inner_used", d(resolved.softening.radius_inner_used));
   kv.emplace_back("auto_softening_radius_outer_used", d(resolved.softening.radius_outer_used));
+  kv.emplace_back("auto_softening_max_capped", b(resolved.softening.max_capped));
+  kv.emplace_back("auto_softening_min_floored", b(resolved.softening.min_floored));
+  kv.emplace_back("auto_softening_max_cap_source", resolved.softening.max_cap_source);
   return kv;
 }
 

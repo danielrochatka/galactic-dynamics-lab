@@ -53,8 +53,26 @@ ResolvedSoftening resolve_softening(const Config& cfg, const State& state) {
     r.effective_softening = fac * kSolarRadiusM;
     r.source = "auto:" + r.profile + "(solar_radius_multiplier)";
   } else throw std::runtime_error("invalid softening_auto_profile");
-  if (cfg.auto_softening_min > 0.0) r.effective_softening = std::max(r.effective_softening, cfg.auto_softening_min);
-  if (cfg.auto_softening_max > 0.0) r.effective_softening = std::min(r.effective_softening, cfg.auto_softening_max);
+  double max_cap = 0.0;
+  if (cfg.auto_softening_max > 0.0) {
+    max_cap = cfg.auto_softening_max;
+    r.max_cap_source = "explicit";
+  } else if (r.mode == "auto" && r.profile == "collisionless" && r.radius_outer_used > 0.0) {
+    max_cap = 0.05 * r.radius_outer_used;
+    r.max_cap_source = "contextual";
+  }
+  if (max_cap > 0.0) {
+    const double prev = r.effective_softening;
+    r.effective_softening = std::min(r.effective_softening, max_cap);
+    r.max_capped = (r.effective_softening < prev);
+    if (r.max_capped) r.source += "|max_cap=" + r.max_cap_source;
+  }
+  if (cfg.auto_softening_min > 0.0) {
+    const double prev = r.effective_softening;
+    r.effective_softening = std::max(r.effective_softening, cfg.auto_softening_min);
+    r.min_floored = (r.effective_softening > prev);
+    if (r.min_floored) r.source += "|min_floor=explicit";
+  }
   if (!std::isfinite(r.effective_softening) || r.effective_softening < 0.0) throw std::runtime_error("resolved softening invalid");
   return r;
 }
