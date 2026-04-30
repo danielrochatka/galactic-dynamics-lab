@@ -10,13 +10,13 @@ COMMON=(--physics_package=Newtonian --n_stars=64 --bh_mass=12000 --dt=0.02 --n_s
 
 run_case() {
   local name="$1"; shift
-  ./galaxy_sim galaxy --output_dir="$OUT/$name" "${COMMON[@]}" "$@" >/dev/null
+  ./galaxy_sim galaxy --output_dir="$OUT/$name" "${COMMON[@]}" --yes "$@" --yes >/dev/null
 }
 
 run_case A_single_preformed_starstar_true --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true
 run_case B_single_symmetric_starstar_true --galaxy_init_template=symmetric_disk --enable_star_star_gravity=true
 run_case C_single_preformed_starstar_false --galaxy_init_template=preformed_spiral --enable_star_star_gravity=false
-./galaxy_sim galaxy --output_dir="$OUT/D_compare" "${COMMON[@]}" --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true --physics_package_compare=TPFCore --tpfcore_enable_provisional_readout=true >/dev/null
+./galaxy_sim galaxy --output_dir="$OUT/D_compare" "${COMMON[@]}" --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true --physics_package_compare=TPFCore --tpfcore_enable_provisional_readout=true --yes >/dev/null
 
 python3 - <<'PY' "$OUT"
 import csv, math, pathlib, statistics, sys

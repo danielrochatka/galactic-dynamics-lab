@@ -98,8 +98,19 @@ void append_galaxy_preflight_to_run_info(const std::string& output_dir,
     << "preflight_outer_orbital_period_s\t" << s.outer_orbital_period_s << "\n"
     << "preflight_outer_orbital_period_myr\t" << s.outer_orbital_period_myr << "\n"
     << "preflight_simulated_outer_orbits\t" << s.simulated_outer_orbits << "\n"
-    << "preflight_warning_count\t" << s.warnings.size() << "\n";
-  for (std::size_t i = 0; i < s.warnings.size(); ++i) f << "preflight_warning_" << i << "\t" << s.warnings[i] << "\n";
+    << "galaxy_preflight_disk_to_bh_mass_ratio\t" << s.disk_to_bh_mass_ratio << "\n"
+    << "galaxy_preflight_softening_to_outer_radius\t" << s.softening_to_outer_radius << "\n"
+    << "galaxy_preflight_estimated_outer_orbital_period\t" << s.outer_orbital_period_s << "\n"
+    << "galaxy_preflight_simulated_outer_orbits\t" << s.simulated_outer_orbits << "\n"
+    << "preflight_warning_count\t" << s.warnings.size() << "\n"
+    << "galaxy_preflight_warning_count\t" << s.warnings.size() << "\n";
+  std::string joined;
+  for (std::size_t i = 0; i < s.warnings.size(); ++i) {
+    if (i) joined += " | ";
+    joined += s.warnings[i];
+    f << "preflight_warning_" << i << "\t" << s.warnings[i] << "\n";
+  }
+  f << "galaxy_preflight_warnings\t" << joined << "\n";
 }
 
 }

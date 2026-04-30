@@ -14,7 +14,7 @@ trap 'rm -rf "$OUT"' EXIT
   --tpf_4d_xi_kernel_coupling=1e-3 \
   --tpf_4d_xi_kernel_factor_mode=beta_power \
   --tpf_4d_xi_temporal_mode=off \
-  --n_stars=24 --n_steps=8 --snapshot_every=4 --save_run_info=true
+  --n_stars=24 --n_steps=8 --snapshot_every=4 --save_run_info=true --yes
 
 test -f "$OUT/compare_manifest.json"
 test -f "$OUT/compare_manifest.txt"

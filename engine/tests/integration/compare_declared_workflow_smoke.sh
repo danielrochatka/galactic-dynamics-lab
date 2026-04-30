@@ -9,8 +9,8 @@ trap 'rm -rf "$OUT"' EXIT
 ./galaxy_sim galaxy --output_dir="$OUT" \
   --physics_package=Newtonian \
   --physics_package_compare=TPFCore \
-  --tpfcore_enable_provisional_readout=true \
-  --n_stars=24 --n_steps=8 --snapshot_every=4 --save_run_info=true
+  --tpfcore_enable_provisional_readout=true --yes \
+  --n_stars=24 --n_steps=8 --snapshot_every=4 --save_run_info=true --yes
 
 test -f "$OUT/compare_manifest.json"
 test -f "$OUT/compare_manifest.txt"

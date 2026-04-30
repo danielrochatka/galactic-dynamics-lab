@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ENGINE_ROOT="${ENGINE_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
+ROOT="$ENGINE_ROOT"
 source "$ROOT/tests/integration/_env.sh"
 
 OUT="$ROOT/../outputs/preflight_yes_bypass_smoke"

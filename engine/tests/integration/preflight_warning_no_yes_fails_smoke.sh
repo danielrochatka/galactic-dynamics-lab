@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ENGINE_ROOT="${ENGINE_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
+ROOT="$ENGINE_ROOT"
 source "$ROOT/tests/integration/_env.sh"
 
 OUT="$ROOT/../outputs/preflight_warning_no_yes_fails_smoke"
@@ -15,5 +16,10 @@ set -e
 
 if [[ $RC -eq 0 ]]; then
   echo "expected warning run without --yes to fail in non-interactive mode" >&2
+  exit 1
+fi
+
+if compgen -G "$OUT/snapshot_*.csv" > /dev/null; then
+  echo "snapshots should not exist when preflight aborts" >&2
   exit 1
 fi
