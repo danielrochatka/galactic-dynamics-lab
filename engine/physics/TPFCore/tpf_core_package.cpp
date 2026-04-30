@@ -98,8 +98,7 @@ TPFCorePackage::TPFCorePackage()
       xi_temporal_coupling_(0.0),
       xi_source_speed_x_(0.0),
       xi_source_speed_y_(0.0),
-      xi_source_speed_z_(0.0),
-      xi_runtime_pair_counters_enabled_(false) {}
+      xi_source_speed_z_(0.0) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
@@ -140,7 +139,6 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
-  xi_runtime_pair_counters_enabled_ = config.tpf_xi_kernel_dump_field_diagnostics;
 }
 
 namespace {
@@ -628,6 +626,11 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
+  const std::uint64_t bh_pairs = (bh_mass > 0.0) ? static_cast<std::uint64_t>(std::max(0, n)) : 0;
+  const std::uint64_t star_pairs = star_star ? static_cast<std::uint64_t>(std::max(0, n)) * static_cast<std::uint64_t>(std::max(0, n - 1)) : 0;
+  const std::uint64_t total_pairs = bh_pairs + star_pairs;
+  xi_runtime_counters_.xi_last_call_pair_evaluations = total_pairs;
+  xi_runtime_counters_.xi_total_pair_evaluations += total_pairs;
 
   std::vector<XiKernelRuntimeSource> star_sources;
   if (star_star) {
@@ -644,10 +647,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   }
 
   auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, double& ax_i, double& ay_i) {
-    if (xi_runtime_pair_counters_enabled_) {
-      ++xi_runtime_counters_.xi_last_call_pair_evaluations;
-      ++xi_runtime_counters_.xi_total_pair_evaluations;
-    }
     const double dx = state.x[i] - src.x;
     const double dy = state.y[i] - src.y;
     const double dz = 0.0;

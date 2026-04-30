@@ -496,3 +496,35 @@ TEST_CASE("xi_kernel_deformed refactor preserves BH-only and star_star=true acce
     CHECK(ay_ss[i] == doctest::Approx(ay_ss_ref[i]));
   }
 }
+
+TEST_CASE("xi_kernel_deformed pair counters remain accurate without diagnostics hot-loop increments") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_xi_kernel_dump_field_diagnostics = false;
+
+  galaxy::State s;
+  s.resize(3);
+  s.x[0] = 1.0; s.y[0] = 0.0; s.vx[0] = 0.0; s.vy[0] = 0.0; s.mass[0] = 1.0;
+  s.x[1] = 0.0; s.y[1] = 1.0; s.vx[1] = 0.0; s.vy[1] = 0.0; s.mass[1] = 2.0;
+  s.x[2] = -1.0; s.y[2] = 0.0; s.vx[2] = 0.0; s.vy[2] = 0.0; s.mass[2] = 3.0;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  std::vector<double> ax, ay;
+
+  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/false, ax, ay);
+  auto c1 = p.xi_runtime_counters();
+  CHECK(c1.xi_last_call_pair_evaluations == 3);
+  CHECK(c1.xi_total_pair_evaluations == 3);
+
+  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.0, /*star_star=*/true, ax, ay);
+  auto c2 = p.xi_runtime_counters();
+  CHECK(c2.xi_last_call_pair_evaluations == 9);
+  CHECK(c2.xi_total_pair_evaluations == 12);
+
+  p.compute_accelerations(s, /*bh_mass=*/0.0, /*softening=*/0.0, /*star_star=*/true, ax, ay);
+  auto c3 = p.xi_runtime_counters();
+  CHECK(c3.xi_last_call_pair_evaluations == 6);
+  CHECK(c3.xi_total_pair_evaluations == 18);
+}
