@@ -6,6 +6,7 @@ cd "$ROOT"
 
 ./run_unit_tests.sh
 ./run_integration_tests.sh
+./run_python_tests.sh
 
 echo ""
 echo "All tests finished OK."
