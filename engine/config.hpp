@@ -134,7 +134,7 @@ struct Config {
 
   double softening = 0.0;
   std::string softening_mode = "manual"; /* off | manual | auto */
-  std::string softening_auto_profile = "stellar_physical"; /* collisionless | stellar_physical | nuclear_cluster */
+  std::string softening_auto_profile = ""; /* empty => context default; or collisionless | stellar_physical | nuclear_cluster */
   double auto_softening_factor = 0.0;
   int auto_softening_dimension = 0;
   double auto_softening_min = 0.0;

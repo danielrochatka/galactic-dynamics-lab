@@ -56,6 +56,8 @@ ResolvedScenario resolve_scenario(const Config& input) {
   const ModeScenarioDefaults mode_defaults = scenario_defaults_for_mode(r.config.simulation_mode);
   r.timing_policy = mode_defaults.timing_policy;
   r.softening_policy = mode_defaults.softening_policy;
+  r.softening = resolve_softening(r.config, State{});
+  r.config.softening = r.softening.effective_softening;
 
   switch (r.config.simulation_mode) {
     case SimulationMode::galaxy:
@@ -105,8 +107,6 @@ ResolvedScenario resolve_scenario(const Config& input) {
       break;
   }
   r.effective_total_sim_time = r.config.dt * static_cast<double>(r.effective_n_steps);
-  r.softening = resolve_softening(r.config, r.initial_state);
-  r.config.softening = r.softening.effective_softening;
 
   return r;
 }
@@ -143,6 +143,7 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("effective_particle_count", i(resolved.initial_state.n()));
   kv.emplace_back("effective_timing_policy", resolved.timing_policy);
   kv.emplace_back("effective_softening_policy", resolved.softening_policy);
+  kv.emplace_back("configured_softening", d(resolved.config.softening));
   kv.emplace_back("configured_softening_mode", resolved.softening.mode);
   kv.emplace_back("configured_softening_auto_profile", resolved.softening.profile);
   kv.emplace_back("softening_source", resolved.softening.source);

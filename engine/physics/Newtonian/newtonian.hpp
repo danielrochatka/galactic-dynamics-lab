@@ -2,7 +2,6 @@
 #define GALAXY_PHYSICS_NEWTONIAN_HPP
 
 #include "../physics_package.hpp"
-#include "../../softening_audit.hpp"
 
 namespace galaxy {
 
@@ -24,9 +23,6 @@ class NewtonianPackage : public PhysicsPackage {
                                  double softening,
                                  bool star_star = true) const override;
  private:
-  mutable SofteningAuditRunStats softening_audit_run_stats_{};
- public:
-  const SofteningAuditRunStats& softening_audit_stats() const { return softening_audit_run_stats_; }
 };
 
 }  // namespace galaxy

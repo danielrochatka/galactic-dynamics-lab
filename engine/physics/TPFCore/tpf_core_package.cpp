@@ -138,9 +138,6 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
-  softening_audit_enable_ = false;
-  softening_audit_last_call_stats_ = SofteningAuditCallStats{};
-  softening_audit_run_stats_ = SofteningAuditRunStats{};
 }
 
 namespace {
@@ -477,8 +474,6 @@ void TPFCorePackage::eval_accel_pipeline(const State& state,
   ay.assign(n, 0.0);
 
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  softening_audit_last_call_stats_ = SofteningAuditCallStats{};
-  softening_audit_last_call_stats_.eps_used = eps;
   if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
     tpfcore::TpfRadialGravityProfile profile =
         tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
@@ -630,8 +625,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  softening_audit_last_call_stats_ = SofteningAuditCallStats{};
-  softening_audit_last_call_stats_.eps_used = eps;
   const double eps2 = eps * eps;
   for (int i = 0; i < n; ++i) {
     std::vector<XiKernelRuntimeSource> sources;
@@ -698,7 +691,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
       }
       const double r2 = dx * dx + dy * dy + dz * dz + eps2;
-      if (softening_audit_enable_) softening_audit_pair(softening_audit_last_call_stats_, std::sqrt(dx * dx + dy * dy + dz * dz), eps, si == 0 && bh_mass > 0.0);
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
       const double xi_sx = src.mass * dx * inv_r3;
@@ -740,7 +732,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         xi_x_eff += src.mass * gx * inv_r_eff3;
         xi_y_eff += src.mass * gy * inv_r_eff3;
         const double base_ratio = (inv_r3 > 0.0) ? (inv_r_eff3 / inv_r3) : 1.0;
-        if (base_ratio > softening_audit_last_call_stats_.xi_metric_max_ratio) softening_audit_last_call_stats_.xi_metric_max_ratio = base_ratio;
       }
     }
     ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
@@ -760,10 +751,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         }
       }
     }
-  }
-  if (softening_audit_enable_) {
-    softening_audit_finalize(softening_audit_last_call_stats_);
-    softening_audit_merge_run(softening_audit_run_stats_, softening_audit_last_call_stats_);
   }
 }
 
