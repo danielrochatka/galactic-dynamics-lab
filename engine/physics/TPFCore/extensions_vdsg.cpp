@@ -1,5 +1,6 @@
 #include "extensions_vdsg.hpp"
 
+#include "../../softening_policy.hpp"
 #include "derived_tpf_radial.hpp"
 #include "source_iteration.hpp"
 #include <algorithm>
@@ -36,8 +37,6 @@ void accumulate_vdsg_velocity_modifier(const State& state,
                                        std::vector<double>& ay) {
   const int n = state.n();
   const double G = tpfcore::TPF_G_SI;
-  const double eps_sq = softening * softening;
-
   ax.assign(n, 0.0);
   ay.assign(n, 0.0);
 
@@ -48,8 +47,7 @@ void accumulate_vdsg_velocity_modifier(const State& state,
       const double dx = state.x[i] - source.x;
       const double dy = state.y[i] - source.y;
       const double r_sq = dx * dx + dy * dy;
-      const double denom = r_sq + eps_sq;
-      const double r_mag = std::sqrt(denom);
+      const double r_mag = std::sqrt(r_sq);
       if (r_mag < 1e-300) return;
 
       const double ux = dx / r_mag;
@@ -64,11 +62,13 @@ void accumulate_vdsg_velocity_modifier(const State& state,
       const double beta = vrel_mag / C_SI_LIGHT;
       const double lambda_eff = vdsg_effective_coupling(vdsg_coupling, source.mass, vdsg_mass_baseline_kg);
       const double doppler_scale = 1.0 + lambda_eff * beta;
-      const double a_newt = G * source.mass / denom;
+      const double a_newt = G * source.mass / r_sq;
       const double accel_mag = a_newt * (doppler_scale - 1.0);
-
-      ax[i] -= ux * accel_mag;
-      ay[i] -= uy * accel_mag;
+      double dax = -ux * accel_mag;
+      double day = -uy * accel_mag;
+      apply_plummer_softening(dx, dy, softening, dax, day);
+      ax[i] += dax;
+      ay[i] += day;
     });
   }
 }

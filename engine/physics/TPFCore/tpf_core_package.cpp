@@ -16,6 +16,7 @@
 #include "tpf_core_package.hpp"
 #include "../../accel_pipeline_stats.hpp"
 #include "../../config.hpp"
+#include "../../softening_policy.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
@@ -625,7 +626,6 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   ax.assign(static_cast<std::size_t>(n), 0.0);
   ay.assign(static_cast<std::size_t>(n), 0.0);
   const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  const double eps2 = eps * eps;
   for (int i = 0; i < n; ++i) {
     std::vector<XiKernelRuntimeSource> sources;
     if (bh_mass > 0.0) {
@@ -650,8 +650,8 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       }
     }
 
-    double xi_x_eff = 0.0;
-    double xi_y_eff = 0.0;
+    double ax_i = 0.0;
+    double ay_i = 0.0;
     for (std::size_t si = 0; si < sources.size(); ++si) {
       ++xi_runtime_counters_.xi_last_call_pair_evaluations;
       ++xi_runtime_counters_.xi_total_pair_evaluations;
@@ -690,18 +690,17 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
       } else {
         metric_scale = std::max(xi_kernel_metric_min_, std::min(xi_kernel_metric_max_, 1.0 + factor_raw));
       }
-      const double r2 = dx * dx + dy * dy + dz * dz + eps2;
+      const double r2 = dx * dx + dy * dy + dz * dz;
       const double r = std::sqrt(r2);
       const double inv_r3 = (r > 0.0) ? (1.0 / (r2 * r)) : 0.0;
-      const double xi_sx = src.mass * dx * inv_r3;
-      const double xi_sy = src.mass * dy * inv_r3;
+      double r_sq_basis = r2;
+      double xi_sx = src.mass * dx * inv_r3;
+      double xi_sy = src.mass * dy * inv_r3;
       if (xi_kernel_mode_ == "off") {
-        xi_x_eff += xi_sx;
-        xi_y_eff += xi_sy;
       } else if (xi_kernel_mode_ == "scalar_beta") {
         const double scalar = 1.0 + factor_raw;
-        xi_x_eff += xi_sx * scalar;
-        xi_y_eff += xi_sy * scalar;
+        xi_sx *= scalar;
+        xi_sy *= scalar;
       } else {
         double nx = 0.0, ny = 0.0, nz = 0.0;
         double n_norm = 0.0;
@@ -726,16 +725,24 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         const double gx = dx + alpha * nx * nd;
         const double gy = dy + alpha * ny * nd;
         const double gz = dz + alpha * nz * nd;
-        const double r_eff2 = dx * gx + dy * gy + dz * gz + eps2;
+        const double r_eff2 = dx * gx + dy * gy + dz * gz;
         const double r_eff = std::sqrt(r_eff2);
         const double inv_r_eff3 = (r_eff > 0.0) ? (1.0 / (r_eff2 * r_eff)) : 0.0;
-        xi_x_eff += src.mass * gx * inv_r_eff3;
-        xi_y_eff += src.mass * gy * inv_r_eff3;
+        r_sq_basis = r_eff2;
+        xi_sx = src.mass * gx * inv_r_eff3;
+        xi_sy = src.mass * gy * inv_r_eff3;
         const double base_ratio = (inv_r3 > 0.0) ? (inv_r_eff3 / inv_r3) : 1.0;
       }
+      double dax = -xi_motion_readout_scale_ * xi_sx;
+      double day = -xi_motion_readout_scale_ * xi_sy;
+      const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
+      dax *= softening_scale;
+      day *= softening_scale;
+      ax_i += dax;
+      ay_i += day;
     }
-    ax[i] = -xi_motion_readout_scale_ * xi_x_eff;
-    ay[i] = -xi_motion_readout_scale_ * xi_y_eff;
+    ax[i] = ax_i;
+    ay[i] = ay_i;
 
     // BH-only sign audit: for particles away from the origin, Xi-kernel readout must point inward
     // toward the central BH when K_xi is positive.

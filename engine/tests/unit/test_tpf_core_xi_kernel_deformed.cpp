@@ -2,6 +2,7 @@
 
 #include "config.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
+#include "physics/TPFCore/runtime_package_helpers.hpp"
 
 #include <cmath>
 #include <vector>
@@ -329,4 +330,98 @@ TEST_CASE("xi_kernel_deformed route does not use additive VDSG or direct/provisi
     CHECK(ax1[i] == doctest::Approx(ax0[i]));
     CHECK(ay1[i] == doctest::Approx(ay0[i]));
   }
+}
+
+TEST_CASE("xi_kernel_deformed off with K_xi=G matches Newtonian BH law for eps=0 and eps>0") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_motion_readout_scale = galaxy::tpfcore::TPF_G_SI;
+
+  galaxy::State s;
+  s.resize(1);
+  s.x[0] = 3.0; s.y[0] = 4.0; s.vx[0] = 0.0; s.vy[0] = 0.0; s.mass[0] = 1.0;
+  const double bh_mass = 9.0;
+  const double r2 = 25.0;
+
+  std::vector<double> ax0, ay0;
+  galaxy::TPFCorePackage p0;
+  p0.init_from_config(c);
+  p0.compute_accelerations(s, bh_mass, 0.0, false, ax0, ay0);
+  CHECK(ax0[0] == doctest::Approx(-galaxy::tpfcore::TPF_G_SI * bh_mass * s.x[0] / std::pow(r2, 1.5)));
+  CHECK(ay0[0] == doctest::Approx(-galaxy::tpfcore::TPF_G_SI * bh_mass * s.y[0] / std::pow(r2, 1.5)));
+
+  std::vector<double> axs, ays;
+  p0.compute_accelerations(s, bh_mass, 2.0, false, axs, ays);
+  const double soft_denom = std::pow(r2 + 4.0, 1.5);
+  CHECK(axs[0] == doctest::Approx(-galaxy::tpfcore::TPF_G_SI * bh_mass * s.x[0] / soft_denom));
+  CHECK(ays[0] == doctest::Approx(-galaxy::tpfcore::TPF_G_SI * bh_mass * s.y[0] / soft_denom));
+}
+
+TEST_CASE("xi_kernel_deformed metric_velocity uses r_eff2 basis for softening scale") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_velocity";
+  c.tpf_4d_xi_kernel_coupling = 4.0;
+  c.tpf_4d_xi_kernel_beta_power = 1.0;
+  c.tpf_4d_xi_kernel_factor_mode = "beta_power";
+  c.tpf_4d_xi_motion_readout_scale = 1.0;
+  c.tpf_4d_xi_source_speed_x = 0.0;
+  c.tpf_4d_xi_source_speed_y = 0.0;
+  c.tpf_4d_xi_source_speed_z = 0.0;
+
+  galaxy::State s;
+  s.resize(1);
+  s.x[0] = 2.0; s.y[0] = 1.0; s.vx[0] = 1.0e7; s.vy[0] = 2.0e6; s.mass[0] = 1.0;
+  const double bh_mass = 10.0;
+  const double eps = 0.7;
+
+  std::vector<double> ax, ay;
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  p.compute_accelerations(s, bh_mass, eps, false, ax, ay);
+
+  const double dx = s.x[0], dy = s.y[0];
+  const double vrel = std::sqrt(s.vx[0] * s.vx[0] + s.vy[0] * s.vy[0]);
+  const galaxy::tpfcore::XiWakeKinematics wake =
+      galaxy::tpfcore::compute_xi_wake_kinematics(dx, dy, 0.0, s.vx[0], s.vy[0], 0.0, 299792458.0, false);
+  const double beta = wake.beta_effective;
+  const double metric_scale = std::max(c.tpf_4d_xi_kernel_metric_min,
+                                       std::min(c.tpf_4d_xi_kernel_metric_max, 1.0 + c.tpf_4d_xi_kernel_coupling * beta));
+  const double nx = s.vx[0] / vrel;
+  const double ny = s.vy[0] / vrel;
+  const double alpha = metric_scale - 1.0;
+  const double nd = nx * dx + ny * dy;
+  const double gx = dx + alpha * nx * nd;
+  const double gy = dy + alpha * ny * nd;
+  const double r_eff2 = dx * gx + dy * gy;
+  const double denom = std::pow(r_eff2 + eps * eps, 1.5);
+  CHECK(ax[0] == doctest::Approx(-bh_mass * gx / denom));
+  CHECK(ay[0] == doctest::Approx(-bh_mass * gy / denom));
+}
+
+TEST_CASE("xi_kernel_deformed source_softening override wins and star_star toggle behaves") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_motion_readout_scale = 1.0;
+  c.tpfcore_source_softening = 2.0;
+
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = 1.0; s.y[0] = 0.0; s.vx[0] = 0.0; s.vy[0] = 0.0; s.mass[0] = 1.0;
+  s.x[1] = 2.0; s.y[1] = 0.0; s.vx[1] = 0.0; s.vy[1] = 0.0; s.mass[1] = 3.0;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  std::vector<double> ax_false, ay_false, ax_true, ay_true;
+  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.1, /*star_star=*/false, ax_false, ay_false);
+  p.compute_accelerations(s, /*bh_mass=*/5.0, /*softening=*/0.1, /*star_star=*/true, ax_true, ay_true);
+
+  // BH term with source softening override eps=2.0 (not global softening=0.1).
+  CHECK(ax_false[0] == doctest::Approx(-5.0 / std::pow(1.0 + 4.0, 1.5)));
+  CHECK(ay_false[0] == doctest::Approx(0.0));
+  // Enabling star-star adds inward pull from star[1] at dx=-1, same eps override.
+  const double star_term = 3.0 / std::pow(1.0 + 4.0, 1.5);
+  CHECK(ax_true[0] == doctest::Approx(ax_false[0] + star_term));
 }
