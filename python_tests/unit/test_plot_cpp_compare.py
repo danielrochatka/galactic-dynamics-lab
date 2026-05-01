@@ -285,6 +285,59 @@ class TestPlotCppCompare(unittest.TestCase):
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_compare_layout_uses_shared_top_readout_and_panel_metadata_boxes(self) -> None:
+        import matplotlib.figure
+
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info_new_schema(left, "TPFCore", dyn="xi_kernel_deformed")
+            _write_run_info_new_schema(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": "r_layout", "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+
+            seen_suptitles: list[str] = []
+            seen_axis_titles: list[list[str]] = []
+            seen_axis_texts: list[list[list[str]]] = []
+            orig_savefig = matplotlib.figure.Figure.savefig
+
+            def _capture_savefig(fig, *args, **kwargs):
+                if len(fig.axes) == 2 and fig.get_facecolor() == (0.0, 0.0, 0.0, 1.0):
+                    seen_suptitles.append(fig._suptitle.get_text() if fig._suptitle else "")
+                    seen_axis_titles.append([ax.get_title() for ax in fig.axes])
+                    seen_axis_texts.append([[t.get_text() for t in ax.texts] for ax in fig.axes])
+                return orig_savefig(fig, *args, **kwargs)
+
+            with patch.object(matplotlib.figure.Figure, "savefig", _capture_savefig):
+                render_compare(parent, no_animation=True, overlay_mode="none")
+
+            self.assertGreaterEqual(len(seen_suptitles), 2)
+            for suptitle in seen_suptitles:
+                self.assertIn("Compare r_layout", suptitle)
+                self.assertIn("step=", suptitle)
+                self.assertIn("display units:", suptitle)
+                self.assertNotIn("left=", suptitle)
+                self.assertNotIn("right=", suptitle)
+                self.assertNotIn("rev=", suptitle)
+            for title_pair in seen_axis_titles:
+                self.assertEqual(title_pair, ["", ""])
+            for panel_texts in seen_axis_texts:
+                self.assertTrue(any("role: left / baseline" in txt for txt in panel_texts[0]))
+                self.assertTrue(any("Newtonian" in txt for txt in panel_texts[1]))
+
     def test_mode_aware_compare_name_supports_legacy_run_info(self) -> None:
         left = {"simulation_mode": "galaxy", "physics_package": "TPFCore", "tpf_dynamics_mode": "direct_tpf"}
         right = {"simulation_mode": "galaxy", "physics_package": "Newtonian"}

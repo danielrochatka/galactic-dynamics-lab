@@ -541,11 +541,26 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
         render_radius=viewport,
         spatial_display=spatial_display,
     )
-    ax.set_title(
-        f"{side.label} / {_panel_physics_text(side.run_info)} / primary trajectory x-y / step={int(snap.step)}",
-        color="white",
-        fontsize=11,
-    )
+    ax.set_title("")
+    panel_lines = _compare_panel_metadata_lines(side)
+    if panel_lines:
+        ax.text(
+            0.02,
+            0.98,
+            "\n".join(panel_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            color="#66ff66",
+            fontsize=5.5,
+            bbox={
+                "facecolor": (0.0, 0.0, 0.0, 0.72),
+                "edgecolor": (0.2, 0.8, 0.2, 0.85),
+                "linewidth": 0.6,
+                "boxstyle": "round,pad=0.20",
+            },
+            zorder=30,
+        )
     if side.overlay_mode != "none":
         draw_galaxy_render_overlay(
             ax,
@@ -555,6 +570,32 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
             step=int(snap.step),
             time_s=float(snap.time),
         )
+
+
+def _compare_panel_metadata_lines(side: SideData) -> list[str]:
+    run_info = side.run_info or {}
+    pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip() or "?"
+    lines = [pkg]
+    if side.label == "left_primary":
+        lines.append(f"package: {pkg}")
+        lines.append("role: left / baseline")
+        return lines
+
+    dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
+    kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
+    if pkg == "TPFCore":
+        if dyn:
+            lines.append(f"dynamics: {dyn}")
+        if kernel:
+            lines.append(f"kernel: {kernel}")
+        coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)
+        if coupling is None:
+            coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
+        if coupling is not None and str(coupling).strip() != "":
+            lines.append(f"coupling: {coupling}")
+    else:
+        lines.append(f"package: {pkg}")
+    return lines
 
 
 def render_compare(
@@ -626,12 +667,15 @@ def render_compare(
         _draw_panel(axes[0], left, ls, shared_vp, spatial_display=spatial_display)
         _draw_panel(axes[1], right, rs, shared_vp, spatial_display=spatial_display)
         step = int(steps[step_idx])
+        tc = format_animation_time_caption(
+            float(ls.time),
+            "galaxy_compare",
+            preferred_time_unit=shared_display.config.time_unit,
+            active_time_unit=shared_display.active_time_unit,
+        )
         fig.suptitle(
-            f"Compare {compare_run_id} | left={left_panel_label} "
-            f"| right={right_panel_label} "
-            f"| step={step} "
-            f"| rev={left_rev} "
-            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"Compare {compare_run_id} | step={step} | {tc} "
+            f"| display units: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,
@@ -654,7 +698,6 @@ def render_compare(
 
     left_panel_label = _panel_physics_text(left.run_info)
     right_panel_label = _panel_physics_text(right.run_info)
-    left_rev = str(_run_info_effective_value(left.run_info, "code_version_label", "unknown") or "unknown")
     mode_aware_initial = _mode_aware_compare_name("initial", left.run_info, right.run_info, ext="png")
     mode_aware_final = _mode_aware_compare_name("final", left.run_info, right.run_info, ext="png")
     save_static(0, mode_aware_initial)
@@ -793,9 +836,7 @@ def render_compare(
         )
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | {tc} "
-            f"| left={left_panel_label} "
-            f"| right={right_panel_label} "
-            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"| display units: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,
