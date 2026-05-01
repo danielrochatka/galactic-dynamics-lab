@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 namespace {
 
@@ -23,6 +24,7 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 
 /** Clean audit default: global |a| shunt off (independent of λ). */
 void apply_clean_tpf_defaults(galaxy::Config& c) {
+  c.tpf_dynamics_mode = "legacy_readout";
   c.tpf_global_accel_shunt_enable = false;
 }
 
@@ -30,6 +32,7 @@ void apply_clean_tpf_defaults(galaxy::Config& c) {
 
 TEST_CASE("Task A: coupling 0 vs tiny nonzero — shunt off, zero shunt events, near-identical ax when v=0") {
   galaxy::Config c0;
+  c0.tpf_dynamics_mode = "legacy_readout";
   c0.tpfcore_enable_provisional_readout = true;
   c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c0.tpf_vdsg_coupling = 0.0;
@@ -96,6 +99,7 @@ TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt disabled — differences at float 
 
 TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt enabled — same policy; shunt events match at v=0") {
   galaxy::Config c0;
+  c0.tpf_dynamics_mode = "legacy_readout";
   c0.tpfcore_enable_provisional_readout = true;
   c0.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c0.tpf_vdsg_coupling = 0.0;
@@ -128,8 +132,17 @@ TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt enabled — same policy; shunt eve
   CHECK(n0 == n1);
   CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
   CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
-  CHECK(p0.last_accel_pipeline_stats().shunt_enabled == true);
-  CHECK(p1.last_accel_pipeline_stats().shunt_enabled == true);
+
+  const auto st0 = p0.last_accel_pipeline_stats();
+  const auto st1 = p1.last_accel_pipeline_stats();
+  CHECK(st0.shunt_enabled == true);
+  CHECK(st1.shunt_enabled == true);
+  CHECK(std::isfinite(st0.frac_capped_last_step));
+  CHECK(std::isfinite(st1.frac_capped_last_step));
+  CHECK(st0.frac_capped_last_step >= 0.0);
+  CHECK(st1.frac_capped_last_step >= 0.0);
+  CHECK(st0.shunt_events_last_step == n0);
+  CHECK(st1.shunt_events_last_step == n1);
 }
 
 TEST_CASE("Task B: tangential motion — VDSG modifier scales with |v|/c (nonzero for circular-like flow)") {
@@ -377,6 +390,19 @@ TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/st
     galaxy::TPFCorePackage p; p.init_from_config(c);
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
+}
+
+TEST_CASE("legacy_readout without provisional gate fails with explicit deprecation opt-in guidance") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "legacy_readout";
+  c.tpfcore_enable_provisional_readout = false;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s = one_body_state(1.0, 0.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+  CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
 }
 
 TEST_CASE("direct_tpf dynamics: tensor principal-part path is independent of correspondence alpha") {

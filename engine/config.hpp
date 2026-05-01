@@ -37,6 +37,10 @@ enum class SimulationMode {
   timestep_convergence,
   tpf_single_source_inspect,
   tpf_symmetric_pair_inspect,
+  tpf_source_field_benchmark,
+  tpf_4d_static_residual_benchmark,
+  tpf_4d_static_motion_readout_benchmark,
+  tpf_4d_xi_motion_probe_benchmark,
   tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
@@ -129,6 +133,12 @@ struct Config {
   int snapshot_every = 50;
 
   double softening = 0.0;
+  std::string softening_mode = "manual"; /* off | manual | auto */
+  std::string softening_auto_profile = ""; /* empty => context default; or collisionless | stellar_physical | nuclear_cluster */
+  double auto_softening_factor = 0.0;
+  int auto_softening_dimension = 0;
+  double auto_softening_min = 0.0;
+  double auto_softening_max = 0.0;
   bool enable_star_star_gravity = true;
 
   /** Physics package name (e.g. "Newtonian", "TPFCore"). Must match a registered package. Default: Newtonian. */
@@ -141,11 +151,12 @@ struct Config {
 
   /**
    * TPFCore only: how dynamical accelerations are produced.
-   * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
+   * - legacy_readout (deprecated legacy; explicit opt-in): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout=true for dynamics.
    * - v11_weak_field_truncation: correspondence truncation implementation (Eq. 42-44 scalar superposition) using alpha_si.
    * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
+   * - xi_kernel_deformed: Xi-direct runtime route using a=-K_xi*Xi_eff_spatial with per-source Xi-kernel deformation.
    */
-  std::string tpf_dynamics_mode = "legacy_readout";
+  std::string tpf_dynamics_mode = "xi_kernel_deformed";
   /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
@@ -246,10 +257,100 @@ struct Config {
   bool tpfcore_dump_invariant_profile = true;
   /** TPFCore inspection: write theta_profile.csv. */
   bool tpfcore_dump_theta_profile = true;
+  /** Xi-kernel route: allow expensive field diagnostics (Theta/I/provisional readout) when explicitly enabled. */
+  bool tpf_xi_kernel_dump_field_diagnostics = false;
   /** TPFCore source ansatz: softening for Phi. If <= 0, use global softening. */
   double tpfcore_source_softening = 0.0;
   /** TPFCore inspection: step size for numerical residual (if used). Not used when analytic. Default 1e-6. */
   double tpfcore_residual_step = 1e-6;
+  /** TPF source-field benchmark geometry selector. */
+  std::string tpf_source_benchmark_shape = "monopole";
+  /** TPF source-field benchmark total source mass [kg]. */
+  double tpf_source_benchmark_total_mass = kDefaultBhMassKg;
+  /** TPF source-field benchmark source-1 mass [kg] (bonded_pair benchmark-only override when > 0). */
+  double tpf_source_benchmark_mass1 = 0.0;
+  /** TPF source-field benchmark source-2 mass [kg] (bonded_pair benchmark-only override when > 0). */
+  double tpf_source_benchmark_mass2 = 0.0;
+  /** TPF source-field benchmark pair separation distance [m] (bonded_pair only). */
+  double tpf_source_benchmark_separation = 1.0e11;
+  /** TPF source-field benchmark orientation angle in-plane [deg] (bonded_pair only). */
+  double tpf_source_benchmark_orientation_deg = 0.0;
+  /** TPF source-field benchmark probe grid half extent L for square domain [-L, +L]. */
+  double tpf_source_probe_grid_half_extent = 2.0e11;
+  /** TPF source-field benchmark probe grid samples per axis N (NxN). */
+  int tpf_source_probe_grid_n = 121;
+  /** TPF source-field benchmark residual diagnostic exclusion radius around source points [m]. */
+  double tpf_source_residual_exclusion_radius = 0.25;
+  /** TPF 4D static residual benchmark cubic grid size N (NxNxN). */
+  int tpf_4d_residual_grid_n = 33;
+  /** TPF 4D static residual benchmark grid half-extent L for support [-L, +L] in x/y/z. */
+  double tpf_4d_residual_grid_half_extent = 20.0;
+  /** TPF 4D static residual benchmark source exclusion radius around source support points [m]. */
+  double tpf_4d_residual_source_exclusion_radius = 2.0;
+  /** TPF 4D static residual benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_residual_field_softening = 0.1;
+  /** TPF 4D static residual benchmark radial-bin count for diagnostic summary exports. */
+  int tpf_4d_residual_bin_count = 32;
+  /** TPF 4D static residual benchmark radial-bin max radius [m]; <=0 selects auto max by binning mode. */
+  double tpf_4d_residual_bin_radius_max = 0.0;
+  /** TPF 4D static motion-readout benchmark cubic probe grid size N (NxNxN). */
+  int tpf_4d_motion_probe_grid_n = 33;
+  /** TPF 4D static motion-readout benchmark grid half-extent L for support [-L, +L] in x/y/z. */
+  double tpf_4d_motion_probe_grid_half_extent = 20.0;
+  /** TPF 4D static motion-readout benchmark source exclusion radius around source support points [m]. */
+  double tpf_4d_motion_source_exclusion_radius = 3.0;
+  /** TPF 4D static motion-readout benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_motion_field_softening = 0.1;
+  /** TPF 4D static motion-readout benchmark kappa multiplier in principal spatial tensor readout. */
+  double tpf_4d_motion_kappa = 1.0;
+  /** TPF 4D static motion-readout benchmark acceleration/readout scale multiplier. */
+  double tpf_4d_motion_readout_scale = 1.0;
+  /** TPF 4D static motion-readout benchmark radial-bin count for diagnostic exports. */
+  int tpf_4d_motion_bin_count = 32;
+  /** TPF 4D Xi motion benchmark timestep size. */
+  double tpf_4d_xi_motion_dt = 0.001;
+  /** TPF 4D Xi motion benchmark number of timesteps. */
+  int tpf_4d_xi_motion_steps = 2000;
+  /** TPF 4D Xi motion benchmark readout scale K_xi in a=-K_xi*Xi_spatial. */
+  double tpf_4d_xi_motion_readout_scale = 1.0e-12;
+  /** TPF 4D Xi motion benchmark field softening epsilon [m] used by static 4D evaluator. */
+  double tpf_4d_xi_motion_field_softening = 0.1;
+  /** TPF 4D Xi motion benchmark source exclusion radius around source points [m]. */
+  double tpf_4d_xi_motion_source_exclusion_radius = 0.5;
+  /** TPF 4D Xi motion benchmark moving probe layout selector. */
+  std::string tpf_4d_xi_motion_probe_layout = "ring";
+  /** TPF 4D Xi motion benchmark probe count. */
+  int tpf_4d_xi_motion_probe_count = 24;
+  /** TPF 4D Xi motion benchmark initial probe radius [m]. */
+  double tpf_4d_xi_motion_probe_radius = 10.0;
+  /** TPF 4D Xi motion benchmark initial probe speed [m/s]. */
+  double tpf_4d_xi_motion_probe_speed = 0.0;
+  /** TPF 4D Xi motion benchmark integrator selector. */
+  std::string tpf_4d_xi_motion_integrator = "velocity_verlet";
+  /** TPF 4D Xi motion benchmark trajectory dump cadence in steps. */
+  int tpf_4d_xi_motion_dump_every = 1;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation mode selector. */
+  std::string tpf_4d_xi_kernel_mode = "off";
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation coupling strength. */
+  double tpf_4d_xi_kernel_coupling = 0.0;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation beta exponent for beta_power factor mode. */
+  double tpf_4d_xi_kernel_beta_power = 1.0;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation factor mode. */
+  std::string tpf_4d_xi_kernel_factor_mode = "beta_power";
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation minimum metric scale clamp. */
+  double tpf_4d_xi_kernel_metric_min = 0.1;
+  /** TPF 4D Xi motion benchmark-only Xi kernel deformation maximum metric scale clamp. */
+  double tpf_4d_xi_kernel_metric_max = 10.0;
+  /** TPF 4D Xi motion benchmark-only Xi temporal diagnostic mode selector. */
+  std::string tpf_4d_xi_temporal_mode = "off";
+  /** TPF 4D Xi motion benchmark-only Xi temporal diagnostic coupling. */
+  double tpf_4d_xi_temporal_coupling = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity x-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_x = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity y-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_y = 0.0;
+  /** TPF 4D Xi motion benchmark-only configured source velocity z-component used in relative-speed deformation terms. */
+  double tpf_4d_xi_source_speed_z = 0.0;
   /** TPFCore inspection (single-source only): opt-in experimental planar Xi configuration-equation exterior solve dump. */
   bool tpf_xi_constraint_exterior_inspect = false;
   /** TPFCore inspection (single-source only): planar Xi exterior grid size N (NxN). */
@@ -311,6 +412,8 @@ struct Config {
    */
   double velocity_noise = 0.05;
   double initial_velocity_scale = 1.0;
+  /** Galaxy init velocity mode: enclosed_mass (default) or pairwise_radial_equilibrium (runtime-force-consistent). */
+  std::string galaxy_init_velocity_mode = "enclosed_mass";
 
   bool save_snapshots = true;
   bool save_run_info = true;

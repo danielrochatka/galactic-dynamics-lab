@@ -7,6 +7,7 @@ import unittest
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 # Repo root (parent of python_tests/)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -14,12 +15,20 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from plot_cpp_compare import (
+    _panel_physics_text,
+    _compare_panel_metadata_lines,
     resolve_compare_display_selection,
     _resolve_side_run_dir,
     _mode_aware_compare_name,
     calculate_compare_smart_viewport,
     matched_steps_strict,
     render_compare,
+    radial_kinematics,
+    estimate_snapshot_accelerations,
+    binned_profile,
+    _time_display_factor,
+    _velocity_display_factor,
+    style_compare_diagnostic_axes,
 )
 from display_units import DisplayUnitConfig
 
@@ -86,6 +95,26 @@ def _write_run_info_new_schema(run_dir: Path, pkg: str, *, dyn: str = "direct_tp
 
 
 class TestPlotCppCompare(unittest.TestCase):
+    def _side_data_for_metadata(self, label: str, run_info: dict):
+        return SimpleNamespace(label=label, run_info=run_info)
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_style_compare_diagnostic_axes_uses_light_theme(self) -> None:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1, 1)
+        style_compare_diagnostic_axes(ax)
+        self.assertEqual(ax.get_facecolor(), (1.0, 1.0, 1.0, 1.0))
+        self.assertEqual(ax.xaxis.label.get_color(), "black")
+        self.assertEqual(ax.yaxis.label.get_color(), "black")
+        self.assertEqual(ax.title.get_color(), "black")
+        for spine in ax.spines.values():
+            self.assertEqual(spine.get_edgecolor(), (0.35, 0.35, 0.35, 1.0))
+        plt.close(fig)
+
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
         "matplotlib/numpy not installed",
@@ -220,6 +249,13 @@ class TestPlotCppCompare(unittest.TestCase):
             render_compare(parent, no_animation=True, overlay_mode="none")
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
+            self.assertTrue((parent / "compare_rotation_curve_final.png").exists())
+            self.assertTrue((parent / "compare_binned_inward_acceleration_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_radial_acceleration_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_centripetal_profile_final.png").exists())
+            self.assertTrue((parent / "compare_radial_velocity_vs_radius_final.png").exists())
+            self.assertTrue((parent / "compare_radius_percentiles_over_time.png").exists())
+            self.assertTrue((parent / "compare_acceleration_ratio_vs_radius_final.png").exists())
 
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
@@ -253,6 +289,59 @@ class TestPlotCppCompare(unittest.TestCase):
             self.assertTrue((parent / "galaxy_initial_compare.png").exists())
             self.assertTrue((parent / "galaxy_final_compare.png").exists())
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_compare_layout_uses_shared_top_readout_and_panel_metadata_boxes(self) -> None:
+        import matplotlib.figure
+
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            left = parent / "left_TPFCore"
+            right = parent / "right_Newtonian"
+            left.mkdir()
+            right.mkdir()
+            _write_run_info_new_schema(left, "TPFCore", dyn="xi_kernel_deformed")
+            _write_run_info_new_schema(right, "Newtonian")
+            _write_snapshot(left / "snapshot_00000.csv", 0, 0.0, 1.0)
+            _write_snapshot(left / "snapshot_00010.csv", 10, 1.0, 2.0)
+            _write_snapshot(right / "snapshot_00000.csv", 0, 0.0, 1.2)
+            _write_snapshot(right / "snapshot_00010.csv", 10, 1.0, 2.2)
+            (parent / "compare_manifest.json").write_text(
+                json.dumps({"compare_run_id": "r_layout", "left_dir": str(left), "right_dir": str(right)}),
+                encoding="utf-8",
+            )
+
+            seen_suptitles: list[str] = []
+            seen_axis_titles: list[list[str]] = []
+            seen_axis_texts: list[list[list[str]]] = []
+            orig_savefig = matplotlib.figure.Figure.savefig
+
+            def _capture_savefig(fig, *args, **kwargs):
+                if len(fig.axes) == 2 and fig.get_facecolor() == (0.0, 0.0, 0.0, 1.0):
+                    seen_suptitles.append(fig._suptitle.get_text() if fig._suptitle else "")
+                    seen_axis_titles.append([ax.get_title() for ax in fig.axes])
+                    seen_axis_texts.append([[t.get_text() for t in ax.texts] for ax in fig.axes])
+                return orig_savefig(fig, *args, **kwargs)
+
+            with patch.object(matplotlib.figure.Figure, "savefig", _capture_savefig):
+                render_compare(parent, no_animation=True, overlay_mode="none")
+
+            self.assertGreaterEqual(len(seen_suptitles), 2)
+            for suptitle in seen_suptitles:
+                self.assertIn("Compare r_layout", suptitle)
+                self.assertIn("step=", suptitle)
+                self.assertIn("display units:", suptitle)
+                self.assertNotIn("left=", suptitle)
+                self.assertNotIn("right=", suptitle)
+                self.assertNotIn("rev=", suptitle)
+            for title_pair in seen_axis_titles:
+                self.assertEqual(title_pair, ["", ""])
+            for panel_texts in seen_axis_texts:
+                self.assertTrue(any("role: left / baseline" in txt for txt in panel_texts[0]))
+                self.assertTrue(any("Newtonian" in txt for txt in panel_texts[1]))
+
     def test_mode_aware_compare_name_supports_legacy_run_info(self) -> None:
         left = {"simulation_mode": "galaxy", "physics_package": "TPFCore", "tpf_dynamics_mode": "direct_tpf"}
         right = {"simulation_mode": "galaxy", "physics_package": "Newtonian"}
@@ -261,6 +350,116 @@ class TestPlotCppCompare(unittest.TestCase):
             name,
             "galaxy_compare__tpfcore_direct_tpf_vs_newtonian__compare__initial_side_by_side.png",
         )
+
+    def test_mode_aware_compare_name_supports_xi_kernel_deformed(self) -> None:
+        left = {
+            "simulation_mode": "galaxy",
+            "physics_package": "TPFCore",
+            "tpf_dynamics_mode": "xi_kernel_deformed",
+            "tpf_4d_xi_kernel_mode": "gaussian_compact",
+        }
+        right = {"simulation_mode": "galaxy", "physics_package": "Newtonian"}
+        name = _mode_aware_compare_name("initial", left, right, ext="png")
+        self.assertEqual(
+            name,
+            "galaxy_compare__tpfcore_xi_kernel_deformed_gaussian_compact_vs_newtonian__compare__initial_side_by_side.png",
+        )
+
+    def test_panel_physics_text_labels_newtonian_baseline(self) -> None:
+        self.assertEqual(
+            _panel_physics_text({"effective_physics_package": "Newtonian"}),
+            "Newtonian baseline package",
+        )
+
+    def test_panel_physics_text_labels_xi_kernel_deformed(self) -> None:
+        self.assertEqual(
+            _panel_physics_text(
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
+                }
+            ),
+            "TPFCore xi_kernel_deformed / gaussian_compact",
+        )
+
+    def test_compare_panel_metadata_newtonian_left_tpfcore_right(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata("left_primary", {"effective_physics_package": "Newtonian"})
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "right_compare",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "metric_transverse_wake",
+                    "effective_tpf_4d_xi_kernel_coupling": "1.0e-5",
+                },
+            )
+        )
+        self.assertIn("package: Newtonian", left_lines)
+        self.assertIn("role: left / baseline", left_lines)
+        self.assertNotIn("dynamics:", "\n".join(left_lines))
+        self.assertIn("package: TPFCore", right_lines)
+        self.assertIn("role: right / compare", right_lines)
+        self.assertIn("dynamics: xi_kernel_deformed", right_lines)
+        self.assertIn("kernel: metric_transverse_wake", right_lines)
+        self.assertIn("coupling: 1.0e-5", right_lines)
+
+    def test_compare_panel_metadata_tpfcore_both_sides_include_model_details(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
+                    "effective_tpf_4d_xi_kernel_coupling": "2.5e-6",
+                    "effective_tpf_factor_mode": "legacy",
+                },
+            )
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "right_compare",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "metric_transverse_wake",
+                    "effective_tpf_4d_xi_kernel_coupling": "1.25e-6",
+                },
+            )
+        )
+        for lines in (left_lines, right_lines):
+            self.assertIn("package: TPFCore", lines)
+            self.assertTrue(any(line.startswith("role: ") for line in lines))
+            self.assertIn("dynamics: xi_kernel_deformed", lines)
+            self.assertTrue(any(line.startswith("kernel: ") for line in lines))
+            self.assertTrue(any(line.startswith("coupling: ") for line in lines))
+        self.assertIn("factor_mode: legacy", left_lines)
+
+    def test_compare_panel_metadata_tpfcore_left_newtonian_right(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "direct_tpf",
+                    "effective_tpf_vdsg_coupling": "0.0",
+                },
+            )
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata("right_compare", {"effective_physics_package": "Newtonian"})
+        )
+        self.assertIn("package: TPFCore", left_lines)
+        self.assertIn("role: left / baseline", left_lines)
+        self.assertIn("dynamics: direct_tpf", left_lines)
+        self.assertIn("coupling: 0.0", left_lines)
+        self.assertIn("package: Newtonian", right_lines)
+        self.assertIn("role: right / compare", right_lines)
+        self.assertFalse(any(line.startswith("dynamics:") for line in right_lines))
 
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
@@ -456,6 +655,71 @@ class TestPlotCppCompare(unittest.TestCase):
         )
         self.assertFalse(sel.config.units_in_overlay)
         self.assertFalse(sel.config.show_unit_reference)
+
+
+    def test_radial_kinematics_plus_x_plus_y(self) -> None:
+        class S: pass
+        s=S(); import numpy as np
+        s.positions=np.array([[1.0,0.0]])
+        s.velocities=np.array([[0.0,2.0]])
+        out=radial_kinematics(s)
+        self.assertAlmostEqual(float(out["v_radial"][0]), 0.0)
+        self.assertAlmostEqual(float(out["v_t"][0]), 2.0)
+
+    def test_estimate_snapshot_accelerations_delta_v_over_dt(self) -> None:
+        class S: pass
+        snaps=[]
+        for t,v in [(0.0,0.0),(1.0,2.0),(2.0,4.0)]:
+            s=S(); import numpy as np
+            s.time=t; s.velocities=np.array([[v,0.0]])
+            snaps.append(s)
+        acc=estimate_snapshot_accelerations(snaps)
+        self.assertAlmostEqual(float(acc[1][0,0]), 2.0)
+        self.assertAlmostEqual(float(acc[0][0,0]), 2.0)
+        self.assertAlmostEqual(float(acc[2][0,0]), 2.0)
+
+    def test_binned_profile_skips_empty_and_returns_medians(self) -> None:
+        import numpy as np
+        x=np.array([0.0,0.1,0.2,9.8,9.9,10.0])
+        y=np.array([1,3,5,7,9,11],dtype=float)
+        bx,bm,_,_=binned_profile(x,y,bins=10)
+        self.assertGreater(len(bx), 1)
+        self.assertTrue(np.all(np.isfinite(bm)))
+
+    def test_distance_scaling_uses_spatial_display_factor(self) -> None:
+        import plot_cpp_compare
+
+        spatial = SimpleNamespace(factor=2.5, unit="km")
+        self.assertEqual(spatial.factor, 2.5)
+        self.assertFalse(hasattr(spatial, "scale_to_display"))
+
+    def test_time_display_factor_scales_days(self) -> None:
+        self.assertAlmostEqual(_time_display_factor("day"), 1.0 / 86400.0)
+        t_plot = 2.0 * 86400.0 * _time_display_factor("day")
+        self.assertAlmostEqual(t_plot, 2.0)
+        self.assertAlmostEqual(60.0 * _time_display_factor("min"), 1.0)
+        self.assertAlmostEqual(3600.0 * _time_display_factor("hr"), 1.0)
+        seconds_per_year = 365.25 * 86400.0
+        self.assertAlmostEqual(seconds_per_year * _time_display_factor("yr"), 1.0)
+        self.assertAlmostEqual((1.0e3 * seconds_per_year) * _time_display_factor("kyr"), 1.0)
+        self.assertAlmostEqual((1.0e6 * seconds_per_year) * _time_display_factor("Myr"), 1.0)
+
+    def test_velocity_display_factor_scales_km_s(self) -> None:
+        self.assertAlmostEqual(_velocity_display_factor("km/s"), 1.0e-3)
+        self.assertAlmostEqual(2000.0 * _velocity_display_factor("km/s"), 2.0)
+
+    def test_raw_acceleration_plot_not_binned_helper(self) -> None:
+        import plot_cpp_compare
+        text = Path(plot_cpp_compare.__file__).read_text(encoding="utf-8")
+        self.assertIn("ax.scatter(lk[\"radius\"] * dist_scale, l_in", text)
+
+    def test_acceleration_ratio_uses_binned_profiles(self) -> None:
+        import plot_cpp_compare
+        text = Path(plot_cpp_compare.__file__).read_text(encoding="utf-8")
+        self.assertIn("l_x, l_med, _, _ = binned_profile", text)
+        self.assertIn("r_x, r_med, _, _ = binned_profile", text)
+        self.assertNotIn("rx=lk['radius'][:m]*dist_scale", text)
+
 
 
 if __name__ == "__main__":

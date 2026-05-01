@@ -106,6 +106,27 @@ def infer_branches_from_run_info(ri: dict[str, Any]) -> tuple[str, str, str]:
         )
     if pp != "TPFCore":
         return (f"{pp} (non-TPFCore)", "unknown", "unknown_package")
+    if dyn_mode == "xi_kernel_deformed":
+        k_xi = _f(ri, "tpf_4d_xi_motion_readout_scale", 0.0)
+        kernel_mode = str(ri.get("tpf_4d_xi_kernel_mode", "unknown_kernel") or "unknown_kernel")
+        kernel_coupling = _f(ri, "tpf_4d_xi_kernel_coupling", 0.0)
+        kernel_label = (
+            "VDSG transverse wake Xi-kernel deformation"
+            if kernel_mode == "metric_transverse_wake"
+            else "Xi-kernel deformation"
+        )
+        return (
+            "TPFCore: xi_kernel_deformed",
+            (
+                "a=-K_xi*Xi_eff; "
+                f"K_xi={k_xi:.6g}; kernel={kernel_mode}; label={kernel_label}; coupling={kernel_coupling:.6g}; "
+                "VDSG/provisional/direct_tpf=off"
+            ),
+            (
+                "TPFCorePackage::compute_accelerations "
+                "(route=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial)"
+            ),
+        )
     if dyn_mode == "direct_tpf":
         if prov != 0:
             met = f"tpfcore_readout:{rmode} (metrics/diagnostics only; dynamics=TPF_direct)"
@@ -174,8 +195,12 @@ def build_overlay_spec(
         "acceleration_code_path": acc,
         "physics_package": _pick_s(mf, ri, "physics_package", ""),
         "simulation_mode": _pick_s(mf, ri, "simulation_mode", ""),
+        "tpf_dynamics_mode": _pick_s(mf, ri, "tpf_dynamics_mode", ""),
         "tpf_vdsg_coupling": _pick_f(mf, ri, "tpf_vdsg_coupling", 0.0),
         "tpf_kappa": _pick_f(mf, ri, "tpf_kappa", 0.0),
+        "tpf_4d_xi_motion_readout_scale": _pick_f(mf, ri, "tpf_4d_xi_motion_readout_scale", 0.0),
+        "tpf_4d_xi_kernel_mode": _pick_s(mf, ri, "tpf_4d_xi_kernel_mode", ""),
+        "tpf_4d_xi_kernel_coupling": _pick_f(mf, ri, "tpf_4d_xi_kernel_coupling", 0.0),
         "tpf_cooling_fraction": _pick_f(mf, ri, "tpf_cooling_fraction", 0.0),
         "tpfcore_readout_mode": _pick_s(mf, ri, "tpfcore_readout_mode", ""),
         "galaxy_init_template": _pick_s(mf, ri, "galaxy_init_template", ""),
@@ -294,15 +319,19 @@ def draw_galaxy_render_overlay(
 
     vdsg = float(spec.get("tpf_vdsg_coupling") or 0.0)
     coup = f"{vdsg:.6g}" if spec.get("physics_package") == "TPFCore" else "N/A"
+    dyn_mode = str(spec.get("tpf_dynamics_mode", "") or "").strip()
+    xi_route = spec.get("physics_package") == "TPFCore" and dyn_mode == "xi_kernel_deformed"
+    xi_kernel_mode = str(spec.get("tpf_4d_xi_kernel_mode", "") or "")
+    xi_kernel_coupling = float(spec.get("tpf_4d_xi_kernel_coupling") or 0.0)
     ntot = int(spec.get("n_steps_total") or 0)
     step_str = f"{step} / {ntot}" if ntot > 0 else str(step)
 
     lines_min = [
         f"Run ID: {spec.get('run_id', '?')}",
-        f"Dynamics: {spec.get('active_dynamics_branch', '?')}",
+        f"Dynamics: {'TPFCore: xi_kernel_deformed' if xi_route else spec.get('active_dynamics_branch', '?')}",
         f"Metrics: {spec.get('active_metrics_branch', '?')}",
-        f"Coupling (VDSG λ): {coup}",
-        f"Cooling: {_cooling_label(run_info, spec)}",
+        f"{'a=-K_xi*Xi_eff' if xi_route else f'Coupling (VDSG λ): {coup}'}",
+        f"{f'kernel={xi_kernel_mode} coupling={xi_kernel_coupling:.6g}' if xi_route else f'Cooling: {_cooling_label(run_info, spec)}'}",
         f"Template: {spec.get('galaxy_init_template', '?')}",
         f"Seed: {spec.get('galaxy_init_seed', '?')}",
         f"Stars: {spec.get('n_stars', '?')}",
@@ -352,6 +381,10 @@ def draw_galaxy_render_overlay(
             f"Physics: {spec.get('physics_package', '')}",
             f"Sim mode: {spec.get('simulation_mode', '')}",
             f"Readout mode: {spec.get('tpfcore_readout_mode', '')}",
+            f"Dynamics route: {spec.get('tpf_dynamics_mode', '')}",
+            f"Xi K_xi: {float(spec.get('tpf_4d_xi_motion_readout_scale') or 0):.6g}",
+            f"Xi kernel mode: {spec.get('tpf_4d_xi_kernel_mode', '')}",
+            f"Xi kernel coupling: {float(spec.get('tpf_4d_xi_kernel_coupling') or 0):.6g}",
             f"κ: {float(spec.get('tpf_kappa') or 0):.6g}",
             f"Softening: {float(spec.get('softening') or 0):.6g}",
             f"R_gal: {float(spec.get('galaxy_radius') or 0):.6g}",

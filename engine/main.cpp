@@ -8,8 +8,11 @@
 #include "render_audit.hpp"
 #include "resolved_scenario.hpp"
 #include "output.hpp"
+#include "preflight.hpp"
+#include "progress_time.hpp"
 #include "physics/physics_package.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
+#include "physics/Newtonian/newtonian.hpp"
 #include "physics/TPFCore/v11_weak_field_correspondence.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
@@ -19,6 +22,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <dirent.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -27,18 +31,21 @@
 #include <string>
 #include <cstdint>
 #include <cstdio>
+#include <vector>
 
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
 #define MKDIR(path, mode) _mkdir(path)
 #define IS_STDOUT_TERMINAL() (_isatty(_fileno(stdout)) != 0)
+#define IS_STDIN_TERMINAL() (_isatty(_fileno(stdin)) != 0)
 #else
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #define MKDIR(path, mode) mkdir(path, mode)
 #define IS_STDOUT_TERMINAL() (isatty(STDOUT_FILENO) != 0)
+#define IS_STDIN_TERMINAL() (isatty(STDIN_FILENO) != 0)
 #endif
 
 namespace {
@@ -54,6 +61,73 @@ std::string run_id_from_time() {
 
 bool ensure_dir(const std::string& path) {
   return MKDIR(path.c_str(), 0755) == 0 || errno == EEXIST;
+}
+
+
+
+std::string shell_single_quote(const std::string& raw) {
+  std::string out = "'";
+  for (std::size_t i = 0; i < raw.size(); ++i) {
+    if (raw[i] == '\'') {
+      out += "'\"'\"'";
+    } else {
+      out += raw[i];
+    }
+  }
+  out += "'";
+  return out;
+}
+
+bool file_exists(const std::string& path) {
+  std::ifstream f(path.c_str());
+  return static_cast<bool>(f);
+}
+
+std::vector<std::string> find_compare_side_by_side_pngs(const std::string& dir,
+                                                         const std::string& stage) {
+  std::vector<std::string> out;
+  DIR* dp = opendir(dir.c_str());
+  if (!dp) return out;
+  const std::string stage_token = stage + "_side_by_side";
+  const std::string ext = ".png";
+  for (dirent* ent = readdir(dp); ent != nullptr; ent = readdir(dp)) {
+    const std::string name(ent->d_name);
+    if (name.find("galaxy_compare__") != std::string::npos &&
+        name.find(stage_token) != std::string::npos &&
+        name.size() >= ext.size() &&
+        name.compare(name.size() - ext.size(), ext.size(), ext) == 0) {
+      out.push_back(name);
+    }
+  }
+  closedir(dp);
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+std::vector<std::string> existing_tpf_4d_static_plot_pngs(const std::string& output_dir) {
+  const char* candidates[] = {
+      "tpf_4d_static_residual_xy_normalized_residual.png",
+      "tpf_4d_static_residual_xy_residual_spatial_norm.png",
+      "tpf_4d_static_residual_xy_xi_spatial_norm.png",
+      "tpf_4d_static_residual_xy_invariant_I.png",
+      "tpf_4d_static_residual_xz_normalized_residual.png",
+      "tpf_4d_static_residual_xz_residual_spatial_norm.png",
+      "tpf_4d_static_residual_xz_xi_spatial_norm.png",
+      "tpf_4d_static_residual_xz_invariant_I.png",
+      "tpf_4d_static_residual_yz_normalized_residual.png",
+      "tpf_4d_static_residual_yz_residual_spatial_norm.png",
+      "tpf_4d_static_residual_yz_xi_spatial_norm.png",
+      "tpf_4d_static_residual_yz_invariant_I.png",
+      "tpf_4d_static_residual_xy_xi_quiver.png",
+      "tpf_4d_static_residual_xz_xi_quiver.png",
+      "tpf_4d_static_residual_yz_xi_quiver.png",
+  };
+  std::vector<std::string> found;
+  for (std::size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+    const std::string full = output_dir + "/" + candidates[i];
+    if (file_exists(full)) found.push_back(candidates[i]);
+  }
+  return found;
 }
 
 double L_z_total(const galaxy::State& s) {
@@ -90,8 +164,9 @@ bool compare_dual_line_progress_enabled(bool progress_to_terminal, const std::st
 galaxy::ProgressCallback make_galaxy_step_progress_callback(
     std::chrono::steady_clock::time_point start_wall,
     bool progress_to_terminal,
-    const std::string& stage_tag) {
-  return [start_wall, progress_to_terminal, stage_tag](int step, int n_steps, double sim_time) {
+    const std::string& stage_tag,
+    const std::string& display_time_unit) {
+  return [start_wall, progress_to_terminal, stage_tag, display_time_unit](int step, int n_steps, double sim_time) {
     auto now = std::chrono::steady_clock::now();
     double elapsed_sec =
         1e-9 * std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_wall).count();
@@ -100,6 +175,8 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
     double pct = 100.0 * step / n_steps;
     const bool compare_dual_line_mode =
         compare_dual_line_progress_enabled(progress_to_terminal, stage_tag);
+    const std::string formatted_sim_time =
+        galaxy::format_sim_time_for_progress(sim_time, display_time_unit);
     const bool single_line_terminal_progress = progress_to_terminal;
     if (single_line_terminal_progress) {
       // Clear the full line before redrawing to prevent remnants when text width shrinks.
@@ -113,7 +190,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
       }
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << "step " << step << "/" << n_steps << ", sim t=" << formatted_sim_time
                 << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec);
       if (compare_dual_line_mode) {
         if (stage_tag == "left")
@@ -127,7 +204,7 @@ galaxy::ProgressCallback make_galaxy_step_progress_callback(
       std::cout << "[ ";
       if (!stage_tag.empty()) std::cout << stage_tag << " ";
       std::cout << std::fixed << std::setprecision(1) << std::setw(5) << pct << "%] "
-                << "step " << step << "/" << n_steps << ", sim t=" << std::setprecision(2) << sim_time
+                << "step " << step << "/" << n_steps << ", sim t=" << formatted_sim_time
                 << ", elapsed=" << format_elapsed(elapsed_sec) << ", eta=" << format_elapsed(eta_sec) << "\n"
                 << std::flush;
     }
@@ -181,7 +258,8 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   if (!csv) return;
   csv << std::scientific << std::setprecision(17);
   csv << "particle_index,radius,vx0,vy0,"
-      << "ax_direct_tpf,ay_direct_tpf,ax_vdsg,ay_vdsg,"
+      << "active_route,applied_acceleration,decomposition_note,"
+      << "ax_reference_direct_tpf,ay_reference_direct_tpf,ax_reference_vdsg,ay_reference_vdsg,"
       << "ax_total,ay_total,ax_bh_only,ay_bh_only,ax_star_star_only,ay_star_star_only\n";
 
   std::vector<double> ax_total, ay_total;
@@ -193,53 +271,73 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   std::vector<double> ax_star_only, ay_star_only;
   physics->compute_accelerations(state, 0.0, config.softening, config.enable_star_star_gravity, ax_star_only, ay_star_only);
 
-  std::vector<double> ax_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ay_direct(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ax_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
-  std::vector<double> ay_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ax_reference_direct_tpf(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_reference_direct_tpf(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ax_reference_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::vector<double> ay_reference_vdsg(state.n(), std::numeric_limits<double>::quiet_NaN());
+  std::string active_route = config.physics_package;
+  std::string applied_accel_formula = "n/a";
+  std::string decomposition_note = "reference decomposition unavailable";
 
   if (config.physics_package == "TPFCore") {
-    galaxy::Config cfg_direct = config;
-    // Step-0 decomposition audit branch:
-    //  1) force direct_tpf dynamics,
-    //  2) force tensor_radial_projection readout implementation,
-    //  3) zero VDSG for the direct/baseline branch,
-    //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
-    cfg_direct.tpf_dynamics_mode = "direct_tpf";
-    cfg_direct.tpfcore_enable_provisional_readout = false;
-    // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
-    cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
-    cfg_direct.tpfcore_readout_scale = 1.0;
-    cfg_direct.tpfcore_theta_tt_scale = 1.0;
-    cfg_direct.tpfcore_theta_tr_scale = 1.0;
-    cfg_direct.tpf_global_accel_shunt_enable = false;
-    cfg_direct.tpf_cooling_fraction = 0.0;
-    cfg_direct.tpf_vdsg_coupling = 0.0;
+    active_route = config.tpf_dynamics_mode;
+    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+      applied_accel_formula = "a=-K_xi*Xi_eff_spatial";
+      decomposition_note =
+          "direct_tpf/principal-C and additive-VDSG decomposition not applicable for active xi_kernel_deformed route";
+    } else {
+      applied_accel_formula = (config.tpf_dynamics_mode == "direct_tpf")
+                                  ? "direct_tpf principal-C (+ optional additive VDSG)"
+                                  : "legacy_readout baseline (+ optional additive VDSG)";
+      decomposition_note = "reference columns report direct_tpf baseline plus additive VDSG excess";
 
-    galaxy::Config cfg_total = cfg_direct;
-    cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
+      galaxy::Config cfg_direct = config;
+      // Step-0 reference decomposition branch:
+      //  1) force direct_tpf dynamics,
+      //  2) force tensor_radial_projection readout implementation,
+      //  3) zero VDSG for the direct/baseline branch,
+      //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
+      cfg_direct.tpf_dynamics_mode = "direct_tpf";
+      cfg_direct.tpfcore_enable_provisional_readout = false;
+      // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
+      cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
+      cfg_direct.tpfcore_readout_scale = 1.0;
+      cfg_direct.tpfcore_theta_tt_scale = 1.0;
+      cfg_direct.tpfcore_theta_tr_scale = 1.0;
+      cfg_direct.tpf_global_accel_shunt_enable = false;
+      cfg_direct.tpf_cooling_fraction = 0.0;
+      cfg_direct.tpf_vdsg_coupling = 0.0;
 
-    galaxy::TPFCorePackage tpf_direct;
-    tpf_direct.init_from_config(cfg_direct);
-    tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
-                                     config.enable_star_star_gravity, ax_direct, ay_direct);
+      galaxy::Config cfg_total = cfg_direct;
+      cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
 
-    std::vector<double> ax_total_direct, ay_total_direct;
-    galaxy::TPFCorePackage tpf_total;
-    tpf_total.init_from_config(cfg_total);
-    tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
-                                    config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
-    for (int i = 0; i < state.n(); ++i) {
-      ax_vdsg[static_cast<size_t>(i)] = ax_total_direct[static_cast<size_t>(i)] - ax_direct[static_cast<size_t>(i)];
-      ay_vdsg[static_cast<size_t>(i)] = ay_total_direct[static_cast<size_t>(i)] - ay_direct[static_cast<size_t>(i)];
+      galaxy::TPFCorePackage tpf_direct;
+      tpf_direct.init_from_config(cfg_direct);
+      tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
+                                       config.enable_star_star_gravity, ax_reference_direct_tpf,
+                                       ay_reference_direct_tpf);
+
+      std::vector<double> ax_total_direct, ay_total_direct;
+      galaxy::TPFCorePackage tpf_total;
+      tpf_total.init_from_config(cfg_total);
+      tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
+                                      config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
+      for (int i = 0; i < state.n(); ++i) {
+        ax_reference_vdsg[static_cast<size_t>(i)] =
+            ax_total_direct[static_cast<size_t>(i)] - ax_reference_direct_tpf[static_cast<size_t>(i)];
+        ay_reference_vdsg[static_cast<size_t>(i)] =
+            ay_total_direct[static_cast<size_t>(i)] - ay_reference_direct_tpf[static_cast<size_t>(i)];
+      }
     }
   }
 
   for (int i = 0; i < state.n(); ++i) {
     const double radius = std::hypot(state.x[i], state.y[i]);
     csv << i << ',' << radius << ',' << state.vx[i] << ',' << state.vy[i] << ','
-        << ax_direct[static_cast<size_t>(i)] << ',' << ay_direct[static_cast<size_t>(i)] << ','
-        << ax_vdsg[static_cast<size_t>(i)] << ',' << ay_vdsg[static_cast<size_t>(i)] << ','
+        << active_route << ',' << applied_accel_formula << ',' << decomposition_note << ','
+        << ax_reference_direct_tpf[static_cast<size_t>(i)] << ',' << ay_reference_direct_tpf[static_cast<size_t>(i)]
+        << ','
+        << ax_reference_vdsg[static_cast<size_t>(i)] << ',' << ay_reference_vdsg[static_cast<size_t>(i)] << ','
         << ax_total[static_cast<size_t>(i)] << ',' << ay_total[static_cast<size_t>(i)] << ','
         << ax_bh_only[static_cast<size_t>(i)] << ',' << ay_bh_only[static_cast<size_t>(i)] << ','
         << ax_star_only[static_cast<size_t>(i)] << ',' << ay_star_only[static_cast<size_t>(i)] << '\n';
@@ -268,25 +366,28 @@ int main(int argc, char** argv) {
 
   // 3. Layered load: built-in -> package defaults -> run config
   galaxy::Config config;
-  std::cout << "[startup_diag][TEMP softening_trace] run_config_path="
-            << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
+  const bool enable_softening_trace = (std::getenv("GALAXY_STARTUP_SOFTENING_TRACE") != nullptr);
   auto print_key_occurrences = [&](const std::string& path, const std::string& key) {
+    if (!enable_softening_trace) return;
     if (path.empty()) {
-      std::cout << "[startup_diag][TEMP softening_trace] key=" << key << " matches: (run config not found)\n";
+      std::cout << "[startup_diag][softening_trace] key=" << key << " matches: (run config not found)\n";
       return;
     }
     const std::vector<galaxy::ConfigKeyOccurrence> matches =
         galaxy::scan_config_key_occurrences(path, key);
     if (matches.empty()) {
-      std::cout << "[startup_diag][TEMP softening_trace] key=" << key << " matches: (none)\n";
+      std::cout << "[startup_diag][softening_trace] key=" << key << " matches: (none)\n";
       return;
     }
-    std::cout << "[startup_diag][TEMP softening_trace] key=" << key
+    std::cout << "[startup_diag][softening_trace] key=" << key
               << " matches (" << matches.size() << "):\n";
     for (const auto& match : matches) {
       std::cout << "  - line " << match.line_number << ": " << match.value << "\n";
     }
   };
+  if (enable_softening_trace)
+    std::cout << "[startup_diag][softening_trace] run_config_path="
+              << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   print_key_occurrences(run_config_path, "softening");
   print_key_occurrences(run_config_path, "tpfcore_source_softening");
 
@@ -294,25 +395,32 @@ int main(int argc, char** argv) {
   if (!package_defaults_path.empty()) {
     galaxy::load_config_file(package_defaults_path, config);
   }
-  std::cout << "[startup_diag][TEMP softening_trace] final softening after package defaults: "
-            << config.softening << "\n";
-  std::cout << "[startup_diag][TEMP softening_trace] final tpfcore_source_softening after package defaults: "
-            << config.tpfcore_source_softening << "\n";
+  if (enable_softening_trace) {
+    std::cout << "[startup_diag][softening_trace] final softening after package defaults: "
+              << config.softening << "\n";
+    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after package defaults: "
+              << config.tpfcore_source_softening << "\n";
+  }
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
   }
-  std::cout << "[startup_diag][TEMP softening_trace] final softening after run config: "
-            << config.softening << "\n";
-  std::cout << "[startup_diag][TEMP softening_trace] final tpfcore_source_softening after run config: "
-            << config.tpfcore_source_softening << "\n";
+  if (enable_softening_trace) {
+    std::cout << "[startup_diag][softening_trace] final softening after run config: "
+              << config.softening << "\n";
+    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after run config: "
+              << config.tpfcore_source_softening << "\n";
+  }
 
   config.run_id = run_id_from_time();
   config.output_dir = "../outputs/" + config.run_id;
 
   bool auto_plot = false;
+  bool assume_yes = false;
   for (int i = 1; i < argc; ++i) {
     if (std::string(argv[i]) == "--plot")
       auto_plot = true;
+    if (std::string(argv[i]) == "--yes")
+      assume_yes = true;
   }
 
   /* First positional is the simulation mode only when it is not a long option (--key=value).
@@ -332,7 +440,9 @@ int main(int argc, char** argv) {
       } catch (const std::exception& e) {
         std::cerr << e.what() << "\nAllowed: galaxy, earth_moon_benchmark, bh_orbit_validation, two_body_orbit (deprecated), "
                      "symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, "
-                     "tpf_symmetric_pair_inspect, tpf_two_body_sweep, tpf_weak_field_calibration, "
+                     "tpf_symmetric_pair_inspect, tpf_source_field_benchmark, tpf_4d_static_residual_benchmark, "
+                     "tpf_4d_static_motion_readout_benchmark, tpf_4d_xi_motion_probe_benchmark, "
+                     "tpf_two_body_sweep, tpf_weak_field_calibration, "
                      "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep, "
                      "tpf_v11_weak_field_correspondence\n";
         return 1;
@@ -342,7 +452,7 @@ int main(int argc, char** argv) {
 
   for (int i = first_cli_config_idx; i < argc; ++i) {
     std::string a = argv[i];
-    if (a == "--plot") continue;
+    if (a == "--plot" || a == "--yes") continue;
     if (a.size() < 4 || a.substr(0, 2) != "--") continue;
     std::size_t eq = a.find('=');
     if (eq == std::string::npos) {
@@ -395,6 +505,13 @@ int main(int argc, char** argv) {
                 << ", tpfcore_enable_provisional_readout=" << (config.tpfcore_enable_provisional_readout ? "true" : "false")
                 << ", tpfcore_readout_mode=" << config.tpfcore_readout_mode << ")\n";
     } else {
+      if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+        std::cout << "TPF runtime path tier: active_supported (xi_kernel_deformed)\n";
+      } else if (config.tpf_dynamics_mode == "direct_tpf") {
+        std::cout << "TPF runtime path tier: paper_facing (direct_tpf)\n";
+      } else if (config.tpf_dynamics_mode == "legacy_readout") {
+        std::cout << "TPF runtime path tier: deprecated_legacy (legacy_readout/provisional_readout)\n";
+      }
       std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
                 << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
                 << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
@@ -414,6 +531,14 @@ int main(int argc, char** argv) {
   }
   physics->init_from_config(config);
 
+  if (config.physics_package == "TPFCore" &&
+      config.simulation_mode == galaxy::SimulationMode::galaxy &&
+      config.tpfcore_enable_provisional_readout) {
+    std::cerr << "tpfcore_enable_provisional_readout=true is deprecated and cannot be used with simulation_mode=galaxy. "
+                 "Use tpf_dynamics_mode=xi_kernel_deformed or direct_tpf.\n";
+    return 1;
+  }
+
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore\n";
@@ -424,7 +549,7 @@ int main(int argc, char** argv) {
       std::cout << "  v11 correspondence audit only: does not run direct_tpf, does not use TPFCore particle "
                    "acceleration routing, and evaluates correspondence formulas only.\n";
     } else {
-      std::cout << "  Legacy/provisional readout branch: "
+      std::cout << "  Deprecated legacy/provisional readout branch: "
                 << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
       if (tpf && tpf->provisional_readout_enabled()) {
         std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [correspondence-calibrated])";
@@ -499,6 +624,107 @@ int main(int argc, char** argv) {
     std::cout << "Probe: +x and +y axes, r in [" << config.tpfcore_probe_radius_min << ", " << config.tpfcore_probe_radius_max << "], n=" << config.tpfcore_probe_samples << " per axis\n";
     tpfcore->run_symmetric_pair_inspect(config, config.output_dir);
     std::cout << "Wrote " << config.output_dir << "/theta_profile.csv, invariant_profile.csv, field_summary.txt\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    write_resolved_artifacts(config);
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark) {
+    if (!tpfcore) {
+      std::cerr << "tpf_source_field_benchmark requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Benchmark mode: tpf_source_field_benchmark\n";
+    tpfcore->run_source_field_benchmark(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir << "/tpf_source_field_probe_grid.csv\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    write_resolved_artifacts(config);
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark) {
+    if (!tpfcore) {
+      std::cerr << "tpf_4d_static_residual_benchmark requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Benchmark mode: tpf_4d_static_residual_benchmark\n";
+    tpfcore->run_4d_static_residual_benchmark(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir
+              << "/tpf_4d_static_residual_summary.txt, tpf_4d_static_residual_slice.csv, "
+                 "tpf_4d_static_residual_slice_xy.csv, tpf_4d_static_residual_slice_xz.csv, "
+                 "tpf_4d_static_residual_slice_yz.csv, tpf_4d_static_residual_sources.csv, "
+                 "tpf_4d_static_residual_bins_nearest_source.csv, tpf_4d_static_residual_bins_origin.csv\n";
+    if (auto_plot) {
+      std::cout.flush();
+      std::cerr.flush();
+      std::cout << "Generating optional view-plane diagnostic PNGs (plot_tpf_4d_static_residual.py)...\n";
+      const std::string dev_py = "../dev/bin/python3";
+      const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+      const std::string py = dev_py_exists ? dev_py : "python3";
+      const std::string script = "../plot_tpf_4d_static_residual.py";
+      const std::string cmd = shell_single_quote(py) + " " + shell_single_quote(script) + " " +
+                              shell_single_quote(config.output_dir);
+      const int ret = std::system(cmd.c_str());
+      if (ret != 0) {
+        std::cerr << "Warning: tpf_4d_static_residual_benchmark plot step failed; CSV/text artifacts remain valid.\n";
+      } else {
+        const std::vector<std::string> generated = existing_tpf_4d_static_plot_pngs(config.output_dir);
+        if (generated.empty()) {
+          std::cerr << "Warning: plot script completed but no expected PNGs were found/generated; "
+                       "CSV/text artifacts remain valid.\n";
+        } else {
+          std::cout << "Generated optional PNGs in " << config.output_dir
+                    << " (view-plane diagnostic renderings from full spatial-support static 4D residual evaluation):\n";
+          for (std::size_t i = 0; i < generated.size(); ++i) {
+            std::cout << "  " << generated[i] << "\n";
+          }
+        }
+      }
+    }
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    write_resolved_artifacts(config);
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    if (!tpfcore) {
+      std::cerr << "tpf_4d_static_motion_readout_benchmark requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Benchmark mode: tpf_4d_static_motion_readout_benchmark\n";
+    tpfcore->run_4d_static_motion_readout_benchmark(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir
+              << "/tpf_4d_static_motion_readout_summary.txt, "
+                 "tpf_4d_static_motion_readout_probe_grid.csv, "
+                 "tpf_4d_static_motion_readout_bins_origin.csv\n";
+    if (config.save_run_info) {
+      galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
+      std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
+    }
+    write_resolved_artifacts(config);
+    return 0;
+  }
+
+  if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    if (!tpfcore) {
+      std::cerr << "tpf_4d_xi_motion_probe_benchmark requires physics_package = TPFCore.\n";
+      return 1;
+    }
+    std::cout << "Benchmark mode: tpf_4d_xi_motion_probe_benchmark\n";
+    tpfcore->run_4d_xi_motion_probe_benchmark(config, config.output_dir);
+    std::cout << "Wrote " << config.output_dir
+              << "/tpf_4d_xi_motion_probe_summary.txt, "
+                 "tpf_4d_xi_motion_probe_trajectories.csv, "
+                 "tpf_4d_xi_motion_probe_initial_readout.csv\n";
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, 0, 0, 0, run_config_path, package_defaults_path);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
@@ -885,6 +1111,10 @@ int main(int argc, char** argv) {
   switch (config.simulation_mode) {
     case galaxy::SimulationMode::tpf_single_source_inspect:
     case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
+    case galaxy::SimulationMode::tpf_source_field_benchmark:
+    case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
+    case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
     case galaxy::SimulationMode::tpf_two_body_sweep:
     case galaxy::SimulationMode::tpf_weak_field_calibration:
     case galaxy::SimulationMode::tpf_newtonian_force_compare:
@@ -903,6 +1133,28 @@ int main(int argc, char** argv) {
   galaxy::State state = resolved.initial_state;
   int n_steps = resolved.effective_n_steps;
   int snapshot_every = resolved.effective_snapshot_every;
+
+  galaxy::GalaxyPreflightSummary galaxy_preflight;
+  if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
+    galaxy_preflight = galaxy::build_galaxy_preflight_summary(config, resolved);
+    galaxy::print_galaxy_preflight_summary(galaxy_preflight);
+    if (!galaxy_preflight.warnings.empty()) {
+      std::cout << "Galaxy preflight warnings:\n";
+      for (std::size_t i = 0; i < galaxy_preflight.warnings.size(); ++i)
+        std::cout << "  - " << galaxy_preflight.warnings[i] << "\n";
+
+      const bool interactive = IS_STDOUT_TERMINAL() && IS_STDIN_TERMINAL();
+      if (interactive && !assume_yes) {
+        std::cout << "Continue anyway? [y/N] ";
+        std::string ans;
+        std::getline(std::cin, ans);
+        if (!(ans == "y" || ans == "Y")) {
+          std::cerr << "Aborting due to preflight warnings.\n";
+          return 1;
+        }
+      }
+    }
+  }
 
   if (config.simulation_mode == galaxy::SimulationMode::galaxy) {
     galaxy::write_galaxy_init_diagnostics(config.output_dir, state, config,
@@ -1075,7 +1327,7 @@ int main(int argc, char** argv) {
                                           static_cast<int>(side_snaps.size()), state.n(),
                                           &galaxy::last_galaxy_init_audit());
           }
-          if (side_cfg.save_snapshots)
+                if (side_cfg.save_snapshots)
             galaxy::write_snapshots(side_cfg.output_dir, side_snaps);
           write_resolved_artifacts(side_cfg);
           galaxy::write_galaxy_init_diagnostics(side_cfg.output_dir, state, side_cfg,
@@ -1098,7 +1350,7 @@ int main(int argc, char** argv) {
           const bool progress_to_terminal = IS_STDOUT_TERMINAL();
           auto start_wall = std::chrono::steady_clock::now();
           galaxy::ProgressCallback side_progress =
-              make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag);
+              make_galaxy_step_progress_callback(start_wall, progress_to_terminal, side_tag, side_cfg.display_time_unit);
           auto side_snapshots = galaxy::run_simulation(side_cfg, side_state, side_physics,
                                                        n_steps, snapshot_every, side_progress,
                                                        compare_progress_interval);
@@ -1263,8 +1515,30 @@ int main(int argc, char** argv) {
       if (ret != 0) {
         std::cerr << "Warning: compare renderer returned non-zero exit code. Command was:\n  " << cmd << "\n";
       } else {
-        std::cout << "Compare render finished (see galaxy_initial_compare.png, galaxy_final_compare.png in "
-                  << compare_parent_dir << ").\n";
+        const std::string legacy_initial = compare_parent_dir + "/galaxy_initial_compare.png";
+        const std::string legacy_final = compare_parent_dir + "/galaxy_final_compare.png";
+        const auto mode_initial = find_compare_side_by_side_pngs(compare_parent_dir, "initial");
+        const auto mode_final = find_compare_side_by_side_pngs(compare_parent_dir, "final");
+        std::vector<std::string> missing;
+        if (!file_exists(legacy_initial)) missing.push_back("galaxy_initial_compare.png");
+        if (!file_exists(legacy_final)) missing.push_back("galaxy_final_compare.png");
+        if (mode_initial.empty()) missing.push_back("galaxy_compare__*__initial_side_by_side.png");
+        if (mode_final.empty()) missing.push_back("galaxy_compare__*__final_side_by_side.png");
+        if (!missing.empty()) {
+          std::cerr << "Error: compare renderer reported success but expected files are missing in "
+                    << compare_parent_dir << ": ";
+          for (std::size_t i = 0; i < missing.size(); ++i) {
+            if (i) std::cerr << ", ";
+            std::cerr << missing[i];
+          }
+          std::cerr << "\n";
+          return 1;
+        }
+        std::cout << "Compare render finished. Generated PNGs in " << compare_parent_dir << ":\n"
+                  << "  galaxy_initial_compare.png\n"
+                  << "  galaxy_final_compare.png\n";
+        for (const auto& f : mode_initial) std::cout << "  " << f << "\n";
+        for (const auto& f : mode_final) std::cout << "  " << f << "\n";
       }
     } else {
       std::cout
@@ -1284,7 +1558,7 @@ int main(int argc, char** argv) {
     progress_interval = std::max(1, std::min(1000, n_steps / 100));
     auto start_wall = std::chrono::steady_clock::now();
     progress_to_terminal = IS_STDOUT_TERMINAL();
-    progress_callback = make_galaxy_step_progress_callback(start_wall, progress_to_terminal, "");
+    progress_callback = make_galaxy_step_progress_callback(start_wall, progress_to_terminal, "", config.display_time_unit);
   }
 
   auto run_start = std::chrono::steady_clock::now();
@@ -1342,6 +1616,8 @@ int main(int argc, char** argv) {
                                  : nullptr,
                              &cooling_audit,
                              tpf_pipeline_stats);
+      if (config.simulation_mode == galaxy::SimulationMode::galaxy)
+        galaxy::append_galaxy_preflight_to_run_info(config.output_dir, galaxy_preflight);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
     }
     if (config.save_run_info && config.simulation_mode == galaxy::SimulationMode::galaxy) {
@@ -1357,15 +1633,21 @@ int main(int argc, char** argv) {
     if (config.physics_package == "TPFCore") {
       galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
       if (tpf && tpf->provisional_readout_enabled()) {
+        const bool xi_field_diag = (config.tpf_dynamics_mode == "xi_kernel_deformed" &&
+                                    config.tpf_xi_kernel_dump_field_diagnostics);
         tpf->write_readout_debug(snapshots, config, config.output_dir);
-        if (config.tpfcore_dump_readout_debug)
+        if (config.tpfcore_dump_readout_debug && config.tpf_dynamics_mode != "xi_kernel_deformed")
           std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
         tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
-        std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
-        tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
-        std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
-        tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
-        if (config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
+        if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag)
+          std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
+        if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) {
+          tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
+          std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
+          tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
+        }
+        if ((config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) &&
+            config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
             (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
           std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
         if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation && snapshots[0].state.n() == 1) {
@@ -1385,6 +1667,18 @@ int main(int argc, char** argv) {
         tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
         std::cout << "Wrote " << config.output_dir
                   << "/direct_tpf_step0_raw_accel_audit.csv, direct_tpf_step0_raw_accel_summary.txt\n";
+      }
+      if (config.save_run_info && config.tpf_dynamics_mode == "xi_kernel_deformed" && tpf) {
+        const auto counters = tpf->xi_runtime_counters();
+        std::ofstream rf(config.output_dir + "/run_info.txt", std::ios::app);
+        if (rf) {
+          rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
+          rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
+          rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
+          rf << "xi_runtime_provisional_readout_evaluations\t" << counters.provisional_readout_evaluations << "\n";
+          rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
+          rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
+        }
       }
     }
   }

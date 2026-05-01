@@ -72,17 +72,21 @@ bool tpf_vdsg_active_for_audit(const Config& config) {
 }
 
 bool tpf_v11_weak_field_truncation_active(const Config& config) {
-  return config.tpf_dynamics_mode == "v11_weak_field_truncation" ||
-         config.tpf_dynamics_mode == "weak_field_correspondence";
-}
-
-bool tpf_v11_weak_field_alias_requested(const Config& config) {
-  return config.tpf_dynamics_mode == "weak_field_correspondence";
+  return config.tpf_dynamics_mode == "v11_weak_field_truncation";
 }
 
 }  // namespace
 
 std::string compute_active_dynamics_branch(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+    return "TPF_4D_static_residual_benchmark (diagnostic-only; no particle integration; no acceleration path)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    return "TPF_4D_static_motion_readout_benchmark (static field -> principal tensor -> probe acceleration readout)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
+  }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
@@ -96,23 +100,48 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si";
   }
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    std::ostringstream os;
+    const std::string kernel_desc =
+        (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
+            ? "VDSG transverse wake Xi-kernel deformation"
+            : "standard Xi-kernel deformation";
+    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
+       << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
+       << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
+       << "; xi_kernel_label=" << kernel_desc
+       << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
+       << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
+       << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
+       << "; additive_vdsg=off; principal_c=off; direct_tpf=off; newtonian=off";
+    return os.str();
+  }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::ostringstream os;
-    os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
+    os << "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
        << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
     return os.str();
   }
-  /* legacy_readout (default when key omitted) */
+  /* DEPRECATED legacy path (Stage 0 banner): legacy_readout/provisional_readout */
   if (!config.tpfcore_enable_provisional_readout)
-    return "tpf_dynamics_mode=legacy_readout; provisional readout disabled";
+    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout disabled";
   const std::string& mode = config.tpfcore_readout_mode;
   std::ostringstream os;
-  os << "tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
+  os << "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
      << "; vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
   return os.str();
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+    return "static_4D_field_residual: Xi4/Theta4 full spatial-support diagnostic";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    return "static_4D_motion_readout: GravityStaticMotionReadout_v1 over probe grid";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
+  }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
@@ -129,6 +158,9 @@ std::string compute_active_metrics_branch(const Config& config) {
          << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
       return os.str();
     }
+    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+      return "xi_kernel_deformed metrics; Xi_eff readout a=-K_xi*Xi_eff_spatial";
+    }
     if (config.tpfcore_enable_provisional_readout)
       return "tpfcore_readout:" + config.tpfcore_readout_mode;
     return "TPFCore metrics n/a (provisional readout off)";
@@ -137,6 +169,15 @@ std::string compute_active_metrics_branch(const Config& config) {
 }
 
 std::string compute_acceleration_code_path(const Config& config) {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+    return "none (tpf_4d_static_residual_benchmark uses evaluate_static_configuration_residual_4d; no compute_accelerations call)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    return "none (tpf_4d_static_motion_readout_benchmark uses evaluate_static_sources_field_4d + GravityStaticMotionReadout_v1; no compute_accelerations call)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
+  }
   if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
     return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";
   }
@@ -145,6 +186,9 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (tpf_v11_weak_field_truncation_active(config)) {
     return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (Eq.42-44 correspondence implementation; "
            "alpha_si path; no VDSG/readout/shunt/cooling)";
+  }
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (runtime Xi-kernel deformation; per-source Xi_eff sum -> a=-K_xi*Xi_eff_spatial; no additive VDSG helper; no principal-C direct_tpf readout)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
@@ -185,6 +229,9 @@ void write_render_manifest(const std::string& output_dir,
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
        config.simulation_mode == SimulationMode::galaxy &&
        !tpf_v11_weak_field_truncation_active(config));
+  const bool legacy_readout_metadata_active =
+      config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "legacy_readout" &&
+      config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence;
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -235,32 +282,41 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_dynamics_branch", dyn);
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
+    const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
+    const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
+    const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
     if (config.physics_package == "TPFCore" &&
         config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
-      const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
-      const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
       json_kv(jf, first, "tpf_core_law_mode",
               is_direct ? "direct_tpf_tensor_principal_part"
-                        : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper" : "legacy_readout_provisional"));
-      json_kv(jf, first, "tpf_truncation_mode",
-              is_direct
-                  ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                  : (is_v11_alias
-                         ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                         : "none"));
-      json_kv(jf, first, "tpf_extension_mode",
-              is_v11_alias ? "none_vdsg_rejected"
-                           : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
-      json_kv(jf, first, "tpf_stabilizer_mode",
-              (is_direct || is_v11_alias)
-                  ? "none_shunt_and_cooling_rejected"
-                  : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                         ? "shunt_or_cooling_configured"
-                         : "none"));
-      if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
-        json_kv_bool(jf, first, "tpf_dynamics_mode_deprecated_alias_used", true);
-        json_kv(jf, first, "tpf_dynamics_mode_deprecated_alias_note",
-                "weak_field_correspondence is deprecated; resolves only to v11_weak_field_truncation correspondence helper path");
+                        : (is_xi_kernel ? "xi_kernel_deformed"
+                                        : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper"
+                                                        : "legacy_readout_provisional")));
+      if (is_xi_kernel) {
+        json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_eff_spatial");
+        json_kv(jf, first, "K_xi", "tpf_4d_xi_motion_readout_scale");
+        json_kv_num(jf, first, "tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
+        json_kv(jf, first, "xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
+        json_kv_num(jf, first, "xi_kernel_coupling", config.tpf_4d_xi_kernel_coupling);
+        json_kv(jf, first, "xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+        json_kv_num(jf, first, "xi_kernel_metric_min", config.tpf_4d_xi_kernel_metric_min);
+        json_kv_num(jf, first, "xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
+        json_kv(jf, first, "xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+      } else {
+        json_kv(jf, first, "tpf_truncation_mode",
+                is_direct
+                    ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                    : (is_v11_alias
+                           ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
+                           : "none"));
+        json_kv(jf, first, "tpf_extension_mode",
+                is_v11_alias ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
+        json_kv(jf, first, "tpf_stabilizer_mode",
+                (is_direct || is_v11_alias)
+                    ? "none_shunt_and_cooling_rejected"
+                    : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                           ? "shunt_or_cooling_configured"
+                           : "none"));
       }
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
@@ -268,13 +324,18 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
-    json_kv_bool(jf, first, "tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
+    if (legacy_readout_metadata_active) {
+      json_kv_bool(jf, first, "tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
+      json_kv(jf, first, "tpfcore_readout_mode", config.tpfcore_readout_mode);
+    } else {
+      json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
+      json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
+    }
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
       json_kv_bool(jf, first, "tpfcore_enable_provisional_readout_operative_for_this_run", false);
       json_kv(jf, first, "tpf_dynamics_mode_operative_for_this_run", "none_audit_only");
     }
-    json_kv(jf, first, "tpfcore_readout_mode", config.tpfcore_readout_mode);
     json_kv(jf, first, "render_overlay_mode", config.render_overlay_mode);
     json_kv(jf, first, "galaxy_init_template", config.galaxy_init_template);
     json_kv_int(jf, first, "galaxy_init_seed", static_cast<long long>(config.galaxy_init_seed));
@@ -304,12 +365,8 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_bool(jf, first, "git_dirty", gp.git_dirty);
     json_kv(jf, first, "code_version_label", gp.code_version_label);
     json_kv(jf, first, "config_key_aliases_note",
-            "Legacy key tpf_gdd_coupling maps to tpf_vdsg_coupling; parser accepts both (canonical: tpf_vdsg_coupling). "
-            "Legacy key tpf_kappa maps to tpfcore_closure_kappa; parser accepts both (canonical: tpfcore_closure_kappa). "
-            "Deprecated dynamics value alias weak_field_correspondence maps only to v11_weak_field_truncation (correspondence helper path), never to direct_tpf.");
+            "Legacy key tpf_kappa maps to tpfcore_closure_kappa; parser accepts both (canonical: tpfcore_closure_kappa).");
     jf << ",\n  \"config_key_aliases\": [\n";
-    jf << "    {\"legacy\": \"tpf_gdd_coupling\", \"canonical\": \"tpf_vdsg_coupling\", "
-          "\"accepted_in_config_parser\": true},\n";
     jf << "    {\"legacy\": \"tpf_kappa\", \"canonical\": \"tpfcore_closure_kappa\", "
           "\"accepted_in_config_parser\": true}\n  ]";
     jf << "\n}\n";
@@ -328,32 +385,41 @@ void write_render_manifest(const std::string& output_dir,
     if (config.physics_package == "TPFCore" &&
         config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
       const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
+      const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
       const bool is_v11_alias = tpf_v11_weak_field_truncation_active(config);
       tf << "tpf_core_law_mode\t"
          << (is_direct ? "direct_tpf_tensor_principal_part"
-                       : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper" : "legacy_readout_provisional"))
+                       : (is_xi_kernel ? "xi_kernel_deformed"
+                                       : (is_v11_alias ? "v11_weak_field_truncation_correspondence_helper"
+                                                       : "legacy_readout_provisional")))
          << "\n";
-      tf << "tpf_truncation_mode\t"
-         << (is_direct
-                 ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                 : (is_v11_alias
-                        ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                        : "none"))
-         << "\n";
-      tf << "tpf_extension_mode\t"
-         << (is_v11_alias ? "none_vdsg_rejected"
-                          : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
-         << "\n";
-      tf << "tpf_stabilizer_mode\t"
-         << ((is_direct || is_v11_alias)
-                 ? "none_shunt_and_cooling_rejected"
-                 : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                        ? "shunt_or_cooling_configured"
-                        : "none"))
-         << "\n";
-      if (is_v11_alias && tpf_v11_weak_field_alias_requested(config)) {
-        tf << "tpf_dynamics_mode_deprecated_alias_used\t1\n";
-        tf << "tpf_dynamics_mode_deprecated_alias_note\tweak_field_correspondence_is_deprecated_and_resolves_only_to_v11_weak_field_truncation_correspondence_helper_path\n";
+      if (is_xi_kernel) {
+        tf << "acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
+        tf << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
+        tf << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
+        tf << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
+        tf << "xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
+        tf << "xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
+        tf << "xi_kernel_metric_min\t" << config.tpf_4d_xi_kernel_metric_min << "\n";
+        tf << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
+        tf << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
+      } else {
+        tf << "tpf_truncation_mode\t"
+           << (is_direct ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
+                         : (is_v11_alias
+                                ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
+                                : "none"))
+           << "\n";
+        tf << "tpf_extension_mode\t"
+           << (is_v11_alias ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
+           << "\n";
+        tf << "tpf_stabilizer_mode\t"
+           << ((is_direct || is_v11_alias)
+                   ? "none_shunt_and_cooling_rejected"
+                   : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
+                          ? "shunt_or_cooling_configured"
+                          : "none"))
+           << "\n";
       }
     }
     tf << "physics_package\t" << config.physics_package << "\n";
@@ -397,14 +463,16 @@ void write_render_manifest(const std::string& output_dir,
       tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
       tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";
       tf << "tpf_dynamics_mode_operative_for_this_run\tnone_audit_only\n";
-      tf << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      tf << "tpfcore_enable_provisional_readout_operative_for_this_run\t0\n";
     } else {
-      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
       tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     }
-    tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    if (legacy_readout_metadata_active) {
+      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+      tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    } else {
+      tf << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
+      tf << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
+    }
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";
     tf << "galaxy_init_seed\t" << config.galaxy_init_seed << "\n";
@@ -436,7 +504,6 @@ void write_render_manifest(const std::string& output_dir,
       tf << "galaxy_init_audit_used_legacy_velocity_noise\t"
          << (galaxy_init_audit->used_legacy_velocity_noise ? 1 : 0) << "\n";
     }
-    tf << "config_key_aliases\ttpf_gdd_coupling -> tpf_vdsg_coupling (legacy alias; canonical tpf_vdsg_coupling)\n";
     tf << "config_key_aliases\ttpf_kappa -> tpfcore_closure_kappa (legacy alias; canonical tpfcore_closure_kappa)\n";
     tf << "=== end render_manifest.txt ===\n";
   }

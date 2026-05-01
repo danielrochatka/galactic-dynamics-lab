@@ -3,6 +3,9 @@
 
 /**
  * PROVISIONAL motion/readout layer for TPFCore.
+ * DEPRECATION STATUS (Stage 0): legacy runtime path retained for transition only.
+ * Prefer xi_kernel_deformed (active supported path) or direct_tpf (paper-facing path)
+ * for normal runs.
  *
  * EXPLORATORY closures downstream of the source ansatz (see readout_closure.hpp).
  * Not the full derived TPF dynamics.

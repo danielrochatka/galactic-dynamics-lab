@@ -61,6 +61,10 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
   if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
   if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
+  if (t == "tpf_source_field_benchmark") return SimulationMode::tpf_source_field_benchmark;
+  if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
+  if (t == "tpf_4d_static_motion_readout_benchmark") return SimulationMode::tpf_4d_static_motion_readout_benchmark;
+  if (t == "tpf_4d_xi_motion_probe_benchmark") return SimulationMode::tpf_4d_xi_motion_probe_benchmark;
   if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
@@ -82,6 +86,10 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::timestep_convergence: return "timestep_convergence";
     case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
     case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
+    case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
+    case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
     case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
@@ -140,6 +148,22 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.explicit_overrides.softening = true;
     return true;
   }
+  if (key == "softening_mode") {
+    const std::string s = trim(val);
+    if (s != "off" && s != "manual" && s != "auto") throw std::runtime_error("softening_mode must be off, manual, or auto");
+    config.softening_mode = s;
+    return true;
+  }
+  if (key == "softening_auto_profile") {
+    const std::string s = trim(val);
+    if (s != "collisionless" && s != "stellar_physical" && s != "nuclear_cluster") throw std::runtime_error("softening_auto_profile must be collisionless, stellar_physical, or nuclear_cluster");
+    config.softening_auto_profile = s;
+    return true;
+  }
+  if (key == "auto_softening_factor") { config.auto_softening_factor = std::stod(val); return true; }
+  if (key == "auto_softening_dimension") { config.auto_softening_dimension = std::stoi(val); return true; }
+  if (key == "auto_softening_min") { config.auto_softening_min = std::stod(val); return true; }
+  if (key == "auto_softening_max") { config.auto_softening_max = std::stod(val); return true; }
   if (key == "enable_star_star_gravity") {
     config.enable_star_star_gravity = parse_bool(val);
     config.explicit_overrides.enable_star_star_gravity = true;
@@ -175,10 +199,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
-    if (s == "weak_field_correspondence") s = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
-    if (s != "legacy_readout" && s != "v11_weak_field_truncation" && s != "direct_tpf") {
+    if (s == "legacy_readout") {
+      throw std::runtime_error("legacy_readout has been removed; use xi_kernel_deformed or direct_tpf.");
+    }
+    if (s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
       throw std::runtime_error(
-          "tpf_dynamics_mode must be legacy_readout, v11_weak_field_truncation, or direct_tpf, got: " + val);
+          "tpf_dynamics_mode must be v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;
@@ -288,6 +314,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_dump_theta_profile = parse_bool(val);
     return true;
   }
+  if (key == "tpf_xi_kernel_dump_field_diagnostics") {
+    config.tpf_xi_kernel_dump_field_diagnostics = parse_bool(val);
+    return true;
+  }
   if (key == "tpfcore_source_softening") {
     config.tpfcore_source_softening = std::stod(val);
     config.explicit_overrides.tpfcore_source_softening = true;
@@ -295,6 +325,186 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpfcore_residual_step") {
     config.tpfcore_residual_step = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_shape") {
+    std::string s = trim(val);
+    if (s != "monopole" && s != "bonded_pair") {
+      throw std::runtime_error("tpf_source_benchmark_shape must be monopole or bonded_pair, got: " + val);
+    }
+    config.tpf_source_benchmark_shape = s;
+    return true;
+  }
+  if (key == "tpf_source_benchmark_total_mass") {
+    config.tpf_source_benchmark_total_mass = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_mass1") {
+    config.tpf_source_benchmark_mass1 = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_mass2") {
+    config.tpf_source_benchmark_mass2 = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_separation") {
+    config.tpf_source_benchmark_separation = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_benchmark_orientation_deg") {
+    config.tpf_source_benchmark_orientation_deg = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_probe_grid_half_extent") {
+    config.tpf_source_probe_grid_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_source_probe_grid_n") {
+    config.tpf_source_probe_grid_n = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_source_residual_exclusion_radius") {
+    config.tpf_source_residual_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_grid_n") {
+    config.tpf_4d_residual_grid_n = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_grid_half_extent") {
+    config.tpf_4d_residual_grid_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_source_exclusion_radius") {
+    config.tpf_4d_residual_source_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_field_softening") {
+    config.tpf_4d_residual_field_softening = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_bin_count") {
+    config.tpf_4d_residual_bin_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_residual_bin_radius_max") {
+    config.tpf_4d_residual_bin_radius_max = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_probe_grid_n") {
+    config.tpf_4d_motion_probe_grid_n = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_probe_grid_half_extent") {
+    config.tpf_4d_motion_probe_grid_half_extent = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_source_exclusion_radius") {
+    config.tpf_4d_motion_source_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_field_softening") {
+    config.tpf_4d_motion_field_softening = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_kappa") {
+    config.tpf_4d_motion_kappa = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_readout_scale") {
+    config.tpf_4d_motion_readout_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_motion_bin_count") {
+    config.tpf_4d_motion_bin_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_dt") {
+    config.tpf_4d_xi_motion_dt = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_steps") {
+    config.tpf_4d_xi_motion_steps = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_readout_scale") {
+    config.tpf_4d_xi_motion_readout_scale = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_field_softening") {
+    config.tpf_4d_xi_motion_field_softening = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_source_exclusion_radius") {
+    config.tpf_4d_xi_motion_source_exclusion_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_layout") {
+    config.tpf_4d_xi_motion_probe_layout = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_count") {
+    config.tpf_4d_xi_motion_probe_count = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_radius") {
+    config.tpf_4d_xi_motion_probe_radius = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_probe_speed") {
+    config.tpf_4d_xi_motion_probe_speed = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_integrator") {
+    config.tpf_4d_xi_motion_integrator = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_motion_dump_every") {
+    config.tpf_4d_xi_motion_dump_every = std::stoi(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_mode") {
+    config.tpf_4d_xi_kernel_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_coupling") {
+    config.tpf_4d_xi_kernel_coupling = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_beta_power") {
+    config.tpf_4d_xi_kernel_beta_power = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_factor_mode") {
+    config.tpf_4d_xi_kernel_factor_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_metric_min") {
+    config.tpf_4d_xi_kernel_metric_min = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_kernel_metric_max") {
+    config.tpf_4d_xi_kernel_metric_max = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_temporal_mode") {
+    config.tpf_4d_xi_temporal_mode = trim(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_temporal_coupling") {
+    config.tpf_4d_xi_temporal_coupling = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_x") {
+    config.tpf_4d_xi_source_speed_x = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_y") {
+    config.tpf_4d_xi_source_speed_y = std::stod(val);
+    return true;
+  }
+  if (key == "tpf_4d_xi_source_speed_z") {
+    config.tpf_4d_xi_source_speed_z = std::stod(val);
     return true;
   }
   if (key == "tpf_xi_constraint_exterior_inspect") {
@@ -397,6 +607,15 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.initial_velocity_scale = std::stod(val);
     return true;
   }
+  if (key == "galaxy_init_velocity_mode") {
+    const std::string mode = trim(val);
+    if (mode != "enclosed_mass" && mode != "pairwise_radial_equilibrium") {
+      throw std::runtime_error(
+          "galaxy_init_velocity_mode must be enclosed_mass or pairwise_radial_equilibrium, got: " + val);
+    }
+    config.galaxy_init_velocity_mode = mode;
+    return true;
+  }
   if (key == "save_snapshots") {
     config.save_snapshots = parse_bool(val);
     return true;
@@ -467,10 +686,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "display_show_unit_reference") {
     config.display_show_unit_reference = parse_bool(val);
-    return true;
-  }
-  if (key == "tpf_gdd_coupling") {
-    config.tpf_vdsg_coupling = std::stod(val);
     return true;
   }
   if (key == "validation_two_body_radius") {
@@ -664,7 +879,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
     return os.str();
   };
   std::vector<std::pair<std::string, std::string>> kv;
-  kv.reserve(80);
+  kv.reserve(90);
   kv.emplace_back("simulation_mode", mode_to_string(config.simulation_mode));
   kv.emplace_back("n_stars", i(config.n_stars));
   kv.emplace_back("star_mass", d(config.star_mass));
@@ -710,8 +925,53 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpfcore_probe_samples", i(config.tpfcore_probe_samples));
   kv.emplace_back("tpfcore_dump_invariant_profile", b(config.tpfcore_dump_invariant_profile));
   kv.emplace_back("tpfcore_dump_theta_profile", b(config.tpfcore_dump_theta_profile));
+  kv.emplace_back("tpf_xi_kernel_dump_field_diagnostics", b(config.tpf_xi_kernel_dump_field_diagnostics));
   kv.emplace_back("tpfcore_source_softening", d(config.tpfcore_source_softening));
   kv.emplace_back("tpfcore_residual_step", d(config.tpfcore_residual_step));
+  kv.emplace_back("tpf_source_benchmark_shape", config.tpf_source_benchmark_shape);
+  kv.emplace_back("tpf_source_benchmark_total_mass", d(config.tpf_source_benchmark_total_mass));
+  kv.emplace_back("tpf_source_benchmark_mass1", d(config.tpf_source_benchmark_mass1));
+  kv.emplace_back("tpf_source_benchmark_mass2", d(config.tpf_source_benchmark_mass2));
+  kv.emplace_back("tpf_source_benchmark_separation", d(config.tpf_source_benchmark_separation));
+  kv.emplace_back("tpf_source_benchmark_orientation_deg", d(config.tpf_source_benchmark_orientation_deg));
+  kv.emplace_back("tpf_source_probe_grid_half_extent", d(config.tpf_source_probe_grid_half_extent));
+  kv.emplace_back("tpf_source_probe_grid_n", i(config.tpf_source_probe_grid_n));
+  kv.emplace_back("tpf_source_residual_exclusion_radius", d(config.tpf_source_residual_exclusion_radius));
+  kv.emplace_back("tpf_4d_residual_grid_n", i(config.tpf_4d_residual_grid_n));
+  kv.emplace_back("tpf_4d_residual_grid_half_extent", d(config.tpf_4d_residual_grid_half_extent));
+  kv.emplace_back("tpf_4d_residual_source_exclusion_radius", d(config.tpf_4d_residual_source_exclusion_radius));
+  kv.emplace_back("tpf_4d_residual_field_softening", d(config.tpf_4d_residual_field_softening));
+  kv.emplace_back("tpf_4d_residual_bin_count", i(config.tpf_4d_residual_bin_count));
+  kv.emplace_back("tpf_4d_residual_bin_radius_max", d(config.tpf_4d_residual_bin_radius_max));
+  kv.emplace_back("tpf_4d_motion_probe_grid_n", i(config.tpf_4d_motion_probe_grid_n));
+  kv.emplace_back("tpf_4d_motion_probe_grid_half_extent", d(config.tpf_4d_motion_probe_grid_half_extent));
+  kv.emplace_back("tpf_4d_motion_source_exclusion_radius", d(config.tpf_4d_motion_source_exclusion_radius));
+  kv.emplace_back("tpf_4d_motion_field_softening", d(config.tpf_4d_motion_field_softening));
+  kv.emplace_back("tpf_4d_motion_kappa", d(config.tpf_4d_motion_kappa));
+  kv.emplace_back("tpf_4d_motion_readout_scale", d(config.tpf_4d_motion_readout_scale));
+  kv.emplace_back("tpf_4d_motion_bin_count", i(config.tpf_4d_motion_bin_count));
+  kv.emplace_back("tpf_4d_xi_motion_dt", d(config.tpf_4d_xi_motion_dt));
+  kv.emplace_back("tpf_4d_xi_motion_steps", i(config.tpf_4d_xi_motion_steps));
+  kv.emplace_back("tpf_4d_xi_motion_readout_scale", d(config.tpf_4d_xi_motion_readout_scale));
+  kv.emplace_back("tpf_4d_xi_motion_field_softening", d(config.tpf_4d_xi_motion_field_softening));
+  kv.emplace_back("tpf_4d_xi_motion_source_exclusion_radius", d(config.tpf_4d_xi_motion_source_exclusion_radius));
+  kv.emplace_back("tpf_4d_xi_motion_probe_layout", config.tpf_4d_xi_motion_probe_layout);
+  kv.emplace_back("tpf_4d_xi_motion_probe_count", i(config.tpf_4d_xi_motion_probe_count));
+  kv.emplace_back("tpf_4d_xi_motion_probe_radius", d(config.tpf_4d_xi_motion_probe_radius));
+  kv.emplace_back("tpf_4d_xi_motion_probe_speed", d(config.tpf_4d_xi_motion_probe_speed));
+  kv.emplace_back("tpf_4d_xi_motion_integrator", config.tpf_4d_xi_motion_integrator);
+  kv.emplace_back("tpf_4d_xi_motion_dump_every", i(config.tpf_4d_xi_motion_dump_every));
+  kv.emplace_back("tpf_4d_xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
+  kv.emplace_back("tpf_4d_xi_kernel_coupling", d(config.tpf_4d_xi_kernel_coupling));
+  kv.emplace_back("tpf_4d_xi_kernel_beta_power", d(config.tpf_4d_xi_kernel_beta_power));
+  kv.emplace_back("tpf_4d_xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+  kv.emplace_back("tpf_4d_xi_kernel_metric_min", d(config.tpf_4d_xi_kernel_metric_min));
+  kv.emplace_back("tpf_4d_xi_kernel_metric_max", d(config.tpf_4d_xi_kernel_metric_max));
+  kv.emplace_back("tpf_4d_xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+  kv.emplace_back("tpf_4d_xi_temporal_coupling", d(config.tpf_4d_xi_temporal_coupling));
+  kv.emplace_back("tpf_4d_xi_source_speed_x", d(config.tpf_4d_xi_source_speed_x));
+  kv.emplace_back("tpf_4d_xi_source_speed_y", d(config.tpf_4d_xi_source_speed_y));
+  kv.emplace_back("tpf_4d_xi_source_speed_z", d(config.tpf_4d_xi_source_speed_z));
   kv.emplace_back("tpf_xi_constraint_exterior_inspect", b(config.tpf_xi_constraint_exterior_inspect));
   kv.emplace_back("tpf_xi_constraint_grid_n", i(config.tpf_xi_constraint_grid_n));
   kv.emplace_back("tpf_xi_constraint_half_extent", d(config.tpf_xi_constraint_half_extent));
@@ -736,8 +996,15 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("galaxy_init_master_chaos", d(config.galaxy_init_master_chaos));
   kv.emplace_back("velocity_noise", d(config.velocity_noise));
   kv.emplace_back("initial_velocity_scale", d(config.initial_velocity_scale));
+  kv.emplace_back("galaxy_init_velocity_mode", config.galaxy_init_velocity_mode);
   kv.emplace_back("save_snapshots", b(config.save_snapshots));
   kv.emplace_back("save_run_info", b(config.save_run_info));
+  kv.emplace_back("softening_mode", config.softening_mode);
+  kv.emplace_back("softening_auto_profile", config.softening_auto_profile);
+  kv.emplace_back("auto_softening_factor", d(config.auto_softening_factor));
+  kv.emplace_back("auto_softening_dimension", i(config.auto_softening_dimension));
+  kv.emplace_back("auto_softening_min", d(config.auto_softening_min));
+  kv.emplace_back("auto_softening_max", d(config.auto_softening_max));
   kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));
   kv.emplace_back("plot_compare_smart_zoom_coverage", d(config.plot_compare_smart_zoom_coverage));
   kv.emplace_back("plot_skip_initial_steps", i(config.plot_skip_initial_steps));

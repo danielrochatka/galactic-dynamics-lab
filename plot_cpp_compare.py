@@ -92,8 +92,13 @@ def _panel_physics_text(run_info: dict) -> str:
     pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip()
     if not pkg:
         return "?"
+    if pkg == "Newtonian":
+        return "Newtonian baseline package"
     if pkg == "TPFCore":
         dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
+        if dyn == "xi_kernel_deformed":
+            kernel_mode = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "unknown_kernel") or "unknown_kernel")
+            return f"TPFCore xi_kernel_deformed / {kernel_mode}"
         if dyn:
             return f"{pkg} ({dyn})"
     return pkg
@@ -368,6 +373,164 @@ def resolve_compare_display_selection(
     )
 
 
+
+
+def radial_kinematics(snapshot):
+    pos = np.asarray(getattr(snapshot, "positions", []), dtype=np.float64).reshape(-1, 2)
+    vel = np.asarray(getattr(snapshot, "velocities", []), dtype=np.float64).reshape(-1, 2)
+    n = min(pos.shape[0], vel.shape[0])
+    pos = pos[:n]
+    vel = vel[:n]
+    r = np.linalg.norm(pos, axis=1)
+    safe = np.where(r > 0.0, r, 1.0)
+    r_hat = pos / safe[:, None]
+    r_hat[r <= 0.0] = 0.0
+    t_hat = np.column_stack([-r_hat[:, 1], r_hat[:, 0]])
+    v_radial = np.sum(vel * r_hat, axis=1)
+    v_tangential = np.sum(vel * t_hat, axis=1)
+    return {
+        "radius": r,
+        "r_hat": r_hat,
+        "t_hat": t_hat,
+        "v_radial": v_radial,
+        "v_tangential": v_tangential,
+        "v_t": np.abs(v_tangential),
+    }
+
+
+def estimate_snapshot_accelerations(snaps):
+    if not snaps:
+        return []
+    out = []
+    n = len(snaps)
+    for i in range(n):
+        cur_v = np.asarray(getattr(snaps[i], "velocities", []), dtype=np.float64)
+        if n == 1:
+            out.append(None)
+            continue
+        if i == 0:
+            v0 = cur_v
+            v1 = np.asarray(getattr(snaps[1], "velocities", []), dtype=np.float64)
+            dt = float(snaps[1].time) - float(snaps[0].time)
+        elif i == n - 1:
+            v0 = np.asarray(getattr(snaps[n - 2], "velocities", []), dtype=np.float64)
+            v1 = cur_v
+            dt = float(snaps[n - 1].time) - float(snaps[n - 2].time)
+        else:
+            v0 = np.asarray(getattr(snaps[i - 1], "velocities", []), dtype=np.float64)
+            v1 = np.asarray(getattr(snaps[i + 1], "velocities", []), dtype=np.float64)
+            dt = float(snaps[i + 1].time) - float(snaps[i - 1].time)
+        if (not np.isfinite(dt)) or dt == 0.0:
+            out.append(None)
+            continue
+        m = min(v0.shape[0], v1.shape[0], cur_v.shape[0])
+        out.append((v1[:m] - v0[:m]) / dt)
+    return out
+
+
+def binned_profile(x, y, bins=30):
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    finite = np.isfinite(x) & np.isfinite(y)
+    x = x[finite]
+    y = y[finite]
+    if x.size == 0:
+        return np.array([]), np.array([]), np.array([]), np.array([])
+    xmin = float(np.min(x))
+    xmax = float(np.max(x))
+    if xmax <= xmin:
+        return np.array([xmin]), np.array([np.median(y)]), np.array([np.percentile(y, 25)]), np.array([np.percentile(y, 75)])
+    edges = np.linspace(xmin, xmax, int(max(2, bins)) + 1)
+    mids=[]; med=[]; p25=[]; p75=[]
+    for i in range(edges.size - 1):
+        left = edges[i]
+        right = edges[i + 1]
+        mask = (x >= left) & (x < right if i < edges.size - 2 else x <= right)
+        if not np.any(mask):
+            continue
+        yy = y[mask]
+        mids.append(0.5 * (left + right))
+        med.append(float(np.median(yy)))
+        p25.append(float(np.percentile(yy, 25)))
+        p75.append(float(np.percentile(yy, 75)))
+    return np.asarray(mids), np.asarray(med), np.asarray(p25), np.asarray(p75)
+
+
+def save_compare_profile_plot(parent_dir, mode_name, alias_name, left_xy, right_xy, *, left_label, right_label, xlabel, ylabel, title, add_ref1=False):
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="white")
+    style_compare_diagnostic_axes(ax)
+
+    def _draw(side_xy, label, color):
+        if side_xy is None:
+            return
+        x, y = side_xy
+        bx, bm, bp25, bp75 = binned_profile(x, y, bins=30)
+        if bx.size == 0:
+            return
+        ax.plot(bx, bm, color=color, lw=2, label=label)
+        ax.fill_between(bx, bp25, bp75, color=color, alpha=0.2)
+
+    _draw(left_xy, left_label, "tab:cyan")
+    _draw(right_xy, right_label, "tab:orange")
+    if add_ref1:
+        ax.axhline(1.0, color="0.2", lw=1, ls="--", alpha=0.7)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    style_compare_diagnostic_legend(ax)
+    fig.tight_layout()
+    for nm in (mode_name, alias_name):
+        fig.savefig(parent_dir / nm, dpi=150, facecolor="white", edgecolor="none")
+    plt.close(fig)
+
+
+def style_compare_diagnostic_axes(ax) -> None:
+    ax.set_facecolor("white")
+    ax.tick_params(colors="black")
+    ax.xaxis.label.set_color("black")
+    ax.yaxis.label.set_color("black")
+    ax.title.set_color("black")
+    for spine in ax.spines.values():
+        spine.set_color("0.35")
+    ax.grid(True, alpha=0.25, color="0.75")
+
+
+def style_compare_diagnostic_legend(ax) -> None:
+    handles, _ = ax.get_legend_handles_labels()
+    if not handles:
+        return
+    leg = ax.legend(facecolor="white", edgecolor="0.5")
+    for text in leg.get_texts():
+        text.set_color("black")
+
+
+def _time_display_factor(unit: str) -> float:
+    u = str(unit or "s")
+    seconds_per_day = 86400.0
+    seconds_per_julian_year = 365.25 * seconds_per_day
+    seconds_per_kyr = 1.0e3 * seconds_per_julian_year
+    seconds_per_myr = 1.0e6 * seconds_per_julian_year
+    if u == "Myr":
+        return 1.0 / seconds_per_myr
+    if u == "kyr":
+        return 1.0 / seconds_per_kyr
+    if u == "yr":
+        return 1.0 / seconds_per_julian_year
+    if u == "day":
+        return 1.0 / seconds_per_day
+    if u == "hr":
+        return 1.0 / 3600.0
+    if u == "min":
+        return 1.0 / 60.0
+    return 1.0
+
+
+def _velocity_display_factor(unit: str) -> float:
+    return 1.0e-3 if str(unit or "m/s") == "km/s" else 1.0
+
+
 def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, spatial_display) -> None:
     from render import scatter_frame
 
@@ -378,11 +541,26 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
         render_radius=viewport,
         spatial_display=spatial_display,
     )
-    ax.set_title(
-        f"{side.label} / {_panel_physics_text(side.run_info)} / primary trajectory x-y / step={int(snap.step)}",
-        color="white",
-        fontsize=11,
-    )
+    ax.set_title("")
+    panel_lines = _compare_panel_metadata_lines(side)
+    if panel_lines:
+        ax.text(
+            0.02,
+            0.98,
+            "\n".join(panel_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            color="#66ff66",
+            fontsize=5.5,
+            bbox={
+                "facecolor": (0.0, 0.0, 0.0, 0.72),
+                "edgecolor": (0.2, 0.8, 0.2, 0.85),
+                "linewidth": 0.6,
+                "boxstyle": "round,pad=0.20",
+            },
+            zorder=30,
+        )
     if side.overlay_mode != "none":
         draw_galaxy_render_overlay(
             ax,
@@ -392,6 +570,30 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
             step=int(snap.step),
             time_s=float(snap.time),
         )
+
+
+def _compare_panel_metadata_lines(side: SideData) -> list[str]:
+    run_info = side.run_info or {}
+    pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip() or "?"
+    role = "left / baseline" if side.label == "left_primary" else "right / compare"
+    lines = [pkg, f"package: {pkg}", f"role: {role}"]
+
+    dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
+    kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
+    if pkg == "TPFCore":
+        if dyn:
+            lines.append(f"dynamics: {dyn}")
+        if dyn == "xi_kernel_deformed" and kernel:
+            lines.append(f"kernel: {kernel}")
+        coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)
+        if coupling is None:
+            coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
+        if coupling is not None and str(coupling).strip() != "":
+            lines.append(f"coupling: {coupling}")
+        factor_mode = _run_info_effective_value(run_info, "tpf_factor_mode", None)
+        if factor_mode is not None and str(factor_mode).strip() != "":
+            lines.append(f"factor_mode: {factor_mode}")
+    return lines
 
 
 def render_compare(
@@ -463,12 +665,15 @@ def render_compare(
         _draw_panel(axes[0], left, ls, shared_vp, spatial_display=spatial_display)
         _draw_panel(axes[1], right, rs, shared_vp, spatial_display=spatial_display)
         step = int(steps[step_idx])
+        tc = format_animation_time_caption(
+            float(ls.time),
+            "galaxy_compare",
+            preferred_time_unit=shared_display.config.time_unit,
+            active_time_unit=shared_display.active_time_unit,
+        )
         fig.suptitle(
-            f"Compare {compare_run_id} | left={left_panel_label} "
-            f"| right={right_panel_label} "
-            f"| step={step} "
-            f"| rev={left_rev} "
-            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"Compare {compare_run_id} | step={step} | {tc} "
+            f"| display units: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,
@@ -491,7 +696,6 @@ def render_compare(
 
     left_panel_label = _panel_physics_text(left.run_info)
     right_panel_label = _panel_physics_text(right.run_info)
-    left_rev = str(_run_info_effective_value(left.run_info, "code_version_label", "unknown") or "unknown")
     mode_aware_initial = _mode_aware_compare_name("initial", left.run_info, right.run_info, ext="png")
     mode_aware_final = _mode_aware_compare_name("final", left.run_info, right.run_info, ext="png")
     save_static(0, mode_aware_initial)
@@ -499,6 +703,102 @@ def render_compare(
     # Compatibility aliases: keep historical filenames as copies of the mode-aware primary artifacts.
     shutil.copy2(parent_dir / mode_aware_initial, parent_dir / "galaxy_initial_compare.png")
     shutil.copy2(parent_dir / mode_aware_final, parent_dir / "galaxy_final_compare.png")
+    required = [
+        parent_dir / mode_aware_initial,
+        parent_dir / mode_aware_final,
+        parent_dir / "galaxy_initial_compare.png",
+        parent_dir / "galaxy_final_compare.png",
+    ]
+    missing = [str(p.name) for p in required if not p.exists()]
+    if missing:
+        raise SystemExit(
+            "Compare render failed: missing expected PNG outputs in "
+            f"{parent_dir}: {', '.join(missing)}"
+        )
+    print(
+        "Compare static renders generated: "
+        + ", ".join([mode_aware_initial, mode_aware_final, "galaxy_initial_compare.png", "galaxy_final_compare.png"])
+    )
+
+    try:
+        dist_scale = spatial_display.factor
+        dist_unit = getattr(spatial_display, "unit", shared_display.active_distance_unit)
+        time_scale = _time_display_factor(shared_display.active_time_unit)
+        vel_scale = _velocity_display_factor(shared_display.active_velocity_unit)
+        vel_unit = shared_display.active_velocity_unit
+        lk = radial_kinematics(left_snaps[-1])
+        rk = radial_kinematics(right_snaps[-1])
+        la_all = estimate_snapshot_accelerations(left_snaps)
+        ra_all = estimate_snapshot_accelerations(right_snaps)
+        la = la_all[-1] if la_all else None
+        ra = ra_all[-1] if ra_all else None
+
+        def inward_accel(kin, acc):
+            if acc is None:
+                return None
+            m = min(acc.shape[0], kin["r_hat"].shape[0])
+            ar = np.sum(acc[:m] * kin["r_hat"][:m], axis=1)
+            return -ar
+
+        l_in = inward_accel(lk, la)
+        r_in = inward_accel(rk, ra)
+        left_name = _slug(_physics_label(left.run_info))
+        right_name = _slug(_physics_label(right.run_info))
+        pref = f"galaxy_compare__{left_name}_vs_{right_name}__compare__"
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1, 1, figsize=(9, 6), facecolor="white")
+        style_compare_diagnostic_axes(ax)
+        if l_in is not None:
+            ax.scatter(lk["radius"] * dist_scale, l_in, s=8, alpha=0.2, color="tab:cyan", label=left_panel_label)
+        if r_in is not None:
+            ax.scatter(rk["radius"] * dist_scale, r_in, s=8, alpha=0.2, color="tab:orange", label=right_panel_label)
+        ax.set_xlabel(f"radius [{dist_unit}]")
+        ax.set_ylabel("inward radial acceleration [m/s^2]")
+        ax.set_title("Final snapshot inward radial acceleration vs radius (raw)")
+        leg = ax.legend(facecolor="white", edgecolor="0.5")
+        for text in leg.get_texts():
+            text.set_color("black")
+        fig.tight_layout()
+        fig.savefig(parent_dir / (pref + "radial_acceleration_vs_radius_final.png"), dpi=150, facecolor="white", edgecolor="none")
+        fig.savefig(parent_dir / "compare_radial_acceleration_vs_radius_final.png", dpi=150, facecolor="white", edgecolor="none")
+        plt.close(fig)
+        save_compare_profile_plot(parent_dir, pref+"binned_inward_acceleration_vs_radius_final.png", "compare_binned_inward_acceleration_vs_radius_final.png", (lk["radius"]*dist_scale, l_in) if l_in is not None else None, (rk["radius"]*dist_scale, r_in) if r_in is not None else None, left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="inward radial acceleration [m/s^2]", title="Binned inward radial acceleration vs radius")
+        save_compare_profile_plot(parent_dir, pref+"rotation_curve_final.png", "compare_rotation_curve_final.png", (lk["radius"]*dist_scale, lk["v_t"] * vel_scale), (rk["radius"]*dist_scale, rk["v_t"] * vel_scale), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel=f"tangential speed [{vel_unit}]", title="Rotation curve (final snapshot)")
+        l_cent = np.divide(lk["v_t"]**2, lk["radius"], out=np.full_like(lk["radius"], np.nan), where=lk["radius"]>0)
+        r_cent = np.divide(rk["v_t"]**2, rk["radius"], out=np.full_like(rk["radius"], np.nan), where=rk["radius"]>0)
+        save_compare_profile_plot(parent_dir, pref+"centripetal_profile_final.png", "compare_centripetal_profile_final.png", (lk["radius"]*dist_scale, l_cent), (rk["radius"]*dist_scale, r_cent), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel="v_t^2 / r [m/s^2]", title="Centripetal profile (final snapshot)")
+        save_compare_profile_plot(parent_dir, pref+"radial_velocity_vs_radius_final.png", "compare_radial_velocity_vs_radius_final.png", (lk["radius"]*dist_scale, lk["v_radial"] * vel_scale), (rk["radius"]*dist_scale, rk["v_radial"] * vel_scale), left_label=left_panel_label, right_label=right_panel_label, xlabel=f"radius [{dist_unit}]", ylabel=f"radial velocity [{vel_unit}]", title="Radial velocity vs radius (final snapshot)")
+
+        lmed=[];lp25=[];lp75=[];rmed=[];rp25=[];rp75=[];tvals=[]
+        for ls, rs in zip(left_snaps, right_snaps):
+            lr = radial_kinematics(ls)["radius"]*dist_scale
+            rr = radial_kinematics(rs)["radius"]*dist_scale
+            tvals.append(float(ls.time))
+            lmed.append(np.median(lr)); lp25.append(np.percentile(lr,25)); lp75.append(np.percentile(lr,75))
+            rmed.append(np.median(rr)); rp25.append(np.percentile(rr,25)); rp75.append(np.percentile(rr,75))
+        fig, ax = plt.subplots(1,1,figsize=(9,6),facecolor='white')
+        style_compare_diagnostic_axes(ax)
+        t=np.asarray(tvals) * time_scale; ax.plot(t,lmed,color='tab:cyan',label=left_panel_label); ax.fill_between(t,lp25,lp75,color='tab:cyan',alpha=0.2)
+        ax.plot(t,rmed,color='tab:orange',label=right_panel_label); ax.fill_between(t,rp25,rp75,color='tab:orange',alpha=0.2)
+        ax.set_xlabel(f"time [{shared_display.active_time_unit}]"); ax.set_ylabel(f"radius [{dist_unit}]"); ax.set_title('Radius percentiles over time')
+        style_compare_diagnostic_legend(ax)
+        fig.tight_layout()
+        fig.savefig(parent_dir/(pref+"radius_percentiles_over_time.png"),dpi=150,facecolor='white',edgecolor='none'); fig.savefig(parent_dir/"compare_radius_percentiles_over_time.png",dpi=150,facecolor='white',edgecolor='none'); plt.close(fig)
+
+        if l_in is not None and r_in is not None:
+            l_x, l_med, _, _ = binned_profile(lk["radius"] * dist_scale, l_in, bins=30)
+            r_x, r_med, _, _ = binned_profile(rk["radius"] * dist_scale, r_in, bins=30)
+            common_x = np.union1d(l_x, r_x)
+            if common_x.size > 0:
+                l_interp = np.interp(common_x, l_x, l_med, left=np.nan, right=np.nan)
+                r_interp = np.interp(common_x, r_x, r_med, left=np.nan, right=np.nan)
+                valid = np.isfinite(l_interp) & np.isfinite(r_interp) & (np.abs(l_interp) > 0.0)
+                if np.any(~valid):
+                    print(f"Warning: skipped {int(np.sum(~valid))} invalid acceleration-ratio bins")
+                ratio = np.divide(r_interp[valid], l_interp[valid])
+                save_compare_profile_plot(parent_dir, pref+"acceleration_ratio_vs_radius_final.png", "compare_acceleration_ratio_vs_radius_final.png", None, (common_x[valid], ratio), left_label=left_panel_label, right_label=f"{right_panel_label}/{left_panel_label}", xlabel=f"radius [{dist_unit}]", ylabel="inward_accel_right / inward_accel_left", title="Acceleration ratio vs radius (final snapshot)", add_ref1=True)
+    except Exception as e:
+        print(f"Warning: compare diagnostic overlay plots failed: {e}")
 
     if no_animation:
         return
@@ -534,9 +834,7 @@ def render_compare(
         )
         fig.suptitle(
             f"Compare {compare_run_id} | step={steps[i]} | {tc} "
-            f"| left={left_panel_label} "
-            f"| right={right_panel_label} "
-            f"| display: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
+            f"| display units: d={shared_display.active_distance_unit}, t={shared_display.active_time_unit}, "
             f"v={shared_display.active_velocity_unit}",
             color="white",
             fontsize=11,

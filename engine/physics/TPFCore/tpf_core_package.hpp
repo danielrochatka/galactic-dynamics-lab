@@ -4,8 +4,8 @@
 /**
  * TPFCore: Honest primitive TPF structure package.
  *
- * Implements Xi^mu, Theta_{mu nu}, I = Theta_mn Theta^mn - lambda Theta^2.
- * Lambda = 1/4 in 4D (fixed theory; not tunable).
+ * Current runtime field path uses legacy projected-vector / spatial-tensor objects with lambda fixed at 1/4.
+ * Isolated 4D math/static residual benchmark helpers live in tpf_4d_field.* / tpf_4d_static_* and are not wired into dynamics.
  *
  * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
  * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
@@ -24,6 +24,7 @@
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
 #include "source_ansatz.hpp"
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,14 @@ class TPFCorePackage : public PhysicsPackage {
 
   /** Run symmetric-pair inspection: sources at (+d,0) and (-d,0), probe along axes. */
   void run_symmetric_pair_inspect(const Config& config, const std::string& output_dir);
+  /** Run source-first field benchmark and dump plane probe grid CSV. */
+  void run_source_field_benchmark(const Config& config, const std::string& output_dir);
+  /** Run static 4D residual benchmark harness and dump summary + view-plane slice artifacts. */
+  void run_4d_static_residual_benchmark(const Config& config, const std::string& output_dir);
+  /** Run static 4D field -> principal tensor -> probe-motion readout benchmark harness. */
+  void run_4d_static_motion_readout_benchmark(const Config& config, const std::string& output_dir);
+  /** Run dynamic probe-motion benchmark using Xi-direct acceleration from fixed-source static 4D field evaluation. */
+  void run_4d_xi_motion_probe_benchmark(const Config& config, const std::string& output_dir);
 
   /** Write tpf_readout_debug.csv for dynamical runs when tpfcore_dump_readout_debug. */
   void write_readout_debug(const std::vector<Snapshot>& snapshots,
@@ -93,6 +102,15 @@ class TPFCorePackage : public PhysicsPackage {
 
   /** Last integrator-step pipeline stats (updated every compute_accelerations). */
   const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
+  struct XiRuntimeCounters {
+    std::uint64_t theta_evaluations = 0;
+    std::uint64_t invariant_I_evaluations = 0;
+    std::uint64_t direct_tpf_evaluations = 0;
+    std::uint64_t provisional_readout_evaluations = 0;
+    std::uint64_t xi_last_call_pair_evaluations = 0;
+    std::uint64_t xi_total_pair_evaluations = 0;
+  };
+  XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
 
   /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -173,6 +191,28 @@ class TPFCorePackage : public PhysicsPackage {
                                      bool star_star,
                                      std::vector<double>& ax,
                                      std::vector<double>& ay) const;
+  void compute_xi_kernel_deformed_accelerations(const State& state,
+                                                double bh_mass,
+                                                double softening,
+                                                bool star_star,
+                                                std::vector<double>& ax,
+                                                std::vector<double>& ay) const;
+  void validate_xi_kernel_runtime_config() const;
+  bool xi_kernel_deformation_active() const;
+
+  double xi_motion_readout_scale_;
+  std::string xi_kernel_mode_;
+  double xi_kernel_coupling_;
+  double xi_kernel_beta_power_;
+  std::string xi_kernel_factor_mode_;
+  double xi_kernel_metric_min_;
+  double xi_kernel_metric_max_;
+  std::string xi_temporal_mode_;
+  double xi_temporal_coupling_;
+  double xi_source_speed_x_;
+  double xi_source_speed_y_;
+  double xi_source_speed_z_;
+  mutable XiRuntimeCounters xi_runtime_counters_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

@@ -12,10 +12,10 @@ TEST_CASE("compute_active_dynamics_branch: TPF legacy_readout labels VDSG in bra
   c.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00");
+        "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-20");
+        "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-20");
 }
 
 TEST_CASE("compute_active_dynamics_branch: TPF direct") {
@@ -24,12 +24,12 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }
@@ -43,14 +43,6 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") 
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "v11 correspondence metrics; alpha_si");
   CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
-}
-
-TEST_CASE("compute_active_dynamics_branch: deprecated weak_field_correspondence alias resolves to correspondence helper labels") {
-  Config c;
-  c.physics_package = "TPFCore";
-  c.tpf_dynamics_mode = "weak_field_correspondence";
-  CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si");
 }
 
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
@@ -97,6 +89,67 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field correspondence audit m
   CHECK(galaxy::compute_active_dynamics_branch(c).find("TPF_v11_weak_field_correspondence_audit") == 0);
   CHECK(galaxy::compute_active_metrics_branch(c).find("v11_paper_tensors") == 0);
   CHECK(galaxy::compute_acceleration_code_path(c).find("audit-only") != std::string::npos);
+}
+
+TEST_CASE("compute_active_* branch labels: tpf_4d_static_residual_benchmark is diagnostic-only") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+
+  const std::string dynamics = galaxy::compute_active_dynamics_branch(c);
+  const std::string metrics = galaxy::compute_active_metrics_branch(c);
+  const std::string accel = galaxy::compute_acceleration_code_path(c);
+
+  CHECK(dynamics.find("diagnostic-only") != std::string::npos);
+  CHECK(dynamics.find("no particle integration") != std::string::npos);
+  CHECK(dynamics.find("no acceleration path") != std::string::npos);
+  CHECK(dynamics.find("direct_tpf") == std::string::npos);
+  CHECK(dynamics.find("compute_direct_tpf_accelerations") == std::string::npos);
+
+  CHECK(metrics.find("static_4D_field_residual") != std::string::npos);
+  CHECK(metrics.find("Xi4") != std::string::npos);
+  CHECK(metrics.find("Theta4") != std::string::npos);
+
+  CHECK(accel.find("none") != std::string::npos);
+  CHECK(accel.find("evaluate_static_configuration_residual_4d") != std::string::npos);
+  CHECK(accel.find("no compute_accelerations call") != std::string::npos);
+  CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
+}
+
+TEST_CASE("compute_active_* branch labels: tpf_4d_static_motion_readout_benchmark is benchmark-only") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+
+  const std::string dynamics = galaxy::compute_active_dynamics_branch(c);
+  const std::string metrics = galaxy::compute_active_metrics_branch(c);
+  const std::string accel = galaxy::compute_acceleration_code_path(c);
+
+  CHECK(dynamics.find("TPF_4D_static_motion_readout_benchmark") != std::string::npos);
+  CHECK(metrics.find("GravityStaticMotionReadout_v1") != std::string::npos);
+  CHECK(accel.find("evaluate_static_sources_field_4d") != std::string::npos);
+  CHECK(accel.find("no compute_accelerations call") != std::string::npos);
+  CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
+}
+
+TEST_CASE("compute_active_* branch labels: tpf_4d_xi_motion_probe_benchmark is isolated Xi-direct benchmark") {
+  Config c;
+  c.simulation_mode = galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark;
+  c.physics_package = "TPFCore";
+  c.tpf_dynamics_mode = "direct_tpf";
+
+  const std::string dynamics = galaxy::compute_active_dynamics_branch(c);
+  const std::string metrics = galaxy::compute_active_metrics_branch(c);
+  const std::string accel = galaxy::compute_acceleration_code_path(c);
+
+  CHECK(dynamics.find("TPF_4D_xi_motion_probe_benchmark") != std::string::npos);
+  CHECK(metrics.find("GravityXiMotionReadout_v1") != std::string::npos);
+  CHECK(accel.find("evaluate_static_sources_field_4d") != std::string::npos);
+  CHECK(accel.find("GravityXiMotionReadout_v1") != std::string::npos);
+  CHECK(accel.find("no compute_accelerations call") != std::string::npos);
+  CHECK(accel.find("compute_direct_tpf_accelerations") == std::string::npos);
 }
 
 TEST_CASE("compute_acceleration_code_path: direct_tpf tensor principal-part route") {

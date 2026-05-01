@@ -64,6 +64,21 @@ class TestRenderOverlay(unittest.TestCase):
         self.assertIn("TPF_legacy_readout:", d)
         self.assertIn("tensor_radial_projection", m)
 
+    def test_infer_branches_xi_kernel_deformed(self) -> None:
+        ri = {
+            "physics_package": "TPFCore",
+            "tpf_dynamics_mode": "xi_kernel_deformed",
+            "tpf_4d_xi_motion_readout_scale": 1.5e-3,
+            "tpf_4d_xi_kernel_mode": "gaussian_compact",
+            "tpf_4d_xi_kernel_coupling": 0.75,
+            "tpfcore_enable_provisional_readout": 0,
+        }
+        d, m, acc = infer_branches_from_run_info(ri)
+        self.assertEqual(d, "TPFCore: xi_kernel_deformed")
+        self.assertIn("a=-K_xi*Xi_eff", m)
+        self.assertIn("kernel=gaussian_compact", m)
+        self.assertIn("route=xi_kernel_deformed", acc)
+
     def test_load_render_manifest_missing(self) -> None:
         self.assertIsNone(load_render_manifest(Path("/nonexistent/does/not/exist")))
 
@@ -185,6 +200,51 @@ class TestRenderOverlay(unittest.TestCase):
         self.assertIn("Display distance: kpc", overlay_text)
         self.assertIn("Display time: Myr", overlay_text)
         self.assertIn("Display velocity: km/s", overlay_text)
+
+    def test_minimal_overlay_xi_kernel_deformed_text(self) -> None:
+        class _FakeAx:
+            def __init__(self) -> None:
+                self.transAxes = object()
+                self.text_calls: list[tuple[float, float, str]] = []
+
+            def text(self, x, y, text, **kwargs):  # type: ignore[no-untyped-def]
+                _ = kwargs
+                self.text_calls.append((x, y, text))
+
+        ax = _FakeAx()
+        spec = {
+            "run_id": "r_xi",
+            "active_dynamics_branch": "legacy",
+            "active_metrics_branch": "met",
+            "physics_package": "TPFCore",
+            "tpf_dynamics_mode": "xi_kernel_deformed",
+            "tpf_4d_xi_kernel_mode": "gaussian_compact",
+            "tpf_4d_xi_kernel_coupling": 0.75,
+            "tpf_vdsg_coupling": 0.0,
+            "galaxy_init_template": "disk",
+            "galaxy_init_seed": 7,
+            "n_stars": 128,
+            "bh_mass": 1.0,
+            "n_steps_total": 100,
+            "display_units_in_overlay": False,
+            "code_version_label": "unknown",
+            "git_commit_short": "abc1234",
+            "git_dirty": False,
+            "git_branch": "",
+            "git_tag": "",
+        }
+        draw_galaxy_render_overlay(
+            ax,
+            "minimal",
+            spec,
+            run_info={"simulation_mode": "galaxy"},
+            step=10,
+            time_s=1.0,
+        )
+        overlay_text = ax.text_calls[0][2]
+        self.assertIn("Dynamics: TPFCore: xi_kernel_deformed", overlay_text)
+        self.assertIn("a=-K_xi*Xi_eff", overlay_text)
+        self.assertIn("kernel=gaussian_compact coupling=0.75", overlay_text)
 
 
 if __name__ == "__main__":

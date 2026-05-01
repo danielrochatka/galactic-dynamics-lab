@@ -96,6 +96,25 @@ struct GalaxyInitAudit {
 
   bool template_defaults_used = false;
   GalaxyInitTemplateDefaultsLog template_defaults_log;
+  std::string velocity_mass_model = "bh_plus_enclosed_stars";
+  bool velocity_uses_star_mass = true;
+  bool velocity_respects_star_star_flag = true;
+  std::string velocity_formula = "legacy_unsoftened_enclosed_mass";
+  double velocity_softening_used = 0.0;
+  bool velocity_softened_circular_speed = false;
+  double median_v_circ_softened_ratio_vs_unsoftened = 1.0;
+  std::string galaxy_init_velocity_mode = "enclosed_mass";
+  bool pairwise_radial_equilibrium_used = false;
+  int pairwise_radial_equilibrium_fallback_count = 0;
+  int pairwise_radial_equilibrium_negative_radial_accel_count = 0;
+  double initial_inward_radial_accel_median = 0.0;
+  double initial_inward_radial_accel_p25 = 0.0;
+  double initial_inward_radial_accel_p75 = 0.0;
+  double initial_v_circ_median = 0.0;
+  double initial_v_circ_p25 = 0.0;
+  double initial_v_circ_p75 = 0.0;
+  double initial_radial_velocity_median_after_noise = 0.0;
+  double initial_tangential_fraction_median_after_noise = 0.0;
 
   double weight_w_max = 1.0;
   int rejection_fallbacks = 0;

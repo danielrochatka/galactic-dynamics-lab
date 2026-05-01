@@ -9,6 +9,7 @@ namespace galaxy {
 class NewtonianPackage : public PhysicsPackage {
  public:
   const char* name() const override { return "Newtonian"; }
+  void init_from_config(const Config&) override {}
 
   void compute_accelerations(const State& state,
                              double bh_mass,
@@ -21,6 +22,7 @@ class NewtonianPackage : public PhysicsPackage {
                                  double bh_mass,
                                  double softening,
                                  bool star_star = true) const override;
+ private:
 };
 
 }  // namespace galaxy

@@ -15,13 +15,15 @@ CXXFLAGS = -std=c++11 -O2 -Wall -I. -Ivendor -MMD -MP
 # Library objects (everything except main.cpp) — linked into galaxy_tests
 LIB_SRCS = config.cpp compare_orchestration.cpp force_compare.cpp physics/registry.cpp physics/Newtonian/newtonian.cpp \
 	physics/TPFCore/source_ansatz.cpp physics/TPFCore/field_evaluation.cpp \
+	physics/TPFCore/tpf_4d_field.cpp physics/TPFCore/tpf_4d_static_field.cpp \
+	physics/TPFCore/tpf_4d_static_residual.cpp \
 	physics/TPFCore/direct_tpf_baseline.cpp physics/TPFCore/derived_tpf_radial.cpp physics/TPFCore/extensions_vdsg.cpp \
 	physics/TPFCore/runtime_package_helpers.cpp physics/TPFCore/provisional_readout.cpp \
 	physics/TPFCore/readout_tensor_radial.cpp physics/TPFCore/readout_derived_radial.cpp \
 	physics/TPFCore/readout_experimental_radial_scaling.cpp physics/TPFCore/xi_constraint_exterior_solver.cpp \
 	physics/TPFCore/tpf_core_package.cpp physics/TPFCore/v11_weak_field_correspondence.cpp \
-	integrator.cpp galaxy_init.cpp init_conditions.cpp scenario_defaults.cpp resolved_scenario.cpp \
-	git_provenance.cpp render_audit.cpp simulation.cpp output.cpp
+	integrator.cpp galaxy_init.cpp init_conditions.cpp scenario_defaults.cpp resolved_scenario.cpp softening_policy.cpp \
+	git_provenance.cpp render_audit.cpp simulation.cpp output.cpp progress_time.cpp preflight.cpp
 
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)
 
@@ -71,9 +73,7 @@ test_integration: $(TARGET)
 	./tests/run_integration.sh
 
 # Full C++ suite: unit/regression binary + integration shell scripts (requires galaxy_sim).
-test: $(TARGET) $(TEST_TARGET)
-	./$(TEST_TARGET)
-	./tests/run_integration.sh
+test: test_unit test_integration
 check: test
 
 clean:
