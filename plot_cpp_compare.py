@@ -546,18 +546,18 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
     if panel_lines:
         ax.text(
             0.02,
-            0.98,
+            0.955,
             "\n".join(panel_lines),
             transform=ax.transAxes,
             ha="left",
             va="top",
             color="#66ff66",
-            fontsize=5.5,
+            fontsize=8.5,
             bbox={
-                "facecolor": (0.0, 0.0, 0.0, 0.72),
+                "facecolor": (0.0, 0.0, 0.0, 0.82),
                 "edgecolor": (0.2, 0.8, 0.2, 0.85),
                 "linewidth": 0.6,
-                "boxstyle": "round,pad=0.20",
+                "boxstyle": "round,pad=0.28",
             },
             zorder=30,
         )
@@ -577,22 +577,55 @@ def _compare_panel_metadata_lines(side: SideData) -> list[str]:
     pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip() or "?"
     role = "left / baseline" if side.label == "left_primary" else "right / compare"
     lines = [pkg, f"package: {pkg}", f"role: {role}"]
+    if pkg == "Newtonian":
+        return lines
 
     dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
-    kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
     if pkg == "TPFCore":
         if dyn:
             lines.append(f"dynamics: {dyn}")
-        if dyn == "xi_kernel_deformed" and kernel:
-            lines.append(f"kernel: {kernel}")
-        coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)
-        if coupling is None:
-            coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
-        if coupling is not None and str(coupling).strip() != "":
-            lines.append(f"coupling: {coupling}")
-        factor_mode = _run_info_effective_value(run_info, "tpf_factor_mode", None)
-        if factor_mode is not None and str(factor_mode).strip() != "":
-            lines.append(f"factor_mode: {factor_mode}")
+        if dyn == "legacy_readout":
+            lines[-1] = "dynamics: legacy_readout (removed)"
+            vdsg_coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
+            if vdsg_coupling is not None and str(vdsg_coupling).strip() != "":
+                lines.append(f"vdsg_coupling: {vdsg_coupling}")
+            readout_mode = _run_info_effective_value(run_info, "tpfcore_readout_mode", None)
+            if readout_mode is not None and str(readout_mode).strip() != "":
+                lines.append(f"readout: {readout_mode}")
+        elif dyn == "xi_kernel_deformed":
+            kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
+            factor_mode = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_factor_mode", "") or "").strip()
+            coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)
+            metric_min = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_metric_min", None)
+            metric_max = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_metric_max", None)
+            temporal_mode = _run_info_effective_value(run_info, "tpf_4d_xi_temporal_mode", None)
+            xi_scale = _run_info_effective_value(run_info, "tpf_4d_xi_motion_readout_scale", None)
+            if kernel:
+                lines.append(f"kernel: {kernel}")
+            if factor_mode:
+                lines.append(f"factor: {factor_mode}")
+            beta_power = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_beta_power", None)
+            if factor_mode == "beta_power" and beta_power is not None and str(beta_power).strip() != "":
+                lines.append(f"beta_power: {beta_power}")
+            if coupling is not None and str(coupling).strip() != "":
+                lines.append(f"coupling: {coupling}")
+            if metric_min is not None and metric_max is not None:
+                lines.append(f"metric clamp: {metric_min}–{metric_max}")
+            if temporal_mode is not None and str(temporal_mode).strip() != "":
+                lines.append(f"temporal: {temporal_mode}")
+            if xi_scale is not None and str(xi_scale).strip() != "":
+                lines.append(f"K_xi: {xi_scale}")
+        elif dyn == "direct_tpf":
+            coupling = _run_info_effective_value(run_info, "tpf_4d_direct_tpf_coupling", None)
+            if coupling is None:
+                coupling = _run_info_effective_value(run_info, "tpf_direct_tpf_coupling", None)
+            if coupling is None:
+                coupling = _run_info_effective_value(run_info, "tpf_kappa", None)
+            if coupling is not None and str(coupling).strip() != "":
+                lines.append(f"kappa: {coupling}")
+            vdsg_coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
+            if vdsg_coupling is not None and str(vdsg_coupling).strip() not in ("", "0", "0.0"):
+                lines.append(f"vdsg_coupling: {vdsg_coupling}")
     return lines
 
 
