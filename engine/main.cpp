@@ -22,6 +22,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <dirent.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -80,6 +81,27 @@ std::string shell_single_quote(const std::string& raw) {
 bool file_exists(const std::string& path) {
   std::ifstream f(path.c_str());
   return static_cast<bool>(f);
+}
+
+std::vector<std::string> find_compare_side_by_side_pngs(const std::string& dir,
+                                                         const std::string& stage) {
+  std::vector<std::string> out;
+  DIR* dp = opendir(dir.c_str());
+  if (!dp) return out;
+  const std::string stage_token = stage + "_side_by_side";
+  const std::string ext = ".png";
+  for (dirent* ent = readdir(dp); ent != nullptr; ent = readdir(dp)) {
+    const std::string name(ent->d_name);
+    if (name.find("galaxy_compare__") != std::string::npos &&
+        name.find(stage_token) != std::string::npos &&
+        name.size() >= ext.size() &&
+        name.compare(name.size() - ext.size(), ext.size(), ext) == 0) {
+      out.push_back(name);
+    }
+  }
+  closedir(dp);
+  std::sort(out.begin(), out.end());
+  return out;
 }
 
 std::vector<std::string> existing_tpf_4d_static_plot_pngs(const std::string& output_dir) {
@@ -1471,8 +1493,30 @@ int main(int argc, char** argv) {
       if (ret != 0) {
         std::cerr << "Warning: compare renderer returned non-zero exit code. Command was:\n  " << cmd << "\n";
       } else {
-        std::cout << "Compare render finished (see galaxy_initial_compare.png, galaxy_final_compare.png in "
-                  << compare_parent_dir << ").\n";
+        const std::string legacy_initial = compare_parent_dir + "/galaxy_initial_compare.png";
+        const std::string legacy_final = compare_parent_dir + "/galaxy_final_compare.png";
+        const auto mode_initial = find_compare_side_by_side_pngs(compare_parent_dir, "initial");
+        const auto mode_final = find_compare_side_by_side_pngs(compare_parent_dir, "final");
+        std::vector<std::string> missing;
+        if (!file_exists(legacy_initial)) missing.push_back("galaxy_initial_compare.png");
+        if (!file_exists(legacy_final)) missing.push_back("galaxy_final_compare.png");
+        if (mode_initial.empty()) missing.push_back("galaxy_compare__*__initial_side_by_side.png");
+        if (mode_final.empty()) missing.push_back("galaxy_compare__*__final_side_by_side.png");
+        if (!missing.empty()) {
+          std::cerr << "Error: compare renderer reported success but expected files are missing in "
+                    << compare_parent_dir << ": ";
+          for (std::size_t i = 0; i < missing.size(); ++i) {
+            if (i) std::cerr << ", ";
+            std::cerr << missing[i];
+          }
+          std::cerr << "\n";
+          return 1;
+        }
+        std::cout << "Compare render finished. Generated PNGs in " << compare_parent_dir << ":\n"
+                  << "  galaxy_initial_compare.png\n"
+                  << "  galaxy_final_compare.png\n";
+        for (const auto& f : mode_initial) std::cout << "  " << f << "\n";
+        for (const auto& f : mode_final) std::cout << "  " << f << "\n";
       }
     } else {
       std::cout

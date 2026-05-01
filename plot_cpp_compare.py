@@ -662,6 +662,22 @@ def render_compare(
     # Compatibility aliases: keep historical filenames as copies of the mode-aware primary artifacts.
     shutil.copy2(parent_dir / mode_aware_initial, parent_dir / "galaxy_initial_compare.png")
     shutil.copy2(parent_dir / mode_aware_final, parent_dir / "galaxy_final_compare.png")
+    required = [
+        parent_dir / mode_aware_initial,
+        parent_dir / mode_aware_final,
+        parent_dir / "galaxy_initial_compare.png",
+        parent_dir / "galaxy_final_compare.png",
+    ]
+    missing = [str(p.name) for p in required if not p.exists()]
+    if missing:
+        raise SystemExit(
+            "Compare render failed: missing expected PNG outputs in "
+            f"{parent_dir}: {', '.join(missing)}"
+        )
+    print(
+        "Compare static renders generated: "
+        + ", ".join([mode_aware_initial, mode_aware_final, "galaxy_initial_compare.png", "galaxy_final_compare.png"])
+    )
 
     try:
         dist_scale = spatial_display.factor
