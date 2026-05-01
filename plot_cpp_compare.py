@@ -575,26 +575,24 @@ def _draw_panel(ax, side: SideData, snap, viewport: SquareViewport | float, *, s
 def _compare_panel_metadata_lines(side: SideData) -> list[str]:
     run_info = side.run_info or {}
     pkg = str(_run_info_effective_value(run_info, "physics_package", "?") or "?").strip() or "?"
-    lines = [pkg]
-    if side.label == "left_primary":
-        lines.append(f"package: {pkg}")
-        lines.append("role: left / baseline")
-        return lines
+    role = "left / baseline" if side.label == "left_primary" else "right / compare"
+    lines = [pkg, f"package: {pkg}", f"role: {role}"]
 
     dyn = str(_run_info_effective_value(run_info, "tpf_dynamics_mode", "") or "").strip()
     kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
     if pkg == "TPFCore":
         if dyn:
             lines.append(f"dynamics: {dyn}")
-        if kernel:
+        if dyn == "xi_kernel_deformed" and kernel:
             lines.append(f"kernel: {kernel}")
         coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)
         if coupling is None:
             coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
         if coupling is not None and str(coupling).strip() != "":
             lines.append(f"coupling: {coupling}")
-    else:
-        lines.append(f"package: {pkg}")
+        factor_mode = _run_info_effective_value(run_info, "tpf_factor_mode", None)
+        if factor_mode is not None and str(factor_mode).strip() != "":
+            lines.append(f"factor_mode: {factor_mode}")
     return lines
 
 

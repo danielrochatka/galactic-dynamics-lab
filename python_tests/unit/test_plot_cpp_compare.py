@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from plot_cpp_compare import (
     _panel_physics_text,
+    _compare_panel_metadata_lines,
     resolve_compare_display_selection,
     _resolve_side_run_dir,
     _mode_aware_compare_name,
@@ -94,6 +95,9 @@ def _write_run_info_new_schema(run_dir: Path, pkg: str, *, dyn: str = "direct_tp
 
 
 class TestPlotCppCompare(unittest.TestCase):
+    def _side_data_for_metadata(self, label: str, run_info: dict):
+        return SimpleNamespace(label=label, run_info=run_info)
+
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
         "matplotlib/numpy not installed",
@@ -378,6 +382,84 @@ class TestPlotCppCompare(unittest.TestCase):
             ),
             "TPFCore xi_kernel_deformed / gaussian_compact",
         )
+
+    def test_compare_panel_metadata_newtonian_left_tpfcore_right(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata("left_primary", {"effective_physics_package": "Newtonian"})
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "right_compare",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "metric_transverse_wake",
+                    "effective_tpf_4d_xi_kernel_coupling": "1.0e-5",
+                },
+            )
+        )
+        self.assertIn("package: Newtonian", left_lines)
+        self.assertIn("role: left / baseline", left_lines)
+        self.assertNotIn("dynamics:", "\n".join(left_lines))
+        self.assertIn("package: TPFCore", right_lines)
+        self.assertIn("role: right / compare", right_lines)
+        self.assertIn("dynamics: xi_kernel_deformed", right_lines)
+        self.assertIn("kernel: metric_transverse_wake", right_lines)
+        self.assertIn("coupling: 1.0e-5", right_lines)
+
+    def test_compare_panel_metadata_tpfcore_both_sides_include_model_details(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
+                    "effective_tpf_4d_xi_kernel_coupling": "2.5e-6",
+                    "effective_tpf_factor_mode": "legacy",
+                },
+            )
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "right_compare",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_mode": "metric_transverse_wake",
+                    "effective_tpf_4d_xi_kernel_coupling": "1.25e-6",
+                },
+            )
+        )
+        for lines in (left_lines, right_lines):
+            self.assertIn("package: TPFCore", lines)
+            self.assertTrue(any(line.startswith("role: ") for line in lines))
+            self.assertIn("dynamics: xi_kernel_deformed", lines)
+            self.assertTrue(any(line.startswith("kernel: ") for line in lines))
+            self.assertTrue(any(line.startswith("coupling: ") for line in lines))
+        self.assertIn("factor_mode: legacy", left_lines)
+
+    def test_compare_panel_metadata_tpfcore_left_newtonian_right(self) -> None:
+        left_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "direct_tpf",
+                    "effective_tpf_vdsg_coupling": "0.0",
+                },
+            )
+        )
+        right_lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata("right_compare", {"effective_physics_package": "Newtonian"})
+        )
+        self.assertIn("package: TPFCore", left_lines)
+        self.assertIn("role: left / baseline", left_lines)
+        self.assertIn("dynamics: direct_tpf", left_lines)
+        self.assertIn("coupling: 0.0", left_lines)
+        self.assertIn("package: Newtonian", right_lines)
+        self.assertIn("role: right / compare", right_lines)
+        self.assertFalse(any(line.startswith("dynamics:") for line in right_lines))
 
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
