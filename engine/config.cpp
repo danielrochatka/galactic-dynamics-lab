@@ -162,6 +162,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "auto_softening_factor") { config.auto_softening_factor = std::stod(val); return true; }
   if (key == "auto_softening_dimension") { config.auto_softening_dimension = std::stoi(val); return true; }
+  if (key == "auto_softening_inner_cap") { config.auto_softening_inner_cap = std::stod(val); return true; }
   if (key == "auto_softening_min") { config.auto_softening_min = std::stod(val); return true; }
   if (key == "auto_softening_max") { config.auto_softening_max = std::stod(val); return true; }
   if (key == "enable_star_star_gravity") {
@@ -1019,6 +1020,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("softening_auto_profile", config.softening_auto_profile);
   kv.emplace_back("auto_softening_factor", d(config.auto_softening_factor));
   kv.emplace_back("auto_softening_dimension", i(config.auto_softening_dimension));
+  kv.emplace_back("auto_softening_inner_cap", d(config.auto_softening_inner_cap));
   kv.emplace_back("auto_softening_min", d(config.auto_softening_min));
   kv.emplace_back("auto_softening_max", d(config.auto_softening_max));
   kv.emplace_back("plot_animation_dynamic_zoom", b(config.plot_animation_dynamic_zoom));

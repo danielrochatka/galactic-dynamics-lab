@@ -53,12 +53,21 @@ ResolvedSoftening resolve_softening(const Config& cfg, const State& state) {
     r.effective_softening = fac * kSolarRadiusM;
     r.source = "auto:" + r.profile + "(solar_radius_multiplier)";
   } else throw std::runtime_error("invalid softening_auto_profile");
+  const double inner_cap_factor = (cfg.auto_softening_inner_cap > 0.0) ? cfg.auto_softening_inner_cap : 0.05;
+  const double inner_cap = (cfg.inner_radius > 0.0 && inner_cap_factor > 0.0) ? (inner_cap_factor * cfg.inner_radius) : 0.0;
+  if (inner_cap > 0.0) {
+    const double prev = r.effective_softening;
+    r.effective_softening = std::min(r.effective_softening, inner_cap);
+    r.max_capped = r.max_capped || (r.effective_softening < prev);
+    if (r.effective_softening < prev) r.source += "|inner_cap=contextual";
+  }
   double max_cap = 0.0;
   if (cfg.auto_softening_max > 0.0) {
     max_cap = cfg.auto_softening_max;
     r.max_cap_source = "explicit";
-  } else if (r.mode == "auto" && r.profile == "collisionless" && r.radius_outer_used > 0.0) {
-    max_cap = 0.05 * r.radius_outer_used;
+  } else if (r.mode == "auto") {
+    const double outer_ref = (r.radius_outer_used > 0.0) ? r.radius_outer_used : cfg.outer_radius;
+    if (outer_ref > 0.0) max_cap = 0.05 * outer_ref;
     r.max_cap_source = "contextual";
   }
   if (max_cap > 0.0) {
