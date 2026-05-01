@@ -137,6 +137,7 @@ struct Config {
   std::string softening_auto_profile = ""; /* empty => context default; or collisionless | stellar_physical | nuclear_cluster */
   double auto_softening_factor = 0.0;
   int auto_softening_dimension = 0;
+  double auto_softening_inner_cap = 0.05;
   double auto_softening_min = 0.0;
   double auto_softening_max = 0.0;
   bool enable_star_star_gravity = true;

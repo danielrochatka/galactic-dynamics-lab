@@ -53,19 +53,50 @@ ResolvedSoftening resolve_softening(const Config& cfg, const State& state) {
     r.effective_softening = fac * kSolarRadiusM;
     r.source = "auto:" + r.profile + "(solar_radius_multiplier)";
   } else throw std::runtime_error("invalid softening_auto_profile");
-  double max_cap = 0.0;
-  if (cfg.auto_softening_max > 0.0) {
-    max_cap = cfg.auto_softening_max;
-    r.max_cap_source = "explicit";
-  } else if (r.mode == "auto" && r.profile == "collisionless" && r.radius_outer_used > 0.0) {
-    max_cap = 0.05 * r.radius_outer_used;
-    r.max_cap_source = "contextual";
-  }
-  if (max_cap > 0.0) {
+  bool structural_capped = false;
+  const bool apply_collisionless_galaxy_structural_caps =
+      (cfg.simulation_mode == SimulationMode::galaxy &&
+       r.mode == "auto" &&
+       r.profile == "collisionless");
+  if (apply_collisionless_galaxy_structural_caps &&
+      std::isfinite(cfg.inner_radius) &&
+      cfg.inner_radius > 0.0 &&
+      cfg.auto_softening_inner_cap > 0.0) {
+    const double inner_cap = cfg.auto_softening_inner_cap * cfg.inner_radius;
     const double prev = r.effective_softening;
-    r.effective_softening = std::min(r.effective_softening, max_cap);
-    r.max_capped = (r.effective_softening < prev);
-    if (r.max_capped) r.source += "|max_cap=" + r.max_cap_source;
+    r.effective_softening = std::min(r.effective_softening, inner_cap);
+    if (r.effective_softening < prev) {
+      structural_capped = true;
+      r.max_capped = true;
+      r.source += "|inner_cap=contextual";
+    }
+  }
+  if (apply_collisionless_galaxy_structural_caps &&
+      std::isfinite(r.radius_outer_used) &&
+      r.radius_outer_used > 0.0) {
+    const double prev = r.effective_softening;
+    r.effective_softening = std::min(r.effective_softening, 0.05 * r.radius_outer_used);
+    if (r.effective_softening < prev) {
+      structural_capped = true;
+      r.max_capped = r.max_capped || (r.effective_softening < prev);
+      r.max_cap_source = "contextual";
+      r.source += "|max_cap=contextual";
+    }
+  }
+  if (cfg.auto_softening_max > 0.0) {
+    const double prev = r.effective_softening;
+    r.effective_softening = std::min(r.effective_softening, cfg.auto_softening_max);
+    if (r.effective_softening < prev) {
+      r.max_capped = true;
+      r.max_cap_source = structural_capped ? "contextual+explicit" : "explicit";
+      r.source += "|max_cap=explicit";
+    } else if (!structural_capped) {
+      r.max_cap_source = "explicit";
+    } else if (r.max_cap_source.empty()) {
+      r.max_cap_source = "contextual";
+    }
+  } else if (structural_capped && r.max_cap_source.empty()) {
+    r.max_cap_source = "contextual";
   }
   if (cfg.auto_softening_min > 0.0) {
     const double prev = r.effective_softening;

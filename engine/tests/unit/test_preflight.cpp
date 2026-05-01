@@ -121,7 +121,7 @@ TEST_CASE("collisionless auto explicit max controls preflight softening warning 
     CHECK_FALSE(has_warning(p, "softening_to_outer_radius > 0.05"));
   }
 
-  SUBCASE("unsafe explicit auto_softening_max can trigger warning") {
+  SUBCASE("inner structural cap bounds softening even with large explicit auto_softening_max") {
     galaxy::Config c;
     c.simulation_mode = galaxy::SimulationMode::galaxy;
     c.softening_mode = "auto";
@@ -137,9 +137,9 @@ TEST_CASE("collisionless auto explicit max controls preflight softening warning 
     const galaxy::ResolvedScenario r = galaxy::resolve_scenario(c);
     const auto p = galaxy::build_galaxy_preflight_summary(c, r);
 
-    CHECK(r.config.softening == doctest::Approx(c.auto_softening_max));
-    CHECK(r.config.softening / c.outer_radius > 0.05);
-    CHECK(has_warning(p, "softening_to_outer_radius > 0.05"));
+    CHECK(r.config.softening <= doctest::Approx(0.05 * c.inner_radius));
+    CHECK(r.config.softening / c.outer_radius <= doctest::Approx(0.05));
+    CHECK_FALSE(has_warning(p, "softening_to_outer_radius > 0.05"));
   }
 }
 
