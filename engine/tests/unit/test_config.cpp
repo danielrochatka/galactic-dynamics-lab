@@ -156,6 +156,11 @@ TEST_CASE("tpfcore_closure_kappa key maps to same tpf_kappa storage") {
   CHECK(c.tpf_kappa == doctest::Approx(4.5e12));
 }
 
+
+TEST_CASE("Config defaults TPFCore dynamics to xi_kernel_deformed") {
+  galaxy::Config c;
+  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+}
 TEST_CASE("tpf_dynamics_mode accepts v11_weak_field_truncation and deprecated weak_field_correspondence alias") {
   Config c;
   CHECK(apply_config_kv("tpf_dynamics_mode", "v11_weak_field_truncation", c));

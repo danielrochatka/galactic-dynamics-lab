@@ -11,7 +11,7 @@ OUT0=$(mktemp -d)
 OUT1=$(mktemp -d)
 trap 'rm -rf "$OUT0" "$OUT1"' EXIT
 
-common=(galaxy --physics_package=TPFCore --tpfcore_enable_provisional_readout=true
+common=(galaxy --physics_package=TPFCore --tpf_dynamics_mode=legacy_readout --tpfcore_enable_provisional_readout=true
   --tpfcore_readout_mode=derived_tpf_radial_readout
   --n_stars=8 --n_steps=2 --snapshot_every=1 --save_run_info=true --yes
   --galaxy_init_seed=424242 --galaxy_init_template=symmetric_disk)

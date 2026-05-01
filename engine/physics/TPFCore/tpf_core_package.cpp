@@ -71,7 +71,7 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
 }
 
 TPFCorePackage::TPFCorePackage()
-    : tpf_dynamics_mode_("legacy_readout"),
+    : tpf_dynamics_mode_("xi_kernel_deformed"),
       provisional_readout_(false),
       readout_mode_("tensor_radial_projection"),
       readout_scale_(1.0),
@@ -843,7 +843,8 @@ void TPFCorePackage::compute_accelerations(const State& state,
 
   if (!provisional_readout_) {
     throw std::runtime_error(
-        "TPFCore legacy_readout dynamics require provisional readout. "
+        "TPFCore deprecated legacy runtime requires explicit opt-in: "
+        "tpf_dynamics_mode=legacy_readout with tpfcore_enable_provisional_readout=true. "
         "Set tpfcore_enable_provisional_readout = true for legacy_readout, or set tpf_dynamics_mode = direct_tpf "
         "for the canonical direct_tpf tensor principal-part path, use Newtonian for dynamics, or run inspection modes (tpf_single_source_inspect, "
         "tpf_symmetric_pair_inspect).");

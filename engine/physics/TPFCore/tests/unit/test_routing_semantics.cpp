@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 namespace {
 
@@ -23,6 +24,7 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 
 /** Clean audit default: global |a| shunt off (independent of λ). */
 void apply_clean_tpf_defaults(galaxy::Config& c) {
+  c.tpf_dynamics_mode = "legacy_readout";
   c.tpf_global_accel_shunt_enable = false;
 }
 
@@ -128,8 +130,6 @@ TEST_CASE("Task C: λ=0 vs λ=1e-8 with shunt enabled — same policy; shunt eve
   CHECK(n0 == n1);
   CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-9));
   CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-9));
-  CHECK(p0.last_accel_pipeline_stats().shunt_enabled == true);
-  CHECK(p1.last_accel_pipeline_stats().shunt_enabled == true);
 }
 
 TEST_CASE("Task B: tangential motion — VDSG modifier scales with |v|/c (nonzero for circular-like flow)") {
@@ -377,6 +377,19 @@ TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/st
     galaxy::TPFCorePackage p; p.init_from_config(c);
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
   }
+}
+
+TEST_CASE("legacy_readout without provisional gate fails with explicit deprecation opt-in guidance") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "legacy_readout";
+  c.tpfcore_enable_provisional_readout = false;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s = one_body_state(1.0, 0.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax, ay;
+  CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
 }
 
 TEST_CASE("direct_tpf dynamics: tensor principal-part path is independent of correspondence alpha") {

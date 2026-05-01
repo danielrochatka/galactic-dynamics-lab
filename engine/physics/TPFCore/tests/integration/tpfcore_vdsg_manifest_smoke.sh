@@ -8,7 +8,7 @@ source "$ENGINE_ROOT/tests/integration/_env.sh"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 ./galaxy_sim galaxy --output_dir="$OUT" --physics_package=TPFCore \
-  --tpfcore_enable_provisional_readout=true --yes \
+  --tpf_dynamics_mode=legacy_readout --tpfcore_enable_provisional_readout=true --yes \
   --tpf_vdsg_coupling=1e-18 \
   --n_stars=15 --n_steps=3 --snapshot_every=1 --save_run_info=true --yes
 test -f "$OUT/render_manifest.json"
