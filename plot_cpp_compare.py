@@ -584,7 +584,15 @@ def _compare_panel_metadata_lines(side: SideData) -> list[str]:
     if pkg == "TPFCore":
         if dyn:
             lines.append(f"dynamics: {dyn}")
-        if dyn == "xi_kernel_deformed":
+        if dyn == "legacy_readout":
+            lines[-1] = "dynamics: legacy_readout (removed)"
+            vdsg_coupling = _run_info_effective_value(run_info, "tpf_vdsg_coupling", None)
+            if vdsg_coupling is not None and str(vdsg_coupling).strip() != "":
+                lines.append(f"vdsg_coupling: {vdsg_coupling}")
+            readout_mode = _run_info_effective_value(run_info, "tpfcore_readout_mode", None)
+            if readout_mode is not None and str(readout_mode).strip() != "":
+                lines.append(f"readout: {readout_mode}")
+        elif dyn == "xi_kernel_deformed":
             kernel = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_mode", "") or "").strip()
             factor_mode = str(_run_info_effective_value(run_info, "tpf_4d_xi_kernel_factor_mode", "") or "").strip()
             coupling = _run_info_effective_value(run_info, "tpf_4d_xi_kernel_coupling", None)

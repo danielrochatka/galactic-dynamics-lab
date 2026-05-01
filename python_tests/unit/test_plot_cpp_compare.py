@@ -500,6 +500,23 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertIn("role: right / compare", right_lines)
         self.assertFalse(any(line.startswith("dynamics:") for line in right_lines))
 
+    def test_compare_panel_metadata_archived_legacy_readout_is_marked_removed(self) -> None:
+        lines = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "legacy_readout",
+                    "effective_tpf_vdsg_coupling": "6.0e-4",
+                    "effective_tpfcore_readout_mode": "legacy_readout",
+                },
+            )
+        )
+        self.assertIn("dynamics: legacy_readout (removed)", lines)
+        self.assertIn("vdsg_coupling: 6.0e-4", lines)
+        self.assertIn("readout: legacy_readout", lines)
+        self.assertFalse(any("xi_kernel" in line for line in lines))
+
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
         "matplotlib/numpy not installed",
