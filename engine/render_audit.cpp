@@ -229,6 +229,9 @@ void write_render_manifest(const std::string& output_dir,
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
        config.simulation_mode == SimulationMode::galaxy &&
        !tpf_v11_weak_field_truncation_active(config));
+  const bool legacy_readout_metadata_active =
+      config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "legacy_readout" &&
+      config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence;
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -321,9 +324,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
-    if (!is_xi_kernel && !is_direct && !is_v11_alias) {
+    if (legacy_readout_metadata_active) {
       json_kv_bool(jf, first, "tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
       json_kv(jf, first, "tpfcore_readout_mode", config.tpfcore_readout_mode);
+    } else {
+      json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
+      json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
     }
     if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
@@ -457,14 +463,16 @@ void write_render_manifest(const std::string& output_dir,
       tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
       tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";
       tf << "tpf_dynamics_mode_operative_for_this_run\tnone_audit_only\n";
-      tf << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      tf << "tpfcore_enable_provisional_readout_operative_for_this_run\t0\n";
     } else {
-      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
       tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     }
-    tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    if (legacy_readout_metadata_active) {
+      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+      tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+    } else {
+      tf << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
+      tf << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
+    }
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";
     tf << "galaxy_init_seed\t" << config.galaxy_init_seed << "\n";
