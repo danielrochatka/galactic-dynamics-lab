@@ -266,6 +266,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpf_vdsg_mass_baseline_kg = std::stod(val);
     return true;
   }
+  if (key == "tpf_vdsg_mode") { config.tpf_vdsg_mode = val; return true; }
+  if (key == "tpf_vdsg_mass_gate_m0_kg") { config.tpf_vdsg_mass_gate_m0_kg = std::stod(val); return true; }
+  if (key == "tpf_vdsg_mass_gate_alpha") { config.tpf_vdsg_mass_gate_alpha = std::stod(val); return true; }
+  if (key == "tpf_vdsg_x_clamp") { config.tpf_vdsg_x_clamp = std::stod(val); return true; }
+  if (key == "tpf_vdsg_weak_field_gate_enable") { config.tpf_vdsg_weak_field_gate_enable = parse_bool(val); return true; }
+  if (key == "tpf_vdsg_weak_field_a0") { config.tpf_vdsg_weak_field_a0 = std::stod(val); return true; }
+  if (key == "tpf_vdsg_weak_field_power") { config.tpf_vdsg_weak_field_power = std::stod(val); return true; }
+  if (key == "tpf_vdsg_bounded_amplitude") { config.tpf_vdsg_bounded_amplitude = std::stod(val); return true; }
   if (key == "tpf_global_accel_shunt_enable") {
     config.tpf_global_accel_shunt_enable = parse_bool(val);
     return true;
@@ -912,6 +920,14 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("tpf_kappa", d(config.tpf_kappa));
   kv.emplace_back("tpf_vdsg_coupling", d(config.tpf_vdsg_coupling));
   kv.emplace_back("tpf_vdsg_mass_baseline_kg", d(config.tpf_vdsg_mass_baseline_kg));
+  kv.emplace_back("tpf_vdsg_mode", config.tpf_vdsg_mode);
+  kv.emplace_back("tpf_vdsg_mass_gate_m0_kg", d(config.tpf_vdsg_mass_gate_m0_kg));
+  kv.emplace_back("tpf_vdsg_mass_gate_alpha", d(config.tpf_vdsg_mass_gate_alpha));
+  kv.emplace_back("tpf_vdsg_x_clamp", d(config.tpf_vdsg_x_clamp));
+  kv.emplace_back("tpf_vdsg_weak_field_gate_enable", b(config.tpf_vdsg_weak_field_gate_enable));
+  kv.emplace_back("tpf_vdsg_weak_field_a0", d(config.tpf_vdsg_weak_field_a0));
+  kv.emplace_back("tpf_vdsg_weak_field_power", d(config.tpf_vdsg_weak_field_power));
+  kv.emplace_back("tpf_vdsg_bounded_amplitude", d(config.tpf_vdsg_bounded_amplitude));
   kv.emplace_back("tpf_global_accel_shunt_enable", b(config.tpf_global_accel_shunt_enable));
   kv.emplace_back("tpf_global_accel_shunt_fraction", d(config.tpf_global_accel_shunt_fraction));
   kv.emplace_back("tpf_accel_pipeline_diagnostics_csv", b(config.tpf_accel_pipeline_diagnostics_csv));

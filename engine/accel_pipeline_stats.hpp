@@ -18,6 +18,10 @@ struct AccelPipelineStats {
   double frac_capped_last_step = 0.0;
   bool shunt_enabled = false;
   double shunt_fraction = 0.0;
+  unsigned long long vdsg_pairs_evaluated = 0;
+  double vdsg_min_beta_rad = 0.0;
+  double vdsg_max_beta_rad = 0.0;
+  double vdsg_mean_abs_beta_rad = 0.0;
 };
 
 }  // namespace galaxy

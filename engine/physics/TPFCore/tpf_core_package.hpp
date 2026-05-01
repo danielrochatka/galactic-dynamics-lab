@@ -156,6 +156,14 @@ class TPFCorePackage : public PhysicsPackage {
   double vdsg_coupling_;
   /** Resolved M_ref (kg): explicit tpf_vdsg_mass_baseline_kg or star_mass when baseline key <= 0. */
   double vdsg_mass_baseline_resolved_kg_;
+  std::string vdsg_mode_;
+  double vdsg_mass_gate_m0_kg_;
+  double vdsg_mass_gate_alpha_;
+  double vdsg_x_clamp_;
+  bool vdsg_weak_field_gate_enable_;
+  double vdsg_weak_field_a0_;
+  double vdsg_weak_field_power_;
+  double vdsg_bounded_amplitude_;
   double simulation_dt_;
   double cooling_fraction_;
   bool shunt_enable_;
