@@ -79,8 +79,8 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
 
       const double denom = r_sq + softening * softening;
       if (!(denom > 0.0) || !std::isfinite(denom)) return;
-      const double a_base = G * source.mass / denom;
-      if (!std::isfinite(a_base)) return;
+      const double softened_force_mag = G * source.mass * r_unsoft / std::pow(denom, 1.5);
+      if (!std::isfinite(softened_force_mag)) return;
       double factor = 1.0;
 
       if (!radial_mode) {
@@ -144,7 +144,7 @@ void accumulate_vdsg_velocity_modifier(const State& state, double bh_mass, doubl
         }
       }
       if (!std::isfinite(factor)) return;
-      const double delta_a_mag = a_base * (factor - 1.0);
+      const double delta_a_mag = softened_force_mag * (factor - 1.0);
       if (diagnostics_out && radial_mode) {
         const bool first = diagnostics_out->pairs_evaluated == 1;
         update_minmax(factor, diagnostics_out->min_factor, diagnostics_out->max_factor, first);

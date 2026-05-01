@@ -61,3 +61,35 @@ TEST_CASE("weak-field gate suppresses compact high-acceleration pairs") {
   compute_delta(s, "radial_doppler_rational", 1.0e4, 1.0e20, true, 1.0e-10, 0.0, ax_on, ay_on);
   CHECK(std::abs(ax_on[0]) < std::abs(ax_off[0]) * 1e-6);
 }
+
+
+TEST_CASE("legacy_speed with softening matches Plummer-equivalent delta formula") {
+  const double x = 3.0e6, y = 4.0e6;
+  const double vx = 2.5e3, vy = -1.5e3;
+  const double soft = 5.0e6;
+  const double coupling = 2.0e-2;
+  galaxy::State s = one_target(x, y, vx, vy, 1.0e30);
+  std::vector<double> ax, ay;
+  compute_delta(s, "legacy_speed", coupling, 1.0e20, false, 1.0e-10, soft, ax, ay);
+
+  const double r_sq = x*x + y*y;
+  const double r = std::sqrt(r_sq);
+  const double ux = x / r, uy = y / r;
+  const double beta = std::sqrt(vx*vx + vy*vy) / 299792458.0;
+  const double lambda_eff = galaxy::tpfcore::vdsg_effective_coupling(coupling, 1.98847e30, 0.0);
+  const double factor = 1.0 + lambda_eff * beta;
+  const double denom = r_sq + soft*soft;
+  const double expected_mag = galaxy::tpfcore::TPF_G_SI * 1.98847e30 * r / std::pow(denom, 1.5) * (factor - 1.0);
+  CHECK(ax[0] == doctest::Approx(-ux * expected_mag).epsilon(1e-12));
+  CHECK(ay[0] == doctest::Approx(-uy * expected_mag).epsilon(1e-12));
+}
+
+TEST_CASE("radial mode softening does not change beta_rad sign but softens magnitude") {
+  const double soft = 9.0e6;
+  std::vector<double> ax0, ay0, axs, ays;
+  compute_delta(one_target(1.0e7, 0.0, 2.0e3, 0.0, 1.0e30), "radial_doppler_exp", 5.0e3, 1.0e20, false, 1.0e-10, 0.0, ax0, ay0);
+  compute_delta(one_target(1.0e7, 0.0, 2.0e3, 0.0, 1.0e30), "radial_doppler_exp", 5.0e3, 1.0e20, false, 1.0e-10, soft, axs, ays);
+  CHECK(ax0[0] < 0.0);
+  CHECK(axs[0] < 0.0);
+  CHECK(std::abs(axs[0]) < std::abs(ax0[0]));
+}
