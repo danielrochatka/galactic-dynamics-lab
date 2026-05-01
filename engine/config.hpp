@@ -151,12 +151,12 @@ struct Config {
 
   /**
    * TPFCore only: how dynamical accelerations are produced.
-   * - legacy_readout (default): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout for dynamics.
+   * - legacy_readout (deprecated legacy; explicit opt-in): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout=true for dynamics.
    * - v11_weak_field_truncation: correspondence truncation implementation (Eq. 42-44 scalar superposition) using alpha_si.
    * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
    * - xi_kernel_deformed: Xi-direct runtime route using a=-K_xi*Xi_eff_spatial with per-source Xi-kernel deformation.
    */
-  std::string tpf_dynamics_mode = "legacy_readout";
+  std::string tpf_dynamics_mode = "xi_kernel_deformed";
   /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
