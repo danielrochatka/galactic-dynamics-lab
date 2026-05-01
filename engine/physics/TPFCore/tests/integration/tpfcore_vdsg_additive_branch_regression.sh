@@ -21,8 +21,8 @@ common=(galaxy --physics_package=TPFCore --tpfcore_enable_provisional_readout=tr
 
 d0=$(grep -m1 '^active_dynamics_branch' "$OUT0/run_info.txt" | cut -f2)
 d1=$(grep -m1 '^active_dynamics_branch' "$OUT1/run_info.txt" | cut -f2)
-echo "$d0" | grep -q '^tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00$'
-echo "$d1" | grep -q '^tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-05$'
+echo "$d0" | grep -q '^tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00$'
+echo "$d1" | grep -q '^tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-05$'
 test "$d0" != "$d1"
 grep -q 'accumulate_vdsg_velocity_modifier' "$OUT0/run_info.txt"
 grep -Fq 'global |a| shunt OFF' "$OUT0/run_info.txt"

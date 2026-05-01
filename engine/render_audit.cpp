@@ -111,7 +111,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
         (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
             ? "VDSG transverse wake Xi-kernel deformation"
             : "standard Xi-kernel deformation";
-    os << "tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
+    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
        << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
        << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
        << "; xi_kernel_label=" << kernel_desc
@@ -123,16 +123,16 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     std::ostringstream os;
-    os << "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
+    os << "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
        << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
     return os.str();
   }
-  /* legacy_readout (default when key omitted) */
+  /* DEPRECATED legacy path (Stage 0 banner): legacy_readout/provisional_readout */
   if (!config.tpfcore_enable_provisional_readout)
-    return "tpf_dynamics_mode=legacy_readout; provisional readout disabled";
+    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout disabled";
   const std::string& mode = config.tpfcore_readout_mode;
   std::ostringstream os;
-  os << "tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
+  os << "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
      << "; vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
   return os.str();
 }

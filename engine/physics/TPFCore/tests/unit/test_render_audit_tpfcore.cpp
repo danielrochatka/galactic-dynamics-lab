@@ -12,10 +12,10 @@ TEST_CASE("compute_active_dynamics_branch: TPF legacy_readout labels VDSG in bra
   c.tpfcore_readout_mode = "derived_tpf_radial_readout";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00");
+        "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-20");
+        "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=derived_tpf_radial_readout; vdsg_coupling=1.000000e-20");
 }
 
 TEST_CASE("compute_active_dynamics_branch: TPF direct") {
@@ -24,12 +24,12 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
   c.tpf_vdsg_coupling = 1e-20;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-20");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }

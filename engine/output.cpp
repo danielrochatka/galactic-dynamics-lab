@@ -220,6 +220,14 @@ void write_run_info(const std::string& output_dir,
       f << "tpf_4d_xi_motion_probe_benchmark_readout_scalars_note\tbenchmark uses tpf_4d_xi_motion_readout_scale with Xi_spatial only\n";
     } else {
       f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+      if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+        f << "tpf_runtime_path_tier\tactive_supported\n";
+      } else if (config.tpf_dynamics_mode == "direct_tpf") {
+        f << "tpf_runtime_path_tier\tpaper_facing\n";
+      } else if (config.tpf_dynamics_mode == "legacy_readout") {
+        f << "tpf_runtime_path_tier\tdeprecated_legacy\n";
+        f << "tpf_runtime_deprecation_note\tlegacy_readout/provisional_readout_path_is_deprecated_and_retained_for_transition_only\n";
+      }
       if (config.tpf_dynamics_mode == "direct_tpf") {
         f << "tpf_core_law_mode\tdirect_tpf\n";
         f << "tpf_truncation_status\ttensor_principal_part_route_Theta_I_kappa_baseline\n";
