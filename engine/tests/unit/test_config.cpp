@@ -173,6 +173,12 @@ TEST_CASE("tpf_dynamics_mode accepts canonical modes and rejects deprecated alia
   CHECK(c.tpf_weak_field_correspondence_alpha_si == doctest::Approx(-6.0e-11));
 }
 
+
+TEST_CASE("tpfcore_enable_provisional_readout parses true for non-galaxy diagnostic compatibility") {
+  Config c;
+  CHECK(apply_config_kv("tpfcore_enable_provisional_readout", "true", c));
+  CHECK(c.tpfcore_enable_provisional_readout == true);
+}
 TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
   Config c;
   CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));
