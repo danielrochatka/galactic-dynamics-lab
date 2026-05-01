@@ -27,6 +27,7 @@ TEST_CASE("collisionless auto softening defaults to 2D when dimension is unset")
   galaxy::Config cfg;
   cfg.softening_mode = "auto";
   cfg.softening_auto_profile = "collisionless";
+  cfg.simulation_mode = galaxy::SimulationMode::galaxy;
   cfg.auto_softening_dimension = 0;
   cfg.galaxy_radius = 100.0;
   cfg.n_stars = 1000;
@@ -62,25 +63,27 @@ TEST_CASE("collisionless auto softening applies contextual cap for compact low-N
   CHECK(r.max_cap_source == "contextual");
 }
 
-TEST_CASE("explicit auto_softening_max overrides contextual cap") {
+TEST_CASE("auto_softening_max smaller than structural result caps downward") {
   galaxy::Config cfg;
   cfg.softening_mode = "auto";
   cfg.softening_auto_profile = "collisionless";
+  cfg.simulation_mode = galaxy::SimulationMode::galaxy;
   cfg.outer_radius = 10.0;
   cfg.galaxy_radius = 10.0;
-  cfg.inner_radius = 0.1;
+  cfg.inner_radius = 1.0;
   cfg.n_stars = 1;
   cfg.auto_softening_max = 0.02;
 
   const galaxy::ResolvedSoftening r = galaxy::resolve_softening(cfg, galaxy::State{});
-  CHECK(r.effective_softening == doctest::Approx(0.05 * cfg.inner_radius));
-  CHECK(r.max_cap_source == "explicit");
+  CHECK(r.effective_softening == doctest::Approx(cfg.auto_softening_max));
+  CHECK(r.max_cap_source == "contextual+explicit");
 }
 
 TEST_CASE("normal collisionless auto softening remains unchanged below cap") {
   galaxy::Config cfg;
   cfg.softening_mode = "auto";
   cfg.softening_auto_profile = "collisionless";
+  cfg.simulation_mode = galaxy::SimulationMode::two_body_orbit;
   cfg.galaxy_radius = 100.0;
   cfg.outer_radius = 100.0;
   cfg.inner_radius = 1.0;
@@ -89,7 +92,7 @@ TEST_CASE("normal collisionless auto softening remains unchanged below cap") {
   const galaxy::ResolvedSoftening r = galaxy::resolve_softening(cfg, galaxy::State{});
   CHECK(r.effective_softening < 0.05 * r.radius_outer_used);
   CHECK_FALSE(r.max_capped);
-  CHECK(r.max_cap_source == "contextual");
+  CHECK(r.max_cap_source.empty());
 }
 
 TEST_CASE("auto_softening_min floors value and remains visible in metadata") {
@@ -112,6 +115,7 @@ TEST_CASE("collisionless auto softening respects inner structural cap for typica
   galaxy::Config cfg;
   cfg.softening_mode = "auto";
   cfg.softening_auto_profile = "collisionless";
+  cfg.simulation_mode = galaxy::SimulationMode::galaxy;
   cfg.auto_softening_dimension = 2;
   cfg.auto_softening_factor = 1.8;
   cfg.inner_radius = 2.5e19;
@@ -121,4 +125,42 @@ TEST_CASE("collisionless auto softening respects inner structural cap for typica
 
   const galaxy::ResolvedSoftening r = galaxy::resolve_softening(cfg, galaxy::State{});
   CHECK(r.effective_softening <= doctest::Approx(0.05 * cfg.inner_radius));
+}
+
+TEST_CASE("stellar_physical and nuclear_cluster auto profiles are not inner-radius capped") {
+  galaxy::Config stellar;
+  stellar.softening_mode = "auto";
+  stellar.softening_auto_profile = "stellar_physical";
+  stellar.simulation_mode = galaxy::SimulationMode::galaxy;
+  stellar.auto_softening_factor = 10.0;
+  stellar.inner_radius = 1.0;
+  const galaxy::ResolvedSoftening s = galaxy::resolve_softening(stellar, galaxy::State{});
+  CHECK(s.effective_softening == doctest::Approx(10.0 * 6.957e8));
+
+  galaxy::Config cluster;
+  cluster.softening_mode = "auto";
+  cluster.softening_auto_profile = "nuclear_cluster";
+  cluster.simulation_mode = galaxy::SimulationMode::galaxy;
+  cluster.auto_softening_factor = 3.0;
+  cluster.inner_radius = 1.0;
+  const galaxy::ResolvedSoftening n = galaxy::resolve_softening(cluster, galaxy::State{});
+  CHECK(n.effective_softening == doctest::Approx(3.0 * 6.957e8));
+}
+
+TEST_CASE("auto_softening_max larger than structural result does not raise softening") {
+  galaxy::Config cfg;
+  cfg.softening_mode = "auto";
+  cfg.softening_auto_profile = "collisionless";
+  cfg.simulation_mode = galaxy::SimulationMode::galaxy;
+  cfg.auto_softening_dimension = 2;
+  cfg.auto_softening_factor = 1.8;
+  cfg.inner_radius = 2.5e19;
+  cfg.outer_radius = 4.6e20;
+  cfg.galaxy_radius = cfg.outer_radius;
+  cfg.n_stars = 1100;
+  cfg.auto_softening_max = 0.10 * cfg.outer_radius;
+
+  const galaxy::ResolvedSoftening r = galaxy::resolve_softening(cfg, galaxy::State{});
+  CHECK(r.effective_softening <= doctest::Approx(0.05 * cfg.inner_radius));
+  CHECK(r.max_cap_source == "contextual");
 }
