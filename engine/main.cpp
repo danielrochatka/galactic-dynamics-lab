@@ -22,8 +22,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <dirent.h>
 #include <fstream>
-#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -85,19 +85,21 @@ bool file_exists(const std::string& path) {
 
 std::vector<std::string> find_compare_side_by_side_pngs(const std::string& dir,
                                                          const std::string& stage) {
-  namespace fs = std::filesystem;
-  const std::string suffix = "__" + stage + "_side_by_side.png";
   std::vector<std::string> out;
-  std::error_code ec;
-  for (const auto& entry : fs::directory_iterator(dir, ec)) {
-    if (ec || !entry.is_regular_file()) continue;
-    const std::string name = entry.path().filename().string();
-    if (name.rfind("galaxy_compare__", 0) == 0 &&
-        name.size() >= suffix.size() &&
-        name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+  DIR* dp = opendir(dir.c_str());
+  if (!dp) return out;
+  const std::string stage_token = stage + "_side_by_side";
+  const std::string ext = ".png";
+  for (dirent* ent = readdir(dp); ent != nullptr; ent = readdir(dp)) {
+    const std::string name(ent->d_name);
+    if (name.find("galaxy_compare__") != std::string::npos &&
+        name.find(stage_token) != std::string::npos &&
+        name.size() >= ext.size() &&
+        name.compare(name.size() - ext.size(), ext.size(), ext) == 0) {
       out.push_back(name);
     }
   }
+  closedir(dp);
   std::sort(out.begin(), out.end());
   return out;
 }
