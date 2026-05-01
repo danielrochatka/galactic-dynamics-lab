@@ -155,6 +155,52 @@ TEST_CASE("write_render_manifest: xi_kernel_deformed reports xi law metadata (no
   rmdir(out_dir.c_str());
 }
 
+TEST_CASE("write_render_manifest: JSON/TXT readout metadata parity by dynamics mode") {
+  auto run_case = [](const std::string& mode, galaxy::SimulationMode sim_mode, bool provisional_enabled) {
+    char dir_template[] = "/tmp/render_audit_readout_parity_XXXXXX";
+    char* out_dir_c = mkdtemp(dir_template);
+    REQUIRE(out_dir_c != nullptr);
+    const std::string out_dir(out_dir_c);
+
+    Config c;
+    c.physics_package = "TPFCore";
+    c.simulation_mode = sim_mode;
+    c.tpf_dynamics_mode = mode;
+    c.tpfcore_enable_provisional_readout = provisional_enabled;
+    c.tpfcore_readout_mode = "derived_tpf_radial_readout";
+    galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+
+    const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+    const std::string json = slurp_file(out_dir + "/render_manifest.json");
+    const bool legacy_active =
+        (c.physics_package == "TPFCore" && c.tpf_dynamics_mode == "legacy_readout" &&
+         c.simulation_mode != galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
+    if (legacy_active) {
+      CHECK(txt.find("tpfcore_enable_provisional_readout\t1") != std::string::npos);
+      CHECK(txt.find("tpfcore_readout_mode\tderived_tpf_radial_readout") != std::string::npos);
+      CHECK(json.find("\"tpfcore_enable_provisional_readout\": true") != std::string::npos);
+      CHECK(json.find("\"tpfcore_readout_mode\": \"derived_tpf_radial_readout\"") != std::string::npos);
+    } else {
+      CHECK(txt.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime") !=
+            std::string::npos);
+      CHECK(txt.find("tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime") !=
+            std::string::npos);
+      CHECK(json.find("\"tpfcore_enable_provisional_readout_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+            std::string::npos);
+      CHECK(json.find("\"tpfcore_readout_mode_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+            std::string::npos);
+    }
+    std::remove((out_dir + "/render_manifest.txt").c_str());
+    std::remove((out_dir + "/render_manifest.json").c_str());
+    rmdir(out_dir.c_str());
+  };
+
+  run_case("xi_kernel_deformed", galaxy::SimulationMode::galaxy, false);
+  run_case("direct_tpf", galaxy::SimulationMode::galaxy, false);
+  run_case("v11_weak_field_truncation", galaxy::SimulationMode::galaxy, false);
+  run_case("legacy_readout", galaxy::SimulationMode::galaxy, true);
+}
+
 TEST_CASE("write_render_manifest: tpf_4d_static_residual_benchmark uses diagnostic-only audit labels") {
   char dir_template[] = "/tmp/render_audit_static4d_XXXXXX";
   char* out_dir_c = mkdtemp(dir_template);

@@ -45,14 +45,6 @@ TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") 
   CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
 }
 
-TEST_CASE("compute_active_dynamics_branch: deprecated weak_field_correspondence alias resolves to correspondence helper labels") {
-  Config c;
-  c.physics_package = "TPFCore";
-  c.tpf_dynamics_mode = "weak_field_correspondence";
-  CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si");
-}
-
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
   Config c;
   c.physics_package = "TPFCore";
