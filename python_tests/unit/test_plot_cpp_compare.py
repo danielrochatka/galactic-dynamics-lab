@@ -8,6 +8,7 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
+import numpy as np
 
 # Repo root (parent of python_tests/)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -29,8 +30,10 @@ from plot_cpp_compare import (
     _time_display_factor,
     _velocity_display_factor,
     style_compare_diagnostic_axes,
+    _draw_panel,
 )
 from display_units import DisplayUnitConfig
+from display_units import spatial_display_for_xy_plot
 
 
 def _write_snapshot(path: Path, step: int, t: float, x: float) -> None:
@@ -416,7 +419,11 @@ class TestPlotCppCompare(unittest.TestCase):
                     "effective_tpf_dynamics_mode": "xi_kernel_deformed",
                     "effective_tpf_4d_xi_kernel_mode": "gaussian_compact",
                     "effective_tpf_4d_xi_kernel_coupling": "2.5e-6",
-                    "effective_tpf_factor_mode": "legacy",
+                    "effective_tpf_4d_xi_kernel_factor_mode": "legacy",
+                    "effective_tpf_4d_xi_kernel_metric_min": "0.1",
+                    "effective_tpf_4d_xi_kernel_metric_max": "0.9",
+                    "effective_tpf_4d_xi_temporal_mode": "ema",
+                    "effective_tpf_4d_xi_motion_readout_scale": "1.8",
                 },
             )
         )
@@ -437,7 +444,36 @@ class TestPlotCppCompare(unittest.TestCase):
             self.assertIn("dynamics: xi_kernel_deformed", lines)
             self.assertTrue(any(line.startswith("kernel: ") for line in lines))
             self.assertTrue(any(line.startswith("coupling: ") for line in lines))
-        self.assertIn("factor_mode: legacy", left_lines)
+        self.assertIn("factor: legacy", left_lines)
+        self.assertIn("metric clamp: 0.1–0.9", left_lines)
+        self.assertIn("temporal: ema", left_lines)
+        self.assertIn("K_xi: 1.8", left_lines)
+
+    def test_compare_panel_metadata_beta_power_only_when_factor_mode_beta_power(self) -> None:
+        with_beta = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_factor_mode": "beta_power",
+                    "effective_tpf_4d_xi_kernel_beta_power": "2.25",
+                },
+            )
+        )
+        without_beta = _compare_panel_metadata_lines(
+            self._side_data_for_metadata(
+                "left_primary",
+                {
+                    "effective_physics_package": "TPFCore",
+                    "effective_tpf_dynamics_mode": "xi_kernel_deformed",
+                    "effective_tpf_4d_xi_kernel_factor_mode": "legacy",
+                    "effective_tpf_4d_xi_kernel_beta_power": "2.25",
+                },
+            )
+        )
+        self.assertIn("beta_power: 2.25", with_beta)
+        self.assertFalse(any(line.startswith("beta_power:") for line in without_beta))
 
     def test_compare_panel_metadata_tpfcore_left_newtonian_right(self) -> None:
         left_lines = _compare_panel_metadata_lines(
@@ -446,6 +482,7 @@ class TestPlotCppCompare(unittest.TestCase):
                 {
                     "effective_physics_package": "TPFCore",
                     "effective_tpf_dynamics_mode": "direct_tpf",
+                    "effective_tpf_4d_direct_tpf_coupling": "4.0e-3",
                     "effective_tpf_vdsg_coupling": "0.0",
                 },
             )
@@ -456,10 +493,40 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertIn("package: TPFCore", left_lines)
         self.assertIn("role: left / baseline", left_lines)
         self.assertIn("dynamics: direct_tpf", left_lines)
-        self.assertIn("coupling: 0.0", left_lines)
+        self.assertIn("kappa: 4.0e-3", left_lines)
+        self.assertFalse(any("xi_kernel" in line for line in left_lines))
+        self.assertFalse(any(line.startswith("vdsg_coupling:") for line in left_lines))
         self.assertIn("package: Newtonian", right_lines)
         self.assertIn("role: right / compare", right_lines)
         self.assertFalse(any(line.startswith("dynamics:") for line in right_lines))
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
+        "matplotlib/numpy not installed",
+    )
+    def test_draw_panel_metadata_fontsize_is_readable(self) -> None:
+        import matplotlib.pyplot as plt
+        from framing import SquareViewport
+
+        fig, ax = plt.subplots(1, 1)
+        side = SimpleNamespace(
+            label="left_primary",
+            run_info={"effective_physics_package": "Newtonian"},
+            overlay_mode="none",
+            overlay_spec={},
+        )
+        snap = SimpleNamespace(
+            positions=np.array([[0.0, 0.0], [1.0, 0.0]], dtype=float),
+            velocities=np.array([[0.0, 0.0], [0.0, 0.0]], dtype=float),
+            step=0,
+            time=0.0,
+        )
+        spatial_display = spatial_display_for_xy_plot("galaxy_compare", 2.0, preferred_unit="m")
+        _draw_panel(ax, side, snap, SquareViewport(0.0, 0.0, 2.0), spatial_display=spatial_display)
+        panel_texts = [t for t in ax.texts if "package:" in t.get_text()]
+        self.assertTrue(panel_texts)
+        self.assertGreaterEqual(panel_texts[0].get_fontsize(), 8.0)
+        plt.close(fig)
 
     @unittest.skipUnless(
         importlib.util.find_spec("matplotlib") is not None and importlib.util.find_spec("numpy") is not None,
