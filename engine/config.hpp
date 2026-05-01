@@ -222,6 +222,14 @@ struct Config {
    * If <= 0, uses star_mass at runtime (same units as simulation).
    */
   double tpf_vdsg_mass_baseline_kg = 0.0;
+  std::string tpf_vdsg_mode = "legacy_speed";
+  double tpf_vdsg_mass_gate_m0_kg = 1.98847e30;
+  double tpf_vdsg_mass_gate_alpha = 1.0;
+  double tpf_vdsg_x_clamp = 0.25;
+  bool tpf_vdsg_weak_field_gate_enable = true;
+  double tpf_vdsg_weak_field_a0 = 1.0e-10;
+  double tpf_vdsg_weak_field_power = 1.0;
+  double tpf_vdsg_bounded_amplitude = 0.25;
   /**
    * TPFCore: optional global |a| cap after acceleration assembly (fraction of |v|/dt per particle).
    * Not implied by tpf_vdsg_coupling. Default false.

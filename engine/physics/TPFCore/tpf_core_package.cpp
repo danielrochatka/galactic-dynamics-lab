@@ -82,6 +82,14 @@ TPFCorePackage::TPFCorePackage()
       weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
       vdsg_coupling_(1.0e-20),
       vdsg_mass_baseline_resolved_kg_(0.0),
+      vdsg_mode_("legacy_speed"),
+      vdsg_mass_gate_m0_kg_(1.98847e30),
+      vdsg_mass_gate_alpha_(1.0),
+      vdsg_x_clamp_(0.25),
+      vdsg_weak_field_gate_enable_(true),
+      vdsg_weak_field_a0_(1.0e-10),
+      vdsg_weak_field_power_(1.0),
+      vdsg_bounded_amplitude_(0.25),
       simulation_dt_(0.01),
       cooling_fraction_(0.2),
       shunt_enable_(false),
@@ -120,6 +128,14 @@ void TPFCorePackage::init_from_config(const Config& config) {
   vdsg_coupling_ = config.tpf_vdsg_coupling;
   vdsg_mass_baseline_resolved_kg_ =
       (config.tpf_vdsg_mass_baseline_kg > 0.0) ? config.tpf_vdsg_mass_baseline_kg : config.star_mass;
+  vdsg_mode_ = config.tpf_vdsg_mode;
+  vdsg_mass_gate_m0_kg_ = config.tpf_vdsg_mass_gate_m0_kg;
+  vdsg_mass_gate_alpha_ = config.tpf_vdsg_mass_gate_alpha;
+  vdsg_x_clamp_ = config.tpf_vdsg_x_clamp;
+  vdsg_weak_field_gate_enable_ = config.tpf_vdsg_weak_field_gate_enable;
+  vdsg_weak_field_a0_ = config.tpf_vdsg_weak_field_a0;
+  vdsg_weak_field_power_ = config.tpf_vdsg_weak_field_power;
+  vdsg_bounded_amplitude_ = config.tpf_vdsg_bounded_amplitude;
   simulation_dt_ = config.dt;
   cooling_fraction_ = config.tpf_cooling_fraction;
   shunt_enable_ = config.tpf_global_accel_shunt_enable;
@@ -503,7 +519,9 @@ void TPFCorePackage::eval_accel_pipeline(const State& state,
 
   std::vector<double> dax, day;
   tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                             vdsg_mass_baseline_resolved_kg_, dax, day);
+                                             vdsg_mass_baseline_resolved_kg_, vdsg_mode_, vdsg_mass_gate_m0_kg_,
+                                             vdsg_mass_gate_alpha_, vdsg_x_clamp_, vdsg_weak_field_gate_enable_,
+                                             vdsg_weak_field_a0_, vdsg_weak_field_power_, vdsg_bounded_amplitude_, dax, day);
   double sum_v = 0.0;
   for (int i = 0; i < n; ++i) {
     sum_v += std::hypot(dax[i], day[i]);
@@ -574,7 +592,9 @@ void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
                                                    std::vector<double>& ay) const {
   std::vector<double> dax, day;
   tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                             vdsg_mass_baseline_resolved_kg_, dax, day);
+                                             vdsg_mass_baseline_resolved_kg_, vdsg_mode_, vdsg_mass_gate_m0_kg_,
+                                             vdsg_mass_gate_alpha_, vdsg_x_clamp_, vdsg_weak_field_gate_enable_,
+                                             vdsg_weak_field_a0_, vdsg_weak_field_power_, vdsg_bounded_amplitude_, dax, day);
   for (int i = 0; i < state.n(); ++i) {
     ax[i] += dax[i];
     ay[i] += day[i];

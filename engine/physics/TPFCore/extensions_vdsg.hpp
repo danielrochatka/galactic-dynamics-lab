@@ -2,6 +2,7 @@
 #define GALAXY_PHYSICS_TPFCORE_EXTENSIONS_VDSG_HPP
 
 #include "../../types.hpp"
+#include <string>
 #include <vector>
 
 namespace galaxy {
@@ -15,6 +16,14 @@ void accumulate_vdsg_velocity_modifier(const State& state,
                                        bool star_star,
                                        double vdsg_coupling,
                                        double vdsg_mass_baseline_kg,
+                                       const std::string& vdsg_mode,
+                                       double mass_gate_m0_kg,
+                                       double mass_gate_alpha,
+                                       double x_clamp,
+                                       bool weak_field_gate_enable,
+                                       double weak_field_a0,
+                                       double weak_field_power,
+                                       double bounded_amplitude,
                                        std::vector<double>& ax,
                                        std::vector<double>& ay);
 
