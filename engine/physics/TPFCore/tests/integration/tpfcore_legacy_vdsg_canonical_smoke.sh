@@ -10,4 +10,5 @@ trap 'rm -rf "$OUT"' EXIT
   --tpf_dynamics_mode=legacy_readout --tpfcore_enable_provisional_readout=true --yes \
   --tpf_vdsg_coupling=2.5e-42 \
   --n_stars=10 --n_steps=1 --snapshot_every=1 --save_run_info=true --yes
-grep -q $'^tpf_vdsg_coupling\t2.5e-42$' "$OUT/run_info.txt"
+
+grep -E '^tpf_vdsg_coupling[[:space:]]+' "$OUT/run_info.txt" | grep -qE '2\.5e-42|2\.5e-042|2\.500000e-42'
