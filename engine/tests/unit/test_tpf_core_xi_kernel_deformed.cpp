@@ -528,3 +528,78 @@ TEST_CASE("xi_kernel_deformed pair counters remain accurate without diagnostics 
   CHECK(c3.xi_last_call_pair_evaluations == 6);
   CHECK(c3.xi_total_pair_evaluations == 18);
 }
+
+
+TEST_CASE("xi_kernel_deformed metric_transverse_wake high coupling near-overlap does not throw and stays finite") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 1.0e6;
+
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = 1.0; s.y[0] = 1.0; s.vx[0] = 0.1; s.vy[0] = -0.2; s.mass[0] = 1.0;
+  s.x[1] = 1.0 + 1.0e-18; s.y[1] = 1.0 - 1.0e-18; s.vx[1] = -0.3; s.vy[1] = 0.2; s.mass[1] = 2.0;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  std::vector<double> ax, ay;
+  CHECK_NOTHROW(p.compute_accelerations(s, /*bh_mass=*/0.0, /*softening=*/0.0, /*star_star=*/true, ax, ay));
+  REQUIRE(ax.size() == 2);
+  REQUIRE(ay.size() == 2);
+  for (int i = 0; i < 2; ++i) {
+    CHECK(std::isfinite(ax[i]));
+    CHECK(std::isfinite(ay[i]));
+  }
+}
+
+TEST_CASE("xi_kernel_deformed metric_transverse_continuous high coupling near-overlap does not throw and stays finite") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_continuous";
+  c.tpf_4d_xi_kernel_coupling = 1.0e6;
+
+  galaxy::State s;
+  s.resize(2);
+  s.x[0] = -2.0; s.y[0] = 0.5; s.vx[0] = 0.25; s.vy[0] = -0.15; s.mass[0] = 1.5;
+  s.x[1] = -2.0 + 1.0e-18; s.y[1] = 0.5 - 1.0e-18; s.vx[1] = -0.2; s.vy[1] = 0.3; s.mass[1] = 0.5;
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  std::vector<double> ax, ay;
+  CHECK_NOTHROW(p.compute_accelerations(s, /*bh_mass=*/0.0, /*softening=*/0.0, /*star_star=*/true, ax, ay));
+  REQUIRE(ax.size() == 2);
+  REQUIRE(ay.size() == 2);
+  for (int i = 0; i < 2; ++i) {
+    CHECK(std::isfinite(ax[i]));
+    CHECK(std::isfinite(ay[i]));
+  }
+}
+
+TEST_CASE("xi_kernel_deformed high coupling close-particle stress remains finite") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "xi_kernel_deformed";
+  c.tpf_4d_xi_kernel_mode = "metric_transverse_wake";
+  c.tpf_4d_xi_kernel_coupling = 1.0e6;
+
+  galaxy::State s;
+  s.resize(5);
+  for (int i = 0; i < 5; ++i) {
+    s.x[i] = 1.0 + i * 1.0e-12;
+    s.y[i] = -1.0 - i * 1.0e-12;
+    s.vx[i] = 0.01 * (i + 1);
+    s.vy[i] = -0.015 * (i + 1);
+    s.mass[i] = 1.0 + 0.1 * i;
+  }
+
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+  std::vector<double> ax, ay;
+  CHECK_NOTHROW(p.compute_accelerations(s, /*bh_mass=*/0.0, /*softening=*/0.0, /*star_star=*/true, ax, ay));
+  REQUIRE(ax.size() == 5);
+  REQUIRE(ay.size() == 5);
+  for (int i = 0; i < 5; ++i) {
+    CHECK(std::isfinite(ax[i]));
+    CHECK(std::isfinite(ay[i]));
+  }
+}
