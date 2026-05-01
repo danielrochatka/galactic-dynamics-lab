@@ -531,6 +531,14 @@ int main(int argc, char** argv) {
   }
   physics->init_from_config(config);
 
+  if (config.physics_package == "TPFCore" &&
+      config.simulation_mode == galaxy::SimulationMode::galaxy &&
+      config.tpfcore_enable_provisional_readout) {
+    std::cerr << "tpfcore_enable_provisional_readout=true is deprecated and cannot be used with simulation_mode=galaxy. "
+                 "Use tpf_dynamics_mode=xi_kernel_deformed or direct_tpf.\n";
+    return 1;
+  }
+
   if (config.physics_package == "TPFCore") {
     galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
     std::cout << "Physics: TPFCore\n";

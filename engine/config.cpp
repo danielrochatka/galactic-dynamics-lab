@@ -178,12 +178,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     return true;
   }
   if (key == "tpfcore_enable_provisional_readout") {
-    const bool enabled = parse_bool(val);
-    if (enabled) {
-      throw std::runtime_error(
-          "tpfcore_enable_provisional_readout=true is no longer supported; legacy_readout runtime has been removed.");
-    }
-    config.tpfcore_enable_provisional_readout = false;
+    config.tpfcore_enable_provisional_readout = parse_bool(val);
     return true;
   }
   if (key == "tpfcore_readout_mode") {
