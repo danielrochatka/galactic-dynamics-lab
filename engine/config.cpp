@@ -178,7 +178,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     return true;
   }
   if (key == "tpfcore_enable_provisional_readout") {
-    config.tpfcore_enable_provisional_readout = parse_bool(val);
+    const bool enabled = parse_bool(val);
+    if (enabled) {
+      throw std::runtime_error(
+          "tpfcore_enable_provisional_readout=true is no longer supported; legacy_readout runtime has been removed.");
+    }
+    config.tpfcore_enable_provisional_readout = false;
     return true;
   }
   if (key == "tpfcore_readout_mode") {
@@ -199,9 +204,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
-    if (s != "legacy_readout" && s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
+    if (s == "legacy_readout") {
+      throw std::runtime_error("legacy_readout has been removed; use xi_kernel_deformed or direct_tpf.");
+    }
+    if (s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
       throw std::runtime_error(
-          "tpf_dynamics_mode must be legacy_readout, v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
+          "tpf_dynamics_mode must be v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;
