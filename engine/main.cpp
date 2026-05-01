@@ -366,25 +366,28 @@ int main(int argc, char** argv) {
 
   // 3. Layered load: built-in -> package defaults -> run config
   galaxy::Config config;
-  std::cout << "[startup_diag][TEMP softening_trace] run_config_path="
-            << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
+  const bool enable_softening_trace = (std::getenv("GALAXY_STARTUP_SOFTENING_TRACE") != nullptr);
   auto print_key_occurrences = [&](const std::string& path, const std::string& key) {
+    if (!enable_softening_trace) return;
     if (path.empty()) {
-      std::cout << "[startup_diag][TEMP softening_trace] key=" << key << " matches: (run config not found)\n";
+      std::cout << "[startup_diag][softening_trace] key=" << key << " matches: (run config not found)\n";
       return;
     }
     const std::vector<galaxy::ConfigKeyOccurrence> matches =
         galaxy::scan_config_key_occurrences(path, key);
     if (matches.empty()) {
-      std::cout << "[startup_diag][TEMP softening_trace] key=" << key << " matches: (none)\n";
+      std::cout << "[startup_diag][softening_trace] key=" << key << " matches: (none)\n";
       return;
     }
-    std::cout << "[startup_diag][TEMP softening_trace] key=" << key
+    std::cout << "[startup_diag][softening_trace] key=" << key
               << " matches (" << matches.size() << "):\n";
     for (const auto& match : matches) {
       std::cout << "  - line " << match.line_number << ": " << match.value << "\n";
     }
   };
+  if (enable_softening_trace)
+    std::cout << "[startup_diag][softening_trace] run_config_path="
+              << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   print_key_occurrences(run_config_path, "softening");
   print_key_occurrences(run_config_path, "tpfcore_source_softening");
 
@@ -392,17 +395,21 @@ int main(int argc, char** argv) {
   if (!package_defaults_path.empty()) {
     galaxy::load_config_file(package_defaults_path, config);
   }
-  std::cout << "[startup_diag][TEMP softening_trace] final softening after package defaults: "
-            << config.softening << "\n";
-  std::cout << "[startup_diag][TEMP softening_trace] final tpfcore_source_softening after package defaults: "
-            << config.tpfcore_source_softening << "\n";
+  if (enable_softening_trace) {
+    std::cout << "[startup_diag][softening_trace] final softening after package defaults: "
+              << config.softening << "\n";
+    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after package defaults: "
+              << config.tpfcore_source_softening << "\n";
+  }
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
   }
-  std::cout << "[startup_diag][TEMP softening_trace] final softening after run config: "
-            << config.softening << "\n";
-  std::cout << "[startup_diag][TEMP softening_trace] final tpfcore_source_softening after run config: "
-            << config.tpfcore_source_softening << "\n";
+  if (enable_softening_trace) {
+    std::cout << "[startup_diag][softening_trace] final softening after run config: "
+              << config.softening << "\n";
+    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after run config: "
+              << config.tpfcore_source_softening << "\n";
+  }
 
   config.run_id = run_id_from_time();
   config.output_dir = "../outputs/" + config.run_id;
@@ -498,6 +505,13 @@ int main(int argc, char** argv) {
                 << ", tpfcore_enable_provisional_readout=" << (config.tpfcore_enable_provisional_readout ? "true" : "false")
                 << ", tpfcore_readout_mode=" << config.tpfcore_readout_mode << ")\n";
     } else {
+      if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+        std::cout << "TPF runtime path tier: active_supported (xi_kernel_deformed)\n";
+      } else if (config.tpf_dynamics_mode == "direct_tpf") {
+        std::cout << "TPF runtime path tier: paper_facing (direct_tpf)\n";
+      } else if (config.tpf_dynamics_mode == "legacy_readout") {
+        std::cout << "TPF runtime path tier: deprecated_legacy (legacy_readout/provisional_readout)\n";
+      }
       std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
                 << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
                 << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
@@ -527,7 +541,7 @@ int main(int argc, char** argv) {
       std::cout << "  v11 correspondence audit only: does not run direct_tpf, does not use TPFCore particle "
                    "acceleration routing, and evaluates correspondence formulas only.\n";
     } else {
-      std::cout << "  Legacy/provisional readout branch: "
+      std::cout << "  Deprecated legacy/provisional readout branch: "
                 << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
       if (tpf && tpf->provisional_readout_enabled()) {
         std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [correspondence-calibrated])";

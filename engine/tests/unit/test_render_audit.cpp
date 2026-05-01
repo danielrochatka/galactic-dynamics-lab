@@ -43,7 +43,7 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
   c.tpf_dynamics_mode = "direct_tpf";
   c.tpf_vdsg_coupling = 0.0;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=0.000000e+00");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
@@ -53,7 +53,7 @@ TEST_CASE("compute_active_dynamics_branch: direct_tpf reports VDSG extension sta
 
   c.tpf_vdsg_coupling = 1e-12;
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-12");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-12");
   CHECK(galaxy::compute_acceleration_code_path(c) ==
