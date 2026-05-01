@@ -254,12 +254,19 @@ void write_run_info(const std::string& output_dir,
         f << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
         f << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
       }
-      f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-      f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+      if (config.tpf_dynamics_mode == "legacy_readout") {
+        f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
+        f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
+      } else {
+        f << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
+        f << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
+      }
     }
-    f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
-    f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
-    f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    if (config.tpf_dynamics_mode == "legacy_readout") {
+      f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
+      f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
+      f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
+    }
     f << "tpf_kappa\t" << config.tpf_kappa << "\n";
     f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
     f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
