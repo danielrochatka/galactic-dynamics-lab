@@ -42,6 +42,9 @@ class CompareDisplaySelection:
     active_time_unit: str
     active_velocity_unit: str
 
+COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD = 2000
+COMPARE_VIEWPORT_MAX_SAMPLE_FRAMES = 50
+
 
 def _run_info_configured_value(run_info: dict, key: str, default=None):
     """Configured setting precedence: configured_<key> then legacy <key>."""
@@ -189,7 +192,7 @@ def calculate_compare_smart_viewport(
     fallback: float,
     *,
     coverage: float = 0.95,
-    exact_point_threshold: int = 2000,
+    exact_point_threshold: int = COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD,
 ) -> SquareViewport:
     """
     Compare-only fixed shared viewport over matched frames.
@@ -696,22 +699,25 @@ def render_compare(
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
     compare_coverage = _resolve_compare_coverage(left.run_info, right.run_info)
-    viewport_sample_indices = _sample_viewport_frame_indices(len(steps), max_samples=50)
-    viewport_left_snaps = [left_snaps[i] for i in viewport_sample_indices]
-    viewport_right_snaps = [right_snaps[i] for i in viewport_sample_indices]
-    pooled_counts = [
-        int(np.asarray(getattr(ls, "positions", []), dtype=np.float64).reshape(-1, 2).shape[0]
-            + np.asarray(getattr(rs, "positions", []), dtype=np.float64).reshape(-1, 2).shape[0] + 1)
-        for ls, rs in zip(viewport_left_snaps, viewport_right_snaps)
-    ]
-    viewport_mode = "exact" if all(c <= 2000 for c in pooled_counts) else "approximate"
+    pooled_counts = []
+    for ls, rs in zip(left_snaps, right_snaps):
+        left_xy = np.asarray(getattr(ls, "positions", []), dtype=np.float64).reshape(-1, 2)
+        right_xy = np.asarray(getattr(rs, "positions", []), dtype=np.float64).reshape(-1, 2)
+        pooled_xy = np.vstack([left_xy, right_xy, np.array([[0.0, 0.0]], dtype=np.float64)])
+        finite = np.isfinite(pooled_xy[:, 0]) & np.isfinite(pooled_xy[:, 1])
+        pooled_counts.append(int(np.count_nonzero(finite)))
+    approximate_used = any(c > COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD for c in pooled_counts)
+    sample_indices = _sample_viewport_frame_indices(len(steps), max_samples=COMPARE_VIEWPORT_MAX_SAMPLE_FRAMES)
+    sampled_counts = [pooled_counts[i] for i in sample_indices]
     print(
-        "Compare viewport sampling: "
-        f"sampled_frames={len(viewport_sample_indices)}/{len(steps)}, mode={viewport_mode}, "
-        f"pooled_points_per_sample={pooled_counts}"
+        "Compare viewport stats: "
+        f"matched_frames_used={len(steps)}, exact_threshold={COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD}, "
+        f"approximate_mode_used={approximate_used}, max_pooled_points_per_frame={max(pooled_counts) if pooled_counts else 0}, "
+        f"sample_preview_frames={len(sample_indices)}/{len(steps)}, "
+        f"sample_preview_pooled_points={sampled_counts}"
     )
     shared_vp = calculate_compare_smart_viewport(
-        viewport_left_snaps, viewport_right_snaps, fallback, coverage=compare_coverage
+        left_snaps, right_snaps, fallback, coverage=compare_coverage
     )
     max_time_s = max(float(left_snaps[-1].time), float(right_snaps[-1].time))
     max_speed_m_s = max(

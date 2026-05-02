@@ -24,6 +24,7 @@ from plot_cpp_compare import (
     calculate_compare_smart_viewport,
     approximate_axis_aligned_box_covering_fraction,
     _sample_viewport_frame_indices,
+    COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD,
     matched_steps_strict,
     render_compare,
     radial_kinematics,
@@ -718,7 +719,7 @@ class TestPlotCppCompare(unittest.TestCase):
     def test_large_point_cloud_uses_approximate_viewport_path(self) -> None:
         from plot_cpp_run import Snapshot
 
-        n = 1100
+        n = (COMPARE_VIEWPORT_EXACT_POINT_THRESHOLD // 2) + 100
         pos_l = np.column_stack([np.linspace(-100.0, 100.0, n), np.zeros(n)])
         pos_r = np.column_stack([np.linspace(-90.0, 110.0, n), np.ones(n)])
         vel = np.zeros_like(pos_l)
@@ -753,6 +754,24 @@ class TestPlotCppCompare(unittest.TestCase):
         self.assertLessEqual(len(idx), 50)
         self.assertEqual(idx[0], 0)
         self.assertEqual(idx[-1], 200)
+
+    def test_compare_smart_viewport_uses_all_matched_frames(self) -> None:
+        from plot_cpp_run import Snapshot
+
+        left_snaps = []
+        right_snaps = []
+        for step in range(60):
+            pos_l = np.column_stack([np.full(200, 10.0), np.linspace(-1.0, 1.0, 200)])
+            pos_r = np.column_stack([np.full(200, -10.0), np.linspace(-1.0, 1.0, 200)])
+            if step == 59:
+                pos_l = np.column_stack([np.full(200, 1.0e5), np.linspace(-1.0, 1.0, 200)])
+                pos_r = np.column_stack([np.full(200, -1.0e5), np.linspace(-1.0, 1.0, 200)])
+            vel = np.zeros_like(pos_l)
+            left_snaps.append(Snapshot(step, float(step), pos_l, vel))
+            right_snaps.append(Snapshot(step, float(step), pos_r, vel))
+
+        vp = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
+        self.assertGreater(vp.half_axis, 9.0e4)
 
     def test_compare_display_selection_shared_distance_unit(self) -> None:
         left = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
