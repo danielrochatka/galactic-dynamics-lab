@@ -111,6 +111,56 @@ TEST_CASE("user overrides survive scenario resolution") {
   CHECK(r.effective_snapshot_every == 7);
 }
 
+TEST_CASE("snapshot_target resolves snapshot cadence automatically") {
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 200000;
+    c.snapshot_every = 77;
+    c.snapshot_target = 200;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 1000);
+    CHECK(r.snapshot_target_active == 1);
+    CHECK(r.configured_snapshot_target == 200);
+    CHECK(r.resolved_snapshot_every == 1000);
+  }
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 50000;
+    c.snapshot_target = 200;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 250);
+  }
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 100;
+    c.snapshot_target = 200;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 1);
+  }
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 4321;
+    c.snapshot_every = 37;
+    c.snapshot_target = 0;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 37);
+    CHECK(r.snapshot_target_active == 0);
+    CHECK(r.resolved_snapshot_every == 37);
+  }
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 100;
+    c.snapshot_target = 1000;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 1);
+  }
+}
+
 TEST_CASE("galaxy explicit zero softening and source softening are preserved") {
   galaxy::Config c;
   c.simulation_mode = galaxy::SimulationMode::galaxy;

@@ -131,6 +131,7 @@ struct Config {
   double dt = 0.01;
   int n_steps = 50000;
   int snapshot_every = 50;
+  int snapshot_target = 0;
 
   double softening = 0.0;
   std::string softening_mode = "manual"; /* off | manual | auto */

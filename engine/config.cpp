@@ -143,6 +143,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.snapshot_every = std::stoi(val);
     return true;
   }
+  if (key == "snapshot_target") {
+    config.snapshot_target = std::stoi(val);
+    return true;
+  }
   if (key == "softening") {
     config.softening = std::stod(val);
     config.explicit_overrides.softening = true;
@@ -899,6 +903,7 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("dt", d(config.dt));
   kv.emplace_back("n_steps", i(config.n_steps));
   kv.emplace_back("snapshot_every", i(config.snapshot_every));
+  kv.emplace_back("snapshot_target", i(config.snapshot_target));
   kv.emplace_back("softening", d(config.softening));
   kv.emplace_back("enable_star_star_gravity", b(config.enable_star_star_gravity));
   kv.emplace_back("physics_package", config.physics_package);
