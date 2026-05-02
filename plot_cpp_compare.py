@@ -189,6 +189,7 @@ def calculate_compare_smart_viewport(
     fallback: float,
     *,
     coverage: float = 0.95,
+    exact_point_threshold: int = 2000,
 ) -> SquareViewport:
     """
     Compare-only fixed shared viewport over matched frames.
@@ -201,6 +202,7 @@ def calculate_compare_smart_viewport(
     MARGIN = 1.10
     fb = float(max(1.0, fallback))
     cov = _validate_compare_coverage(coverage)
+    exact_threshold = int(max(1, exact_point_threshold))
 
     union_xmin: float | None = None
     union_xmax: float | None = None
@@ -219,7 +221,10 @@ def calculate_compare_smart_viewport(
         if not np.any(finite):
             continue
         points = np.column_stack([x[finite], y[finite]])
-        xmin, xmax, ymin, ymax = minimum_axis_aligned_box_covering_fraction(points, cov)
+        if points.shape[0] <= exact_threshold:
+            xmin, xmax, ymin, ymax = minimum_axis_aligned_box_covering_fraction(points, cov)
+        else:
+            xmin, xmax, ymin, ymax = approximate_axis_aligned_box_covering_fraction(points, cov)
         cx = 0.5 * (xmin + xmax)
         cy = 0.5 * (ymin + ymax)
         half_axis = 0.5 * max(xmax - xmin, ymax - ymin) * MARGIN
@@ -314,6 +319,45 @@ def minimum_axis_aligned_box_covering_fraction(points_xy: np.ndarray, coverage: 
 
     return (float(np.min(x)), float(np.max(x)), float(np.min(y)), float(np.max(y)))
 
+
+
+def approximate_axis_aligned_box_covering_fraction(points_xy: np.ndarray, coverage: float) -> tuple[float, float, float, float]:
+    """Fast quantile-based approximation for coverage-constrained viewport bounds."""
+    arr = np.asarray(points_xy, dtype=np.float64).reshape(-1, 2)
+    if arr.size == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+    finite = np.isfinite(arr[:, 0]) & np.isfinite(arr[:, 1])
+    pts = arr[finite]
+    if pts.shape[0] == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+
+    cov = _validate_compare_coverage(coverage)
+    q = 0.5 * (1.0 - cov)
+    lo = 100.0 * q
+    hi = 100.0 * (1.0 - q)
+    x = pts[:, 0]
+    y = pts[:, 1]
+    xmin = float(np.percentile(x, lo))
+    xmax = float(np.percentile(x, hi))
+    ymin = float(np.percentile(y, lo))
+    ymax = float(np.percentile(y, hi))
+    return (xmin, xmax, ymin, ymax)
+
+
+def _sample_viewport_frame_indices(total_frames: int, *, max_samples: int = 50) -> list[int]:
+    n = int(total_frames)
+    if n <= 0:
+        return []
+    if n == 1:
+        return [0]
+    cap = int(max(2, max_samples))
+    if n <= cap:
+        return list(range(n))
+    sample_count = min(cap, n)
+    idx = np.linspace(0, n - 1, num=sample_count, dtype=int)
+    idx[0] = 0
+    idx[-1] = n - 1
+    return sorted(set(int(i) for i in idx))
 
 def _resolve_compare_coverage(left_run_info: dict, right_run_info: dict) -> float:
     raw = _run_info_effective_value(left_run_info, "plot_compare_smart_zoom_coverage", None)
@@ -652,8 +696,22 @@ def render_compare(
     fb_r = _fallback_render_radius_m(right.run_info)
     fallback = float(max(fb_l, fb_r, 1.0))
     compare_coverage = _resolve_compare_coverage(left.run_info, right.run_info)
+    viewport_sample_indices = _sample_viewport_frame_indices(len(steps), max_samples=50)
+    viewport_left_snaps = [left_snaps[i] for i in viewport_sample_indices]
+    viewport_right_snaps = [right_snaps[i] for i in viewport_sample_indices]
+    pooled_counts = [
+        int(np.asarray(getattr(ls, "positions", []), dtype=np.float64).reshape(-1, 2).shape[0]
+            + np.asarray(getattr(rs, "positions", []), dtype=np.float64).reshape(-1, 2).shape[0] + 1)
+        for ls, rs in zip(viewport_left_snaps, viewport_right_snaps)
+    ]
+    viewport_mode = "exact" if all(c <= 2000 for c in pooled_counts) else "approximate"
+    print(
+        "Compare viewport sampling: "
+        f"sampled_frames={len(viewport_sample_indices)}/{len(steps)}, mode={viewport_mode}, "
+        f"pooled_points_per_sample={pooled_counts}"
+    )
     shared_vp = calculate_compare_smart_viewport(
-        left_snaps, right_snaps, fallback, coverage=compare_coverage
+        viewport_left_snaps, viewport_right_snaps, fallback, coverage=compare_coverage
     )
     max_time_s = max(float(left_snaps[-1].time), float(right_snaps[-1].time))
     max_speed_m_s = max(

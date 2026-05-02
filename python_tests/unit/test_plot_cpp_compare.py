@@ -22,6 +22,8 @@ from plot_cpp_compare import (
     _resolve_side_run_dir,
     _mode_aware_compare_name,
     calculate_compare_smart_viewport,
+    approximate_axis_aligned_box_covering_fraction,
+    _sample_viewport_frame_indices,
     matched_steps_strict,
     render_compare,
     radial_kinematics,
@@ -712,6 +714,45 @@ class TestPlotCppCompare(unittest.TestCase):
         vp_95 = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.95)
         vp_90 = calculate_compare_smart_viewport(left_snaps, right_snaps, 150.0, coverage=0.90)
         self.assertLessEqual(vp_90.half_axis, vp_95.half_axis)
+
+    def test_large_point_cloud_uses_approximate_viewport_path(self) -> None:
+        from plot_cpp_run import Snapshot
+
+        n = 1100
+        pos_l = np.column_stack([np.linspace(-100.0, 100.0, n), np.zeros(n)])
+        pos_r = np.column_stack([np.linspace(-90.0, 110.0, n), np.ones(n)])
+        vel = np.zeros_like(pos_l)
+        left = [Snapshot(0, 0.0, pos_l, vel)]
+        right = [Snapshot(0, 0.0, pos_r, vel)]
+        with patch("plot_cpp_compare.minimum_axis_aligned_box_covering_fraction") as exact_mock:
+            vp = calculate_compare_smart_viewport(left, right, 150.0, coverage=0.95)
+        exact_mock.assert_not_called()
+        self.assertTrue(np.isfinite(vp.half_axis))
+
+    def test_approximate_viewport_returns_finite_bounds(self) -> None:
+        pts = np.array([[0.0, 0.0], [1.0, np.nan], [2.0, 3.0], [4.0, 5.0], [10.0, -2.0]], dtype=np.float64)
+        xmin, xmax, ymin, ymax = approximate_axis_aligned_box_covering_fraction(pts, 0.8)
+        self.assertTrue(np.isfinite([xmin, xmax, ymin, ymax]).all())
+        self.assertLessEqual(xmin, xmax)
+        self.assertLessEqual(ymin, ymax)
+
+    def test_small_point_cloud_still_uses_exact_path(self) -> None:
+        from plot_cpp_run import Snapshot
+
+        n = 100
+        pos = np.column_stack([np.linspace(-10.0, 10.0, n), np.zeros(n)])
+        vel = np.zeros_like(pos)
+        left = [Snapshot(0, 0.0, pos, vel)]
+        right = [Snapshot(0, 0.0, pos, vel)]
+        with patch("plot_cpp_compare.minimum_axis_aligned_box_covering_fraction", wraps=__import__("plot_cpp_compare").minimum_axis_aligned_box_covering_fraction) as exact_mock:
+            calculate_compare_smart_viewport(left, right, 150.0, coverage=0.95)
+        exact_mock.assert_called()
+
+    def test_viewport_sampling_caps_large_frame_counts(self) -> None:
+        idx = _sample_viewport_frame_indices(201, max_samples=50)
+        self.assertLessEqual(len(idx), 50)
+        self.assertEqual(idx[0], 0)
+        self.assertEqual(idx[-1], 200)
 
     def test_compare_display_selection_shared_distance_unit(self) -> None:
         left = DisplayUnitConfig(distance_unit="AU", time_unit="day", velocity_unit="km/s")
