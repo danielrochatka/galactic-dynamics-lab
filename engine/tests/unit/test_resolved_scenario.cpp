@@ -143,6 +143,14 @@ TEST_CASE("snapshot_target resolves snapshot cadence automatically") {
   {
     galaxy::Config c;
     c.simulation_mode = galaxy::SimulationMode::galaxy;
+    c.n_steps = 10;
+    c.snapshot_target = 6;
+    auto r = galaxy::resolve_scenario(c);
+    CHECK(r.effective_snapshot_every == 2);
+  }
+  {
+    galaxy::Config c;
+    c.simulation_mode = galaxy::SimulationMode::galaxy;
     c.n_steps = 4321;
     c.snapshot_every = 37;
     c.snapshot_target = 0;

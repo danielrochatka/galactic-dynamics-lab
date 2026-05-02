@@ -109,7 +109,7 @@ ResolvedScenario resolve_scenario(const Config& input) {
   }
   r.configured_snapshot_target = r.config.snapshot_target;
   if (r.config.snapshot_target > 0 && r.effective_n_steps > 0) {
-    r.effective_snapshot_every = std::max(1, r.effective_n_steps / r.config.snapshot_target);
+    r.effective_snapshot_every = std::max(1, (r.effective_n_steps + r.config.snapshot_target - 1) / r.config.snapshot_target);
     r.snapshot_target_active = 1;
   } else {
     r.snapshot_target_active = 0;
