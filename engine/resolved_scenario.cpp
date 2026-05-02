@@ -3,6 +3,7 @@
 #include "galaxy_init.hpp"
 #include "init_conditions.hpp"
 #include "scenario_defaults.hpp"
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -106,6 +107,14 @@ ResolvedScenario resolve_scenario(const Config& input) {
       r.effective_snapshot_every = r.config.snapshot_every;
       break;
   }
+  r.configured_snapshot_target = r.config.snapshot_target;
+  if (r.config.snapshot_target > 0 && r.effective_n_steps > 0) {
+    r.effective_snapshot_every = std::max(1, (r.effective_n_steps + r.config.snapshot_target - 1) / r.config.snapshot_target);
+    r.snapshot_target_active = 1;
+  } else {
+    r.snapshot_target_active = 0;
+  }
+  r.resolved_snapshot_every = r.effective_snapshot_every;
   r.effective_total_sim_time = r.config.dt * static_cast<double>(r.effective_n_steps);
 
   return r;
@@ -136,6 +145,9 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("effective_dt", d(resolved.config.dt));
   kv.emplace_back("effective_n_steps", i(resolved.effective_n_steps));
   kv.emplace_back("effective_snapshot_every", i(resolved.effective_snapshot_every));
+  kv.emplace_back("configured_snapshot_target", i(resolved.configured_snapshot_target));
+  kv.emplace_back("snapshot_target_active", i(resolved.snapshot_target_active));
+  kv.emplace_back("resolved_snapshot_every", i(resolved.resolved_snapshot_every));
   kv.emplace_back("effective_total_sim_time", d(resolved.effective_total_sim_time));
   kv.emplace_back("effective_softening", d(resolved.config.softening));
   kv.emplace_back("effective_bh_mass", d(resolved.config.bh_mass));
