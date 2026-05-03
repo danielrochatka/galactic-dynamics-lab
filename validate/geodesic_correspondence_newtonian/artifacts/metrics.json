@@ -1,0 +1,26 @@
+[
+  {
+    "case": "case1_single_source",
+    "snapshots_compared": 601,
+    "max_abs_accel_diff": 0.0,
+    "max_rel_accel_diff": 0.0,
+    "max_pos_diff": 0.0,
+    "max_vel_diff": 0.0
+  },
+  {
+    "case": "case2_galaxy_starstar_false",
+    "snapshots_compared": 81,
+    "max_abs_accel_diff": 0.0,
+    "max_rel_accel_diff": 0.0,
+    "max_pos_diff": 0.0,
+    "max_vel_diff": 0.0
+  },
+  {
+    "case": "case3_smallN_starstar_true",
+    "snapshots_compared": 101,
+    "max_abs_accel_diff": 0.0,
+    "max_rel_accel_diff": 0.0,
+    "max_pos_diff": 0.0,
+    "max_vel_diff": 0.0
+  }
+]
