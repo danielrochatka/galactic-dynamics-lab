@@ -72,7 +72,7 @@ bool tpf_vdsg_active_for_audit(const Config& config) {
 }
 
 bool tpf_v11_weak_field_truncation_active(const Config& config) {
-  return config.tpf_dynamics_mode == "v11_weak_field_truncation";
+  return config.tpf_dynamics_mode == "v11_weak_field_truncation" || config.tpf_dynamics_mode == "geodesic_correspondence";
 }
 
 }  // namespace
@@ -98,7 +98,9 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si";
+    if (config.tpf_dynamics_mode == "geodesic_correspondence")
+      return "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=geodesic_correspondence; rho_Xi -> Poisson analytic -> geodesic";
+    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si legacy free-parameter";
   }
   if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
     std::ostringstream os;
@@ -151,7 +153,9 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
     if (tpf_v11_weak_field_truncation_active(config))
-      return "v11 correspondence metrics; alpha_si";
+      return (config.tpf_dynamics_mode == "geodesic_correspondence")
+                 ? "geodesic correspondence metrics; rho_Xi -> Poisson analytic -> geodesic"
+                 : "v11 correspondence metrics; alpha_si legacy free-parameter";
     if (config.tpf_dynamics_mode == "direct_tpf") {
       std::ostringstream os;
       os << "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling="
@@ -184,8 +188,9 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
   if (tpf_v11_weak_field_truncation_active(config)) {
-    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (Eq.42-44 correspondence implementation; "
-           "alpha_si path; no VDSG/readout/shunt/cooling)";
+    return (config.tpf_dynamics_mode == "geodesic_correspondence")
+               ? "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic"
+               : "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (legacy alpha_si free-parameter path; no VDSG/readout/shunt/cooling)";
   }
   if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
     return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (runtime Xi-kernel deformation; per-source Xi_eff sum -> a=-K_xi*Xi_eff_spatial; no additive VDSG helper; no principal-C direct_tpf readout)";

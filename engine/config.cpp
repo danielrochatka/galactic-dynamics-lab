@@ -207,15 +207,16 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     if (s == "legacy_readout") {
       throw std::runtime_error("legacy_readout has been removed; use xi_kernel_deformed or direct_tpf.");
     }
-    if (s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
+    if (s != "geodesic_correspondence" && s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
       throw std::runtime_error(
-          "tpf_dynamics_mode must be v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
+          "tpf_dynamics_mode must be geodesic_correspondence, v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;
   }
   if (key == "tpf_weak_field_correspondence_alpha_si") {
     config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
+    config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
     return true;
   }
   if (key == "tpf_analysis_mode") {
