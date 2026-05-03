@@ -605,6 +605,23 @@ void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State
                                                                      bool star_star,
                                                                      std::vector<double>& ax,
                                                                      std::vector<double>& ay) const {
+  /**
+   * Canonical weak-field/geodesic correspondence chain (Paper A draft appendix + TPF_FOUNDATIONS):
+   *   matter -> Xi -> rho_Xi -> Poisson -> Phi -> a = -grad(Phi).
+   *
+   * Runtime on this route uses the analytic closed-form point-source shortcut of that chain.
+   * It does NOT numerically compute rho_Xi, solve Poisson on a grid, or differentiate Phi on a grid.
+   *
+   * Singular correspondence limit for a point source:
+   *   rho_Xi = M delta^3(x).
+   *
+   * Softened implementation uses:
+   *   rho_eps(r) = 3 M eps^2 / [4 pi (r^2 + eps^2)^(5/2)],
+   * which integrates to M over R^3.
+   *
+   * Theta_ij Theta^ij, I, and Q_wf are nonlinear ledger/diagnostic quantities.
+   * They are NOT the leading density source used by geodesic_correspondence acceleration.
+   */
   compute_v11_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star,
                                                       weak_field_correspondence_alpha_si_, ax, ay);
 }
