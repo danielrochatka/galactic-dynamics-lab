@@ -242,7 +242,7 @@ TEST_CASE("direct_tpf translation invariance for two-body relative acceleration"
   CHECK(rel1y == doctest::Approx(rel0y).epsilon(1e-12));
 }
 
-TEST_CASE("direct_tpf is independent of correspondence alpha while v11_weak_field_truncation depends on alpha") {
+TEST_CASE("direct_tpf is independent of correspondence alpha while geodesic canonical ignores alpha and v11 explicit-alpha stays legacy") {
   const galaxy::State s = sample_state();
   const double bh_mass = 2.0e30;
 
@@ -262,15 +262,10 @@ TEST_CASE("direct_tpf is independent of correspondence alpha while v11_weak_fiel
   galaxy::TPFCorePackage v11_b = make_package("v11_weak_field_truncation", -1.33486e-10, 2.0e4, 0.0);
   run_accel(v11_a, s, bh_mass, true, ax_v1, ay_v1);
   run_accel(v11_b, s, bh_mass, true, ax_v2, ay_v2);
-
-  bool any_changed = false;
   for (int i = 0; i < s.n(); ++i) {
-    if (std::abs(ax_v1[i] - ax_v2[i]) > 1e-30 || std::abs(ay_v1[i] - ay_v2[i]) > 1e-30) {
-      any_changed = true;
-      break;
-    }
+    CHECK(ax_v1[i] == doctest::Approx(ax_v2[i]));
+    CHECK(ay_v1[i] == doctest::Approx(ay_v2[i]));
   }
-  CHECK(any_changed);
 }
 
 TEST_CASE("direct_tpf VDSG contribution is additive and converges continuously to zero with coupling") {

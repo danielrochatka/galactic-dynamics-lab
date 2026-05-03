@@ -304,10 +304,11 @@ TEST_CASE("derived-radial readout acceleration equals radial_acceleration_scalar
   CHECK(ay == doctest::Approx(expected_ay));
 }
 
-TEST_CASE("v11_weak_field_truncation dynamics: one-source acceleration matches alpha*M/r^2 radial law") {
+TEST_CASE("geodesic_correspondence dynamics: one-source acceleration matches Newtonian with -G") {
   galaxy::Config c;
-  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_dynamics_mode = "geodesic_correspondence";
   c.tpf_weak_field_correspondence_alpha_si = -2.0;
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
   c.tpfcore_enable_provisional_readout = false;
   c.tpf_vdsg_coupling = 0.0;
   c.tpf_cooling_fraction = 0.0;
@@ -323,14 +324,14 @@ TEST_CASE("v11_weak_field_truncation dynamics: one-source acceleration matches a
 
   REQUIRE(ax.size() == 1);
   const double r = 5.0;
-  const double coeff = c.tpf_weak_field_correspondence_alpha_si * bh_mass / (r * r * r);
+  const double coeff = -galaxy::tpfcore::TPF_G_SI * bh_mass / (r * r * r);
   CHECK(ax[0] == doctest::Approx(coeff * 3.0));
   CHECK(ay[0] == doctest::Approx(coeff * 4.0));
 }
 
-TEST_CASE("v11_weak_field_truncation dynamics: pair superposition reproduces Newtonian-like symmetry for alpha=-G") {
+TEST_CASE("geodesic_correspondence dynamics: pair superposition reproduces Newtonian-like symmetry") {
   galaxy::Config c;
-  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_dynamics_mode = "geodesic_correspondence";
   c.tpf_weak_field_correspondence_alpha_si = -galaxy::tpfcore::TPF_G_SI;
   c.tpfcore_enable_provisional_readout = false;
   c.tpf_vdsg_coupling = 0.0;
@@ -352,13 +353,13 @@ TEST_CASE("v11_weak_field_truncation dynamics: pair superposition reproduces New
   CHECK(ay[1] == doctest::Approx(0.0));
 }
 
-TEST_CASE("v11_weak_field_truncation dynamics rejects exploratory/provisional/stabilizer knobs") {
+TEST_CASE("geodesic_correspondence dynamics rejects exploratory/provisional/stabilizer knobs") {
   galaxy::State s = one_body_state(10.0, 0.0, 0.0, 0.0, 1.0);
   std::vector<double> ax, ay;
 
   auto make_base = []() {
     galaxy::Config c;
-    c.tpf_dynamics_mode = "v11_weak_field_truncation";
+    c.tpf_dynamics_mode = "geodesic_correspondence";
     c.tpfcore_enable_provisional_readout = false;
     c.tpf_vdsg_coupling = 0.0;
     c.tpf_cooling_fraction = 0.0;
@@ -562,4 +563,36 @@ TEST_CASE("direct_tpf allows nonzero VDSG as additive extension") {
   REQUIRE(ax0.size() == 1);
   REQUIRE(ax1.size() == 1);
   CHECK(std::fabs(ax1[0] - ax0[0]) > 0.0);
+}
+
+TEST_CASE("v11 alias forwarding and explicit-alpha legacy behavior") {
+  galaxy::State s = one_body_state(3.0, 4.0, 0.0, 0.0, 1.0);
+  std::vector<double> ax_g, ay_g, ax_a, ay_a, ax_l, ay_l;
+  const double bh_mass = 5.0;
+
+  galaxy::Config cg;
+  cg.tpf_dynamics_mode = "geodesic_correspondence";
+  cg.tpf_vdsg_coupling = 0.0;
+  cg.tpf_cooling_fraction = 0.0;
+  cg.tpf_global_accel_shunt_enable = false;
+  cg.tpfcore_enable_provisional_readout = false;
+
+  galaxy::Config ca = cg;
+  ca.tpf_dynamics_mode = "v11_weak_field_truncation";
+
+  galaxy::Config cl = ca;
+  cl.tpf_weak_field_correspondence_alpha_si = -2.0;
+  cl.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
+
+  galaxy::TPFCorePackage pg, pa, pl;
+  pg.init_from_config(cg);
+  pa.init_from_config(ca);
+  pl.init_from_config(cl);
+  pg.compute_accelerations(s, bh_mass, 0.0, false, ax_g, ay_g);
+  pa.compute_accelerations(s, bh_mass, 0.0, false, ax_a, ay_a);
+  pl.compute_accelerations(s, bh_mass, 0.0, false, ax_l, ay_l);
+
+  CHECK(ax_g[0] == doctest::Approx(ax_a[0]));
+  CHECK(ay_g[0] == doctest::Approx(ay_a[0]));
+  CHECK(ax_l[0] != doctest::Approx(ax_g[0]));
 }

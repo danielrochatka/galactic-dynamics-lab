@@ -34,15 +34,20 @@ TEST_CASE("compute_active_dynamics_branch: TPF direct") {
         "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling=1.000000e-20");
 }
 
-TEST_CASE("compute_active_dynamics_branch: v11 weak-field truncation dynamics") {
+TEST_CASE("compute_active_dynamics_branch: correspondence dynamics labels") {
   Config c;
   c.physics_package = "TPFCore";
-  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_dynamics_mode = "geodesic_correspondence";
   CHECK(galaxy::compute_active_dynamics_branch(c) ==
-        "tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si");
+        "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=geodesic_correspondence; rho_Xi -> Poisson analytic -> geodesic");
   CHECK(galaxy::compute_active_metrics_branch(c) ==
-        "v11 correspondence metrics; alpha_si");
-  CHECK(galaxy::compute_acceleration_code_path(c).find("Eq.42-44") != std::string::npos);
+        "geodesic correspondence metrics; rho_Xi -> Poisson analytic -> geodesic");
+  CHECK(galaxy::compute_acceleration_code_path(c) ==
+        "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic");
+
+  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  CHECK(galaxy::compute_active_dynamics_branch(c).find("deprecated_legacy") != std::string::npos);
+  CHECK(galaxy::compute_active_metrics_branch(c).find("legacy free-parameter") != std::string::npos);
 }
 
 TEST_CASE("compute_active_metrics_branch: metrics vs dynamics when VDSG on") {
