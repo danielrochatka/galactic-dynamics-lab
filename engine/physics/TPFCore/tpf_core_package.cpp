@@ -5,7 +5,8 @@
  * Integrator accelerations are mode-dependent (see compute_accelerations):
  * - direct_tpf: principal-part implementation with Theta/I/kappa baseline; DeltaC omitted in current scope;
  *   optional additive VDSG extension on top of that baseline.
- * - v11_weak_field_truncation: correspondence implementation using tpf_weak_field_correspondence_alpha_si.
+ * - geodesic_correspondence: canonical correspondence implementation using fixed -TPF_G_SI coefficient.
+ * - v11_weak_field_truncation: deprecated alias; optional legacy free-parameter alpha_si behavior.
  * - legacy_readout: provisional readout-based implementation + optional VDSG modifier + optional global |a| shunt.
  * - xi_kernel_deformed: runtime Xi-kernel route; computes Xi-based acceleration without Theta/I in its default
  *   acceleration path, can apply optional Xi-kernel deformation before readout, and reads acceleration as
@@ -113,13 +114,27 @@ void TPFCorePackage::init_from_config(const Config& config) {
   if (tpf_dynamics_mode_ == "weak_field_correspondence") {
     tpf_dynamics_mode_ = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
   }
+  if (tpf_dynamics_mode_ == "geodesic_correspondence") {
+    weak_field_correspondence_alpha_si_ = -tpfcore::TPF_G_SI;
+    if (config.tpf_weak_field_correspondence_alpha_si_explicitly_set) {
+      std::cerr << "[TPFCore] warning: tpf_dynamics_mode=geodesic_correspondence ignores explicit tpf_weak_field_correspondence_alpha_si and uses -TPF_G_SI.\n";
+    }
+  } else if (tpf_dynamics_mode_ == "v11_weak_field_truncation") {
+    if (!config.tpf_weak_field_correspondence_alpha_si_explicitly_set) {
+      std::cerr << "[TPFCore] deprecation warning: tpf_dynamics_mode=v11_weak_field_truncation is deprecated; forwarding to geodesic_correspondence with fixed -TPF_G_SI.\n";
+      tpf_dynamics_mode_ = "geodesic_correspondence";
+      weak_field_correspondence_alpha_si_ = -tpfcore::TPF_G_SI;
+    } else {
+      std::cerr << "[TPFCore] warning: tpf_dynamics_mode=v11_weak_field_truncation with explicit alpha_si is legacy free-parameter mode, not canonical geodesic correspondence.\n";
+    }
+  }
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
   readout_scale_ = config.tpfcore_readout_scale;
   theta_tt_scale_ = config.tpfcore_theta_tt_scale;
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
-  weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
+  if (tpf_dynamics_mode_ != "geodesic_correspondence") weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
   kappa_ = config.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
   derived_poisson_cfg_.kappa = config.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
@@ -841,34 +856,38 @@ void TPFCorePackage::compute_accelerations(const State& state,
     last_pipeline_ = AccelPipelineStats{};
     return;
   }
-  if (tpf_dynamics_mode_ == "v11_weak_field_truncation") {
+  if (tpf_dynamics_mode_ == "geodesic_correspondence" || tpf_dynamics_mode_ == "v11_weak_field_truncation") {
+    const bool canonical_geodesic = (tpf_dynamics_mode_ == "geodesic_correspondence");
+    const std::string mode_name = canonical_geodesic ? "geodesic_correspondence" : "v11_weak_field_truncation";
     if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=v11_weak_field_truncation rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
+          "tpf_dynamics_mode=" + mode_name + " rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
           "not part of the paper-backed weak-field truncation path).");
     }
     if (provisional_readout_) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=v11_weak_field_truncation rejects tpfcore_enable_provisional_readout=true "
+          "tpf_dynamics_mode=" + mode_name + " rejects tpfcore_enable_provisional_readout=true "
           "(provisional readout closures are not used on this paper-backed path).");
     }
     if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
         theta_tr_scale_ != 1.0) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=v11_weak_field_truncation rejects readout closure knobs "
+          "tpf_dynamics_mode=" + mode_name + " rejects readout closure knobs "
           "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale).");
     }
     if (shunt_enable_) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=v11_weak_field_truncation rejects tpf_global_accel_shunt_enable=true "
+          "tpf_dynamics_mode=" + mode_name + " rejects tpf_global_accel_shunt_enable=true "
           "(global |a| shunt is not part of the correspondence dynamics path).");
     }
     if (cooling_fraction_ > 0.0) {
       throw std::runtime_error(
-          "tpf_dynamics_mode=v11_weak_field_truncation rejects positive tpf_cooling_fraction "
+          "tpf_dynamics_mode=" + mode_name + " rejects positive tpf_cooling_fraction "
           "(cooling is a numerical stabilizer outside the correspondence dynamics scope).");
     }
-    compute_v11_weak_field_truncation_accelerations(state, bh_mass, softening, star_star, ax, ay);
+    compute_v11_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star,
+                                                      canonical_geodesic ? -tpfcore::TPF_G_SI : weak_field_correspondence_alpha_si_,
+                                                      ax, ay);
     last_pipeline_ = AccelPipelineStats{};
     return;
   }

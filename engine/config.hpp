@@ -154,7 +154,8 @@ struct Config {
   /**
    * TPFCore only: how dynamical accelerations are produced.
    * - legacy_readout (deprecated legacy; explicit opt-in): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout=true for dynamics.
-   * - v11_weak_field_truncation: correspondence truncation implementation (Eq. 42-44 scalar superposition) using alpha_si.
+   * - geodesic_correspondence: canonical static weak-field correspondence route (rho_Xi -> Poisson analytic -> geodesic) with fixed -G coefficient.
+   * - v11_weak_field_truncation: deprecated alias; forwards to geodesic_correspondence unless alpha_si is explicitly set (legacy free-parameter mode).
    * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
    * - xi_kernel_deformed: Xi-direct runtime route using a=-K_xi*Xi_eff_spatial with per-source Xi-kernel deformation.
    */
@@ -166,6 +167,7 @@ struct Config {
    * also feeds derived-radial closure parameters where configured).
    */
   double tpf_weak_field_correspondence_alpha_si = -6.67430e-11;
+  bool tpf_weak_field_correspondence_alpha_si_explicitly_set = false;
 
   /**
    * TPFCore analysis/audit layer; does not replace dynamics.

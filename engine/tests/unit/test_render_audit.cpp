@@ -105,9 +105,48 @@ TEST_CASE("write_render_manifest TXT tpf_extension_mode semantics align with JSO
 
   c.tpf_dynamics_mode = "v11_weak_field_truncation";
   c.tpf_vdsg_coupling = 1e-12;
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
   galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
   txt = slurp_file(out_dir + "/render_manifest.txt");
   CHECK(txt.find("tpf_extension_mode\tnone_vdsg_rejected\n") != std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
+}
+
+TEST_CASE("write_render_manifest: geodesic and alias-forwarded labels are canonical, explicit-alpha alias stays legacy") {
+  char dir_template[] = "/tmp/render_audit_geodesic_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::galaxy;
+
+  c.tpf_dynamics_mode = "geodesic_correspondence";
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  std::string json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(txt.find("tpf_core_law_mode\tgeodesic_correspondence_flux_poisson_geodesic") != std::string::npos);
+  CHECK(txt.find("tpf_truncation_mode\tgeodesic_correspondence_static_weak_field_flux_poisson_geodesic") != std::string::npos);
+  CHECK(txt.find("v11_weak_field") == std::string::npos);
+  CHECK(json.find("\"tpf_core_law_mode\": \"geodesic_correspondence_flux_poisson_geodesic\"") != std::string::npos);
+  CHECK(json.find("\"v11_weak_field") == std::string::npos);
+
+  c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = false;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  txt = slurp_file(out_dir + "/render_manifest.txt");
+  CHECK(txt.find("requested_tpf_dynamics_mode\tv11_weak_field_truncation") != std::string::npos);
+  CHECK(txt.find("effective_tpf_dynamics_mode\tgeodesic_correspondence") != std::string::npos);
+  CHECK(txt.find("tpf_dynamics_mode_alias_forwarded\t1") != std::string::npos);
+
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+  txt = slurp_file(out_dir + "/render_manifest.txt");
+  CHECK(txt.find("legacy_compat_benchmark") != std::string::npos);
+  CHECK(txt.find("tpf_dynamics_mode_alias_forwarded\t0") != std::string::npos);
 
   std::remove((out_dir + "/render_manifest.txt").c_str());
   std::remove((out_dir + "/render_manifest.json").c_str());
