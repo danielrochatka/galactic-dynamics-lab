@@ -6,7 +6,7 @@
 
 The proposed `geodesic_correspondence` route implements the chain matter → Ξ → ρ_Ξ → Poisson →
 Φ → a = −∇Φ per TPF_FOUNDATIONS.md §4. The density step uses the linear flux correspondence
-`ρ_Ξ = (1/4π) ∂_i Ξ^i` (Paper A v14.4 Appendix D). In the singular (ε → 0) limit this recovers
+`ρ_Ξ = (1/4π) ∂_i Ξ^i` (current Paper A draft Appendix D). In the singular (ε → 0) limit this recovers
 M δ³(x) exactly; the softened implementation produces a regularized Plummer density that integrates
 to M (see B.2). The runtime route uses the analytic closed-form shortcut of the correspondence
 chain for point sources and does not numerically compute ρ_Ξ, solve Poisson, or differentiate Φ
@@ -70,8 +70,8 @@ trace-squared) — the field-equation invariant used in C_μν. `derived_invaria
 computes only `Θ_ij Θ^ij` (raw Frobenius squared, no λ correction) — its header comment says
 "Frobenius Θ_ij Θ_ij only — not compute_invariant_I". **Neither function is the density proxy
 for `geodesic_correspondence`.** The density step uses the linear flux divergence
-`ρ_Ξ = (1/4π) ∂_i Ξ^i` (Paper A v14.4 Appendix D), not a Θ contraction. `Θ_ij Θ^ij` belongs
-to the nonlinear energy-ledger sector (v14.4 §IV.A.d) and is documented here only for completeness.
+`ρ_Ξ = (1/4π) ∂_i Ξ^i` (current Paper A draft Appendix D), not a Θ contraction. `Θ_ij Θ^ij` belongs
+to the nonlinear energy-ledger sector (current Paper A draft §IV.A.d) and is documented here only for completeness.
 
 ### A.4 Existing Poisson Infrastructure
 
@@ -101,7 +101,7 @@ bins, max_radius, galaxy_radius. It is populated from config keys `tpf_kappa`,
 
 **κ terminology note:** Two distinct things share the name "kappa" in this codebase and should
 not be conflated:
-- **κ = 8πG/c⁴**: the formal tensor correspondence coupling per Paper A v14.5; a fixed physical
+- **κ = 8πG/c⁴**: the formal tensor correspondence coupling per current Paper A draft; a fixed physical
   constant derived from the field equation structure.
 - **`tpf_kappa`**: the legacy simulator config knob (default 1e32) used by `direct_tpf` and the
   radial-Poisson paths above. It is a numerical parameter specific to those legacy paths, not the
@@ -153,18 +153,23 @@ catching the old string `"v11_weak_field_truncation"` as a deprecation alias usi
 - If the config **explicitly sets** `alpha_si`: honor it with a "free-parameter legacy mode"
   warning; do not forward.
 
-`geodesic_correspondence` ignores any `alpha_si` config value entirely; it uses `−G_SI` internally.
-The presence check must use the config-loading layer's key-presence flag, not a numerical
-comparison — float equality against `−G_SI` is fragile across config-loading paths.
+If key-presence tracking is not already available for `alpha_si` in the config-loading layer, add
+a minimal presence flag during config parsing. Do not infer explicitness from the numeric value
+(defaults may equal `−G_SI` by accident). The LOC estimate for B.1 in Section C may need adjustment
+if presence tracking infrastructure must be added; flag this in the PR description if encountered.
+
+If `alpha_si` is explicitly set while `tpf_dynamics_mode=geodesic_correspondence`, emit a warning
+stating that `alpha_si` is ignored for this mode, then proceed with `−G_SI` internally. Do not throw
+(old configs may carry this key); do not silently ignore.
 
 No new private method is required; `compute_v11_weak_field_truncation_accelerations()` is renamed
 to `compute_geodesic_correspondence_accelerations()` in place. Also update `"geodesic_correspondence"`
 in any validation or manifest enumerations. The `init_from_config()` block at line 113 already
 handles a similar alias rename for `"weak_field_correspondence"` and serves as the pattern.
 
-### B.2 Step 3 — ρ from linear flux divergence of Ξ (Paper A v14.4 Appendix D)
+### B.2 Step 3 — ρ from linear flux divergence of Ξ (current Paper A draft Appendix D)
 
-**Supersedes the earlier Θ_ij Θ^ij approach.** Paper A v14.4 Appendix D establishes the
+**Supersedes the earlier Θ_ij Θ^ij approach.** The current Paper A draft Appendix D establishes the
 correct correspondence as the linear flux divergence:
 
 ```
@@ -197,8 +202,15 @@ softened Newtonian acceleration. It is **not** literally M δ³(x); it is a smoo
 that approaches M δ³(x) as ε → 0. No free calibration parameter is introduced — ε is already
 fixed by the existing softening policy — but the density is ε-dependent.
 
+Important diagnostic caveat: although the simulator often evaluates fields on the z=0 plane, the
+flux correspondence is the full 3D divergence. Any diagnostic that explicitly computes `rho_Xi`
+must use the full trace `Theta_xx + Theta_yy + Theta_zz`, not only the planar divergence
+`partial_x Xi_x + partial_y Xi_y`. The planar-only divergence does not reproduce the Plummer
+density. The runtime route does not compute `rho_Xi` numerically (see B.5 analytic shortcut), so
+this caveat applies only to future diagnostic implementations.
+
 The quadratic invariant `Θ_ij Θ^ij` is correctly relegated to the nonlinear energy-ledger sector
-per v14.4 §IV.A.d; it is not part of the geodesic_correspondence density step.
+per current Paper A draft §IV.A.d; it is not part of the geodesic_correspondence density step.
 
 **Code status:** No new code is needed for the multi-source case. The divergence is linear, so
 `∂_i Ξ^i_total = Σ_j ∂_i Ξ^i_j`. The runtime route uses the analytic closed-form shortcut (see
@@ -247,7 +259,9 @@ The implementation is a **rename with parameter lock**, not a new parallel branc
    using **config-key-presence** (not float equality) to forward or run in legacy mode (see B.1).
    ~10–15 lines.
 2. **Lock `alpha_si`**: `geodesic_correspondence` ignores `alpha_si` from config entirely;
-   hardcode `−TPF_G_SI` at the call site. ~5 lines.
+   hardcode `−TPF_G_SI` at the call site. If `alpha_si` is explicitly set while
+   `tpf_dynamics_mode=geodesic_correspondence`, emit a warning stating that `alpha_si` is ignored
+   for this mode, then proceed with `−G_SI` internally. Do not throw; do not silently ignore. ~5 lines.
 3. **Config validation**: Update allowlist of valid `tpf_dynamics_mode` strings to include
    `"geodesic_correspondence"`; retain `"v11_weak_field_truncation"` as a known alias.
 4. **Contamination guards**: Add rejection/warning for incompatible config keys (see B.6). ~10–15 lines.
@@ -257,6 +271,15 @@ The implementation is a **rename with parameter lock**, not a new parallel branc
    geodesic) is the theoretical grounding; the runtime collapses it via the analytic Poisson
    identity for point sources.
 6. **Manifest entry**: Record `acceleration_code_path = "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic"` in run_info output. ~5 lines.
+7. **Paper-facing config preset**: Add `configs/geodesic_correspondence_baseline.cfg` with:
+   ```ini
+   tpf_dynamics_mode = geodesic_correspondence
+   tpf_vdsg_coupling = 0
+   tpf_global_accel_shunt_enable = false
+   tpf_cooling_fraction = 0
+   ```
+   This preset establishes the canonical paper-facing configuration. Paper validation runs should
+   use this preset (or explicitly verify equivalent settings) rather than constructing config from scratch.
 
 ### B.6 Contamination Guards
 
@@ -282,12 +305,13 @@ established in the existing `v11_weak_field_truncation` dispatch block (lines ~8
 | Item | Lines | Files |
 |------|-------|-------|
 | Rename dispatch string + config-key-presence alias guard (B.1) | 15–20 | `tpf_core_package.cpp` |
-| Lock `alpha_si` internally; ignore from config for this mode (B.5) | 5–8 | `tpf_core_package.cpp`, `config.hpp` |
+| Lock `alpha_si` internally; warn + ignore from config for this mode (B.5) | 5–8 | `tpf_core_package.cpp`, `config.hpp` |
 | Config validation allowlist update | 3–5 | `config.hpp`, `defaults.cfg` |
 | Contamination guards — four throw blocks (B.6) | 10–15 | `tpf_core_package.cpp` |
 | Analytic shortcut documentation block + manifest entry (B.5) | 15–20 | `tpf_core_package.cpp` |
+| Paper-facing config preset (B.5) | 5–8 | `configs/geodesic_correspondence_baseline.cfg` |
 | Unit and integration tests (seven tests below) | 80–110 | test files (see below) |
-| **Total** | **~130–180 lines** | **4–5 files touched** |
+| **Total** | **~135–190 lines** | **5–6 files touched** |
 
 **Required tests:**
 
@@ -297,8 +321,8 @@ established in the existing `v11_weak_field_truncation` dispatch block (lines ~8
    `star_star=false`.
 3. `geodesic_correspondence` equals `NewtonianPackage` for a galaxy configuration with
    `star_star=true` (use small N to keep the test fast).
-4. Setting `alpha_si` in config does not affect `geodesic_correspondence` acceleration (parameter
-   is silently ignored for this mode).
+4. Setting `alpha_si` in config does not affect `geodesic_correspondence` acceleration and emits a
+   warning that `alpha_si` is ignored for this mode.
 5. `"v11_weak_field_truncation"` mode string still runs (when `alpha_si` is not explicitly set)
    and emits a deprecation notice in stderr.
 6. Nonzero `tpf_vdsg_coupling`, `tpf_global_accel_shunt_enable=true`, or positive
@@ -315,10 +339,10 @@ uses a positive allowlist. `tpfcore_vdsg_manifest_smoke.sh` and
 
 ## D. Honest Assessment of Issues
 
-### D.2 Divergence concern resolved by linear flux correspondence (Paper A v14.4 Appendix D)
+### D.2 Divergence concern resolved by linear flux correspondence (current Paper A draft Appendix D)
 
 The earlier concern — that `Θ_ij Θ^ij ~ (GM)²/r⁶` diverges at r→0, requiring softening
-calibration — **no longer applies to the geodesic_correspondence route**. Paper A v14.4
+calibration — **no longer applies to the geodesic_correspondence route**. The current Paper A draft
 Appendix D resolves this by replacing the quadratic density proxy with the linear flux divergence:
 
 ```
@@ -326,10 +350,11 @@ Appendix D resolves this by replacing the quadratic density proxy with the linea
 ```
 
 For the point-source ansatz this gives `ρ_Ξ = M δ³(x)` exactly — no softening parameter
-enters the density recovery, and no calibration is required (see B.2 for derivation).
+enters the singular-limit density recovery, and no calibration is required (see B.2 for derivation).
+For the softened runtime kernel, see the regularized Plummer-density caveat in B.2.
 
 **Where the quadratic invariant still belongs:** `Θ_ij Θ^ij` is correctly placed in the
-nonlinear energy-ledger sector per v14.4 Section IV.A.d (and Paper B App. E). It quantifies
+nonlinear energy-ledger sector per current Paper A draft Section IV.A.d (and Paper B App. E). It quantifies
 the configuration-gradient energy density, not the matter source density. The two quantities
 serve different roles in the theory and should not be conflated.
 
@@ -380,19 +405,21 @@ and identical guards. The actual minimal change is:
    `tpf_core_package.cpp` and all config/manifest references.
 2. **Lock `alpha_si` to `−G_SI`** in the renamed route — it is now a derived constant (the
    geodesic chain derives `a = −G Σ M/r²` from first principles), not a tunable calibration
-   parameter. Remove `alpha_si` from the config surface for this mode.
+   parameter. Remove `alpha_si` from the config surface for this mode. If `alpha_si` is explicitly
+   set while `tpf_dynamics_mode=geodesic_correspondence`, emit a warning stating that `alpha_si`
+   is ignored for this mode, then proceed with `−G_SI` internally. Do not throw; do not silently ignore.
 3. **Keep `"v11_weak_field_truncation"` as a deprecation alias** using config-key-presence
    semantics (not float equality — float equality against `−G_SI` is fragile across config-loading
    paths): if the config does **not** explicitly set `alpha_si`, emit a deprecation warning and
    forward to `geodesic_correspondence`; if the config **explicitly sets** `alpha_si`, honor it
    with a "free-parameter legacy mode" warning.
 4. **Add a documentation block** at the top of the renamed method stating: the theoretical chain
-   is Ξ → ρ_Ξ → Poisson → geodesic (Paper A v14.4 Appendix D; TPF_FOUNDATIONS.md §4). The
+   is Ξ → ρ_Ξ → Poisson → geodesic (current Paper A draft Appendix D; TPF_FOUNDATIONS.md §4). The
    runtime uses the analytic closed-form shortcut for point sources and does **not** numerically
    compute ρ_Ξ, solve Poisson, or differentiate Φ on a grid. The five-step chain is theoretical
    grounding; the runtime collapses it via the analytic Poisson identity. In the softened
    implementation ρ_ε(r) = 3Mε²/[4π(r²+ε²)^(5/2)] integrates to M; Θ_ij Θ^ij is the nonlinear
-   energy-ledger quantity (v14.4 §IV.A.d), not the density proxy.
+   energy-ledger quantity (current Paper A draft §IV.A.d), not the density proxy.
 
 This is approximately 15–20 lines of changes (dispatch rename, parameter lock, alias guard,
 documentation). The key deliverable is the correct theoretical framing, not new numerical code.
@@ -408,7 +435,7 @@ from this route is the primary architectural gain.
   for current galaxy simulations.
 - **Non-static corrections** (retardation, radiation reaction): defer; these require the time-
   dependent sector of TPF, which is not yet in scope.
-- **Θ_ij Θ^ij energy-ledger implementation**: the nonlinear ledger quantity (v14.4 §IV.A.d) is
+- **Θ_ij Θ^ij energy-ledger implementation**: the nonlinear ledger quantity (current Paper A draft §IV.A.d) is
   not part of the geodesic_correspondence density step; defer its implementation to when the
   energy-ledger sector is developed separately.
 - **VDSG additive extension on this route**: defer until the base route is validated; can be
@@ -431,7 +458,9 @@ as a migration alias, emitting a deprecation notice.
 `geodesic_correspondence` is a separate future PR. Existing configs that explicitly set
 `tpf_dynamics_mode = xi_kernel_deformed` continue to work with no migration required. Paper-facing
 validation runs must explicitly set `tpf_dynamics_mode = geodesic_correspondence`; there is no
-automatic migration.
+automatic migration. No paper-facing validation result should be produced from the default mode
+unless the run_info/manifest confirms `active_dynamics_branch = geodesic_correspondence`. This is
+a procedural audit guard for paper claims, not a code change.
 
 ### E.4 Implementation Chain Summary
 
@@ -439,7 +468,7 @@ The five steps of the route and their code grounding:
 
 1. **Ξ** — computed by `provisional_point_source_field()` (`source_ansatz.cpp:12–37`), Paper A Eq. (19).
 2. **Θ** — computed by same function, Paper A Eqs. (20)–(25).
-3. **ρ_Ξ** — linear flux correspondence `ρ_Ξ = (1/4π) ∂_i Ξ^i` (Paper A v14.4 Appendix D).
+3. **ρ_Ξ** — linear flux correspondence `ρ_Ξ = (1/4π) ∂_i Ξ^i` (current Paper A draft Appendix D).
    Singular limit: M δ³(x). Softened implementation: ρ_ε(r) = 3Mε²/[4π(r²+ε²)^(5/2)], integrates
    to M. **Runtime uses the analytic closed-form shortcut; ρ_Ξ is not numerically computed.**
 4. **Poisson / Φ** — analytic identity `Φ = −G Σ M_i / |x − x_i|` (no grid solve);
