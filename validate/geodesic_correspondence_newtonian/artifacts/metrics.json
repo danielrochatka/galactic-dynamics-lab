@@ -1,26 +1,44 @@
 [
   {
     "case": "case1_single_source",
+    "newtonian_dir": "outputs/val_case1_newt",
+    "tpf_dir": "outputs/val_case1_tpf",
+    "newtonian_snapshot_count": 601,
+    "tpf_snapshot_count": 601,
+    "rows_per_snapshot": 1,
     "snapshots_compared": 601,
     "max_abs_accel_diff": 0.0,
     "max_rel_accel_diff": 0.0,
     "max_pos_diff": 0.0,
-    "max_vel_diff": 0.0
+    "max_vel_diff": 0.0,
+    "pass": true
   },
   {
     "case": "case2_galaxy_starstar_false",
+    "newtonian_dir": "outputs/val_case2_newt",
+    "tpf_dir": "outputs/val_case2_tpf",
+    "newtonian_snapshot_count": 81,
+    "tpf_snapshot_count": 81,
+    "rows_per_snapshot": 64,
     "snapshots_compared": 81,
     "max_abs_accel_diff": 0.0,
     "max_rel_accel_diff": 0.0,
     "max_pos_diff": 0.0,
-    "max_vel_diff": 0.0
+    "max_vel_diff": 0.0,
+    "pass": true
   },
   {
     "case": "case3_smallN_starstar_true",
+    "newtonian_dir": "outputs/val_case3_newt",
+    "tpf_dir": "outputs/val_case3_tpf",
+    "newtonian_snapshot_count": 101,
+    "tpf_snapshot_count": 101,
+    "rows_per_snapshot": 12,
     "snapshots_compared": 101,
     "max_abs_accel_diff": 0.0,
     "max_rel_accel_diff": 0.0,
     "max_pos_diff": 0.0,
-    "max_vel_diff": 0.0
+    "max_vel_diff": 0.0,
+    "pass": true
   }
 ]
