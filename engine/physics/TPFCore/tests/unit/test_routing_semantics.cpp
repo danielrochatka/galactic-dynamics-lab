@@ -3,6 +3,7 @@
 #include "physics/TPFCore/derived_tpf_radial.hpp"
 #include "physics/TPFCore/provisional_readout.hpp"
 #include "physics/TPFCore/tpf_core_package.hpp"
+#include "physics/Newtonian/newtonian.hpp"
 #include "types.hpp"
 
 #include <cmath>
@@ -26,6 +27,11 @@ galaxy::State one_body_state(double x, double y, double vx, double vy, double m)
 void apply_clean_tpf_defaults(galaxy::Config& c) {
   c.tpf_dynamics_mode = "legacy_readout";
   c.tpf_global_accel_shunt_enable = false;
+}
+
+void check_close_combined_tol(double actual, double expected, double abs_floor, double rel_tol) {
+  const double tol = std::max(abs_floor, rel_tol * std::max(1.0, std::abs(expected)));
+  CHECK(std::abs(actual - expected) <= tol);
 }
 
 }  // namespace
@@ -390,6 +396,97 @@ TEST_CASE("geodesic_correspondence dynamics rejects exploratory/provisional/stab
     c.tpf_cooling_fraction = 0.1;
     galaxy::TPFCorePackage p; p.init_from_config(c);
     CHECK_THROWS(p.compute_accelerations(s, 1.0, 0.0, false, ax, ay));
+  }
+}
+
+TEST_CASE("geodesic_correspondence matches NewtonianPackage for one-body point source") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "geodesic_correspondence";
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage tpf;
+  galaxy::NewtonianPackage newtonian;
+  tpf.init_from_config(c);
+
+  galaxy::State s = one_body_state(7.0, -11.0, 0.0, 0.0, 2.5);
+  const double bh_mass = 8.0;
+  const double softening = 0.0;
+  std::vector<double> ax_tpf, ay_tpf, ax_newt, ay_newt;
+  tpf.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax_tpf, ay_tpf);
+  newtonian.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax_newt, ay_newt);
+
+  REQUIRE(ax_tpf.size() == 1);
+  REQUIRE(ax_newt.size() == 1);
+  check_close_combined_tol(ax_tpf[0], ax_newt[0], 1e-15, 1e-12);
+  check_close_combined_tol(ay_tpf[0], ay_newt[0], 1e-15, 1e-12);
+}
+
+TEST_CASE("geodesic_correspondence matches NewtonianPackage for galaxy-style star_star=false setup") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "geodesic_correspondence";
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage tpf;
+  galaxy::NewtonianPackage newtonian;
+  tpf.init_from_config(c);
+
+  galaxy::State s;
+  s.resize(4);
+  s.x = {40.0, -55.0, 12.0, -9.0};
+  s.y = {-10.0, 22.0, 65.0, -71.0};
+  s.vx = {0.0, 0.0, 0.0, 0.0};
+  s.vy = {0.0, 0.0, 0.0, 0.0};
+  s.mass = {5.0, 3.0, 4.0, 2.0};
+
+  const double bh_mass = 1.5e3;
+  const double softening = 0.25;
+  std::vector<double> ax_tpf, ay_tpf, ax_newt, ay_newt;
+  tpf.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax_tpf, ay_tpf);
+  newtonian.compute_accelerations(s, bh_mass, softening, /*star_star=*/false, ax_newt, ay_newt);
+
+  REQUIRE(ax_tpf.size() == ax_newt.size());
+  for (std::size_t i = 0; i < ax_tpf.size(); ++i) {
+    check_close_combined_tol(ax_tpf[i], ax_newt[i], 1e-15, 1e-12);
+    check_close_combined_tol(ay_tpf[i], ay_newt[i], 1e-15, 1e-12);
+  }
+}
+
+TEST_CASE("geodesic_correspondence matches NewtonianPackage for small-N star_star=true setup") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "geodesic_correspondence";
+  c.tpfcore_enable_provisional_readout = false;
+  c.tpf_vdsg_coupling = 0.0;
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = false;
+
+  galaxy::TPFCorePackage tpf;
+  galaxy::NewtonianPackage newtonian;
+  tpf.init_from_config(c);
+
+  galaxy::State s;
+  s.resize(3);
+  s.x = {-20.0, 0.0, 35.0};
+  s.y = {15.0, -12.0, 8.0};
+  s.vx = {0.0, 0.0, 0.0};
+  s.vy = {0.0, 0.0, 0.0};
+  s.mass = {7.0, 11.0, 13.0};
+
+  const double bh_mass = 350.0;
+  const double softening = 0.5;
+  std::vector<double> ax_tpf, ay_tpf, ax_newt, ay_newt;
+  tpf.compute_accelerations(s, bh_mass, softening, /*star_star=*/true, ax_tpf, ay_tpf);
+  newtonian.compute_accelerations(s, bh_mass, softening, /*star_star=*/true, ax_newt, ay_newt);
+
+  REQUIRE(ax_tpf.size() == ax_newt.size());
+  for (std::size_t i = 0; i < ax_tpf.size(); ++i) {
+    check_close_combined_tol(ax_tpf[i], ax_newt[i], 1e-15, 1e-12);
+    check_close_combined_tol(ay_tpf[i], ay_newt[i], 1e-15, 1e-12);
   }
 }
 
