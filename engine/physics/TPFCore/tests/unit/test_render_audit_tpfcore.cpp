@@ -46,6 +46,11 @@ TEST_CASE("compute_active_dynamics_branch: correspondence dynamics labels") {
         "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic");
 
   c.tpf_dynamics_mode = "v11_weak_field_truncation";
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = false;
+  CHECK(galaxy::compute_active_dynamics_branch(c).find("alias_forwarded=true") != std::string::npos);
+  CHECK(galaxy::compute_active_metrics_branch(c) ==
+        "geodesic correspondence metrics; rho_Xi -> Poisson analytic -> geodesic");
+  c.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
   CHECK(galaxy::compute_active_dynamics_branch(c).find("deprecated_legacy") != std::string::npos);
   CHECK(galaxy::compute_active_metrics_branch(c).find("legacy free-parameter") != std::string::npos);
 }

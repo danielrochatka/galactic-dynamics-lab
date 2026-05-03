@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include "doctest.h"
 #include <algorithm>
+#include <fstream>
 
 using galaxy::apply_config_kv;
 using galaxy::Config;
@@ -159,6 +160,13 @@ TEST_CASE("tpfcore_closure_kappa key maps to same tpf_kappa storage") {
 TEST_CASE("Config defaults TPFCore dynamics to xi_kernel_deformed") {
   galaxy::Config c;
   CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+}
+
+TEST_CASE("geodesic_correspondence_baseline preset selects TPFCore and geodesic mode") {
+  Config c;
+  CHECK(galaxy::load_config_file("../configs/geodesic_correspondence_baseline.cfg", c));
+  CHECK(c.physics_package == "TPFCore");
+  CHECK(c.tpf_dynamics_mode == "geodesic_correspondence");
 }
 TEST_CASE("tpf_dynamics_mode accepts canonical modes and rejects deprecated alias") {
   Config c;
