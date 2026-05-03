@@ -33,7 +33,8 @@ Theta.zz = m r² / R⁵      (= m / R³ at z = 0)
 ```
 
 This is the 3D Hessian of Φ = −m/R (with R² = dx² + dy² + eps²), i.e., Θ_ij = ∂_i ∂_j Φ.
-**This matches Paper A Eqs. (20)–(25).** The note in the header says it explicitly:
+This matches the current Paper A draft's implemented Θ-component ansatz in the simulator-realization subsection
+(LaTeX label `eq:implemented-theta-wf-revised`). The note in the header says it explicitly:
 "Theta_ij = Hess_ij(Phi)" and "3D Hessian of Phi = -m/R at z = 0".
 
 Multi-source superposition: `evaluate_provisional_field_multi_source` linearly sums per-source
@@ -466,8 +467,8 @@ a procedural audit guard for paper claims, not a code change.
 
 The five steps of the route and their code grounding:
 
-1. **Ξ** — computed by `provisional_point_source_field()` (`source_ansatz.cpp:12–37`), Paper A Eq. (19).
-2. **Θ** — computed by same function, Paper A Eqs. (20)–(25).
+1. **Ξ** — computed by `provisional_point_source_field()` (`source_ansatz.cpp:12–37`), matching the current Paper A draft's implemented displacement ansatz in the simulator-realization subsection (LaTeX label `eq:implemented-xi-wf`).
+2. **Θ** — computed by the same function, matching the current Paper A draft's implemented Θ-component ansatz in the simulator-realization subsection (LaTeX label `eq:implemented-theta-wf-revised`).
 3. **ρ_Ξ** — linear flux correspondence `ρ_Ξ = (1/4π) ∂_i Ξ^i` (current Paper A draft Appendix D).
    Singular limit: M δ³(x). Softened implementation: ρ_ε(r) = 3Mε²/[4π(r²+ε²)^(5/2)], integrates
    to M. **Runtime uses the analytic closed-form shortcut; ρ_Ξ is not numerically computed.**
