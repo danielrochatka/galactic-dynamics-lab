@@ -212,8 +212,7 @@ TEST_CASE("write_render_manifest: JSON/TXT readout metadata parity by dynamics m
     const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
     const std::string json = slurp_file(out_dir + "/render_manifest.json");
     const bool legacy_active =
-        (c.physics_package == "TPFCore" && c.tpf_dynamics_mode == "legacy_readout" &&
-         c.simulation_mode != galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
+        (c.physics_package == "TPFCore" && c.tpf_dynamics_mode == "legacy_readout");
     if (legacy_active) {
       CHECK(txt.find("tpfcore_enable_provisional_readout\t1") != std::string::npos);
       CHECK(txt.find("tpfcore_readout_mode\tderived_tpf_radial_readout") != std::string::npos);

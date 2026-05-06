@@ -46,8 +46,6 @@ enum class SimulationMode {
   tpf_newtonian_force_compare,
   tpf_diagnostic_consistency_audit,
   tpf_bound_orbit_sweep,
-  /** v11 static weak-field correspondence audit (Ξ,Θ,I,C principal); not particle dynamics. */
-  tpf_v11_weak_field_correspondence,
   /** Canonical Earth–Moon SI benchmark (same IC as legacy two_body_orbit string). */
   earth_moon_benchmark,
   /** Single star + central mass; uses init_two_body_star_around_bh. */

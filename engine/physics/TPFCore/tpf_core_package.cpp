@@ -22,7 +22,6 @@
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
 #include "tpf_4d_static_residual.hpp"
-#include "v11_weak_field_correspondence.hpp"
 #include "xi_constraint_exterior_solver.hpp"
 #include "source_iteration.hpp"
 #include <algorithm>

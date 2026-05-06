@@ -183,33 +183,6 @@ TEST_CASE("tpfcore_enable_provisional_readout parses true for non-galaxy diagnos
   CHECK(apply_config_kv("tpfcore_enable_provisional_readout", "true", c));
   CHECK(c.tpfcore_enable_provisional_readout == true);
 }
-TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
-  Config c;
-  CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));
-  CHECK(c.tpf_analysis_mode == "v11_weak_field_correspondence");
-  CHECK(apply_config_kv("simulation_mode", "tpf_v11_weak_field_correspondence", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
-  CHECK(apply_config_kv("simulation_mode", "tpf_source_field_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_motion_readout_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_xi_motion_probe_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark);
-}
-
-TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
-  Config c;
-  CHECK(c.v11_weak_field_correspondence_benchmark == "axis_monopole");
-  CHECK(apply_config_kv("v11_weak_field_correspondence_benchmark", "earth_moon_line_of_centers", c));
-  CHECK(c.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers");
-  CHECK(apply_config_kv("v11_em_mean_distance_m", "3.844e8", c));
-  CHECK(c.v11_em_mean_distance_m == doctest::Approx(3.844e8));
-  CHECK(apply_config_kv("v11_em_calib_surface_g_m_s2", "9.81", c));
-  CHECK(c.v11_em_calib_surface_g_m_s2 == doctest::Approx(9.81));
-}
-
 TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
   Config c;
   CHECK(apply_config_kv("tpf_xi_constraint_exterior_inspect", "true", c));

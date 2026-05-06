@@ -93,7 +93,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
              "legacy_readout; not direct_tpf dynamics; not orbit integration)";
@@ -132,7 +132,7 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
     }
@@ -157,7 +157,7 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";
   }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
@@ -186,7 +186,7 @@ void write_render_manifest(const std::string& output_dir,
        !geodesic_correspondence_effective(config) && !v11_legacy_free_parameter_active(config));
   const bool legacy_readout_metadata_active =
       config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "legacy_readout" &&
-      config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence;
+      true;
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -205,7 +205,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "artifact_scope_note_secondary",
             "secondary = lab/origin-radial diagnostics when pair-frame diagnostics are primary");
     json_kv(jf, first, "tpf_analysis_mode", config.tpf_analysis_mode);
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       json_kv_bool(jf, first, "v11_delta_c_computed", false);
       json_kv(jf, first, "v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
       if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
@@ -242,7 +242,7 @@ void write_render_manifest(const std::string& output_dir,
     const bool is_geodesic_effective = geodesic_correspondence_effective(config);
     const bool is_v11_legacy = v11_legacy_free_parameter_active(config);
     if (config.physics_package == "TPFCore" &&
-        config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
+        true) {
       json_kv(jf, first, "tpf_core_law_mode",
               is_direct ? "direct_tpf_tensor_principal_part"
                         : (is_xi_kernel ? "xi_kernel_deformed"
@@ -295,7 +295,7 @@ void write_render_manifest(const std::string& output_dir,
       json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
       json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
     }
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
       json_kv_bool(jf, first, "tpfcore_enable_provisional_readout_operative_for_this_run", false);
       json_kv(jf, first, "tpf_dynamics_mode_operative_for_this_run", "none_audit_only");
@@ -347,7 +347,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "active_metrics_branch\t" << met << "\n";
     tf << "acceleration_code_path\t" << acc << "\n";
     if (config.physics_package == "TPFCore" &&
-        config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
+        true) {
       const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
       const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
       const bool is_geodesic_effective = geodesic_correspondence_effective(config);
@@ -403,7 +403,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "artifact_scope_note_primary\tprimary=main interpretation outputs for selected mode\n";
     tf << "artifact_scope_note_secondary\tsecondary=lab/origin-radial diagnostics when pair frame is primary\n";
     tf << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       tf << "v11_delta_c_computed\t0\n";
       tf << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
       if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
@@ -432,7 +432,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "tpf_kappa\t" << config.tpf_kappa << "\n";
     tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
     tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       tf << "v11_weak_field_correspondence_audit_only\t1\n";
       tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
       tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";

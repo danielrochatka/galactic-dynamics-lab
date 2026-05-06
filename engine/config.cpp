@@ -70,7 +70,6 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
   if (t == "tpf_diagnostic_consistency_audit") return SimulationMode::tpf_diagnostic_consistency_audit;
   if (t == "tpf_bound_orbit_sweep") return SimulationMode::tpf_bound_orbit_sweep;
-  if (t == "tpf_v11_weak_field_correspondence") return SimulationMode::tpf_v11_weak_field_correspondence;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -95,7 +94,6 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
     case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
     case SimulationMode::tpf_bound_orbit_sweep: return "tpf_bound_orbit_sweep";
-    case SimulationMode::tpf_v11_weak_field_correspondence: return "tpf_v11_weak_field_correspondence";
   }
   return "unknown";
 }
