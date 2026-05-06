@@ -91,8 +91,6 @@ class TPFCorePackage : public PhysicsPackage {
   struct XiRuntimeCounters {
     std::uint64_t theta_evaluations = 0;
     std::uint64_t invariant_I_evaluations = 0;
-    std::uint64_t direct_tpf_evaluations = 0;
-    std::uint64_t provisional_readout_evaluations = 0;
     std::uint64_t xi_last_call_pair_evaluations = 0;
     std::uint64_t xi_total_pair_evaluations = 0;
   };
@@ -174,24 +172,6 @@ class TPFCorePackage : public PhysicsPackage {
                            std::vector<double>& ay,
                            AccelPipelineStats* stats_out) const;
 
-  void compute_direct_tpf_accelerations(const State& state,
-                                        double bh_mass,
-                                        double softening,
-                                        bool star_star,
-                                        std::vector<double>& ax,
-                                        std::vector<double>& ay) const;
-  void compute_v11_weak_field_truncation_accelerations(const State& state,
-                                                       double bh_mass,
-                                                       double softening,
-                                                       bool star_star,
-                                                       std::vector<double>& ax,
-                                                       std::vector<double>& ay) const;
-  void apply_vdsg_additive_extension(const State& state,
-                                     double bh_mass,
-                                     double softening,
-                                     bool star_star,
-                                     std::vector<double>& ax,
-                                     std::vector<double>& ay) const;
   void compute_xi_kernel_deformed_accelerations(const State& state,
                                                 double bh_mass,
                                                 double softening,
