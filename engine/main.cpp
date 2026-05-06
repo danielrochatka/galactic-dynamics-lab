@@ -281,15 +281,13 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
 
   if (config.physics_package == "TPFCore") {
     active_route = config.tpf_dynamics_mode;
-    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-      applied_accel_formula = "a=-K_xi*Xi_eff_spatial";
+    if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
+      applied_accel_formula = "a=-K_xi*Xi_total_spatial";
       decomposition_note =
-          "direct_tpf/principal-C and additive-VDSG decomposition not applicable for active xi_kernel_deformed route";
+          "v1 route: Xi_total-driven motion; Theta=grad(Xi_total) is diagnostic-only";
     } else {
-      applied_accel_formula = (config.tpf_dynamics_mode == "direct_tpf")
-                                  ? "direct_tpf principal-C (+ optional additive VDSG)"
-                                  : "legacy_readout baseline (+ optional additive VDSG)";
-      decomposition_note = "reference columns report direct_tpf baseline plus additive VDSG excess";
+      applied_accel_formula = "unsupported non-v1 dynamics mode";
+      decomposition_note = "non-v1 decomposition disabled on this branch";
 
       galaxy::Config cfg_direct = config;
       // Step-0 reference decomposition branch:
@@ -297,9 +295,8 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
       //  2) force tensor_radial_projection readout implementation,
       //  3) zero VDSG for the direct/baseline branch,
       //  4) compute additive VDSG = (total-with-configured-VDSG) - (direct baseline).
-      cfg_direct.tpf_dynamics_mode = "direct_tpf";
+      cfg_direct.tpf_dynamics_mode = "tpf_xi_theta_v1";
       cfg_direct.tpfcore_enable_provisional_readout = false;
-      // direct_tpf rejects legacy/provisional readout closure knobs in this audit path.
       cfg_direct.tpfcore_readout_mode = "tensor_radial_projection";
       cfg_direct.tpfcore_readout_scale = 1.0;
       cfg_direct.tpfcore_theta_tt_scale = 1.0;
@@ -309,7 +306,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
       cfg_direct.tpf_vdsg_coupling = 0.0;
 
       galaxy::Config cfg_total = cfg_direct;
-      cfg_total.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
+      cfg_total.tpf_vdsg_coupling = 0.0;
 
       galaxy::TPFCorePackage tpf_direct;
       tpf_direct.init_from_config(cfg_direct);
@@ -499,25 +496,13 @@ int main(int argc, char** argv) {
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
   if (config.physics_package == "TPFCore") {
     if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
-      std::cout << "v11 correspondence audit: tpf_dynamics_mode / provisional readout are configured-inherited only "
+      std::cout << "v11 correspondence audit: tpf_dynamics_mode is configured-inherited only "
                    "(not operative); no TPFCore particle accelerations this run.\n";
       std::cout << "  (configured: tpf_dynamics_mode=" << config.tpf_dynamics_mode
-                << ", tpfcore_enable_provisional_readout=" << (config.tpfcore_enable_provisional_readout ? "true" : "false")
-                << ", tpfcore_readout_mode=" << config.tpfcore_readout_mode << ")\n";
+                << ")\n";
     } else {
-      if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-        std::cout << "TPF runtime path tier: active_supported (xi_kernel_deformed)\n";
-      } else if (config.tpf_dynamics_mode == "direct_tpf") {
-        std::cout << "TPF runtime path tier: paper_facing (direct_tpf)\n";
-      } else if (config.tpf_dynamics_mode == "legacy_readout") {
-        std::cout << "TPF runtime path tier: deprecated_legacy (legacy_readout/provisional_readout)\n";
-      }
-      std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "  "
-                << "tpfcore_enable_provisional_readout: " << (config.tpfcore_enable_provisional_readout ? "true" : "false")
-                << "  tpfcore_readout_mode: " << config.tpfcore_readout_mode;
-      if (config.tpfcore_readout_mode == "tr_coherence_readout")
-        std::cout << "  theta_tt_scale: " << config.tpfcore_theta_tt_scale << "  theta_tr_scale: " << config.tpfcore_theta_tr_scale;
-      std::cout << "\n";
+      std::cout << "TPF runtime path tier: active_supported (tpf_xi_theta_v1)\n";
+      std::cout << "tpf_dynamics_mode: " << config.tpf_dynamics_mode << "\n";
     }
   }
   std::cout << "------------------------\n";
@@ -534,8 +519,7 @@ int main(int argc, char** argv) {
   if (config.physics_package == "TPFCore" &&
       config.simulation_mode == galaxy::SimulationMode::galaxy &&
       config.tpfcore_enable_provisional_readout) {
-    std::cerr << "tpfcore_enable_provisional_readout=true is deprecated and cannot be used with simulation_mode=galaxy. "
-                 "Use tpf_dynamics_mode=xi_kernel_deformed or direct_tpf.\n";
+    std::cerr << "tpfcore_enable_provisional_readout=true is not used by tpf_xi_theta_v1 runtime dynamics on this branch.\n";
     return 1;
   }
 
@@ -546,40 +530,10 @@ int main(int argc, char** argv) {
                  "(R^2=dx^2+dy^2+eps^2), Theta=Hess_3D(Phi) evaluated on the plane\n";
     std::cout << "  Parameters: lambda=1/4 | eps=source softening | readout branch/settings as configured\n";
     if (config.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence) {
-      std::cout << "  v11 correspondence audit only: does not run direct_tpf, does not use TPFCore particle "
+      std::cout << "  v11 correspondence audit only: does not use TPFCore particle "
                    "acceleration routing, and evaluates correspondence formulas only.\n";
     } else {
-      std::cout << "  Deprecated legacy/provisional readout branch: "
-                << (tpf && tpf->provisional_readout_enabled() ? "enabled" : "disabled");
-      if (tpf && tpf->provisional_readout_enabled()) {
-        std::cout << " (readout mode: " << tpf->readout_mode() << ", scale=" << config.tpfcore_readout_scale << " [correspondence-calibrated])";
-        if (config.tpfcore_readout_mode == "tr_coherence_readout")
-          std::cout << " [exploratory t-r; theta_tt_scale=" << config.tpfcore_theta_tt_scale << ", theta_tr_scale=" << config.tpfcore_theta_tr_scale << "]";
-        if (config.tpfcore_dump_readout_debug)
-          std::cout << " [readout debug CSV enabled]";
-      } else {
-        std::cout << " (direct_tpf readout implementation remains available via tpf_dynamics_mode=direct_tpf)";
-      }
-      std::cout << "\n";
-    }
-
-    if (config.tpf_dynamics_mode == "legacy_readout" && !tpf->provisional_readout_enabled()) {
-      bool is_dynamical =
-          (config.simulation_mode == galaxy::SimulationMode::galaxy ||
-           config.simulation_mode == galaxy::SimulationMode::two_body_orbit ||
-           config.simulation_mode == galaxy::SimulationMode::earth_moon_benchmark ||
-           config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation ||
-           config.simulation_mode == galaxy::SimulationMode::symmetric_pair ||
-           config.simulation_mode == galaxy::SimulationMode::small_n_conservation ||
-           config.simulation_mode == galaxy::SimulationMode::timestep_convergence);
-      if (is_dynamical) {
-        std::cerr << "TPFCore legacy_readout does not support dynamical modes (galaxy, earth_moon_benchmark, "
-                     "bh_orbit_validation, etc.) unless provisional readout is enabled.\n";
-        std::cerr << "Set tpfcore_enable_provisional_readout = true, or use tpf_dynamics_mode = direct_tpf for the "
-                     "direct_tpf implementation, or physics_package = Newtonian, or inspection modes: "
-                     "tpf_single_source_inspect, tpf_symmetric_pair_inspect.\n";
-        return 1;
-      }
+      std::cout << "  Active dynamics route: tpf_xi_theta_v1 (Xi_total-driven motion; Theta=grad(Xi_total) diagnostic-only)\n";
     }
   }
 

@@ -4,19 +4,11 @@
 /**
  * TPFCore: Honest primitive TPF structure package.
  *
- * Current runtime field path uses legacy projected-vector / spatial-tensor objects with lambda fixed at 1/4.
+ * Active runtime route on this branch: `tpf_xi_theta_v1`.
+ * - Xi_total is accumulated from per-source Xi contributions.
+ * - Theta is the full unsymmetrized spatial Jacobian Theta_ij = d_j Xi_i,total.
+ * - Motion update uses Xi_total only; Theta is diagnostic-only.
  * Isolated 4D math/static residual benchmark helpers live in tpf_4d_field.* / tpf_4d_static_* and are not wired into dynamics.
- *
- * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
- * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
- *
- * Dynamics routing: tpf_dynamics_mode legacy_readout uses provisional readout (+ optional VDSG); that path
- * requires tpfcore_enable_provisional_readout. direct_tpf is the canonical paper-facing tensor principal-part
- * route (Theta/I/kappa baseline; DeltaC omitted in current implementation scope); VDSG is an optional additive
- * extension on top of that baseline.
- * When tpf_vdsg_coupling != 0 on legacy_readout, ax, ay include the VDSG additive modifier on top of readout baseline.
- * When VDSG is off on legacy_readout, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
- * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
  */
 
 #include "../../accel_pipeline_stats.hpp"
@@ -38,13 +30,7 @@ class TPFCorePackage : public PhysicsPackage {
 
   void init_from_config(const Config& config) override;
 
-  /**
-   * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
-   * v11_weak_field_truncation: paper-backed weak-field scalar correspondence truncation (static/quasi-static limit).
-   * direct_tpf: canonical paper-facing tensor principal-part route with Theta/I/kappa baseline
-   * (DeltaC omitted in current implementation scope), strict non-readout/non-stabilizer guardrails
-   * (no provisional readout closures, no shunt, no cooling), and optional additive VDSG via tpf_vdsg_coupling.
-   */
+  /** Particle accelerations for `tpf_xi_theta_v1`: Xi_total-driven motion update; Theta is diagnostic-only. */
   void compute_accelerations(const State& state,
                             double bh_mass,
                             double softening,

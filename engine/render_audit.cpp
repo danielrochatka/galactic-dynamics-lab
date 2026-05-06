@@ -103,13 +103,6 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
-  if (geodesic_correspondence_requested(config))
-    return "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=geodesic_correspondence; rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_weak_field_truncation_requested(config) && !v11_legacy_free_parameter_active(config))
-    return "tpf_runtime_path_tier=paper_facing; requested_tpf_dynamics_mode=v11_weak_field_truncation; effective_tpf_dynamics_mode=geodesic_correspondence; alias_forwarded=true; rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_legacy_free_parameter_active(config)) {
-    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si legacy free-parameter";
-  }
   if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
     std::ostringstream os;
     const std::string kernel_desc =
@@ -123,23 +116,10 @@ std::string compute_active_dynamics_branch(const Config& config) {
        << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
        << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
        << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
-       << "; additive_vdsg=off; principal_c=off; direct_tpf=off; newtonian=off";
+       << "; motion_update=Xi_total_only; theta_role=diagnostic_only";
     return os.str();
   }
-  if (config.tpf_dynamics_mode == "direct_tpf") {
-    std::ostringstream os;
-    os << "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
-       << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-    return os.str();
-  }
-  /* DEPRECATED legacy path (Stage 0 banner): legacy_readout/provisional_readout */
-  if (!config.tpfcore_enable_provisional_readout)
-    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout disabled";
-  const std::string& mode = config.tpfcore_readout_mode;
-  std::ostringstream os;
-  os << "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
-     << "; vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-  return os.str();
+  return "tpf_runtime_path_tier=unsupported_non_v1";
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
@@ -160,22 +140,9 @@ std::string compute_active_metrics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
-    if (geodesic_correspondence_effective(config))
-      return "geodesic correspondence metrics; rho_Xi -> Poisson analytic -> geodesic";
-    if (v11_legacy_free_parameter_active(config))
-      return "v11 correspondence metrics; alpha_si legacy free-parameter";
-    if (config.tpf_dynamics_mode == "direct_tpf") {
-      std::ostringstream os;
-      os << "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling="
-         << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-      return os.str();
-    }
-    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-      return "xi_kernel_deformed metrics; Xi_eff readout a=-K_xi*Xi_eff_spatial";
-    }
-    if (config.tpfcore_enable_provisional_readout)
-      return "tpfcore_readout:" + config.tpfcore_readout_mode;
-    return "TPFCore metrics n/a (provisional readout off)";
+    if (config.tpf_dynamics_mode == "tpf_xi_theta_v1")
+      return "tpf_xi_theta_v1 metrics; Xi_total and full unsymmetrized Theta=grad(Xi_total)";
+    return "unsupported_non_v1";
   }
   return "unknown";
 }
@@ -195,34 +162,10 @@ std::string compute_acceleration_code_path(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
-  if (geodesic_correspondence_effective(config))
-    return "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_legacy_free_parameter_active(config))
-    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (legacy alpha_si free-parameter path; no VDSG/readout/shunt/cooling)";
   if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
     return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (v1 Xi route; per-source Xi contributions sum into Xi_total; motion uses Xi_total only; Theta=grad(Xi_total) is diagnostic only)";
   }
-  if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
-                       "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
-           + (tpf_vdsg_active_for_audit(config)
-                  ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
-                  : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
-  }
-  if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";
-  std::string base;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode))
-    base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
-  else
-    base = "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
-  std::string tail = " + accumulate_vdsg_velocity_modifier";
-  if (config.tpf_global_accel_shunt_enable)
-    tail += " + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)";
-  else
-    tail += " (global |a| shunt OFF)";
-  return base + tail;
+  return "unsupported_non_v1";
 }
 
 void write_render_manifest(const std::string& output_dir,
