@@ -690,7 +690,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     }
   }
 
-  auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, double& ax_i, double& ay_i) {
+  auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, XiThetaV1Sample& sample_i) {
     const double dx = state.x[i] - src.x;
     const double dy = state.y[i] - src.y;
     const double dz = 0.0;
@@ -766,13 +766,33 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         xi_sy = src.mass * gy * inv_r_eff3;
       }
     }
-    double dax = -xi_motion_readout_scale_ * xi_sx;
-    double day = -xi_motion_readout_scale_ * xi_sy;
     const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
-    dax *= softening_scale;
-    day *= softening_scale;
-    ax_i += dax;
-    ay_i += day;
+    const double xi_x = xi_sx * softening_scale;
+    const double xi_y = xi_sy * softening_scale;
+    const double xi_z = 0.0;
+
+    sample_i.xi_x += xi_x;
+    sample_i.xi_y += xi_y;
+    sample_i.xi_z += xi_z;
+
+    if (xi_kernel_mode_ != "off") {
+      throw std::runtime_error(
+          "tpf_xi_theta_v1 Theta Jacobian derivative is currently implemented only for xi_kernel_mode=off; "
+          "analytic derivative rule for active deformation mode is required before runtime use.");
+    }
+    const double s = r2 + eps * eps;
+    if (!(s > 0.0) || !std::isfinite(s)) return;
+    const double inv_s_3_2 = 1.0 / std::pow(s, 1.5);
+    const double inv_s_5_2 = 1.0 / std::pow(s, 2.5);
+    const double m = src.mass;
+    const double rx[3] = {dx, dy, 0.0};
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        const double delta = (row == col) ? 1.0 : 0.0;
+        const double d_xi = m * (delta * inv_s_3_2 - 3.0 * rx[row] * rx[col] * inv_s_5_2) * softening_scale;
+        sample_i.theta[row][col] += d_xi;
+      }
+    }
   };
 
   XiKernelRuntimeSource bh_src;
@@ -782,19 +802,19 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   bh_src.vz = xi_source_speed_z_;
 
   for (int i = 0; i < n; ++i) {
-    double ax_i = 0.0;
-    double ay_i = 0.0;
+    XiThetaV1Sample sample_i{};
     if (bh_mass > 0.0) {
-      accumulate_source(i, bh_src, ax_i, ay_i);
+      accumulate_source(i, bh_src, sample_i);
     }
     if (star_star) {
       for (int j = 0; j < n; ++j) {
         if (j == i) continue;
-        accumulate_source(i, star_sources[static_cast<std::size_t>(j)], ax_i, ay_i);
+        accumulate_source(i, star_sources[static_cast<std::size_t>(j)], sample_i);
       }
     }
-    ax[i] = ax_i;
-    ay[i] = ay_i;
+    ax[i] = -xi_motion_readout_scale_ * sample_i.xi_x;
+    ay[i] = -xi_motion_readout_scale_ * sample_i.xi_y;
+    if (i == 0) last_xi_theta_v1_sample_ = sample_i;
 
     if (bh_mass > 0.0 && !star_star && xi_motion_readout_scale_ > 0.0) {
       const double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i]);

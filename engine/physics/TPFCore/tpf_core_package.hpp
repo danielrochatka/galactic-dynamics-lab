@@ -111,6 +111,13 @@ class TPFCorePackage : public PhysicsPackage {
     std::uint64_t xi_total_pair_evaluations = 0;
   };
   XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
+  struct XiThetaV1Sample {
+    double xi_x = 0.0;
+    double xi_y = 0.0;
+    double xi_z = 0.0;
+    double theta[3][3] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
+  };
+  XiThetaV1Sample last_xi_theta_v1_sample() const { return last_xi_theta_v1_sample_; }
 
   /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -221,6 +228,7 @@ class TPFCorePackage : public PhysicsPackage {
   double xi_source_speed_y_;
   double xi_source_speed_z_;
   mutable XiRuntimeCounters xi_runtime_counters_;
+  mutable XiThetaV1Sample last_xi_theta_v1_sample_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */
