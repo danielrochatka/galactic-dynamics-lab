@@ -157,9 +157,9 @@ TEST_CASE("tpfcore_closure_kappa key maps to same tpf_kappa storage") {
 }
 
 
-TEST_CASE("Config defaults TPFCore dynamics to xi_kernel_deformed") {
+TEST_CASE("Config defaults TPFCore dynamics to tpf_xi_theta_v1") {
   galaxy::Config c;
-  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+  CHECK(c.tpf_dynamics_mode == "tpf_xi_theta_v1");
 }
 
 TEST_CASE("geodesic_correspondence_baseline preset selects TPFCore and geodesic mode") {
@@ -168,15 +168,13 @@ TEST_CASE("geodesic_correspondence_baseline preset selects TPFCore and geodesic 
   CHECK(c.physics_package == "TPFCore");
   CHECK(c.tpf_dynamics_mode == "geodesic_correspondence");
 }
-TEST_CASE("tpf_dynamics_mode accepts canonical modes and rejects deprecated alias") {
+TEST_CASE("tpf_dynamics_mode accepts only tpf_xi_theta_v1 on this branch") {
   Config c;
-  CHECK(apply_config_kv("tpf_dynamics_mode", "v11_weak_field_truncation", c));
-  CHECK(c.tpf_dynamics_mode == "v11_weak_field_truncation");
+  CHECK(apply_config_kv("tpf_dynamics_mode", "tpf_xi_theta_v1", c));
+  CHECK(c.tpf_dynamics_mode == "tpf_xi_theta_v1");
   CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "weak_field_correspondence", c));
-  CHECK(apply_config_kv("tpf_dynamics_mode", "direct_tpf", c));
-  CHECK(c.tpf_dynamics_mode == "direct_tpf");
-  CHECK(apply_config_kv("tpf_dynamics_mode", "xi_kernel_deformed", c));
-  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+  CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "direct_tpf", c));
+  CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "xi_kernel_deformed", c));
   CHECK(apply_config_kv("tpf_weak_field_correspondence_alpha_si", "-6.0e-11", c));
   CHECK(c.tpf_weak_field_correspondence_alpha_si == doctest::Approx(-6.0e-11));
 }

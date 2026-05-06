@@ -152,14 +152,11 @@ struct Config {
   std::string physics_package_compare = "";
 
   /**
-   * TPFCore only: how dynamical accelerations are produced.
-   * - legacy_readout (deprecated legacy; explicit opt-in): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout=true for dynamics.
-   * - geodesic_correspondence: canonical static weak-field correspondence route (rho_Xi -> Poisson analytic -> geodesic) with fixed -G coefficient.
-   * - v11_weak_field_truncation: deprecated alias; forwards to geodesic_correspondence unless alpha_si is explicitly set (legacy free-parameter mode).
-   * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
-   * - xi_kernel_deformed: Xi-direct runtime route using a=-K_xi*Xi_eff_spatial with per-source Xi-kernel deformation.
+   * TPFCore only: canonical v1 dynamics route.
+   * - tpf_xi_theta_v1: per-source Xi contributions are summed into Xi_total; motion uses Xi_total only.
+   *   Theta is the unsymmetrized spatial Jacobian Theta_ij = d_j Xi_i,total and is diagnostic-only in v1.
    */
-  std::string tpf_dynamics_mode = "xi_kernel_deformed";
+  std::string tpf_dynamics_mode = "tpf_xi_theta_v1";
   /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).

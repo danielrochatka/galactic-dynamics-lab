@@ -204,12 +204,8 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
-    if (s == "legacy_readout") {
-      throw std::runtime_error("legacy_readout has been removed; use xi_kernel_deformed or direct_tpf.");
-    }
-    if (s != "geodesic_correspondence" && s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
-      throw std::runtime_error(
-          "tpf_dynamics_mode must be geodesic_correspondence, v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
+    if (s != "tpf_xi_theta_v1") {
+      throw std::runtime_error("tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;

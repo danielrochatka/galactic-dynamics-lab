@@ -110,13 +110,13 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (v11_legacy_free_parameter_active(config)) {
     return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si legacy free-parameter";
   }
-  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
     std::ostringstream os;
     const std::string kernel_desc =
         (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
             ? "VDSG transverse wake Xi-kernel deformation"
             : "standard Xi-kernel deformation";
-    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
+    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=tpf_xi_theta_v1; Xi_total-driven motion; Theta=grad(Xi_total) diagnostic_only; K_xi=tpf_4d_xi_motion_readout_scale="
        << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
        << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
        << "; xi_kernel_label=" << kernel_desc
@@ -199,8 +199,8 @@ std::string compute_acceleration_code_path(const Config& config) {
     return "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic";
   if (v11_legacy_free_parameter_active(config))
     return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (legacy alpha_si free-parameter path; no VDSG/readout/shunt/cooling)";
-  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (runtime Xi-kernel deformation; per-source Xi_eff sum -> a=-K_xi*Xi_eff_spatial; no additive VDSG helper; no principal-C direct_tpf readout)";
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
+    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (v1 Xi route; per-source Xi contributions sum into Xi_total; motion uses Xi_total only; Theta=grad(Xi_total) is diagnostic only)";
   }
   if (config.tpf_dynamics_mode == "direct_tpf") {
     return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
