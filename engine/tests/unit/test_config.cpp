@@ -162,11 +162,9 @@ TEST_CASE("Config defaults TPFCore dynamics to tpf_xi_theta_v1") {
   CHECK(c.tpf_dynamics_mode == "tpf_xi_theta_v1");
 }
 
-TEST_CASE("geodesic_correspondence_baseline preset selects TPFCore and geodesic mode") {
+TEST_CASE("geodesic_correspondence_baseline preset is rejected on tpf_xi_theta_v1 branch") {
   Config c;
-  CHECK(galaxy::load_config_file("../configs/geodesic_correspondence_baseline.cfg", c));
-  CHECK(c.physics_package == "TPFCore");
-  CHECK(c.tpf_dynamics_mode == "geodesic_correspondence");
+  CHECK_THROWS(galaxy::load_config_file("../configs/geodesic_correspondence_baseline.cfg", c));
 }
 TEST_CASE("tpf_dynamics_mode accepts only tpf_xi_theta_v1 on this branch") {
   Config c;
