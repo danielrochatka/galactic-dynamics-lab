@@ -15,7 +15,6 @@
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
-#include "direct_tpf_baseline.hpp"
 #include "extensions_vdsg.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
@@ -3167,10 +3166,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   for (int i = 0; i < s0.n(); ++i) {
     const tpfcore::FieldAtPoint field =
         tpfcore::evaluate_provisional_field_multi_source(s0, i, bh_mass, star_star, eps);
-    const tpfcore::DirectTpfBaselineArtifacts artifacts =
-        tpfcore::compute_direct_tpf_baseline_artifacts(field, kappa, lambda);
-    const tpfcore::XiDirectedReadoutResult baseline_readout =
-        tpfcore::compute_xi_directed_tensor_readout(artifacts.xi, artifacts.principal_cij);
     const tpfcore::Theta3D& theta = field.theta;
     const double theta_trace = field.theta_trace;
     const double invariant_I = field.invariant_I;
@@ -3205,64 +3200,26 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
             << ax_newton << ',' << ay_newton << '\n';
 
     if (decomp_csv) {
-      const double x = s0.x[i];
-      const double y = s0.y[i];
-      const double r = std::hypot(x, y);
-      const double xi_x = artifacts.xi.xi.x;
-      const double xi_y = artifacts.xi.xi.y;
-      const double xi_mag = std::hypot(xi_x, xi_y);
-      double u_x = 0.0;
-      double u_y = 0.0;
-      if (xi_mag > 1e-300) {
-        u_x = xi_x / xi_mag;
-        u_y = xi_y / xi_mag;
-      }
-      const double proj_x = artifacts.principal_cij.c_xx * u_x + artifacts.principal_cij.c_xy * u_y;
-      const double proj_y = artifacts.principal_cij.c_xy * u_x + artifacts.principal_cij.c_yy * u_y;
-      const double a_raw_x = baseline_readout.ax;
-      const double a_raw_y = baseline_readout.ay;
-      const double a_raw_mag = std::hypot(a_raw_x, a_raw_y);
-      double r_hat_x = 0.0;
-      double r_hat_y = 0.0;
-      if (r > 1e-300) {
-        r_hat_x = x / r;
-        r_hat_y = y / r;
-      }
-      const double a_raw_radial_dot = a_raw_x * r_hat_x + a_raw_y * r_hat_y;
+      const double a_raw_mag = std::hypot(ax_raw, ay_raw);
       const double a_newton_mag = std::hypot(ax_newton, ay_newton);
-      const double a_newton_radial_dot = ax_newton * r_hat_x + ay_newton * r_hat_y;
       const double ratio_mag =
           (std::isfinite(a_raw_mag) && std::isfinite(a_newton_mag) && (a_newton_mag > 1e-300))
               ? (a_raw_mag / a_newton_mag)
               : std::numeric_limits<double>::quiet_NaN();
-      const bool has_ratio = std::isfinite(ratio_mag);
-      decomp_csv << i << ',' << x << ',' << y << ',' << r << ','
-                 << xi_x << ',' << xi_y << ',' << xi_mag << ',' << u_x << ',' << u_y << ','
-                 << artifacts.theta.theta.xx << ',' << artifacts.theta.theta.xy << ','
-                 << artifacts.theta.theta.yy << ',' << artifacts.theta.theta.zz << ','
-                 << artifacts.theta_trace.value << ',' << artifacts.invariant_I.value << ','
-                 << artifacts.principal_cij.c_xx << ',' << artifacts.principal_cij.c_xy << ','
-                 << artifacts.principal_cij.c_yy << ',' << artifacts.principal_cij.c_zz << ','
-                 << proj_x << ',' << proj_y << ','
-                 << a_raw_x << ',' << a_raw_y << ',' << a_raw_mag << ','
-                 << a_raw_radial_dot << ','
-                 << ax_newton << ',' << ay_newton << ',' << a_newton_mag << ','
-                 << a_newton_radial_dot << ',' << ratio_mag << '\n';
-
-      if (has_ratio) {
+      if (std::isfinite(ratio_mag)) {
         ratio_min = std::min(ratio_min, ratio_mag);
         ratio_max = std::max(ratio_max, ratio_mag);
         ratio_sum += ratio_mag;
         ++ratio_count;
       }
-      if (a_raw_radial_dot < 0.0) ++raw_inward_count;
-      if (a_raw_radial_dot > 0.0) ++raw_outward_count;
-      theta_trace_min = std::min(theta_trace_min, artifacts.theta_trace.value);
-      theta_trace_max = std::max(theta_trace_max, artifacts.theta_trace.value);
-      theta_trace_sum += artifacts.theta_trace.value;
-      invariant_min = std::min(invariant_min, artifacts.invariant_I.value);
-      invariant_max = std::max(invariant_max, artifacts.invariant_I.value);
-      invariant_sum += artifacts.invariant_I.value;
+      if (ax_raw < 0.0) ++raw_inward_count;
+      if (ax_raw > 0.0) ++raw_outward_count;
+      theta_trace_min = std::min(theta_trace_min, theta_trace);
+      theta_trace_max = std::max(theta_trace_max, theta_trace);
+      theta_trace_sum += theta_trace;
+      invariant_min = std::min(invariant_min, invariant_I);
+      invariant_max = std::max(invariant_max, invariant_I);
+      invariant_sum += invariant_I;
     }
 
     const double mag_raw = std::hypot(ax_raw, ay_raw);
