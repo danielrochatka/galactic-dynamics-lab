@@ -9,7 +9,6 @@
  */
 
 #include "tpf_core_package.hpp"
-#include "../../accel_pipeline_stats.hpp"
 #include "../../config.hpp"
 #include "../../softening_policy.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
@@ -87,7 +86,6 @@ TPFCorePackage::TPFCorePackage()
       cooling_fraction_(0.2),
       shunt_enable_(false),
       shunt_fraction_(0.001),
-      pipeline_diagnostics_csv_(true),
       xi_motion_readout_scale_(1.0e-12),
       xi_kernel_mode_("off"),
       xi_kernel_coupling_(0.0),
@@ -139,7 +137,6 @@ void TPFCorePackage::init_from_config(const Config& config) {
   shunt_fraction_ = (config.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(config.tpf_global_accel_shunt_fraction))
                         ? config.tpf_global_accel_shunt_fraction
                         : 0.001;
-  pipeline_diagnostics_csv_ = config.tpf_accel_pipeline_diagnostics_csv;
   xi_motion_readout_scale_ = config.tpf_4d_xi_motion_readout_scale;
   xi_kernel_mode_ = config.tpf_4d_xi_kernel_mode;
   xi_kernel_coupling_ = config.tpf_4d_xi_kernel_coupling;
@@ -476,83 +473,6 @@ TPFCoreRegistrar s_tpfcore_registrar;
 
 }  // namespace
 
-void TPFCorePackage::eval_accel_pipeline(const State& state,
-                                         double bh_mass,
-                                         double softening,
-                                         bool star_star,
-                                         std::vector<double>& ax,
-                                         std::vector<double>& ay,
-                                         AccelPipelineStats* stats_out) const {
-  const int n = state.n();
-  ax.assign(n, 0.0);
-  ay.assign(n, 0.0);
-
-  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-    tpfcore::TpfRadialGravityProfile profile =
-        tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          &derived_poisson_cfg_, &profile);
-    }
-  } else {
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          nullptr, nullptr);
-    }
-  }
-
-  double sum_b = 0.0;
-  for (int i = 0; i < n; ++i) {
-    sum_b += std::hypot(ax[i], ay[i]);
-  }
-  const double mean_b = (n > 0) ? (sum_b / static_cast<double>(n)) : 0.0;
-
-  std::vector<double> dax, day;
-  tpfcore::VdsgDiagnosticsSummary vdsg_diag;
-  tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                             vdsg_mass_baseline_resolved_kg_, vdsg_mode_, vdsg_mass_gate_m0_kg_,
-                                             vdsg_mass_gate_alpha_, vdsg_x_clamp_, vdsg_weak_field_gate_enable_,
-                                             vdsg_weak_field_a0_, vdsg_weak_field_power_, vdsg_bounded_amplitude_, dax, day,
-                                             &vdsg_diag);
-  double sum_v = 0.0;
-  for (int i = 0; i < n; ++i) {
-    sum_v += std::hypot(dax[i], day[i]);
-  }
-  const double mean_v = (n > 0) ? (sum_v / static_cast<double>(n)) : 0.0;
-
-  for (int i = 0; i < n; ++i) {
-    ax[i] += dax[i];
-    ay[i] += day[i];
-  }
-
-  const unsigned shunt_n =
-      tpfcore::apply_global_accel_magnitude_shunt(state, simulation_dt_, shunt_enable_, shunt_fraction_, ax, ay);
-
-  if (stats_out) {
-    stats_out->valid = true;
-    stats_out->mean_baseline_mag = mean_b;
-    stats_out->mean_vdsg_mag = mean_v;
-    stats_out->vdsg_pairs_evaluated = vdsg_diag.pairs_evaluated;
-    stats_out->vdsg_min_beta_rad = vdsg_diag.min_beta_rad;
-    stats_out->vdsg_max_beta_rad = vdsg_diag.max_beta_rad;
-    stats_out->vdsg_mean_abs_beta_rad = (vdsg_diag.pairs_evaluated > 0) ? (vdsg_diag.sum_abs_beta_rad / vdsg_diag.pairs_evaluated) : 0.0;
-    stats_out->vdsg_over_baseline_ratio = (mean_b > 1e-300) ? (mean_v / mean_b) : 0.0;
-    stats_out->shunt_events_last_step = shunt_n;
-    stats_out->frac_capped_last_step =
-        (n > 0) ? (static_cast<double>(shunt_n) / static_cast<double>(n)) : 0.0;
-    stats_out->shunt_enabled = shunt_enable_;
-    stats_out->shunt_fraction = shunt_fraction_;
-  }
-}
-
-
 bool TPFCorePackage::xi_kernel_deformation_active() const {
   return (xi_kernel_mode_ != "off" && xi_kernel_coupling_ != 0.0);
 }
@@ -768,7 +688,6 @@ void TPFCorePackage::compute_accelerations(const State& state,
   if (tpf_dynamics_mode_ == "tpf_xi_theta_v1") {
     xi_runtime_counters_.xi_last_call_pair_evaluations = 0;
     compute_xi_kernel_deformed_accelerations(state, bh_mass, softening, star_star, ax, ay);
-    last_pipeline_ = AccelPipelineStats{};
     return;
   }
   throw std::runtime_error("Unsupported tpf_dynamics_mode for this branch; expected tpf_xi_theta_v1.");
@@ -3397,26 +3316,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
     txt << "This initial state is within the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
   else
     txt << "This initial state is outside the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
-}
-
-void TPFCorePackage::write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
-                                                      const Config& config,
-                                                      const std::string& output_dir) const {
-  if (!pipeline_diagnostics_csv_ || !provisional_readout_) return;
-  std::ostringstream path;
-  path << output_dir << "/tpf_accel_pipeline_diagnostics.csv";
-  std::ofstream f(path.str());
-  if (!f) return;
-  f << "step,time,mean_baseline_accel_mag,mean_vdsg_accel_mag,vdsg_over_baseline_ratio,shunt_events,frac_capped,tpf_global_accel_shunt_enabled,vdsg_pairs_evaluated,vdsg_min_beta_rad,vdsg_max_beta_rad,vdsg_mean_abs_beta_rad\n";
-  f << std::scientific << std::setprecision(17);
-  for (const auto& sn : snapshots) {
-    std::vector<double> ax, ay;
-    AccelPipelineStats st;
-    eval_accel_pipeline(sn.state, config.bh_mass, config.softening, config.enable_star_star_gravity, ax, ay, &st);
-    f << sn.step << ',' << sn.time << ',' << st.mean_baseline_mag << ',' << st.mean_vdsg_mag << ','
-      << st.vdsg_over_baseline_ratio << ',' << st.shunt_events_last_step << ',' << st.frac_capped_last_step << ','
-      << (shunt_enable_ ? 1 : 0) << '\n';
-  }
 }
 
 void tpf_test_reset_global_accel_shunt_events() { tpfcore::reset_global_accel_shunt_events(); }

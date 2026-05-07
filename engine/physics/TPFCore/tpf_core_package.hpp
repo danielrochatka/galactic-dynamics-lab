@@ -11,7 +11,6 @@
  * Isolated 4D math/static residual benchmark helpers live in tpf_4d_field.* / tpf_4d_static_* and are not wired into dynamics.
  */
 
-#include "../../accel_pipeline_stats.hpp"
 #include "../../types.hpp"
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
@@ -81,13 +80,6 @@ class TPFCorePackage : public PhysicsPackage {
                                  const Config& config,
                                  const std::string& output_dir) const;
 
-  /** Per-snapshot pipeline metrics CSV (readout baseline, VDSG modifier, shunt); optional end-of-run pass. */
-  void write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
-                                          const Config& config,
-                                          const std::string& output_dir) const;
-
-  /** Last integrator-step pipeline stats (updated every compute_accelerations). */
-  const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
   struct XiRuntimeCounters {
     std::uint64_t theta_evaluations = 0;
     std::uint64_t invariant_I_evaluations = 0;
@@ -159,18 +151,8 @@ class TPFCorePackage : public PhysicsPackage {
   double cooling_fraction_;
   bool shunt_enable_;
   double shunt_fraction_;
-  bool pipeline_diagnostics_csv_;
-  mutable AccelPipelineStats last_pipeline_;
   /** Legacy derived-radial closure ledger configuration (still fed from flat config keys). */
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
-
-  void eval_accel_pipeline(const State& state,
-                           double bh_mass,
-                           double softening,
-                           bool star_star,
-                           std::vector<double>& ax,
-                           std::vector<double>& ay,
-                           AccelPipelineStats* stats_out) const;
 
   void compute_xi_kernel_deformed_accelerations(const State& state,
                                                 double bh_mass,
