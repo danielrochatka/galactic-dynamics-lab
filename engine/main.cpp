@@ -1,4 +1,3 @@
-#include "accel_pipeline_stats.hpp"
 #include "config.hpp"
 #include "compare_orchestration.hpp"
 #include "force_compare.hpp"
@@ -698,19 +697,11 @@ int main(int argc, char** argv) {
             cooling_audit.first_saved_snapshot_time = first_saved->time;
           }
 
-          const galaxy::AccelPipelineStats* tpf_pipeline_stats = nullptr;
-          if (side_cfg.physics_package == "TPFCore") {
-            if (auto* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(side_physics)) {
-              if (tpf_pkg->provisional_readout_enabled() && tpf_pkg->last_accel_pipeline_stats().valid)
-                tpf_pipeline_stats = &tpf_pkg->last_accel_pipeline_stats();
-            }
-          }
-
           if (side_cfg.save_run_info) {
             galaxy::write_run_info(side_cfg.output_dir, side_cfg, n_steps, static_cast<int>(side_snaps.size()),
                                    state.n(), run_config_path, side_defaults_path,
                                    nullptr, nullptr,
-                                   &galaxy::last_galaxy_init_audit(), &cooling_audit, tpf_pipeline_stats);
+                                   &galaxy::last_galaxy_init_audit(), &cooling_audit, nullptr);
             galaxy::write_render_manifest(side_cfg.output_dir, side_cfg, n_steps,
                                           static_cast<int>(side_snaps.size()), state.n(),
                                           &galaxy::last_galaxy_init_audit());
@@ -986,14 +977,6 @@ int main(int argc, char** argv) {
       cooling_audit.first_saved_snapshot_time = first_saved->time;
     }
 
-    const galaxy::AccelPipelineStats* tpf_pipeline_stats = nullptr;
-    if (config.physics_package == "TPFCore") {
-      if (auto* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(physics)) {
-        if (tpf_pkg->provisional_readout_enabled() && tpf_pkg->last_accel_pipeline_stats().valid)
-          tpf_pipeline_stats = &tpf_pkg->last_accel_pipeline_stats();
-      }
-    }
-
     if (config.save_run_info) {
       galaxy::write_run_info(config.output_dir, config, n_steps, static_cast<int>(snapshots.size()), state.n(),
                              run_config_path, package_defaults_path,
@@ -1003,7 +986,7 @@ int main(int argc, char** argv) {
                                  ? &galaxy::last_galaxy_init_audit()
                                  : nullptr,
                              &cooling_audit,
-                             tpf_pipeline_stats);
+                             nullptr);
       if (config.simulation_mode == galaxy::SimulationMode::galaxy)
         galaxy::append_galaxy_preflight_to_run_info(config.output_dir, galaxy_preflight);
       std::cout << "Wrote " << config.output_dir << "/run_info.txt\n";
@@ -1046,10 +1029,6 @@ int main(int argc, char** argv) {
           tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
           std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
         }
-        if (config.tpf_accel_pipeline_diagnostics_csv) {
-          tpf->write_accel_pipeline_diagnostics(snapshots, config, config.output_dir);
-          std::cout << "Wrote " << config.output_dir << "/tpf_accel_pipeline_diagnostics.csv\n";
-        }
       }
       if (tpf && config.tpf_dynamics_mode == "direct_tpf" && !snapshots.empty()) {
         tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
@@ -1063,7 +1042,6 @@ int main(int argc, char** argv) {
           rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
           rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
           rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
-          rf << "xi_runtime_provisional_readout_evaluations\t" << counters.provisional_readout_evaluations << "\n";
           rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
           rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
         }
