@@ -237,6 +237,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_dynamics_branch", dyn);
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
+    const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
     const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
     const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
     const bool is_geodesic_effective = geodesic_correspondence_effective(config);
@@ -244,13 +245,14 @@ void write_render_manifest(const std::string& output_dir,
     if (config.physics_package == "TPFCore" &&
         true) {
       json_kv(jf, first, "tpf_core_law_mode",
-              is_direct ? "direct_tpf_tensor_principal_part"
-                        : (is_xi_kernel ? "xi_kernel_deformed"
-                                        : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
-                                                                 : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
-                                                                                  : "legacy_readout_provisional"))));
-      if (is_xi_kernel) {
-        json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_eff_spatial");
+              is_v1 ? "tpf_xi_theta_v1"
+                    : (is_direct ? "direct_tpf_tensor_principal_part"
+                                 : (is_xi_kernel ? "xi_kernel_deformed"
+                                                 : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
+                                                                          : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
+                                                                                           : "legacy_readout_provisional")))));
+      if (is_v1 || is_xi_kernel) {
+        json_kv(jf, first, "acceleration_formula", is_v1 ? "a=-K_xi*Xi_total_spatial" : "a=-K_xi*Xi_eff_spatial");
         json_kv(jf, first, "K_xi", "tpf_4d_xi_motion_readout_scale");
         json_kv_num(jf, first, "tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
         json_kv(jf, first, "xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
@@ -348,19 +350,21 @@ void write_render_manifest(const std::string& output_dir,
     tf << "acceleration_code_path\t" << acc << "\n";
     if (config.physics_package == "TPFCore" &&
         true) {
+      const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
       const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
       const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
       const bool is_geodesic_effective = geodesic_correspondence_effective(config);
       const bool is_v11_legacy = v11_legacy_free_parameter_active(config);
       tf << "tpf_core_law_mode\t"
-         << (is_direct ? "direct_tpf_tensor_principal_part"
-                       : (is_xi_kernel ? "xi_kernel_deformed"
-                                       : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
-                                                                : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
-                                                                                 : "legacy_readout_provisional"))))
+         << (is_v1 ? "tpf_xi_theta_v1"
+                   : (is_direct ? "direct_tpf_tensor_principal_part"
+                                : (is_xi_kernel ? "xi_kernel_deformed"
+                                                : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
+                                                                         : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
+                                                                                          : "legacy_readout_provisional")))))
          << "\n";
-      if (is_xi_kernel) {
-        tf << "acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
+      if (is_v1 || is_xi_kernel) {
+        tf << "acceleration_formula\t" << (is_v1 ? "a=-K_xi*Xi_total_spatial" : "a=-K_xi*Xi_eff_spatial") << "\n";
         tf << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
         tf << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
         tf << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";

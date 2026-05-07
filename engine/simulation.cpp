@@ -54,7 +54,7 @@ std::vector<Snapshot> run_simulation(const Config& config,
   const bool tpf_cooling_on =
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
   const bool xi_kernel_deformation_active =
-      (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "xi_kernel_deformed" &&
+      (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "tpf_xi_theta_v1" &&
        config.tpf_4d_xi_kernel_mode != "off" && config.tpf_4d_xi_kernel_coupling != 0.0);
   const int cooling_steps = tpf_cooling_on
       ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
