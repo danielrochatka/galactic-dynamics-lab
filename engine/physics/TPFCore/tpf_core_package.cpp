@@ -158,6 +158,12 @@ void TPFCorePackage::init_from_config(const Config& config) {
   if (config.tpf_vdsg_coupling != 0.0) {
     throw std::runtime_error("tpf_xi_theta_v1 rejects nonzero tpf_vdsg_coupling; additive VDSG modifier is not part of strict v1 dynamics.");
   }
+  if (config.tpf_4d_xi_kernel_mode != "off") {
+    throw std::runtime_error("tpf_xi_theta_v1 currently supports only tpf_4d_xi_kernel_mode=off; non-off Xi-kernel modes are unavailable on this branch.");
+  }
+  if (config.tpf_4d_xi_kernel_coupling != 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 currently requires tpf_4d_xi_kernel_coupling=0.0 on this branch.");
+  }
 }
 
 namespace {

@@ -375,3 +375,16 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
   CHECK(has_key("tpf_4d_xi_source_speed_y"));
   CHECK(has_key("tpf_4d_xi_source_speed_z"));
 }
+
+
+TEST_CASE("utility simulation modes remain parseable") {
+  const char* modes[] = {
+      "tpf_single_source_inspect", "tpf_symmetric_pair_inspect", "tpf_source_field_benchmark",
+      "tpf_4d_static_residual_benchmark", "tpf_4d_static_motion_readout_benchmark",
+      "tpf_4d_xi_motion_probe_benchmark", "tpf_two_body_sweep", "tpf_weak_field_calibration",
+      "tpf_newtonian_force_compare", "tpf_diagnostic_consistency_audit", "tpf_bound_orbit_sweep"};
+  for (const char* m : modes) {
+    galaxy::Config c;
+    CHECK_NOTHROW(galaxy::apply_config_kv("simulation_mode", m, c));
+  }
+}

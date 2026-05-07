@@ -496,23 +496,6 @@ int main(int argc, char** argv) {
 
 
 
-  switch (config.simulation_mode) {
-    case galaxy::SimulationMode::tpf_single_source_inspect:
-    case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
-    case galaxy::SimulationMode::tpf_source_field_benchmark:
-    case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
-    case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
-    case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-    case galaxy::SimulationMode::tpf_two_body_sweep:
-    case galaxy::SimulationMode::tpf_weak_field_calibration:
-    case galaxy::SimulationMode::tpf_newtonian_force_compare:
-    case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
-    case galaxy::SimulationMode::tpf_bound_orbit_sweep:
-      std::cerr << "Internal error: inspection/utility/sweep/calibration/audit modes should have returned earlier.\n";
-      return 1;
-    default:
-      break;
-  }
 
   const galaxy::Config configured_after_layering = config;
   galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(configured_after_layering);
