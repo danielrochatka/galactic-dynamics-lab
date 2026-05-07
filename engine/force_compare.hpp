@@ -8,15 +8,14 @@ namespace galaxy {
 
 /**
  * Newtonian-vs-TPF acceleration comparison diagnostic (diagnostics only; no physics change).
- * Requires physics_package=TPFCore and tpfcore_enable_provisional_readout=true so TPF
- * uses the current readout mode and calibrated scale. Writes tpf_newtonian_force_compare.csv
+ * Requires physics_package=TPFCore. Writes tpf_newtonian_force_compare.csv
  * and tpf_newtonian_force_compare.txt to output_dir.
  */
 void run_tpf_newtonian_force_compare(const Config& config, const std::string& output_dir);
 
 /**
- * Consistency audit between weak_field_calibration and force_compare diagnostics.
- * Same points, side-by-side intermediates; decisive conclusion. Diagnostics only.
+ * Quarantined on tpf_xi_theta_v1 because it depends on provisional readout
+ * diagnostics that are not part of the v1 Xi/Theta runtime path.
  */
 void run_tpf_diagnostic_consistency_audit(const Config& config, const std::string& output_dir);
 
