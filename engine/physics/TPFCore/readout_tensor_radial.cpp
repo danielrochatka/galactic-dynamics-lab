@@ -1,5 +1,5 @@
 #include "readout_model_families.hpp"
-#include "provisional_readout.hpp"
+#include "readout_diagnostics.hpp"
 
 #include "field_evaluation.hpp"
 #include "source_iteration.hpp"
