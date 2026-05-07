@@ -91,3 +91,29 @@ TEST_CASE("tpf_xi_theta_v1 stores full unsymmetrized 3x3 Theta map entries") {
   CHECK(std::abs(sample.theta[0][0]) > 1e-18);
   CHECK(std::abs(sample.theta[1][1]) > 1e-18);
 }
+
+
+TEST_CASE("tpf_xi_theta_v1 rejects nonzero cooling/shunt/vdsg modifiers") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "tpf_xi_theta_v1";
+
+  c.tpf_cooling_fraction = 0.1;
+  {
+    galaxy::TPFCorePackage p;
+    CHECK_THROWS(p.init_from_config(c));
+  }
+
+  c.tpf_cooling_fraction = 0.0;
+  c.tpf_global_accel_shunt_enable = true;
+  {
+    galaxy::TPFCorePackage p;
+    CHECK_THROWS(p.init_from_config(c));
+  }
+
+  c.tpf_global_accel_shunt_enable = false;
+  c.tpf_vdsg_coupling = 1e-20;
+  {
+    galaxy::TPFCorePackage p;
+    CHECK_THROWS(p.init_from_config(c));
+  }
+}

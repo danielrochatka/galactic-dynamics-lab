@@ -11,9 +11,10 @@ TEST_CASE("config defaults") {
   CHECK(c.simulation_mode == galaxy::SimulationMode::galaxy);
   CHECK(c.physics_package == "Newtonian");
   CHECK(c.physics_package_compare == "");
-  CHECK(c.tpf_vdsg_coupling == doctest::Approx(1.0e-20));
+  CHECK(c.tpf_vdsg_coupling == doctest::Approx(0.0));
   CHECK(c.tpf_global_accel_shunt_enable == false);
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
+  CHECK(c.tpf_cooling_fraction == doctest::Approx(0.0));
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
   CHECK(c.tpf_source_benchmark_shape == "monopole");
   CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(galaxy::kDefaultBhMassKg));

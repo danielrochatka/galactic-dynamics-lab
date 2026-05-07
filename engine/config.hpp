@@ -215,7 +215,7 @@ struct Config {
    * Current implementation uses relative-speed scaling beta = |v_rel|/c with doppler_scale = 1 + λ_eff * beta.
    * λ_eff is mass-normalized (see tpf_vdsg_mass_baseline_kg).
    */
-  double tpf_vdsg_coupling = 1.0e-20;
+  double tpf_vdsg_coupling = 0.0;
   /**
    * VDSG mass baseline M_ref (kg) for log normalization: λ_eff = λ · log10(M_ref) / log10(M_source).
    * If <= 0, uses star_mass at runtime (same units as simulation).
@@ -249,7 +249,7 @@ struct Config {
    * TPFCore dynamical runs: fraction of n_steps using startup radial damping (1% per step).
    * Snapshots are not recorded during that interval. Ignored when physics_package != TPFCore.
    */
-  double tpf_cooling_fraction = 0.2;
+  double tpf_cooling_fraction = 0.0;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
   /** TPFCore diagnostics: enable live Newtonian-vs-TPF force audit for bh_orbit_validation runs. */

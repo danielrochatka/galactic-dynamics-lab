@@ -72,7 +72,7 @@ TPFCorePackage::TPFCorePackage()
       source_softening_(0.0),
       kappa_(1.0e32),
       weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
-      vdsg_coupling_(1.0e-20),
+      vdsg_coupling_(0.0),
       vdsg_mass_baseline_resolved_kg_(0.0),
       vdsg_mode_("legacy_speed"),
       vdsg_mass_gate_m0_kg_(1.98847e30),
@@ -83,7 +83,7 @@ TPFCorePackage::TPFCorePackage()
       vdsg_weak_field_power_(1.0),
       vdsg_bounded_amplitude_(0.25),
       simulation_dt_(0.01),
-      cooling_fraction_(0.2),
+      cooling_fraction_(0.0),
       shunt_enable_(false),
       shunt_fraction_(0.001),
       xi_motion_readout_scale_(1.0e-12),
@@ -149,6 +149,15 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
+  if (config.tpf_cooling_fraction > 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_cooling_fraction > 0; cooling is not part of strict v1 dynamics.");
+  }
+  if (config.tpf_global_accel_shunt_enable) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_global_accel_shunt_enable=true; global acceleration shunt is not part of strict v1 dynamics.");
+  }
+  if (config.tpf_vdsg_coupling != 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects nonzero tpf_vdsg_coupling; additive VDSG modifier is not part of strict v1 dynamics.");
+  }
 }
 
 namespace {
