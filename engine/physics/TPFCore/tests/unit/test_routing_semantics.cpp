@@ -3,6 +3,7 @@
 #include "physics/TPFCore/tpf_core_package.hpp"
 #include "types.hpp"
 
+#include <cmath>
 #include <vector>
 
 namespace {
@@ -18,6 +19,7 @@ TEST_CASE("tpf_xi_theta_v1 is accepted and computes acceleration") {
   galaxy::Config c;
   c.tpf_dynamics_mode = "tpf_xi_theta_v1";
   c.tpf_4d_xi_kernel_mode = "off";
+  c.tpf_4d_xi_motion_readout_scale = 3.25e-12;
   galaxy::TPFCorePackage p;
   p.init_from_config(c);
   galaxy::State s = one_body_state(10.0, 0.0, 1.0);
@@ -25,6 +27,11 @@ TEST_CASE("tpf_xi_theta_v1 is accepted and computes acceleration") {
   p.compute_accelerations(s, 100.0, 0.1, false, ax, ay);
   CHECK(ax.size() == 1);
   CHECK(ay.size() == 1);
+  CHECK(std::isfinite(ax[0]));
+  CHECK(std::isfinite(ay[0]));
+  const auto sample = p.last_xi_theta_v1_sample();
+  CHECK(ax[0] == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * sample.xi_x));
+  CHECK(ay[0] == doctest::Approx(-c.tpf_4d_xi_motion_readout_scale * sample.xi_y));
 }
 
 TEST_CASE("non-v1 dynamics route names are rejected") {

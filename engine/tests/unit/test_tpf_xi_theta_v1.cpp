@@ -51,9 +51,43 @@ TEST_CASE("tpf_xi_theta_v1 cancellation can yield Xi_total ~ 0 with nonzero unsy
   const auto sample = p.last_xi_theta_v1_sample();
   CHECK(std::abs(sample.xi_x) < 1e-10);
   CHECK(std::abs(sample.xi_y) < 1e-10);
+  CHECK(std::abs(ax[0]) < 1e-20);
+  CHECK(std::abs(ay[0]) < 1e-20);
   const double theta_norm =
       std::abs(sample.theta[0][0]) + std::abs(sample.theta[0][1]) + std::abs(sample.theta[1][0]) +
       std::abs(sample.theta[1][1]) + std::abs(sample.theta[2][2]);
   CHECK(theta_norm > 0.0);
 }
 
+TEST_CASE("tpf_xi_theta_v1 stores full unsymmetrized 3x3 Theta map entries") {
+  galaxy::Config c;
+  c.tpf_dynamics_mode = "tpf_xi_theta_v1";
+  c.tpf_4d_xi_kernel_mode = "off";
+  c.enable_star_star_gravity = true;
+  c.tpfcore_source_softening = 0.25;
+  galaxy::TPFCorePackage p;
+  p.init_from_config(c);
+
+  galaxy::State s;
+  s.resize(3);
+  // probe (index 0)
+  s.x[0] = 0.3; s.y[0] = -0.2; s.vx[0] = s.vy[0] = 0.0; s.mass[0] = 1.0;
+  // asymmetric source layout to force nonzero off-diagonals
+  s.x[1] = 1.1; s.y[1] = 0.4; s.vx[1] = s.vy[1] = 0.0; s.mass[1] = 2.3;
+  s.x[2] = -0.7; s.y[2] = 0.9; s.vx[2] = s.vy[2] = 0.0; s.mass[2] = 1.7;
+
+  std::vector<double> ax, ay;
+  p.compute_accelerations(s, 0.0, 0.0, true, ax, ay);
+  const auto sample = p.last_xi_theta_v1_sample();
+
+  // Entry-level checks: diagonal + off-diagonal + z-row/col retention.
+  CHECK(std::isfinite(sample.theta[0][0]));
+  CHECK(std::isfinite(sample.theta[1][1]));
+  CHECK(std::isfinite(sample.theta[0][1]));
+  CHECK(std::isfinite(sample.theta[1][0]));
+  CHECK(std::isfinite(sample.theta[2][2]));
+  CHECK(std::abs(sample.theta[0][1]) > 1e-18);
+  CHECK(std::abs(sample.theta[1][0]) > 1e-18);
+  CHECK(std::abs(sample.theta[0][0]) > 1e-18);
+  CHECK(std::abs(sample.theta[1][1]) > 1e-18);
+}
