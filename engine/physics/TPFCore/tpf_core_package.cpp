@@ -2760,122 +2760,10 @@ void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& s
 void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snapshots,
                                                const Config& config,
                                                const std::string& output_dir) const {
-  const bool closure_diag_mode =
-      (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) || readout_mode_ == "experimental_radial_r_scaling");
-  if (!provisional_readout_ || !closure_diag_mode || snapshots.empty())
-    return;
-  const int n_part = snapshots[0].state.n();
-  if (n_part != 1) return;
-
-  tpfcore::TPFCoreParams params = build_params(config, output_dir);
-  double eps = params.effective_source_softening;
-  double softening = params.softening;
-  double bh_mass = params.bh_mass;
-  bool star_star = params.enable_star_star_gravity;
-
-  std::ofstream csv(params.output_dir + "/tpf_closure_diagnostics.csv");
-  if (!csv) return;
-  csv << "time,r,theta_rr,theta_tt,theta_tr,radial_closure,tangential_closure,a_inward,v_radial,v_tangential,sign_radial_acc_vs_radial_vel\n";
-
-  size_t n_inward_radial = 0;
-  double sum_abs_tangential = 0.0;
-  size_t n_outward_drift = 0;
-  size_t n_outward_drift_with_inward_pull = 0;
-  size_t n_same_sign = 0, n_opposite_sign = 0;
-  size_t n_rows = 0;
-
-  for (const auto& snap : snapshots) {
-    const State& s = snap.state;
-    double t = snap.time;
-    double x = s.x[0], y = s.y[0], vx = s.vx[0], vy = s.vy[0];
-    double r2 = x * x + y * y + eps * eps;
-    double r = std::sqrt(r2);
-    if (r < 1e-30) continue;
-
-    double rx = x / r, ry = y / r;
-    double ax = 0.0, ay = 0.0;
-    tpfcore::ReadoutDiagnostics diag;
-    tpfcore::TpfRadialGravityProfile prof;
-    const tpfcore::TpfRadialGravityProfile* prof_ptr = nullptr;
-    if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-      prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
-      prof_ptr = &prof;
-    }
-    tpfcore::compute_provisional_readout_with_diagnostics(
-        s, 0, bh_mass, star_star, softening, source_softening_,
-        readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_, ax, ay, diag,
-        tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
-        prof_ptr);
-
-    double radial_closure = diag.provisional_radial_readout;
-    double tangential_closure = diag.provisional_tangential_readout;
-    double a_radial = ax * rx + ay * ry;
-    double a_inward = -a_radial;
-    double v_radial = vx * rx + vy * ry;
-    double v_tangential = x * vy - y * vx;
-
-    const char* sign_str = "zero";
-    if (a_radial * v_radial > 1e-30) { sign_str = "same"; ++n_same_sign; }
-    else if (a_radial * v_radial < -1e-30) { sign_str = "opposite"; ++n_opposite_sign; }
-
-    if (radial_closure < 0.0) ++n_inward_radial;
-    sum_abs_tangential += std::abs(tangential_closure);
-    if (v_radial > 0.0) {
-      ++n_outward_drift;
-      if (a_inward > 0.0) ++n_outward_drift_with_inward_pull;
-    }
-
-    csv << std::scientific << t << "," << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr
-        << "," << radial_closure << "," << tangential_closure << "," << a_inward << "," << v_radial << "," << v_tangential
-        << "," << sign_str << "\n";
-    ++n_rows;
-  }
-
-  if (n_rows == 0) return;
-
-  std::ofstream txt(params.output_dir + "/tpf_closure_diagnostics.txt");
-  if (!txt) return;
-
-  txt << "TPFCore closure-term decomposition (single-body)\n";
-  txt << "Mode: " << readout_mode_ << ". Diagnostics only; no change to formulas or behavior.\n\n";
-
-  txt << "--- Per-step CSV: tpf_closure_diagnostics.csv ---\n";
-  txt << "Columns: time, r, theta_rr, theta_tt, theta_tr, radial_closure, tangential_closure,\n";
-  txt << "  a_inward, v_radial, v_tangential, sign_radial_acc_vs_radial_vel (same/opposite/zero)\n";
-  txt << "radial_closure = readout radial contribution (provisional_radial_readout); negative = inward.\n";
-  txt << "tangential_closure = readout tangential contribution (provisional_tangential_readout).\n\n";
-
-  double frac_inward = 100.0 * n_inward_radial / n_rows;
-  double mean_abs_tangential = sum_abs_tangential / n_rows;
-  double frac_outward_drift = 100.0 * n_outward_drift / n_rows;
-  double frac_outward_with_inward_pull = (n_outward_drift > 0) ? (100.0 * n_outward_drift_with_inward_pull / n_outward_drift) : 0.0;
-
-  txt << "--- Summary statistics ---\n";
-  txt << "  Steps with radial_closure < 0 (inward): " << n_inward_radial << " / " << n_rows << " (" << std::fixed << std::setprecision(1) << frac_inward << "%)\n";
-  txt << "  Mean |tangential_closure|: " << std::scientific << mean_abs_tangential << "\n";
-  txt << "  Steps with v_radial > 0 (outward drift): " << n_outward_drift << " / " << n_rows << " (" << std::fixed << std::setprecision(1) << frac_outward_drift << "%)\n";
-  txt << "  Of those, steps with a_inward > 0 (inward pull): " << n_outward_drift_with_inward_pull << " (" << std::fixed << std::setprecision(1) << frac_outward_with_inward_pull << "% of outward-drift steps)\n";
-  txt << "  sign_radial_acc_vs_radial_vel: same=" << n_same_sign << ", opposite=" << n_opposite_sign << "\n\n";
-
-  txt << "--- Conservative diagnostic answers ---\n";
-  txt << "  Is the radial term mostly inward? ";
-  if (frac_inward >= 80.0) txt << "Yes (" << std::fixed << std::setprecision(0) << frac_inward << "% of steps have radial_closure < 0).\n";
-  else if (frac_inward >= 50.0) txt << "Partially (radial inward in " << frac_inward << "% of steps).\n";
-  else txt << "No (radial inward in only " << frac_inward << "% of steps).\n";
-
-  txt << "  Is the tangential/coherence term large enough to bend the trajectory? ";
-  txt << "Mean |tangential_closure| = " << std::scientific << mean_abs_tangential << "; compare to |radial_closure| in CSV for relative size.\n";
-
-  txt << "  Does the tangential term correlate with continued outward drift? ";
-  txt << "Check CSV: where v_radial > 0, is tangential_closure positive or negative? (Diagnostic only; no causal claim.)\n";
-
-  txt << "  Is the closure producing mostly outward kinematics despite inward radial pull? ";
-  if (n_outward_drift_with_inward_pull > 0 && n_outward_drift > 0 && frac_outward_with_inward_pull > 50.0)
-    txt << "In " << std::fixed << std::setprecision(0) << frac_outward_with_inward_pull << "% of outward-drift steps the radial acceleration is inward (a_inward > 0); trajectory continues outward.\n";
-  else if (n_outward_drift_with_inward_pull > 0)
-    txt << "Some steps show outward drift with inward pull (" << n_outward_drift_with_inward_pull << " steps). See CSV.\n";
-  else
-    txt << "When v_radial > 0, a_inward is typically not positive; see CSV for details.\n";
+  (void)snapshots;
+  (void)config;
+  (void)output_dir;
+  return;
 }
 
 void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -3236,23 +3124,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   if (std::abs(a_rad_newton) > 1e-300)
     ratio_radial = std::abs(a_rad_tpf) / std::abs(a_rad_newton);
 
-  tpfcore::ReadoutDiagnostics diag;
-  double ax_d = 0.0, ay_d = 0.0;
-  tpfcore::TpfRadialGravityProfile step0_prof;
-  const tpfcore::TpfRadialGravityProfile* step0_prof_ptr = nullptr;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-    step0_prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
-    step0_prof_ptr = &step0_prof;
-  }
-  tpfcore::compute_provisional_readout_with_diagnostics(
-      s, 0, bh_mass, star_star, softening, source_softening_,
-      readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
-      ax_d, ay_d, diag,
-      tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
-      step0_prof_ptr);
-  (void)ax_d;
-  (void)ay_d;
-
   txt << std::scientific << std::setprecision(16);
   txt << "TPFCore step-0 orbit audit (exact initial state of bh_orbit_validation)\n";
   txt << "Diagnostics only; no averaging or summaries. All values exact for step 0.\n\n";
@@ -3280,11 +3151,11 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   txt << "diff_tangential = " << diff_tangential << "\n";
   txt << "ratio_radial = |a_rad_tpf| / |a_rad_newton| = " << ratio_radial << "\n\n";
 
-  txt << "theta_rr = " << diag.theta_rr << "\n";
-  txt << "theta_tt = " << diag.theta_tt << "\n";
-  txt << "theta_tr = " << diag.theta_tr << "\n";
-  txt << "provisional_radial_readout = " << diag.provisional_radial_readout << "\n";
-  txt << "provisional_tangential_readout = " << diag.provisional_tangential_readout << "\n\n";
+  txt << "theta_rr = unavailable_in_this_branch_step0_writer\n";
+  txt << "theta_tt = unavailable_in_this_branch_step0_writer\n";
+  txt << "theta_tr = unavailable_in_this_branch_step0_writer\n";
+  txt << "provisional_radial_readout = unavailable_in_this_branch_step0_writer\n";
+  txt << "provisional_tangential_readout = unavailable_in_this_branch_step0_writer\n\n";
 
   double abs_a_rad_newton = std::abs(a_rad_newton);
   double radial_mismatch_pct = 0.0;
