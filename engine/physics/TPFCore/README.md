@@ -123,11 +123,13 @@ For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **n
 - The default acceleration path does not compute Theta/I/direct_tpf/provisional readout fields.
 - Optional field diagnostics can compute expensive Theta/I/provisional quantities only when explicitly enabled (for example `tpf_xi_kernel_dump_field_diagnostics=true`).
 
+At each simulation step, the route builds `Xi_total` for the current source configuration and computes `Theta` as the configuration-gradient map of that `Xi_total` field. All particles/probes in that step read from the same frozen Xi/Theta state. After the update, Xi/Theta are rebuilt from the new source configuration.
+
 Mode details:
 - `off`: baseline Xi with no deformation.
 - `scalar_beta`: scales Xi by a beta-derived factor (exploratory).
-- `metric_radial`: metric-style deformation along source-target radial direction.
-- `metric_velocity`: metric-style deformation using total relative speed/direction (exploratory).
+- `metric_radial`: configuration-gradient deformation along source-target radial direction (legacy mode label retained for config compatibility).
+- `metric_velocity`: configuration-gradient deformation using total relative speed/direction (exploratory; legacy mode label retained for config compatibility).
 - `metric_transverse_wake`: preferred current VDSG ship-wake **candidate** mode requiring transverse passing motion and post-pass/separating geometry. Current implemented gate uses  
   `beta_pass = v_transverse / c`,  
   `radial_ratio = v_radial / max(v_transverse, eps)`,  
@@ -136,8 +138,8 @@ Mode details:
   Circular/pure transverse orbiting geometry is tested to keep wake activation near null in this mode, consistent with an intended circular-orbit/null correspondence behavior. This is a tested runtime behavior and candidate interpretation, not yet an empirical validation claim.
 - `metric_transverse_continuous`: experimental orbit-active transverse mode preserving older behavior with  
   `wake_gate = 0.5 * (1 + tanh(v_radial / max(v_transverse, eps)))`.  
-  At circular/closest-pass (`v_radial≈0`) with transverse motion, `wake_gate≈0.5`. This mode is useful for testing whether continuous transverse spacetime/Xi deformation is needed; it is experimental and not yet validated.
-- `spacetime_metric`: Xi0/Xi_t diagnostic mode where configured; Xi0 does not feed spatial acceleration unless explicitly implemented later.
+  At circular/closest-pass (`v_radial≈0`) with transverse motion, `wake_gate≈0.5`. This mode is useful for testing whether continuous transverse Xi-field / configuration-gradient deformation is needed; it is experimental and not yet validated.
+- `spacetime_metric`: Xi0/Xi_t diagnostic mode (legacy mode label retained for config compatibility); Xi0 does not feed spatial acceleration unless explicitly implemented later.
 
 Factor modes and clamps:
 - `beta_power`: `factor_raw = coupling * beta_effective^beta_power`.

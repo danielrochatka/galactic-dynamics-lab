@@ -563,7 +563,7 @@ void TPFCorePackage::validate_xi_kernel_runtime_config() const {
       xi_kernel_mode_ != "metric_velocity" && xi_kernel_mode_ != "metric_transverse_wake" &&
       xi_kernel_mode_ != "metric_transverse_continuous" && xi_kernel_mode_ != "spacetime_metric") {
     throw std::runtime_error(
-        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric");
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric (legacy label)");
   }
   if (xi_kernel_factor_mode_ != "beta_power" && xi_kernel_factor_mode_ != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
@@ -2015,7 +2015,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   if (kernel_mode != "off" && kernel_mode != "scalar_beta" && kernel_mode != "metric_radial" && kernel_mode != "metric_velocity" &&
       kernel_mode != "metric_transverse_wake" && kernel_mode != "metric_transverse_continuous" && kernel_mode != "spacetime_metric") {
     throw std::runtime_error(
-        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric");
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric (legacy label)");
   }
   if (kernel_factor_mode != "beta_power" && kernel_factor_mode != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
