@@ -157,11 +157,9 @@ TEST_CASE("single-source inspect xi exterior outputs are produced and report fre
   CHECK(summary_text.find("single-source only") != std::string::npos);
 }
 
-TEST_CASE("xi exterior inspection flag does not change dynamics routing or accelerations") {
+TEST_CASE("xi exterior inspection flag does not bypass strict tpf_xi_theta_v1 mode gate") {
   galaxy::Config base;
-  base.tpfcore_enable_provisional_readout = true;
-  base.tpfcore_readout_mode = "tensor_radial_projection";
-  base.tpf_dynamics_mode = "legacy_readout";
+  base.tpf_dynamics_mode = "tpf_xi_theta_v1";
   base.tpf_vdsg_coupling = 0.0;
 
   galaxy::Config with_flag = base;
@@ -182,6 +180,12 @@ TEST_CASE("xi exterior inspection flag does not change dynamics routing or accel
   REQUIRE(ax1.size() == 1);
   CHECK(ax1[0] == doctest::Approx(ax0[0]).epsilon(1e-12));
   CHECK(ay1[0] == doctest::Approx(ay0[0]).epsilon(1e-12));
+
+  galaxy::Config rejected = base;
+  rejected.tpf_dynamics_mode = "legacy_readout";
+  galaxy::TPFCorePackage preject;
+  CHECK_THROWS_WITH(preject.init_from_config(rejected),
+                    "TPFCore on this branch supports only tpf_dynamics_mode=tpf_xi_theta_v1.");
 }
 
 TEST_CASE("source-field benchmark bonded_pair supports explicit unequal masses with fallback") {

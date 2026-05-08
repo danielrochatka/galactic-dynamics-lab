@@ -16,7 +16,7 @@ run_case() {
 run_case A_single_preformed_starstar_true --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true
 run_case B_single_symmetric_starstar_true --galaxy_init_template=symmetric_disk --enable_star_star_gravity=true
 run_case C_single_preformed_starstar_false --galaxy_init_template=preformed_spiral --enable_star_star_gravity=false
-./galaxy_sim galaxy --output_dir="$OUT/D_compare" "${COMMON[@]}" --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true --physics_package_compare=TPFCore --tpf_dynamics_mode=xi_kernel_deformed --yes >/dev/null
+./galaxy_sim galaxy --output_dir="$OUT/D_compare" "${COMMON[@]}" --galaxy_init_template=preformed_spiral --enable_star_star_gravity=true --physics_package_compare=TPFCore --tpf_dynamics_mode=tpf_xi_theta_v1 --yes >/dev/null
 
 python3 - <<'PY' "$OUT"
 import csv, math, pathlib, statistics, sys

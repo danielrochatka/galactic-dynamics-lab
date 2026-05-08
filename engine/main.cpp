@@ -133,6 +133,13 @@ void write_resolved_artifacts(const galaxy::Config& config) {
   galaxy::write_resolved_scenario_artifacts(config.output_dir, resolved);
 }
 
+void finalize_utility_mode_run(const galaxy::Config& config) {
+  write_resolved_artifacts(config);
+  if (config.save_run_info) {
+    galaxy::write_run_info(config.output_dir, config, 0, 0, -1);
+  }
+}
+
 double L_z_total(const galaxy::State& s) {
   double L = 0;
   for (int i = 0; i < s.n(); ++i)
@@ -518,36 +525,62 @@ int main(int argc, char** argv) {
       case galaxy::SimulationMode::tpf_single_source_inspect:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_single_source_inspect requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_single_source_inspect(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_symmetric_pair_inspect requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_symmetric_pair_inspect(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_source_field_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_source_field_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_source_field_benchmark(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_residual_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_4d_static_residual_benchmark(config, config.output_dir);
+        if (auto_plot) {
+          const std::string dev_py = "../dev/bin/python3";
+          const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+          const std::string py = dev_py_exists ? dev_py : "python3";
+          const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + shell_single_quote(config.output_dir);
+          const int ret = std::system(cmd.c_str());
+          if (ret != 0) {
+            std::cerr << "Warning: optional tpf_4d_static_residual plot script returned non-zero exit code.\n";
+          }
+          const std::vector<std::string> pngs = existing_tpf_4d_static_plot_pngs(config.output_dir);
+          if (pngs.empty()) {
+            std::cout << "plot script completed but no expected PNGs were found/generated\n";
+          } else {
+            std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
+          }
+        }
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_motion_readout_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_4d_static_motion_readout_benchmark(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_xi_motion_probe_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_4d_xi_motion_probe_benchmark(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_weak_field_calibration:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_weak_field_calibration requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_weak_field_calibration(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_newtonian_force_compare:
         galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
+        finalize_utility_mode_run(config);
         return 0;
       case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
-        return galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir) ? 0 : 1;
+        if (!galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir)) return 1;
+        finalize_utility_mode_run(config);
+        return 0;
       default:
         break;
     }

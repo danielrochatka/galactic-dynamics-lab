@@ -17,4 +17,4 @@ if [[ $status -eq 0 ]]; then
   echo "expected legacy_readout to be rejected" >&2
   exit 1
 fi
-grep -q "legacy_readout has been removed; use xi_kernel_deformed or direct_tpf" "$OUT/stderr.txt"
+grep -q "tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch" "$OUT/stderr.txt"
