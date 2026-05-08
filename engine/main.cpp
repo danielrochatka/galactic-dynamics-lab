@@ -61,7 +61,27 @@ bool ensure_dir(const std::string& path) {
   return MKDIR(path.c_str(), 0755) == 0 || errno == EEXIST;
 }
 
-
+bool ensure_dir_recursive(const std::string& path) {
+  if (path.empty()) return false;
+  std::string cur;
+  std::size_t i = 0;
+  if (path[0] == '/') {
+    cur = '/';
+    i = 1;
+  }
+  while (i <= path.size()) {
+    const std::size_t j = path.find('/', i);
+    const std::string part = path.substr(i, j == std::string::npos ? std::string::npos : j - i);
+    if (!part.empty() && part != ".") {
+      if (!cur.empty() && cur[cur.size() - 1] != '/') cur += '/';
+      cur += part;
+      if (!ensure_dir(cur)) return false;
+    }
+    if (j == std::string::npos) break;
+    i = j + 1;
+  }
+  return true;
+}
 
 std::string shell_single_quote(const std::string& raw) {
   std::string out = "'";
@@ -133,10 +153,14 @@ void write_resolved_artifacts(const galaxy::Config& config) {
   galaxy::write_resolved_scenario_artifacts(config.output_dir, resolved);
 }
 
-void finalize_utility_mode_run(const galaxy::Config& config) {
-  write_resolved_artifacts(config);
+void finalize_utility_mode_run(const galaxy::Config& config,
+                               const std::string& run_config_path,
+                               const std::string& package_defaults_path) {
+  const galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(config);
+  galaxy::write_resolved_scenario_artifacts(config.output_dir, resolved);
   if (config.save_run_info) {
-    galaxy::write_run_info(config.output_dir, config, 0, 0, -1);
+    galaxy::write_run_info(config.output_dir, config, 0, 0, resolved.initial_state.n(),
+                           run_config_path, package_defaults_path, &config, &resolved);
   }
 }
 
@@ -504,7 +528,7 @@ int main(int argc, char** argv) {
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
   if (galaxy::simulation_mode_requires_output_dir(config.simulation_mode)) {
-    if (!ensure_dir("../outputs") || !ensure_dir(config.output_dir)) {
+    if (!ensure_dir_recursive(config.output_dir)) {
       std::cerr << "Failed to create output directory for simulation_mode="
                 << galaxy::mode_to_string(config.simulation_mode)
                 << ": " << config.output_dir << "\n";
@@ -525,17 +549,17 @@ int main(int argc, char** argv) {
       case galaxy::SimulationMode::tpf_single_source_inspect:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_single_source_inspect requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_single_source_inspect(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_symmetric_pair_inspect requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_symmetric_pair_inspect(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_source_field_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_source_field_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_source_field_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_residual_benchmark requires physics_package=TPFCore\n", 1;
@@ -556,30 +580,30 @@ int main(int argc, char** argv) {
             std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
           }
         }
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_motion_readout_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_4d_static_motion_readout_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_xi_motion_probe_benchmark requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_4d_xi_motion_probe_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_weak_field_calibration:
         if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_weak_field_calibration requires physics_package=TPFCore\n", 1;
         tpf_pkg->run_weak_field_calibration(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_newtonian_force_compare:
         galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
         if (!galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir)) return 1;
-        finalize_utility_mode_run(config);
+        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
         return 0;
       default:
         break;
@@ -717,8 +741,8 @@ int main(int argc, char** argv) {
     const std::string compare_parent_dir = config.output_dir;
     const std::string left_dir = compare_parent_dir + "/left_" + sanitize_label(config.physics_package);
     const std::string right_dir = compare_parent_dir + "/right_" + sanitize_label(config.physics_package_compare);
-    if (!ensure_dir("../outputs") || !ensure_dir(compare_parent_dir) ||
-        !ensure_dir(left_dir) || !ensure_dir(right_dir)) {
+    if (!ensure_dir_recursive(compare_parent_dir) ||
+        !ensure_dir_recursive(left_dir) || !ensure_dir_recursive(right_dir)) {
       std::cerr << "Failed to create compare output directories under " << compare_parent_dir << "\n";
       return 1;
     }
