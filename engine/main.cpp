@@ -136,7 +136,7 @@ void write_resolved_artifacts(const galaxy::Config& config) {
 void finalize_utility_mode_run(const galaxy::Config& config) {
   write_resolved_artifacts(config);
   if (config.save_run_info) {
-    galaxy::write_run_info(config.output_dir, config, 0, 0, 0);
+    galaxy::write_run_info(config.output_dir, config, 0, 0, -1);
   }
 }
 

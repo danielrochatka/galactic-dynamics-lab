@@ -354,6 +354,19 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
 
   {
     galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_n_particles_fallback";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_source_field_benchmark;
+    configured.physics_package = "TPFCore";
+    configured.n_stars = 123;
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, configured, 0, 0, -1);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("n_stars\t123") != std::string::npos);
+  }
+
+  {
+    galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_direct_runtime_mode";
     configured.simulation_mode = galaxy::SimulationMode::tpf_source_field_benchmark;
     configured.physics_package = "TPFCore";
