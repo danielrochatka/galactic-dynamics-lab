@@ -19,4 +19,4 @@ if [[ $status -eq 0 ]]; then
   echo "Expected --tpf_gdd_coupling to be rejected, but command succeeded." >&2
   exit 1
 fi
-grep -q "Unknown CLI config key: tpf_gdd_coupling" "$LOG"
+grep -Eq "Unknown CLI config key: tpf_gdd_coupling|tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch" "$LOG"

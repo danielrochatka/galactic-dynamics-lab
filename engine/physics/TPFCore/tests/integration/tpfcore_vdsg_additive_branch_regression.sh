@@ -16,4 +16,4 @@ if [[ $status -eq 0 ]]; then
   echo "expected provisional legacy gate to be rejected" >&2
   exit 1
 fi
-grep -q "tpfcore_enable_provisional_readout=true is deprecated and cannot be used with simulation_mode=galaxy" "$OUT/stderr.txt"
+grep -Eq "tpfcore_enable_provisional_readout=true is deprecated and cannot be used with simulation_mode=galaxy|tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch" "$OUT/stderr.txt"

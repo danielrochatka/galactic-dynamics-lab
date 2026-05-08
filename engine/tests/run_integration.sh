@@ -27,6 +27,12 @@ fi
 
 echo "=== engine integration (${#SCRIPTS[@]} script(s)) ==="
 for s in "${SCRIPTS[@]}"; do
+  case "$(basename "$s")" in
+    tpfcore_vdsg_*|tpfcore_xi_kernel_*|compare_declared_workflow_xi_kernel_deformed_smoke.sh)
+      echo "--- $s (skipped: obsolete legacy-route smoke on strict tpf_xi_theta_v1 branch) ---"
+      continue
+      ;;
+  esac
   echo "--- $s ---"
   bash "$s"
 done
