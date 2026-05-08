@@ -313,9 +313,10 @@ void run_tpf_newtonian_force_compare(const Config& config, const std::string& ou
 
 // --- Diagnostic consistency audit quarantined on tpf_xi_theta_v1 branch ---
 
-void run_tpf_diagnostic_consistency_audit(const Config& /*config*/, const std::string& /*output_dir*/) {
+bool run_tpf_diagnostic_consistency_audit(const Config& /*config*/, const std::string& /*output_dir*/) {
   std::cerr << "tpf_diagnostic_consistency_audit is unavailable on tpf_xi_theta_v1: "
             << "it depends on provisional readout diagnostics.\n";
+  return false;
 }
 
 }  // namespace galaxy

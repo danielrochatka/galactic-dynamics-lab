@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
+#include "force_compare.hpp"
 #include <algorithm>
 #include <fstream>
 
@@ -407,4 +408,9 @@ TEST_CASE("tpf utility mode dispatch classification") {
   CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
   CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::galaxy));
   CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::earth_moon_benchmark));
+}
+
+TEST_CASE("diagnostic_consistency_audit reports unavailable on v1 branch") {
+  galaxy::Config c;
+  CHECK_FALSE(galaxy::run_tpf_diagnostic_consistency_audit(c, "/tmp"));
 }

@@ -498,6 +498,10 @@ int main(int argc, char** argv) {
 
 
   if (galaxy::is_tpf_utility_mode(config.simulation_mode)) {
+    if (!ensure_dir("../outputs") || !ensure_dir(config.output_dir)) {
+      std::cerr << "Failed to create utility output directory: " << config.output_dir << "\n";
+      return 1;
+    }
     galaxy::PhysicsPackage* utility_physics = galaxy::get_physics_package(config.physics_package);
     if (!utility_physics) {
       std::cerr << "Unknown physics package: " << config.physics_package << "\n";
@@ -539,8 +543,7 @@ int main(int argc, char** argv) {
         galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
         return 0;
       case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
-        galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir);
-        return 0;
+        return galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir) ? 0 : 1;
       default:
         break;
     }
