@@ -31,13 +31,18 @@ Command used:
 
 ```bash
 rg -n "TPF|tpf_|Xi|Ξ|Theta|Θ|VDSG|direct_tpf|xi_kernel_deformed|geodesic_correspondence|v11_weak_field_truncation|legacy_readout|C_mu_nu|C_μν" \
-  --glob '!engine/physics/TPFCore/**' --glob '!dev/**' --glob '!outputs/**' --glob '!.git/**'
+  --glob '!engine/physics/TPFCore/**' \
+  --glob '!dev/**' \
+  --glob '!outputs/**' \
+  --glob '!.git/**' \
+  --glob '!docs/audits/tpf_package_boundary_audit.md'
 ```
+Baseline note: the leak-count baseline was generated with exclusions for generated outputs (`outputs/**`), dev artifacts (`dev/**`), VCS internals (`.git/**`), TPFCore package internals (`engine/physics/TPFCore/**`), and this audit file itself (`docs/audits/tpf_package_boundary_audit.md`) to keep future tracking reproducible.
 
 ## Inventory summary
 
 - **Raw matches outside boundary:** 2,342
-- **Files with matches:** 66
+- **Files with matches:** 73
 - Largest concentrations:
   1. `engine/config.cpp` (247)
   2. `engine/tests/unit/test_config.cpp` (245)
