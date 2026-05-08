@@ -65,12 +65,9 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
   if (t == "tpf_4d_static_motion_readout_benchmark") return SimulationMode::tpf_4d_static_motion_readout_benchmark;
   if (t == "tpf_4d_xi_motion_probe_benchmark") return SimulationMode::tpf_4d_xi_motion_probe_benchmark;
-  if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
   if (t == "tpf_diagnostic_consistency_audit") return SimulationMode::tpf_diagnostic_consistency_audit;
-  if (t == "tpf_bound_orbit_sweep") return SimulationMode::tpf_bound_orbit_sweep;
-  if (t == "tpf_v11_weak_field_correspondence") return SimulationMode::tpf_v11_weak_field_correspondence;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -90,14 +87,52 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
     case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
     case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
-    case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
     case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
-    case SimulationMode::tpf_bound_orbit_sweep: return "tpf_bound_orbit_sweep";
-    case SimulationMode::tpf_v11_weak_field_correspondence: return "tpf_v11_weak_field_correspondence";
   }
   return "unknown";
+}
+
+bool is_tpf_utility_mode(SimulationMode m) {
+  switch (m) {
+    case SimulationMode::tpf_single_source_inspect:
+    case SimulationMode::tpf_symmetric_pair_inspect:
+    case SimulationMode::tpf_source_field_benchmark:
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+    case SimulationMode::tpf_weak_field_calibration:
+    case SimulationMode::tpf_newtonian_force_compare:
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool simulation_mode_requires_output_dir(SimulationMode m) {
+  switch (m) {
+    case SimulationMode::galaxy:
+    case SimulationMode::two_body_orbit:
+    case SimulationMode::symmetric_pair:
+    case SimulationMode::small_n_conservation:
+    case SimulationMode::timestep_convergence:
+    case SimulationMode::tpf_single_source_inspect:
+    case SimulationMode::tpf_symmetric_pair_inspect:
+    case SimulationMode::tpf_source_field_benchmark:
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+    case SimulationMode::tpf_weak_field_calibration:
+    case SimulationMode::tpf_newtonian_force_compare:
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+    case SimulationMode::earth_moon_benchmark:
+    case SimulationMode::bh_orbit_validation:
+      return true;
+    default:
+      return false;
+  }
 }
 
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
@@ -204,12 +239,8 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_dynamics_mode") {
     std::string s = trim(val);
-    if (s == "legacy_readout") {
-      throw std::runtime_error("legacy_readout has been removed; use xi_kernel_deformed or direct_tpf.");
-    }
-    if (s != "geodesic_correspondence" && s != "v11_weak_field_truncation" && s != "direct_tpf" && s != "xi_kernel_deformed") {
-      throw std::runtime_error(
-          "tpf_dynamics_mode must be geodesic_correspondence, v11_weak_field_truncation, direct_tpf, or xi_kernel_deformed, got: " + val);
+    if (s != "tpf_xi_theta_v1") {
+      throw std::runtime_error("tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch, got: " + val);
     }
     config.tpf_dynamics_mode = s;
     return true;

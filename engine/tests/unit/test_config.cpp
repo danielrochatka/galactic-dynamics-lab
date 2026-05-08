@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
+#include "force_compare.hpp"
 #include <algorithm>
 #include <fstream>
 
@@ -11,9 +12,10 @@ TEST_CASE("config defaults") {
   CHECK(c.simulation_mode == galaxy::SimulationMode::galaxy);
   CHECK(c.physics_package == "Newtonian");
   CHECK(c.physics_package_compare == "");
-  CHECK(c.tpf_vdsg_coupling == doctest::Approx(1.0e-20));
+  CHECK(c.tpf_vdsg_coupling == doctest::Approx(0.0));
   CHECK(c.tpf_global_accel_shunt_enable == false);
   CHECK(c.tpf_global_accel_shunt_fraction == doctest::Approx(0.001));
+  CHECK(c.tpf_cooling_fraction == doctest::Approx(0.0));
   CHECK(c.tpf_accel_pipeline_diagnostics_csv == true);
   CHECK(c.tpf_source_benchmark_shape == "monopole");
   CHECK(c.tpf_source_benchmark_total_mass == doctest::Approx(galaxy::kDefaultBhMassKg));
@@ -157,26 +159,22 @@ TEST_CASE("tpfcore_closure_kappa key maps to same tpf_kappa storage") {
 }
 
 
-TEST_CASE("Config defaults TPFCore dynamics to xi_kernel_deformed") {
+TEST_CASE("Config defaults TPFCore dynamics to tpf_xi_theta_v1") {
   galaxy::Config c;
-  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+  CHECK(c.tpf_dynamics_mode == "tpf_xi_theta_v1");
 }
 
-TEST_CASE("geodesic_correspondence_baseline preset selects TPFCore and geodesic mode") {
+TEST_CASE("geodesic_correspondence_baseline preset is rejected on tpf_xi_theta_v1 branch") {
   Config c;
-  CHECK(galaxy::load_config_file("../configs/geodesic_correspondence_baseline.cfg", c));
-  CHECK(c.physics_package == "TPFCore");
-  CHECK(c.tpf_dynamics_mode == "geodesic_correspondence");
+  CHECK_THROWS(galaxy::load_config_file("../configs/geodesic_correspondence_baseline.cfg", c));
 }
-TEST_CASE("tpf_dynamics_mode accepts canonical modes and rejects deprecated alias") {
+TEST_CASE("tpf_dynamics_mode accepts only tpf_xi_theta_v1 on this branch") {
   Config c;
-  CHECK(apply_config_kv("tpf_dynamics_mode", "v11_weak_field_truncation", c));
-  CHECK(c.tpf_dynamics_mode == "v11_weak_field_truncation");
+  CHECK(apply_config_kv("tpf_dynamics_mode", "tpf_xi_theta_v1", c));
+  CHECK(c.tpf_dynamics_mode == "tpf_xi_theta_v1");
   CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "weak_field_correspondence", c));
-  CHECK(apply_config_kv("tpf_dynamics_mode", "direct_tpf", c));
-  CHECK(c.tpf_dynamics_mode == "direct_tpf");
-  CHECK(apply_config_kv("tpf_dynamics_mode", "xi_kernel_deformed", c));
-  CHECK(c.tpf_dynamics_mode == "xi_kernel_deformed");
+  CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "direct_tpf", c));
+  CHECK_THROWS(apply_config_kv("tpf_dynamics_mode", "xi_kernel_deformed", c));
   CHECK(apply_config_kv("tpf_weak_field_correspondence_alpha_si", "-6.0e-11", c));
   CHECK(c.tpf_weak_field_correspondence_alpha_si == doctest::Approx(-6.0e-11));
 }
@@ -187,33 +185,6 @@ TEST_CASE("tpfcore_enable_provisional_readout parses true for non-galaxy diagnos
   CHECK(apply_config_kv("tpfcore_enable_provisional_readout", "true", c));
   CHECK(c.tpfcore_enable_provisional_readout == true);
 }
-TEST_CASE("tpf_analysis_mode and simulation_mode tpf_v11_weak_field_correspondence") {
-  Config c;
-  CHECK(apply_config_kv("tpf_analysis_mode", "v11_weak_field_correspondence", c));
-  CHECK(c.tpf_analysis_mode == "v11_weak_field_correspondence");
-  CHECK(apply_config_kv("simulation_mode", "tpf_v11_weak_field_correspondence", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_v11_weak_field_correspondence);
-  CHECK(apply_config_kv("simulation_mode", "tpf_source_field_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_source_field_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_static_motion_readout_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark);
-  CHECK(apply_config_kv("simulation_mode", "tpf_4d_xi_motion_probe_benchmark", c));
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark);
-}
-
-TEST_CASE("v11_weak_field_correspondence_benchmark and Earth-Moon SI keys") {
-  Config c;
-  CHECK(c.v11_weak_field_correspondence_benchmark == "axis_monopole");
-  CHECK(apply_config_kv("v11_weak_field_correspondence_benchmark", "earth_moon_line_of_centers", c));
-  CHECK(c.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers");
-  CHECK(apply_config_kv("v11_em_mean_distance_m", "3.844e8", c));
-  CHECK(c.v11_em_mean_distance_m == doctest::Approx(3.844e8));
-  CHECK(apply_config_kv("v11_em_calib_surface_g_m_s2", "9.81", c));
-  CHECK(c.v11_em_calib_surface_g_m_s2 == doctest::Approx(9.81));
-}
-
 TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
   Config c;
   CHECK(apply_config_kv("tpf_xi_constraint_exterior_inspect", "true", c));
@@ -404,4 +375,50 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
   CHECK(has_key("tpf_4d_xi_source_speed_x"));
   CHECK(has_key("tpf_4d_xi_source_speed_y"));
   CHECK(has_key("tpf_4d_xi_source_speed_z"));
+}
+
+
+TEST_CASE("utility simulation modes remain parseable") {
+  const char* modes[] = {
+      "tpf_single_source_inspect", "tpf_symmetric_pair_inspect", "tpf_source_field_benchmark",
+      "tpf_4d_static_residual_benchmark", "tpf_4d_static_motion_readout_benchmark",
+      "tpf_4d_xi_motion_probe_benchmark", "tpf_weak_field_calibration",
+      "tpf_newtonian_force_compare", "tpf_diagnostic_consistency_audit"};
+  for (const char* m : modes) {
+    galaxy::Config c;
+    CHECK_NOTHROW(galaxy::apply_config_kv("simulation_mode", m, c));
+  }
+}
+
+TEST_CASE("unsupported utility simulation modes are rejected") {
+  galaxy::Config c;
+  CHECK_THROWS(galaxy::apply_config_kv("simulation_mode", "tpf_two_body_sweep", c));
+  CHECK_THROWS(galaxy::apply_config_kv("simulation_mode", "tpf_bound_orbit_sweep", c));
+}
+
+TEST_CASE("tpf utility mode dispatch classification") {
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_single_source_inspect));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_symmetric_pair_inspect));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_source_field_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_residual_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_weak_field_calibration));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_newtonian_force_compare));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
+  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::galaxy));
+  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::earth_moon_benchmark));
+}
+
+TEST_CASE("all executable simulation modes require output directory setup") {
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::galaxy));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::earth_moon_benchmark));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::bh_orbit_validation));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_single_source_inspect));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_newtonian_force_compare));
+}
+
+TEST_CASE("diagnostic_consistency_audit reports unavailable on v1 branch") {
+  galaxy::Config c;
+  CHECK_FALSE(galaxy::run_tpf_diagnostic_consistency_audit(c, "/tmp"));
 }

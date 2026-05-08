@@ -2,26 +2,25 @@
 #define GALAXY_PHYSICS_TPFCORE_PROVISIONAL_READOUT_HPP
 
 /**
- * PROVISIONAL motion/readout layer for TPFCore.
- * DEPRECATION STATUS (Stage 0): legacy runtime path retained for transition only.
- * Prefer xi_kernel_deformed (active supported path) or direct_tpf (paper-facing path)
- * for normal runs.
+ * PROVISIONAL readout/diagnostic helper layer for TPFCore.
  *
- * EXPLORATORY closures downstream of the source ansatz (see readout_closure.hpp).
- * Not the full derived TPF dynamics.
+ * Branch status: the active canonical runtime route is tpf_xi_theta_v1.
+ * Active v1 motion is Xi_total-driven (a = -K_xi * Xi_total_spatial), with Theta retained
+ * as diagnostic-only configuration-gradient output.
+ *
+ * The provisional functions declared here are retained temporarily for readout/diagnostic
+ * tooling cleanup and are not active v1 motion mechanics.
  *
  * Modes (dispatch in compute_provisional_readout_acceleration):
  * - tensor_radial_projection / _negated: per-source Theta projected along r_hat, superposed.
  * - tr_coherence_readout, derived_tpf_radial_readout: same hybrid radial closure (a_s r̂ from
  *   radial_acceleration_scalar_derived; κ–I ledger). Extra theta_tt/tr terms are diagnostics only.
  * - experimental_radial_r_scaling: separate radial closure from theta_rr.
- *
- * Integrator note: TPFCorePackage::compute_accelerations may fill ax, ay from VDSG instead;
- * when tpf_vdsg_coupling != 0, readout closures here are not used for ax, ay on that path.
  */
 
 #include "../../types.hpp"
 #include "derived_tpf_radial.hpp"
+#include "readout_diagnostics.hpp"
 #include <string>
 #include <vector>
 
@@ -49,23 +48,6 @@ void compute_provisional_readout_acceleration(const State& state,
                                                double& ay,
                                                const DerivedTpfPoissonConfig* derived_poisson = nullptr,
                                                const TpfRadialGravityProfile* derived_profile = nullptr);
-
-/** Per-particle readout diagnostics: a, Theta, I, and derived quantities. */
-struct ReadoutDiagnostics {
-  double ax, ay;
-  double theta_xx, theta_xy, theta_yy, theta_trace, invariant_I;
-  /** Theta Frobenius norm (configuration intensity); for regime diagnostics. */
-  double theta_norm = 0.0;
-  /* Derived-radial closure: diagnostic theta components (not added to ax, ay on that path). */
-  double theta_rr = 0.0;
-  double theta_tt = 0.0;
-  double theta_tr = 0.0;
-  double theta_rr_plus_theta_tt = 0.0;
-  double provisional_radial_readout = 0.0;
-  double provisional_tangential_readout = 0.0;
-  /** Optional regime label when populated (often empty for non–derived-radial modes). */
-  std::string regime;
-};
 
 void compute_provisional_readout_with_diagnostics(const State& state,
                                                    int i,

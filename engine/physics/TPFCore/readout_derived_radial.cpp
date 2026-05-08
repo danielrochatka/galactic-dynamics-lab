@@ -1,4 +1,5 @@
 #include "readout_model_families.hpp"
+#include "readout_diagnostics.hpp"
 
 #include "field_evaluation.hpp"
 

@@ -93,7 +93,7 @@ std::string compute_active_dynamics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
              "legacy_readout; not direct_tpf dynamics; not orbit integration)";
@@ -103,43 +103,23 @@ std::string compute_active_dynamics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
   if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
-  if (geodesic_correspondence_requested(config))
-    return "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=geodesic_correspondence; rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_weak_field_truncation_requested(config) && !v11_legacy_free_parameter_active(config))
-    return "tpf_runtime_path_tier=paper_facing; requested_tpf_dynamics_mode=v11_weak_field_truncation; effective_tpf_dynamics_mode=geodesic_correspondence; alias_forwarded=true; rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_legacy_free_parameter_active(config)) {
-    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=v11_weak_field_truncation; correspondence implementation; alpha_si legacy free-parameter";
-  }
-  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
     std::ostringstream os;
     const std::string kernel_desc =
         (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
             ? "VDSG transverse wake Xi-kernel deformation"
             : "standard Xi-kernel deformation";
-    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=xi_kernel_deformed; a=-K_xi*Xi_eff_spatial; K_xi=tpf_4d_xi_motion_readout_scale="
+    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=tpf_xi_theta_v1; Xi_total-driven motion; Theta=grad(Xi_total) diagnostic_only; K_xi=tpf_4d_xi_motion_readout_scale="
        << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
        << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
        << "; xi_kernel_label=" << kernel_desc
        << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
        << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
        << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
-       << "; additive_vdsg=off; principal_c=off; direct_tpf=off; newtonian=off";
+       << "; motion_update=Xi_total_only; theta_role=diagnostic_only";
     return os.str();
   }
-  if (config.tpf_dynamics_mode == "direct_tpf") {
-    std::ostringstream os;
-    os << "tpf_runtime_path_tier=paper_facing; tpf_dynamics_mode=direct_tpf; Theta/I/kappa; DeltaC omitted; Xi-directed readout; vdsg_coupling="
-       << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-    return os.str();
-  }
-  /* DEPRECATED legacy path (Stage 0 banner): legacy_readout/provisional_readout */
-  if (!config.tpfcore_enable_provisional_readout)
-    return "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout disabled";
-  const std::string& mode = config.tpfcore_readout_mode;
-  std::ostringstream os;
-  os << "tpf_runtime_path_tier=deprecated_legacy; tpf_dynamics_mode=legacy_readout; provisional readout; mode=" << mode
-     << "; vdsg_coupling=" << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-  return os.str();
+  return "tpf_runtime_path_tier=unsupported_non_v1";
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
@@ -152,7 +132,7 @@ std::string compute_active_metrics_branch(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
       return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
     }
@@ -160,22 +140,9 @@ std::string compute_active_metrics_branch(const Config& config) {
   }
   if (config.physics_package == "Newtonian") return "none";
   if (config.physics_package == "TPFCore") {
-    if (geodesic_correspondence_effective(config))
-      return "geodesic correspondence metrics; rho_Xi -> Poisson analytic -> geodesic";
-    if (v11_legacy_free_parameter_active(config))
-      return "v11 correspondence metrics; alpha_si legacy free-parameter";
-    if (config.tpf_dynamics_mode == "direct_tpf") {
-      std::ostringstream os;
-      os << "direct_tpf metrics; Theta/I/kappa; DeltaC omitted; vdsg_coupling="
-         << std::scientific << std::setprecision(6) << config.tpf_vdsg_coupling;
-      return os.str();
-    }
-    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-      return "xi_kernel_deformed metrics; Xi_eff readout a=-K_xi*Xi_eff_spatial";
-    }
-    if (config.tpfcore_enable_provisional_readout)
-      return "tpfcore_readout:" + config.tpfcore_readout_mode;
-    return "TPFCore metrics n/a (provisional readout off)";
+    if (config.tpf_dynamics_mode == "tpf_xi_theta_v1")
+      return "tpf_xi_theta_v1 metrics; Xi_total and full unsymmetrized Theta=grad(Xi_total)";
+    return "unsupported_non_v1";
   }
   return "unknown";
 }
@@ -190,39 +157,15 @@ std::string compute_acceleration_code_path(const Config& config) {
   if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";
   }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
   if (config.physics_package != "TPFCore") return "unknown_package";
-  if (geodesic_correspondence_effective(config))
-    return "geodesic_correspondence: rho_Xi -> Poisson analytic -> geodesic";
-  if (v11_legacy_free_parameter_active(config))
-    return "TPFCorePackage::compute_v11_weak_field_truncation_accelerations (legacy alpha_si free-parameter path; no VDSG/readout/shunt/cooling)";
-  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (runtime Xi-kernel deformation; per-source Xi_eff sum -> a=-K_xi*Xi_eff_spatial; no additive VDSG helper; no principal-C direct_tpf readout)";
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
+    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (v1 Xi route; per-source Xi contributions sum into Xi_total; motion uses Xi_total only; Theta=grad(Xi_total) is diagnostic only)";
   }
-  if (config.tpf_dynamics_mode == "direct_tpf") {
-    return std::string("TPFCorePackage::compute_direct_tpf_accelerations "
-                       "(principal-part implementation: field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; "
-                       "Theta/I/kappa baseline; DeltaC omitted in current implementation scope; readout/shunt/cooling rejected)")
-           + (tpf_vdsg_active_for_audit(config)
-                  ? std::string(" + accumulate_vdsg_velocity_modifier (optional additive VDSG extension)")
-                  : std::string(" + accumulate_vdsg_velocity_modifier (continuous zero contribution at tpf_vdsg_coupling == 0)"));
-  }
-  if (!config.tpfcore_enable_provisional_readout)
-    return "TPFCorePackage::compute_accelerations (legacy_readout; throws without provisional readout)";
-  std::string base;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(config.tpfcore_readout_mode))
-    base = "TPFCorePackage::compute_provisional_readout_acceleration + derived_tpf_radial_profile";
-  else
-    base = "TPFCorePackage::compute_provisional_readout_acceleration (" + config.tpfcore_readout_mode + ")";
-  std::string tail = " + accumulate_vdsg_velocity_modifier";
-  if (config.tpf_global_accel_shunt_enable)
-    tail += " + apply_global_accel_magnitude_shunt (when tpf_global_accel_shunt_enable)";
-  else
-    tail += " (global |a| shunt OFF)";
-  return base + tail;
+  return "unsupported_non_v1";
 }
 
 void write_render_manifest(const std::string& output_dir,
@@ -243,7 +186,7 @@ void write_render_manifest(const std::string& output_dir,
        !geodesic_correspondence_effective(config) && !v11_legacy_free_parameter_active(config));
   const bool legacy_readout_metadata_active =
       config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "legacy_readout" &&
-      config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence;
+      true;
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -262,7 +205,7 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "artifact_scope_note_secondary",
             "secondary = lab/origin-radial diagnostics when pair-frame diagnostics are primary");
     json_kv(jf, first, "tpf_analysis_mode", config.tpf_analysis_mode);
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       json_kv_bool(jf, first, "v11_delta_c_computed", false);
       json_kv(jf, first, "v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
       if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
@@ -294,20 +237,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_dynamics_branch", dyn);
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
-    const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
-    const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
-    const bool is_geodesic_effective = geodesic_correspondence_effective(config);
-    const bool is_v11_legacy = v11_legacy_free_parameter_active(config);
+    const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
     if (config.physics_package == "TPFCore" &&
-        config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
-      json_kv(jf, first, "tpf_core_law_mode",
-              is_direct ? "direct_tpf_tensor_principal_part"
-                        : (is_xi_kernel ? "xi_kernel_deformed"
-                                        : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
-                                                                 : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
-                                                                                  : "legacy_readout_provisional"))));
-      if (is_xi_kernel) {
-        json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_eff_spatial");
+        true) {
+      json_kv(jf, first, "tpf_core_law_mode", is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1");
+      if (is_v1) {
+        json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_total_spatial");
         json_kv(jf, first, "K_xi", "tpf_4d_xi_motion_readout_scale");
         json_kv_num(jf, first, "tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
         json_kv(jf, first, "xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
@@ -317,27 +252,7 @@ void write_render_manifest(const std::string& output_dir,
         json_kv_num(jf, first, "xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
         json_kv(jf, first, "xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
       } else {
-        json_kv(jf, first, "tpf_truncation_mode",
-                is_direct
-                    ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                    : (is_geodesic_effective
-                           ? "geodesic_correspondence_static_weak_field_flux_poisson_geodesic"
-                           : (is_v11_legacy
-                                  ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                                  : "none")));
-        json_kv(jf, first, "tpf_extension_mode",
-                (is_geodesic_effective || is_v11_legacy) ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"));
-        json_kv(jf, first, "tpf_stabilizer_mode",
-                (is_direct || is_geodesic_effective || is_v11_legacy)
-                    ? "none_shunt_and_cooling_rejected"
-                    : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                           ? "shunt_or_cooling_configured"
-                           : "none"));
-        if (v11_weak_field_truncation_requested(config)) {
-          json_kv(jf, first, "requested_tpf_dynamics_mode", "v11_weak_field_truncation");
-          json_kv(jf, first, "effective_tpf_dynamics_mode", is_geodesic_effective ? "geodesic_correspondence" : "v11_weak_field_truncation");
-          json_kv_bool(jf, first, "tpf_dynamics_mode_alias_forwarded", is_geodesic_effective);
-        }
+        json_kv(jf, first, "tpf_runtime_route_status", "unsupported_non_v1");
       }
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
@@ -352,7 +267,7 @@ void write_render_manifest(const std::string& output_dir,
       json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
       json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
     }
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
       json_kv_bool(jf, first, "tpfcore_enable_provisional_readout_operative_for_this_run", false);
       json_kv(jf, first, "tpf_dynamics_mode_operative_for_this_run", "none_audit_only");
@@ -404,20 +319,11 @@ void write_render_manifest(const std::string& output_dir,
     tf << "active_metrics_branch\t" << met << "\n";
     tf << "acceleration_code_path\t" << acc << "\n";
     if (config.physics_package == "TPFCore" &&
-        config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence) {
-      const bool is_direct = (config.tpf_dynamics_mode == "direct_tpf");
-      const bool is_xi_kernel = (config.tpf_dynamics_mode == "xi_kernel_deformed");
-      const bool is_geodesic_effective = geodesic_correspondence_effective(config);
-      const bool is_v11_legacy = v11_legacy_free_parameter_active(config);
-      tf << "tpf_core_law_mode\t"
-         << (is_direct ? "direct_tpf_tensor_principal_part"
-                       : (is_xi_kernel ? "xi_kernel_deformed"
-                                       : (is_geodesic_effective ? "geodesic_correspondence_flux_poisson_geodesic"
-                                                                : (is_v11_legacy ? "v11_weak_field_truncation_correspondence_helper"
-                                                                                 : "legacy_readout_provisional"))))
-         << "\n";
-      if (is_xi_kernel) {
-        tf << "acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
+        true) {
+      const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
+      tf << "tpf_core_law_mode\t" << (is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1") << "\n";
+      if (is_v1) {
+        tf << "acceleration_formula\ta=-K_xi*Xi_total_spatial\n";
         tf << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
         tf << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
         tf << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
@@ -427,30 +333,7 @@ void write_render_manifest(const std::string& output_dir,
         tf << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
         tf << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
       } else {
-        tf << "tpf_truncation_mode\t"
-           << (is_direct ? "direct_tpf_tensor_principal_part_Theta_I_kappa_baseline_DeltaC_omitted"
-                         : (is_geodesic_effective
-                                ? "geodesic_correspondence_static_weak_field_flux_poisson_geodesic"
-                                : (is_v11_legacy
-                                ? "v11_weak_field_correspondence_helper_alpha_si_path_legacy_compat_benchmark"
-                                : "none")))
-           << "\n";
-        tf << "tpf_extension_mode\t"
-           << ((is_geodesic_effective || is_v11_legacy) ? "none_vdsg_rejected" : (tpf_vdsg_active_for_audit(config) ? "vdsg" : "none"))
-           << "\n";
-        tf << "tpf_stabilizer_mode\t"
-           << ((is_direct || is_geodesic_effective || is_v11_legacy)
-                   ? "none_shunt_and_cooling_rejected"
-                   : ((config.tpf_global_accel_shunt_enable || config.tpf_cooling_fraction > 0.0)
-                          ? "shunt_or_cooling_configured"
-                          : "none"))
-           << "\n";
-        if (v11_weak_field_truncation_requested(config)) {
-          tf << "requested_tpf_dynamics_mode\tv11_weak_field_truncation\n";
-          tf << "effective_tpf_dynamics_mode\t"
-             << (is_geodesic_effective ? "geodesic_correspondence" : "v11_weak_field_truncation") << "\n";
-          tf << "tpf_dynamics_mode_alias_forwarded\t" << (is_geodesic_effective ? 1 : 0) << "\n";
-        }
+        tf << "tpf_runtime_route_status	unsupported_non_v1\n";
       }
     }
     tf << "physics_package\t" << config.physics_package << "\n";
@@ -460,7 +343,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "artifact_scope_note_primary\tprimary=main interpretation outputs for selected mode\n";
     tf << "artifact_scope_note_secondary\tsecondary=lab/origin-radial diagnostics when pair frame is primary\n";
     tf << "tpf_analysis_mode\t" << config.tpf_analysis_mode << "\n";
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       tf << "v11_delta_c_computed\t0\n";
       tf << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
       if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
@@ -489,7 +372,7 @@ void write_render_manifest(const std::string& output_dir,
     tf << "tpf_kappa\t" << config.tpf_kappa << "\n";
     tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
     tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       tf << "v11_weak_field_correspondence_audit_only\t1\n";
       tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
       tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";

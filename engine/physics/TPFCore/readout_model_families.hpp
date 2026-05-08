@@ -2,11 +2,13 @@
 #define GALAXY_PHYSICS_TPFCORE_READOUT_MODEL_FAMILIES_HPP
 
 #include "derived_tpf_radial.hpp"
-#include "provisional_readout.hpp"
 #include "../../types.hpp"
 
 namespace galaxy {
 namespace tpfcore {
+
+struct ReadoutDiagnostics;
+
 namespace readout_models {
 
 void apply_tensor_radial_projection_readout(const State& state,

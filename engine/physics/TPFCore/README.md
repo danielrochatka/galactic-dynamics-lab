@@ -4,7 +4,7 @@
 
 It is **not** the old removed “weak-field Newtonian-like TPF” package. For **lab-wide overview** and **engine** behavior, see **[../../../README.md](../../../README.md)** and **[../../README.md](../../README.md)** (`engine`). Here: **what this package is**, **what is paper-aligned vs exploratory**, and **how to read branch labels** in manifests.
 
-Current spike branch status: runtime dynamics are route-dependent and now include the `xi_kernel_deformed` runtime route (`tpf_dynamics_mode=xi_kernel_deformed`) alongside legacy compatibility routes (`legacy_readout`, `direct_tpf`, `v11_weak_field_truncation`). Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. Stage 5 adds view-plane export/plot outputs rendered from that full spatial-support static 4D residual evaluation. Stage 7A adds `tpf_4d_static_motion_readout_benchmark`, a candidate probe-motion readout benchmark from frozen static 4D field data using `GravityStaticMotionReadout_v1` (principal tensor readout with DeltaC omitted for this named benchmark).
+Current branch status: runtime dynamics use a single canonical route, `tpf_xi_theta_v1`. On this route, per-source Xi contributions are summed into Xi_total, acceleration is read from Xi_total only, and Theta is kept as a diagnostic-only full unsymmetrized Jacobian `Theta_ij = d_j Xi_i,total`. Stage 1–4 added an isolated `tpf_4d_static_residual_benchmark` path with static Xi4/ordered-Theta4 field objects and full spatial-support residual diagnostics over an x/y/z stencil. Stage 5 adds view-plane export/plot outputs rendered from that full spatial-support static 4D residual evaluation. Stage 7A adds `tpf_4d_static_motion_readout_benchmark`, a candidate probe-motion readout benchmark from frozen static 4D field data using `GravityStaticMotionReadout_v1` (principal tensor readout with DeltaC omitted for this named benchmark).
 
 **Manuscript v11 vs simulator tiers:** **[TPF_PAPER_V11_SCOPE.md](TPF_PAPER_V11_SCOPE.md)**.
 
@@ -15,7 +15,7 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 ## Runtime dynamics vs static 4D benchmark scope
 
 - **Ξ** — displacement field from the potential ansatz (see `source_ansatz.*`).
-- **Runtime dynamics path (current)**: uses existing projected-vector / spatial-tensor structures and route-specific acceleration closures.
+- **Runtime dynamics path (current)**: `tpf_xi_theta_v1` only.
 - **Static 4D benchmark path (Stage 1–4, spike branch)**: diagnostic-only path that evaluates static Xi4 / ordered Theta4 and a full spatial-support residual diagnostic (x/y/z stencil), with no particle integration and no acceleration path.
 - **Static 4D motion-readout benchmark (Stage 7A, spike branch)**: simulator-exploratory path that evaluates static Xi4 / ordered Theta4 field data and computes candidate probe-motion readout accelerations via `GravityStaticMotionReadout_v1`; this is a candidate future paper-expansion path if benchmark behavior continues to pass regression tests.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
@@ -30,8 +30,8 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 | Layer | Role |
 |-------|------|
 | **Ansatz** | **Φ = −M/R**, **R² = dx²+dy²+eps²**; **Ξ**, **Θ** from closed-form derivatives (`source_ansatz.*`). Provisional where the manuscript leaves the full source unspecified. |
-| **Closure (acceleration)** | **Current code is route-dependent:** **`direct_tpf`** is the tensor principal-part route (field_evaluation → legacy spatial tensor objects → principal_Cij → tensor_projection; Theta/I/kappa baseline; DeltaC omitted in current implementation scope) with optional **legacy additive VDSG** extension. **`v11_weak_field_truncation`** is the explicit weak-field correspondence helper (alpha_si path; legacy/benchmark compatibility). **`legacy_readout`** uses readout baseline from **`compute_provisional_readout_acceleration`**, then **`accumulate_vdsg_velocity_modifier`** (no-op when `tpf_vdsg_coupling = 0`), then optional **`apply_global_accel_magnitude_shunt`**. **`xi_kernel_deformed`** is a runtime Xi-kernel route: per-source Xi is computed, optional Xi-kernel deformation is applied, `Xi_eff` is summed, and acceleration is read as `a = -K_xi * Xi_eff_spatial` (no additive VDSG term appended). |
-| **Diagnostics** | CSVs, debug columns, and **`ReadoutDiagnostics`**: on **derived-radial** readout modes, **theta_tt** / **theta_tr** / **provisional_tangential_readout** are **not** added to **ax, ay** (only radial **a_s** is). Legacy additive VDSG contributes an additive SI excess on applicable legacy routes, while Xi-kernel deformation modifies Xi before readout in `xi_kernel_deformed`. |
+| **Closure (acceleration)** | `tpf_xi_theta_v1`: compute Xi contributions per active source, sum to Xi_total, and apply `a = -K_xi * Xi_total_spatial` for point motion. |
+| **Diagnostics** | Keep canonical full unsymmetrized `Theta_ij = d_j Xi_i,total` as diagnostic/topological output only. Derived scalars may be emitted in addition to this full object. |
 
 ---
 
@@ -39,10 +39,10 @@ Current spike branch status: runtime dynamics are route-dependent and now includ
 
 The simulator exposes **resolved strings** in **`run_info.txt`** and **`render_manifest.json`** (computed in **`render_audit.cpp`**):
 
-- **`active_dynamics_branch`** — runtime branch identity (`direct_tpf` tensor principal-part route vs `v11_weak_field_truncation` correspondence helper vs `legacy_readout` provisional path vs `xi_kernel_deformed` Xi-kernel route).
+- **`active_dynamics_branch`** — runtime branch identity (`tpf_xi_theta_v1` on this branch for dynamics).
 - **`active_metrics_branch`** — matching metrics branch identity for that runtime route.
 
-**Integrator accelerations** depend on routing: **`direct_tpf`** uses the tensor principal-part Theta/I/kappa baseline (DeltaC omitted in current implementation scope; legacy additive VDSG optional extension; readout/shunt/cooling rejected), **`v11_weak_field_truncation`** is the weak-field correspondence helper (alpha_si path, legacy/benchmark compatibility), **`legacy_readout`** uses baseline readout + optional legacy additive VDSG + optional global shunt, and **`xi_kernel_deformed`** uses Xi-kernel evaluation plus optional Xi-kernel deformation with acceleration readout `a = -K_xi * Xi_eff_spatial`.
+**Integrator accelerations** on this branch use `tpf_xi_theta_v1`: Xi_total-driven motion only; Theta remains diagnostic-only.
 
 ---
 
@@ -123,11 +123,13 @@ For clarity: **`tpf_vdsg_coupling`** is the legacy additive VDSG knob and is **n
 - The default acceleration path does not compute Theta/I/direct_tpf/provisional readout fields.
 - Optional field diagnostics can compute expensive Theta/I/provisional quantities only when explicitly enabled (for example `tpf_xi_kernel_dump_field_diagnostics=true`).
 
+At each simulation step, the route builds `Xi_total` for the current source configuration and computes `Theta` as the configuration-gradient map of that `Xi_total` field. All particles/probes in that step read from the same frozen Xi/Theta state. After the update, Xi/Theta are rebuilt from the new source configuration.
+
 Mode details:
 - `off`: baseline Xi with no deformation.
 - `scalar_beta`: scales Xi by a beta-derived factor (exploratory).
-- `metric_radial`: metric-style deformation along source-target radial direction.
-- `metric_velocity`: metric-style deformation using total relative speed/direction (exploratory).
+- `metric_radial`: configuration-gradient deformation along source-target radial direction (legacy mode label retained for config compatibility).
+- `metric_velocity`: configuration-gradient deformation using total relative speed/direction (exploratory; legacy mode label retained for config compatibility).
 - `metric_transverse_wake`: preferred current VDSG ship-wake **candidate** mode requiring transverse passing motion and post-pass/separating geometry. Current implemented gate uses  
   `beta_pass = v_transverse / c`,  
   `radial_ratio = v_radial / max(v_transverse, eps)`,  
@@ -136,8 +138,8 @@ Mode details:
   Circular/pure transverse orbiting geometry is tested to keep wake activation near null in this mode, consistent with an intended circular-orbit/null correspondence behavior. This is a tested runtime behavior and candidate interpretation, not yet an empirical validation claim.
 - `metric_transverse_continuous`: experimental orbit-active transverse mode preserving older behavior with  
   `wake_gate = 0.5 * (1 + tanh(v_radial / max(v_transverse, eps)))`.  
-  At circular/closest-pass (`v_radial≈0`) with transverse motion, `wake_gate≈0.5`. This mode is useful for testing whether continuous transverse spacetime/Xi deformation is needed; it is experimental and not yet validated.
-- `spacetime_metric`: Xi0/Xi_t diagnostic mode where configured; Xi0 does not feed spatial acceleration unless explicitly implemented later.
+  At circular/closest-pass (`v_radial≈0`) with transverse motion, `wake_gate≈0.5`. This mode is useful for testing whether continuous transverse Xi-field / configuration-gradient deformation is needed; it is experimental and not yet validated.
+- `spacetime_metric`: Xi0/Xi_t diagnostic mode (legacy mode label retained for config compatibility); Xi0 does not feed spatial acceleration unless explicitly implemented later.
 
 Factor modes and clamps:
 - `beta_power`: `factor_raw = coupling * beta_effective^beta_power`.

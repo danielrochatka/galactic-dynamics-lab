@@ -1,27 +1,19 @@
 /**
  * TPFCore package implementation.
- * Current implementation uses Xi and Theta from the provisional source ansatz on z = 0;
- * in the direct_tpf baseline helper path, I is derived from Theta.
- * Integrator accelerations are mode-dependent (see compute_accelerations):
- * - direct_tpf: principal-part implementation with Theta/I/kappa baseline; DeltaC omitted in current scope;
- *   optional additive VDSG extension on top of that baseline.
- * - geodesic_correspondence: canonical correspondence implementation using fixed -TPF_G_SI coefficient.
- * - v11_weak_field_truncation: deprecated alias; optional legacy free-parameter alpha_si behavior.
- * - legacy_readout: provisional readout-based implementation + optional VDSG modifier + optional global |a| shunt.
- * - xi_kernel_deformed: runtime Xi-kernel route; computes Xi-based acceleration without Theta/I in its default
- *   acceleration path, can apply optional Xi-kernel deformation before readout, and reads acceleration as
- *   a = -K_xi * Xi_eff_spatial. The old additive VDSG acceleration modifier is not used on this route.
- *   Optional diagnostics can still compute Theta/I/provisional quantities when explicitly enabled.
+ * Canonical branch route: tpf_xi_theta_v1.
+ * - Sources contribute Xi_a.
+ * - Xi_total = sum_a Xi_a.
+ * - Motion update uses Xi_total only.
+ * - Theta is the diagnostic unsymmetrized spatial Jacobian: Theta_ij = d_j Xi_i,total.
+ * - Theta must not alter motion in v1.
  */
 
 #include "tpf_core_package.hpp"
-#include "../../accel_pipeline_stats.hpp"
 #include "../../config.hpp"
 #include "../../softening_policy.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
 #include "field_evaluation.hpp"
-#include "direct_tpf_baseline.hpp"
 #include "extensions_vdsg.hpp"
 #include "provisional_readout.hpp"
 #include "regime_diagnostics.hpp"
@@ -29,7 +21,6 @@
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
 #include "tpf_4d_static_residual.hpp"
-#include "v11_weak_field_correspondence.hpp"
 #include "xi_constraint_exterior_solver.hpp"
 #include "source_iteration.hpp"
 #include <algorithm>
@@ -72,7 +63,7 @@ static tpfcore::TPFCoreParams build_params(const Config& config, const std::stri
 }
 
 TPFCorePackage::TPFCorePackage()
-    : tpf_dynamics_mode_("xi_kernel_deformed"),
+    : tpf_dynamics_mode_("tpf_xi_theta_v1"),
       provisional_readout_(false),
       readout_mode_("tensor_radial_projection"),
       readout_scale_(1.0),
@@ -81,7 +72,7 @@ TPFCorePackage::TPFCorePackage()
       source_softening_(0.0),
       kappa_(1.0e32),
       weak_field_correspondence_alpha_si_(-tpfcore::TPF_G_SI),
-      vdsg_coupling_(1.0e-20),
+      vdsg_coupling_(0.0),
       vdsg_mass_baseline_resolved_kg_(0.0),
       vdsg_mode_("legacy_speed"),
       vdsg_mass_gate_m0_kg_(1.98847e30),
@@ -92,10 +83,9 @@ TPFCorePackage::TPFCorePackage()
       vdsg_weak_field_power_(1.0),
       vdsg_bounded_amplitude_(0.25),
       simulation_dt_(0.01),
-      cooling_fraction_(0.2),
+      cooling_fraction_(0.0),
       shunt_enable_(false),
       shunt_fraction_(0.001),
-      pipeline_diagnostics_csv_(true),
       xi_motion_readout_scale_(1.0e-12),
       xi_kernel_mode_("off"),
       xi_kernel_coupling_(0.0),
@@ -111,22 +101,8 @@ TPFCorePackage::TPFCorePackage()
 
 void TPFCorePackage::init_from_config(const Config& config) {
   tpf_dynamics_mode_ = config.tpf_dynamics_mode;
-  if (tpf_dynamics_mode_ == "weak_field_correspondence") {
-    tpf_dynamics_mode_ = "v11_weak_field_truncation";  // deprecated compatibility alias (correspondence helper only)
-  }
-  if (tpf_dynamics_mode_ == "geodesic_correspondence") {
-    weak_field_correspondence_alpha_si_ = -tpfcore::TPF_G_SI;
-    if (config.tpf_weak_field_correspondence_alpha_si_explicitly_set) {
-      std::cerr << "[TPFCore] warning: tpf_dynamics_mode=geodesic_correspondence ignores explicit tpf_weak_field_correspondence_alpha_si and uses -TPF_G_SI.\n";
-    }
-  } else if (tpf_dynamics_mode_ == "v11_weak_field_truncation") {
-    if (!config.tpf_weak_field_correspondence_alpha_si_explicitly_set) {
-      std::cerr << "[TPFCore] deprecation warning: tpf_dynamics_mode=v11_weak_field_truncation is deprecated; forwarding to geodesic_correspondence with fixed -TPF_G_SI.\n";
-      tpf_dynamics_mode_ = "geodesic_correspondence";
-      weak_field_correspondence_alpha_si_ = -tpfcore::TPF_G_SI;
-    } else {
-      std::cerr << "[TPFCore] warning: tpf_dynamics_mode=v11_weak_field_truncation with explicit alpha_si is legacy free-parameter mode, not canonical geodesic correspondence.\n";
-    }
+  if (tpf_dynamics_mode_ != "tpf_xi_theta_v1") {
+    throw std::runtime_error("TPFCore on this branch supports only tpf_dynamics_mode=tpf_xi_theta_v1.");
   }
   provisional_readout_ = config.tpfcore_enable_provisional_readout;
   readout_mode_ = config.tpfcore_readout_mode;
@@ -134,7 +110,7 @@ void TPFCorePackage::init_from_config(const Config& config) {
   theta_tt_scale_ = config.tpfcore_theta_tt_scale;
   theta_tr_scale_ = config.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
-  if (tpf_dynamics_mode_ != "geodesic_correspondence") weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
+  weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
   kappa_ = config.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
   derived_poisson_cfg_.kappa = config.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
   derived_poisson_cfg_.bins = config.tpf_poisson_bins;
@@ -161,7 +137,6 @@ void TPFCorePackage::init_from_config(const Config& config) {
   shunt_fraction_ = (config.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(config.tpf_global_accel_shunt_fraction))
                         ? config.tpf_global_accel_shunt_fraction
                         : 0.001;
-  pipeline_diagnostics_csv_ = config.tpf_accel_pipeline_diagnostics_csv;
   xi_motion_readout_scale_ = config.tpf_4d_xi_motion_readout_scale;
   xi_kernel_mode_ = config.tpf_4d_xi_kernel_mode;
   xi_kernel_coupling_ = config.tpf_4d_xi_kernel_coupling;
@@ -174,6 +149,21 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
+  if (config.tpf_cooling_fraction > 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_cooling_fraction > 0; cooling is not part of strict v1 dynamics.");
+  }
+  if (config.tpf_global_accel_shunt_enable) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_global_accel_shunt_enable=true; global acceleration shunt is not part of strict v1 dynamics.");
+  }
+  if (config.tpf_vdsg_coupling != 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 rejects nonzero tpf_vdsg_coupling; additive VDSG modifier is not part of strict v1 dynamics.");
+  }
+  if (config.tpf_4d_xi_kernel_mode != "off") {
+    throw std::runtime_error("tpf_xi_theta_v1 currently supports only tpf_4d_xi_kernel_mode=off; non-off Xi-kernel modes are unavailable on this branch.");
+  }
+  if (config.tpf_4d_xi_kernel_coupling != 0.0) {
+    throw std::runtime_error("tpf_xi_theta_v1 currently requires tpf_4d_xi_kernel_coupling=0.0 on this branch.");
+  }
 }
 
 namespace {
@@ -498,153 +488,6 @@ TPFCoreRegistrar s_tpfcore_registrar;
 
 }  // namespace
 
-void TPFCorePackage::eval_accel_pipeline(const State& state,
-                                         double bh_mass,
-                                         double softening,
-                                         bool star_star,
-                                         std::vector<double>& ax,
-                                         std::vector<double>& ay,
-                                         AccelPipelineStats* stats_out) const {
-  const int n = state.n();
-  ax.assign(n, 0.0);
-  ay.assign(n, 0.0);
-
-  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-    tpfcore::TpfRadialGravityProfile profile =
-        tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps);
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          &derived_poisson_cfg_, &profile);
-    }
-  } else {
-    for (int i = 0; i < n; ++i) {
-      tpfcore::compute_provisional_readout_acceleration(
-          state, i, bh_mass, star_star, softening, source_softening_,
-          readout_mode_, readout_scale_,
-          theta_tt_scale_, theta_tr_scale_, ax[i], ay[i],
-          nullptr, nullptr);
-    }
-  }
-
-  double sum_b = 0.0;
-  for (int i = 0; i < n; ++i) {
-    sum_b += std::hypot(ax[i], ay[i]);
-  }
-  const double mean_b = (n > 0) ? (sum_b / static_cast<double>(n)) : 0.0;
-
-  std::vector<double> dax, day;
-  tpfcore::VdsgDiagnosticsSummary vdsg_diag;
-  tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                             vdsg_mass_baseline_resolved_kg_, vdsg_mode_, vdsg_mass_gate_m0_kg_,
-                                             vdsg_mass_gate_alpha_, vdsg_x_clamp_, vdsg_weak_field_gate_enable_,
-                                             vdsg_weak_field_a0_, vdsg_weak_field_power_, vdsg_bounded_amplitude_, dax, day,
-                                             &vdsg_diag);
-  double sum_v = 0.0;
-  for (int i = 0; i < n; ++i) {
-    sum_v += std::hypot(dax[i], day[i]);
-  }
-  const double mean_v = (n > 0) ? (sum_v / static_cast<double>(n)) : 0.0;
-
-  for (int i = 0; i < n; ++i) {
-    ax[i] += dax[i];
-    ay[i] += day[i];
-  }
-
-  const unsigned shunt_n =
-      tpfcore::apply_global_accel_magnitude_shunt(state, simulation_dt_, shunt_enable_, shunt_fraction_, ax, ay);
-
-  if (stats_out) {
-    stats_out->valid = true;
-    stats_out->mean_baseline_mag = mean_b;
-    stats_out->mean_vdsg_mag = mean_v;
-    stats_out->vdsg_pairs_evaluated = vdsg_diag.pairs_evaluated;
-    stats_out->vdsg_min_beta_rad = vdsg_diag.min_beta_rad;
-    stats_out->vdsg_max_beta_rad = vdsg_diag.max_beta_rad;
-    stats_out->vdsg_mean_abs_beta_rad = (vdsg_diag.pairs_evaluated > 0) ? (vdsg_diag.sum_abs_beta_rad / vdsg_diag.pairs_evaluated) : 0.0;
-    stats_out->vdsg_over_baseline_ratio = (mean_b > 1e-300) ? (mean_v / mean_b) : 0.0;
-    stats_out->shunt_events_last_step = shunt_n;
-    stats_out->frac_capped_last_step =
-        (n > 0) ? (static_cast<double>(shunt_n) / static_cast<double>(n)) : 0.0;
-    stats_out->shunt_enabled = shunt_enable_;
-    stats_out->shunt_fraction = shunt_fraction_;
-  }
-}
-
-void TPFCorePackage::compute_direct_tpf_accelerations(const State& state,
-                                                      double bh_mass,
-                                                      double softening,
-                                                      bool star_star,
-                                                      std::vector<double>& ax,
-                                                      std::vector<double>& ay) const {
-  const int n = state.n();
-  ax.assign(n, 0.0);
-  ay.assign(n, 0.0);
-  const double eps = (source_softening_ > 0.0) ? source_softening_ : softening;
-  const double kappa = kappa_;
-  const double lambda = tpfcore::LAMBDA_4D;
-
-  for (int i = 0; i < n; ++i) {
-    // Explicit upstream boundary: Eq. (10) direct_tpf principal-part baseline is applied
-    // over the current provisional field ansatz from evaluate_provisional_field_multi_source.
-    const tpfcore::FieldAtPoint field =
-        tpfcore::evaluate_provisional_field_multi_source(state, i, bh_mass, star_star, eps);
-    const tpfcore::DirectTpfBaselineAccelerationResult baseline =
-        tpfcore::compute_direct_tpf_baseline_acceleration(field, kappa, lambda);
-    ax[i] = baseline.ax;
-    ay[i] = baseline.ay;
-  }
-}
-
-void TPFCorePackage::compute_v11_weak_field_truncation_accelerations(const State& state,
-                                                                     double bh_mass,
-                                                                     double softening,
-                                                                     bool star_star,
-                                                                     std::vector<double>& ax,
-                                                                     std::vector<double>& ay) const {
-  /**
-   * Canonical weak-field/geodesic correspondence chain (Paper A draft appendix + TPF_FOUNDATIONS):
-   *   matter -> Xi -> rho_Xi -> Poisson -> Phi -> a = -grad(Phi).
-   *
-   * Runtime on this route uses the analytic closed-form point-source shortcut of that chain.
-   * It does NOT numerically compute rho_Xi, solve Poisson on a grid, or differentiate Phi on a grid.
-   *
-   * Singular correspondence limit for a point source:
-   *   rho_Xi = M delta^3(x).
-   *
-   * Softened implementation uses:
-   *   rho_eps(r) = 3 M eps^2 / [4 pi (r^2 + eps^2)^(5/2)],
-   * which integrates to M over R^3.
-   *
-   * Theta_ij Theta^ij, I, and Q_wf are nonlinear ledger/diagnostic quantities.
-   * They are NOT the leading density source used by geodesic_correspondence acceleration.
-   */
-  compute_v11_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star,
-                                                      weak_field_correspondence_alpha_si_, ax, ay);
-}
-
-void TPFCorePackage::apply_vdsg_additive_extension(const State& state,
-                                                   double bh_mass,
-                                                   double softening,
-                                                   bool star_star,
-                                                   std::vector<double>& ax,
-                                                   std::vector<double>& ay) const {
-  std::vector<double> dax, day;
-  tpfcore::VdsgDiagnosticsSummary vdsg_diag;
-  tpfcore::accumulate_vdsg_velocity_modifier(state, bh_mass, softening, star_star, vdsg_coupling_,
-                                             vdsg_mass_baseline_resolved_kg_, vdsg_mode_, vdsg_mass_gate_m0_kg_,
-                                             vdsg_mass_gate_alpha_, vdsg_x_clamp_, vdsg_weak_field_gate_enable_,
-                                             vdsg_weak_field_a0_, vdsg_weak_field_power_, vdsg_bounded_amplitude_, dax, day,
-                                             &vdsg_diag);
-  for (int i = 0; i < state.n(); ++i) {
-    ax[i] += dax[i];
-    ay[i] += day[i];
-  }
-}
-
 bool TPFCorePackage::xi_kernel_deformation_active() const {
   return (xi_kernel_mode_ != "off" && xi_kernel_coupling_ != 0.0);
 }
@@ -655,7 +498,7 @@ void TPFCorePackage::validate_xi_kernel_runtime_config() const {
       xi_kernel_mode_ != "metric_velocity" && xi_kernel_mode_ != "metric_transverse_wake" &&
       xi_kernel_mode_ != "metric_transverse_continuous" && xi_kernel_mode_ != "spacetime_metric") {
     throw std::runtime_error(
-        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric");
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric (legacy label)");
   }
   if (xi_kernel_factor_mode_ != "beta_power" && xi_kernel_factor_mode_ != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
@@ -710,7 +553,7 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
     }
   }
 
-  auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, double& ax_i, double& ay_i) {
+  auto accumulate_source = [&](int i, const XiKernelRuntimeSource& src, XiThetaV1Sample& sample_i) {
     const double dx = state.x[i] - src.x;
     const double dy = state.y[i] - src.y;
     const double dz = 0.0;
@@ -786,13 +629,33 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
         xi_sy = src.mass * gy * inv_r_eff3;
       }
     }
-    double dax = -xi_motion_readout_scale_ * xi_sx;
-    double day = -xi_motion_readout_scale_ * xi_sy;
     const double softening_scale = plummer_softening_scale(r_sq_basis, eps);
-    dax *= softening_scale;
-    day *= softening_scale;
-    ax_i += dax;
-    ay_i += day;
+    const double xi_x = xi_sx * softening_scale;
+    const double xi_y = xi_sy * softening_scale;
+    const double xi_z = 0.0;
+
+    sample_i.xi_x += xi_x;
+    sample_i.xi_y += xi_y;
+    sample_i.xi_z += xi_z;
+
+    if (xi_kernel_mode_ != "off") {
+      throw std::runtime_error(
+          "tpf_xi_theta_v1 Theta Jacobian derivative is currently implemented only for xi_kernel_mode=off; "
+          "analytic derivative rule for active deformation mode is required before runtime use.");
+    }
+    const double s = r2 + eps * eps;
+    if (!(s > 0.0) || !std::isfinite(s)) return;
+    const double inv_s_3_2 = 1.0 / std::pow(s, 1.5);
+    const double inv_s_5_2 = 1.0 / std::pow(s, 2.5);
+    const double m = src.mass;
+    const double rx[3] = {dx, dy, 0.0};
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        const double delta = (row == col) ? 1.0 : 0.0;
+        const double d_xi = m * (delta * inv_s_3_2 - 3.0 * rx[row] * rx[col] * inv_s_5_2) * softening_scale;
+        sample_i.theta[row][col] += d_xi;
+      }
+    }
   };
 
   XiKernelRuntimeSource bh_src;
@@ -802,19 +665,19 @@ void TPFCorePackage::compute_xi_kernel_deformed_accelerations(const State& state
   bh_src.vz = xi_source_speed_z_;
 
   for (int i = 0; i < n; ++i) {
-    double ax_i = 0.0;
-    double ay_i = 0.0;
+    XiThetaV1Sample sample_i{};
     if (bh_mass > 0.0) {
-      accumulate_source(i, bh_src, ax_i, ay_i);
+      accumulate_source(i, bh_src, sample_i);
     }
     if (star_star) {
       for (int j = 0; j < n; ++j) {
         if (j == i) continue;
-        accumulate_source(i, star_sources[static_cast<std::size_t>(j)], ax_i, ay_i);
+        accumulate_source(i, star_sources[static_cast<std::size_t>(j)], sample_i);
       }
     }
-    ax[i] = ax_i;
-    ay[i] = ay_i;
+    ax[i] = -xi_motion_readout_scale_ * sample_i.xi_x;
+    ay[i] = -xi_motion_readout_scale_ * sample_i.xi_y;
+    if (i == 0) last_xi_theta_v1_sample_ = sample_i;
 
     if (bh_mass > 0.0 && !star_star && xi_motion_readout_scale_ > 0.0) {
       const double r = std::sqrt(state.x[i] * state.x[i] + state.y[i] * state.y[i]);
@@ -837,189 +700,12 @@ void TPFCorePackage::compute_accelerations(const State& state,
                                             bool star_star,
                                             std::vector<double>& ax,
                                             std::vector<double>& ay) const {
-  if (tpf_dynamics_mode_ == "xi_kernel_deformed") {
+  if (tpf_dynamics_mode_ == "tpf_xi_theta_v1") {
     xi_runtime_counters_.xi_last_call_pair_evaluations = 0;
     compute_xi_kernel_deformed_accelerations(state, bh_mass, softening, star_star, ax, ay);
-    last_pipeline_ = AccelPipelineStats{};
     return;
   }
-  if (tpf_dynamics_mode_ == "direct_tpf") {
-    if (provisional_readout_) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects tpfcore_enable_provisional_readout=true "
-          "(current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted).");
-    }
-    const bool has_non_neutral_readout_closure_knobs =
-        (readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 || theta_tr_scale_ != 1.0);
-    if (has_non_neutral_readout_closure_knobs) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects non-neutral provisional readout closure knobs "
-          "(tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale). "
-          "direct_tpf uses Xi_directed_tensor_readout internally and does not honor provisional readout closure knobs "
-          "(including tpfcore_readout_mode). Current direct_tpf implementation uses Theta/I/kappa with DeltaC omitted.");
-    }
-    if (shunt_enable_) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects tpf_global_accel_shunt_enable=true "
-          "(direct_tpf does not apply global |a| shunt).");
-    }
-    if (cooling_fraction_ > 0.0) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=direct_tpf rejects positive tpf_cooling_fraction "
-          "(direct_tpf does not apply cooling).");
-    }
-    compute_direct_tpf_accelerations(state, bh_mass, softening, star_star, ax, ay);
-    apply_vdsg_additive_extension(state, bh_mass, softening, star_star, ax, ay);
-    last_pipeline_ = AccelPipelineStats{};
-    return;
-  }
-  if (tpf_dynamics_mode_ == "geodesic_correspondence" || tpf_dynamics_mode_ == "v11_weak_field_truncation") {
-    const bool canonical_geodesic = (tpf_dynamics_mode_ == "geodesic_correspondence");
-    const std::string mode_name = canonical_geodesic ? "geodesic_correspondence" : "v11_weak_field_truncation";
-    if (std::isfinite(vdsg_coupling_) && (vdsg_coupling_ != 0.0)) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=" + mode_name + " rejects nonzero tpf_vdsg_coupling (VDSG is exploratory and "
-          "not part of the paper-backed weak-field truncation path).");
-    }
-    if (provisional_readout_) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=" + mode_name + " rejects tpfcore_enable_provisional_readout=true "
-          "(provisional readout closures are not used on this paper-backed path).");
-    }
-    if (readout_mode_ != "tensor_radial_projection" || readout_scale_ != 1.0 || theta_tt_scale_ != 1.0 ||
-        theta_tr_scale_ != 1.0) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=" + mode_name + " rejects readout closure knobs "
-          "(tpfcore_readout_mode/tpfcore_readout_scale/tpfcore_theta_tt_scale/tpfcore_theta_tr_scale).");
-    }
-    if (shunt_enable_) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=" + mode_name + " rejects tpf_global_accel_shunt_enable=true "
-          "(global |a| shunt is not part of the correspondence dynamics path).");
-    }
-    if (cooling_fraction_ > 0.0) {
-      throw std::runtime_error(
-          "tpf_dynamics_mode=" + mode_name + " rejects positive tpf_cooling_fraction "
-          "(cooling is a numerical stabilizer outside the correspondence dynamics scope).");
-    }
-    compute_v11_weak_field_correspondence_accelerations(state, bh_mass, softening, star_star,
-                                                      canonical_geodesic ? -tpfcore::TPF_G_SI : weak_field_correspondence_alpha_si_,
-                                                      ax, ay);
-    last_pipeline_ = AccelPipelineStats{};
-    return;
-  }
-
-  if (!provisional_readout_) {
-    throw std::runtime_error(
-        "TPFCore deprecated legacy runtime requires explicit opt-in: "
-        "tpf_dynamics_mode=legacy_readout with tpfcore_enable_provisional_readout=true. "
-        "Set tpfcore_enable_provisional_readout = true for legacy_readout, or set tpf_dynamics_mode = direct_tpf "
-        "for the canonical direct_tpf tensor principal-part path, use Newtonian for dynamics, or run inspection modes (tpf_single_source_inspect, "
-        "tpf_symmetric_pair_inspect).");
-  }
-
-  const int n = state.n();
-
-  static bool has_branch_audited = false;
-  if (!has_branch_audited && n > 0) {
-    has_branch_audited = true;
-    const bool vdsg_active = (vdsg_coupling_ != 0.0);
-    const bool readout_enabled = provisional_readout_;
-
-    std::cerr << "\n========== ACTIVE PHYSICS LEDGER (one-time branch audit) ==========\n";
-    std::cerr << "TPF readout baseline: provisional readout closures per tpfcore_readout_mode "
-                 "(tensor / derived radial / experimental)\n";
-    std::cerr << "VDSG velocity modifier: " << (vdsg_active ? "ACTIVE" : "INACTIVE")
-              << "  (tpf_vdsg_coupling " << (vdsg_active ? "!=" : "==") << " 0; additive excess "
-                 "a_N*(doppler_scale-1), doppler_scale=1+lambda_eff*|v_rel|/c)\n";
-    std::cerr << "tpf_dynamics_mode: legacy_readout (provisional readout + optional VDSG)\n";
-    std::cerr << "provisional_readout GATE: " << (readout_enabled ? "ENABLED" : "DISABLED")
-              << "  (tpfcore_enable_provisional_readout; required for legacy_readout accelerations)\n";
-    std::cerr << "Global |a| shunt (velocity cap): "
-              << (shunt_enable_ ? "ENABLED" : "OFF")
-              << "  (tpf_global_accel_shunt_enable; independent of tpf_vdsg_coupling; clean λ=0 baseline when off)\n";
-    if (shunt_enable_) {
-      std::cerr << "  shunt cap = tpf_global_accel_shunt_fraction * |v|/dt  (fraction=" << shunt_fraction_
-                << ")\n";
-    }
-    std::cerr << std::scientific << std::setprecision(16);
-    std::cerr << "tpf_vdsg_coupling = " << vdsg_coupling_ << "\n";
-    std::cerr << "tpf_kappa (external config key; mapped to internal direct_tpf kappa) = " << kappa_ << "\n";
-    std::cerr << "tpfcore_readout_mode = " << readout_mode_ << "\n";
-    std::cerr << "VDSG mass normalization (PROVISIONAL / exploratory heuristic): "
-                 "lambda_eff = lambda * log10(max(M_ref,eps_kg)) / log10(max(M_src,eps_kg)); "
-                 "M_ref = tpf_vdsg_mass_baseline_kg if >0 else star_mass; "
-                 "if M_ref<=0 => lambda_eff=lambda (identity). Single tpf_vdsg_coupling only.\n";
-    std::cerr << "tpf_vdsg_mass_baseline_resolved_kg (runtime M_ref) = " << vdsg_mass_baseline_resolved_kg_
-              << "\n";
-    if (vdsg_active && vdsg_mass_baseline_resolved_kg_ > 0.0) {
-      const double le_bh =
-          tpfcore::vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
-      const int idx_star = (n > 1) ? 1 : 0;
-      const double m_st = state.mass[idx_star];
-      const double le_st =
-          tpfcore::vdsg_effective_coupling(vdsg_coupling_, m_st, vdsg_mass_baseline_resolved_kg_);
-      std::cerr << "lambda_eff sample (gravitational source = BH, M_src = M_BH) = " << le_bh << "\n";
-      std::cerr << "lambda_eff sample (gravitational source = star, M_src = mass[" << idx_star << "]) = " << le_st
-                << "\n";
-    } else if (vdsg_active) {
-      std::cerr << "lambda_eff mass scaling: OFF (M_ref <= 0; set tpf_vdsg_mass_baseline_kg or star_mass > 0).\n";
-    }
-
-    const double eps_soft = (source_softening_ > 0.0) ? source_softening_ : softening;
-    const double G_si = tpfcore::TPF_G_SI;
-
-    if (bh_mass > 0.0) {
-      const double xi = state.x[0];
-      const double yi = state.y[0];
-      const double r_sq = xi * xi + yi * yi;
-      const double eps_sq = softening * softening;
-      const double denom = r_sq + eps_sq;
-      const double r_mag = std::sqrt(denom);
-      if (r_mag > 1e-300) {
-        const double v_mag =
-            std::sqrt(state.vx[0] * state.vx[0] + state.vy[0] * state.vy[0] + 1e-300);
-        const double beta_sample = v_mag / C_SI_LIGHT;
-        const double lambda_eff_bh =
-            tpfcore::vdsg_effective_coupling(vdsg_coupling_, bh_mass, vdsg_mass_baseline_resolved_kg_);
-        const double doppler_scale = 1.0 + lambda_eff_bh * beta_sample;
-        const double a_newtonian = G_si * bh_mass / denom;
-        const double a_VDSG_modifier = a_newtonian * (doppler_scale - 1.0);
-
-        std::cerr << "--- Sample: Star 0 vs BH (SI magnitudes) ---\n";
-        std::cerr << "a_newtonian = " << a_newtonian << "  (G*M_BH/(r^2+eps^2))\n";
-        std::cerr << "a_VDSG_modifier = " << a_VDSG_modifier
-                  << "  (= a_newtonian * (doppler_scale - 1); doppler_scale = 1 + lambda_eff*|v|/c = "
-                  << doppler_scale;
-        if (vdsg_active)
-          std::cerr << "; lambda_eff(BH source) = " << lambda_eff_bh;
-        std::cerr << ")\n";
-
-        double ax_r = 0.0;
-        double ay_r = 0.0;
-        if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-          tpfcore::TpfRadialGravityProfile profile =
-              tpfcore::build_tpf_gravity_profile(state, bh_mass, derived_poisson_cfg_, eps_soft);
-          tpfcore::compute_provisional_readout_acceleration(
-              state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
-              theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, &derived_poisson_cfg_, &profile);
-        } else {
-          tpfcore::compute_provisional_readout_acceleration(
-              state, 0, bh_mass, star_star, softening, source_softening_, readout_mode_, readout_scale_,
-              theta_tt_scale_, theta_tr_scale_, ax_r, ay_r, nullptr, nullptr);
-        }
-        const double a_tpf_readout = std::hypot(ax_r, ay_r);
-        std::cerr << "a_readout_baseline (sample |a|) = " << a_tpf_readout << "\n";
-      } else {
-        std::cerr << "--- Sample: Star 0 vs BH skipped (r_mag too small) ---\n";
-      }
-    } else {
-      std::cerr << "--- Sample: Star 0 vs BH skipped (bh_mass <= 0) ---\n";
-    }
-    std::cerr << "===================================================================\n\n" << std::flush;
-  }
-
-  eval_accel_pipeline(state, bh_mass, softening, star_star, ax, ay, &last_pipeline_);
+  throw std::runtime_error("Unsupported tpf_dynamics_mode for this branch; expected tpf_xi_theta_v1.");
 }
 
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
@@ -2263,7 +1949,7 @@ void TPFCorePackage::run_4d_xi_motion_probe_benchmark(const Config& config, cons
   if (kernel_mode != "off" && kernel_mode != "scalar_beta" && kernel_mode != "metric_radial" && kernel_mode != "metric_velocity" &&
       kernel_mode != "metric_transverse_wake" && kernel_mode != "metric_transverse_continuous" && kernel_mode != "spacetime_metric") {
     throw std::runtime_error(
-        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric");
+        "tpf_4d_xi_kernel_mode must be one of: off, scalar_beta, metric_radial, metric_velocity, metric_transverse_wake, metric_transverse_continuous, spacetime_metric (legacy label)");
   }
   if (kernel_factor_mode != "beta_power" && kernel_factor_mode != "gamma_minus_one") {
     throw std::runtime_error("tpf_4d_xi_kernel_factor_mode must be beta_power or gamma_minus_one");
@@ -3089,122 +2775,10 @@ void TPFCorePackage::write_trajectory_diagnostics(const std::vector<Snapshot>& s
 void TPFCorePackage::write_closure_diagnostics(const std::vector<Snapshot>& snapshots,
                                                const Config& config,
                                                const std::string& output_dir) const {
-  const bool closure_diag_mode =
-      (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) || readout_mode_ == "experimental_radial_r_scaling");
-  if (!provisional_readout_ || !closure_diag_mode || snapshots.empty())
-    return;
-  const int n_part = snapshots[0].state.n();
-  if (n_part != 1) return;
-
-  tpfcore::TPFCoreParams params = build_params(config, output_dir);
-  double eps = params.effective_source_softening;
-  double softening = params.softening;
-  double bh_mass = params.bh_mass;
-  bool star_star = params.enable_star_star_gravity;
-
-  std::ofstream csv(params.output_dir + "/tpf_closure_diagnostics.csv");
-  if (!csv) return;
-  csv << "time,r,theta_rr,theta_tt,theta_tr,radial_closure,tangential_closure,a_inward,v_radial,v_tangential,sign_radial_acc_vs_radial_vel\n";
-
-  size_t n_inward_radial = 0;
-  double sum_abs_tangential = 0.0;
-  size_t n_outward_drift = 0;
-  size_t n_outward_drift_with_inward_pull = 0;
-  size_t n_same_sign = 0, n_opposite_sign = 0;
-  size_t n_rows = 0;
-
-  for (const auto& snap : snapshots) {
-    const State& s = snap.state;
-    double t = snap.time;
-    double x = s.x[0], y = s.y[0], vx = s.vx[0], vy = s.vy[0];
-    double r2 = x * x + y * y + eps * eps;
-    double r = std::sqrt(r2);
-    if (r < 1e-30) continue;
-
-    double rx = x / r, ry = y / r;
-    double ax = 0.0, ay = 0.0;
-    tpfcore::ReadoutDiagnostics diag;
-    tpfcore::TpfRadialGravityProfile prof;
-    const tpfcore::TpfRadialGravityProfile* prof_ptr = nullptr;
-    if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-      prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
-      prof_ptr = &prof;
-    }
-    tpfcore::compute_provisional_readout_with_diagnostics(
-        s, 0, bh_mass, star_star, softening, source_softening_,
-        readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_, ax, ay, diag,
-        tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
-        prof_ptr);
-
-    double radial_closure = diag.provisional_radial_readout;
-    double tangential_closure = diag.provisional_tangential_readout;
-    double a_radial = ax * rx + ay * ry;
-    double a_inward = -a_radial;
-    double v_radial = vx * rx + vy * ry;
-    double v_tangential = x * vy - y * vx;
-
-    const char* sign_str = "zero";
-    if (a_radial * v_radial > 1e-30) { sign_str = "same"; ++n_same_sign; }
-    else if (a_radial * v_radial < -1e-30) { sign_str = "opposite"; ++n_opposite_sign; }
-
-    if (radial_closure < 0.0) ++n_inward_radial;
-    sum_abs_tangential += std::abs(tangential_closure);
-    if (v_radial > 0.0) {
-      ++n_outward_drift;
-      if (a_inward > 0.0) ++n_outward_drift_with_inward_pull;
-    }
-
-    csv << std::scientific << t << "," << r << "," << diag.theta_rr << "," << diag.theta_tt << "," << diag.theta_tr
-        << "," << radial_closure << "," << tangential_closure << "," << a_inward << "," << v_radial << "," << v_tangential
-        << "," << sign_str << "\n";
-    ++n_rows;
-  }
-
-  if (n_rows == 0) return;
-
-  std::ofstream txt(params.output_dir + "/tpf_closure_diagnostics.txt");
-  if (!txt) return;
-
-  txt << "TPFCore closure-term decomposition (single-body)\n";
-  txt << "Mode: " << readout_mode_ << ". Diagnostics only; no change to formulas or behavior.\n\n";
-
-  txt << "--- Per-step CSV: tpf_closure_diagnostics.csv ---\n";
-  txt << "Columns: time, r, theta_rr, theta_tt, theta_tr, radial_closure, tangential_closure,\n";
-  txt << "  a_inward, v_radial, v_tangential, sign_radial_acc_vs_radial_vel (same/opposite/zero)\n";
-  txt << "radial_closure = readout radial contribution (provisional_radial_readout); negative = inward.\n";
-  txt << "tangential_closure = readout tangential contribution (provisional_tangential_readout).\n\n";
-
-  double frac_inward = 100.0 * n_inward_radial / n_rows;
-  double mean_abs_tangential = sum_abs_tangential / n_rows;
-  double frac_outward_drift = 100.0 * n_outward_drift / n_rows;
-  double frac_outward_with_inward_pull = (n_outward_drift > 0) ? (100.0 * n_outward_drift_with_inward_pull / n_outward_drift) : 0.0;
-
-  txt << "--- Summary statistics ---\n";
-  txt << "  Steps with radial_closure < 0 (inward): " << n_inward_radial << " / " << n_rows << " (" << std::fixed << std::setprecision(1) << frac_inward << "%)\n";
-  txt << "  Mean |tangential_closure|: " << std::scientific << mean_abs_tangential << "\n";
-  txt << "  Steps with v_radial > 0 (outward drift): " << n_outward_drift << " / " << n_rows << " (" << std::fixed << std::setprecision(1) << frac_outward_drift << "%)\n";
-  txt << "  Of those, steps with a_inward > 0 (inward pull): " << n_outward_drift_with_inward_pull << " (" << std::fixed << std::setprecision(1) << frac_outward_with_inward_pull << "% of outward-drift steps)\n";
-  txt << "  sign_radial_acc_vs_radial_vel: same=" << n_same_sign << ", opposite=" << n_opposite_sign << "\n\n";
-
-  txt << "--- Conservative diagnostic answers ---\n";
-  txt << "  Is the radial term mostly inward? ";
-  if (frac_inward >= 80.0) txt << "Yes (" << std::fixed << std::setprecision(0) << frac_inward << "% of steps have radial_closure < 0).\n";
-  else if (frac_inward >= 50.0) txt << "Partially (radial inward in " << frac_inward << "% of steps).\n";
-  else txt << "No (radial inward in only " << frac_inward << "% of steps).\n";
-
-  txt << "  Is the tangential/coherence term large enough to bend the trajectory? ";
-  txt << "Mean |tangential_closure| = " << std::scientific << mean_abs_tangential << "; compare to |radial_closure| in CSV for relative size.\n";
-
-  txt << "  Does the tangential term correlate with continued outward drift? ";
-  txt << "Check CSV: where v_radial > 0, is tangential_closure positive or negative? (Diagnostic only; no causal claim.)\n";
-
-  txt << "  Is the closure producing mostly outward kinematics despite inward radial pull? ";
-  if (n_outward_drift_with_inward_pull > 0 && n_outward_drift > 0 && frac_outward_with_inward_pull > 50.0)
-    txt << "In " << std::fixed << std::setprecision(0) << frac_outward_with_inward_pull << "% of outward-drift steps the radial acceleration is inward (a_inward > 0); trajectory continues outward.\n";
-  else if (n_outward_drift_with_inward_pull > 0)
-    txt << "Some steps show outward drift with inward pull (" << n_outward_drift_with_inward_pull << " steps). See CSV.\n";
-  else
-    txt << "When v_radial > 0, a_inward is typically not positive; see CSV for details.\n";
+  (void)snapshots;
+  (void)config;
+  (void)output_dir;
+  return;
 }
 
 void TPFCorePackage::write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -3413,10 +2987,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   for (int i = 0; i < s0.n(); ++i) {
     const tpfcore::FieldAtPoint field =
         tpfcore::evaluate_provisional_field_multi_source(s0, i, bh_mass, star_star, eps);
-    const tpfcore::DirectTpfBaselineArtifacts artifacts =
-        tpfcore::compute_direct_tpf_baseline_artifacts(field, kappa, lambda);
-    const tpfcore::XiDirectedReadoutResult baseline_readout =
-        tpfcore::compute_xi_directed_tensor_readout(artifacts.xi, artifacts.principal_cij);
     const tpfcore::Theta3D& theta = field.theta;
     const double theta_trace = field.theta_trace;
     const double invariant_I = field.invariant_I;
@@ -3451,64 +3021,26 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
             << ax_newton << ',' << ay_newton << '\n';
 
     if (decomp_csv) {
-      const double x = s0.x[i];
-      const double y = s0.y[i];
-      const double r = std::hypot(x, y);
-      const double xi_x = artifacts.xi.xi.x;
-      const double xi_y = artifacts.xi.xi.y;
-      const double xi_mag = std::hypot(xi_x, xi_y);
-      double u_x = 0.0;
-      double u_y = 0.0;
-      if (xi_mag > 1e-300) {
-        u_x = xi_x / xi_mag;
-        u_y = xi_y / xi_mag;
-      }
-      const double proj_x = artifacts.principal_cij.c_xx * u_x + artifacts.principal_cij.c_xy * u_y;
-      const double proj_y = artifacts.principal_cij.c_xy * u_x + artifacts.principal_cij.c_yy * u_y;
-      const double a_raw_x = baseline_readout.ax;
-      const double a_raw_y = baseline_readout.ay;
-      const double a_raw_mag = std::hypot(a_raw_x, a_raw_y);
-      double r_hat_x = 0.0;
-      double r_hat_y = 0.0;
-      if (r > 1e-300) {
-        r_hat_x = x / r;
-        r_hat_y = y / r;
-      }
-      const double a_raw_radial_dot = a_raw_x * r_hat_x + a_raw_y * r_hat_y;
+      const double a_raw_mag = std::hypot(ax_raw, ay_raw);
       const double a_newton_mag = std::hypot(ax_newton, ay_newton);
-      const double a_newton_radial_dot = ax_newton * r_hat_x + ay_newton * r_hat_y;
       const double ratio_mag =
           (std::isfinite(a_raw_mag) && std::isfinite(a_newton_mag) && (a_newton_mag > 1e-300))
               ? (a_raw_mag / a_newton_mag)
               : std::numeric_limits<double>::quiet_NaN();
-      const bool has_ratio = std::isfinite(ratio_mag);
-      decomp_csv << i << ',' << x << ',' << y << ',' << r << ','
-                 << xi_x << ',' << xi_y << ',' << xi_mag << ',' << u_x << ',' << u_y << ','
-                 << artifacts.theta.theta.xx << ',' << artifacts.theta.theta.xy << ','
-                 << artifacts.theta.theta.yy << ',' << artifacts.theta.theta.zz << ','
-                 << artifacts.theta_trace.value << ',' << artifacts.invariant_I.value << ','
-                 << artifacts.principal_cij.c_xx << ',' << artifacts.principal_cij.c_xy << ','
-                 << artifacts.principal_cij.c_yy << ',' << artifacts.principal_cij.c_zz << ','
-                 << proj_x << ',' << proj_y << ','
-                 << a_raw_x << ',' << a_raw_y << ',' << a_raw_mag << ','
-                 << a_raw_radial_dot << ','
-                 << ax_newton << ',' << ay_newton << ',' << a_newton_mag << ','
-                 << a_newton_radial_dot << ',' << ratio_mag << '\n';
-
-      if (has_ratio) {
+      if (std::isfinite(ratio_mag)) {
         ratio_min = std::min(ratio_min, ratio_mag);
         ratio_max = std::max(ratio_max, ratio_mag);
         ratio_sum += ratio_mag;
         ++ratio_count;
       }
-      if (a_raw_radial_dot < 0.0) ++raw_inward_count;
-      if (a_raw_radial_dot > 0.0) ++raw_outward_count;
-      theta_trace_min = std::min(theta_trace_min, artifacts.theta_trace.value);
-      theta_trace_max = std::max(theta_trace_max, artifacts.theta_trace.value);
-      theta_trace_sum += artifacts.theta_trace.value;
-      invariant_min = std::min(invariant_min, artifacts.invariant_I.value);
-      invariant_max = std::max(invariant_max, artifacts.invariant_I.value);
-      invariant_sum += artifacts.invariant_I.value;
+      if (ax_raw < 0.0) ++raw_inward_count;
+      if (ax_raw > 0.0) ++raw_outward_count;
+      theta_trace_min = std::min(theta_trace_min, theta_trace);
+      theta_trace_max = std::max(theta_trace_max, theta_trace);
+      theta_trace_sum += theta_trace;
+      invariant_min = std::min(invariant_min, invariant_I);
+      invariant_max = std::max(invariant_max, invariant_I);
+      invariant_sum += invariant_I;
     }
 
     const double mag_raw = std::hypot(ax_raw, ay_raw);
@@ -3607,23 +3139,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   if (std::abs(a_rad_newton) > 1e-300)
     ratio_radial = std::abs(a_rad_tpf) / std::abs(a_rad_newton);
 
-  tpfcore::ReadoutDiagnostics diag;
-  double ax_d = 0.0, ay_d = 0.0;
-  tpfcore::TpfRadialGravityProfile step0_prof;
-  const tpfcore::TpfRadialGravityProfile* step0_prof_ptr = nullptr;
-  if (tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_)) {
-    step0_prof = tpfcore::build_tpf_gravity_profile(s, bh_mass, derived_poisson_cfg_, eps);
-    step0_prof_ptr = &step0_prof;
-  }
-  tpfcore::compute_provisional_readout_with_diagnostics(
-      s, 0, bh_mass, star_star, softening, source_softening_,
-      readout_mode_, readout_scale_, theta_tt_scale_, theta_tr_scale_,
-      ax_d, ay_d, diag,
-      tpfcore::is_derived_tpf_radial_readout_mode(readout_mode_) ? &derived_poisson_cfg_ : nullptr,
-      step0_prof_ptr);
-  (void)ax_d;
-  (void)ay_d;
-
   txt << std::scientific << std::setprecision(16);
   txt << "TPFCore step-0 orbit audit (exact initial state of bh_orbit_validation)\n";
   txt << "Diagnostics only; no averaging or summaries. All values exact for step 0.\n\n";
@@ -3651,11 +3166,11 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
   txt << "diff_tangential = " << diff_tangential << "\n";
   txt << "ratio_radial = |a_rad_tpf| / |a_rad_newton| = " << ratio_radial << "\n\n";
 
-  txt << "theta_rr = " << diag.theta_rr << "\n";
-  txt << "theta_tt = " << diag.theta_tt << "\n";
-  txt << "theta_tr = " << diag.theta_tr << "\n";
-  txt << "provisional_radial_readout = " << diag.provisional_radial_readout << "\n";
-  txt << "provisional_tangential_readout = " << diag.provisional_tangential_readout << "\n\n";
+  txt << "theta_rr = unavailable_in_this_branch_step0_writer\n";
+  txt << "theta_tt = unavailable_in_this_branch_step0_writer\n";
+  txt << "theta_tr = unavailable_in_this_branch_step0_writer\n";
+  txt << "provisional_radial_readout = unavailable_in_this_branch_step0_writer\n";
+  txt << "provisional_tangential_readout = unavailable_in_this_branch_step0_writer\n\n";
 
   double abs_a_rad_newton = std::abs(a_rad_newton);
   double radial_mismatch_pct = 0.0;
@@ -3687,26 +3202,6 @@ void TPFCorePackage::write_step0_orbit_audit(const std::vector<Snapshot>& snapsh
     txt << "This initial state is within the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] but ratio_radial = " << std::scientific << ratio_radial << " is not near 1 (outside sweet spot).\n";
   else
     txt << "This initial state is outside the correspondence-calibration probe range r in [" << r_min << ", " << r_max << "] (r = " << r << ").\n";
-}
-
-void TPFCorePackage::write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
-                                                      const Config& config,
-                                                      const std::string& output_dir) const {
-  if (!pipeline_diagnostics_csv_ || !provisional_readout_) return;
-  std::ostringstream path;
-  path << output_dir << "/tpf_accel_pipeline_diagnostics.csv";
-  std::ofstream f(path.str());
-  if (!f) return;
-  f << "step,time,mean_baseline_accel_mag,mean_vdsg_accel_mag,vdsg_over_baseline_ratio,shunt_events,frac_capped,tpf_global_accel_shunt_enabled,vdsg_pairs_evaluated,vdsg_min_beta_rad,vdsg_max_beta_rad,vdsg_mean_abs_beta_rad\n";
-  f << std::scientific << std::setprecision(17);
-  for (const auto& sn : snapshots) {
-    std::vector<double> ax, ay;
-    AccelPipelineStats st;
-    eval_accel_pipeline(sn.state, config.bh_mass, config.softening, config.enable_star_star_gravity, ax, ay, &st);
-    f << sn.step << ',' << sn.time << ',' << st.mean_baseline_mag << ',' << st.mean_vdsg_mag << ','
-      << st.vdsg_over_baseline_ratio << ',' << st.shunt_events_last_step << ',' << st.frac_capped_last_step << ','
-      << (shunt_enable_ ? 1 : 0) << '\n';
-  }
 }
 
 void tpf_test_reset_global_accel_shunt_events() { tpfcore::reset_global_accel_shunt_events(); }

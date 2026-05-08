@@ -81,7 +81,7 @@ void write_run_info(const std::string& output_dir,
     f << "galaxy_init_spiral_phase\t" << config.galaxy_init_spiral_phase << "\n";
     f << "velocity_noise\t" << config.velocity_noise << "\n";
   }
-  if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+  if (false) {
     f << "\n=== v11 weak-field correspondence audit (manuscript v11; not integrator dynamics) ===\n";
     f << "v11_weak_field_correspondence_benchmark\t" << config.v11_weak_field_correspondence_benchmark << "\n";
     if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
@@ -175,7 +175,7 @@ void write_run_info(const std::string& output_dir,
     f << "=== End TPF 4D Xi motion probe benchmark note ===\n\n";
   }
   if (config.physics_package == "TPFCore") {
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       f << "v11_audit_tpfcore_dynamics_note\tno particle integration; TPFCore acceleration API (legacy_readout / "
            "direct_tpf) not used in this mode\n";
       f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
@@ -289,7 +289,7 @@ void write_run_info(const std::string& output_dir,
   f << "=== End code provenance ===\n\n";
 
   if (config.physics_package == "TPFCore") {
-    if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    if (false) {
       f << "=== TPFCore (v11 correspondence audit only: dynamics routing not operative) ===\n";
       f << "note\tlayered config may still set tpf_dynamics_mode, tpfcore_enable_provisional_readout, readout_mode; "
            "they are inherited only and not used for particle accelerations in this audit-only mode\n";
@@ -378,13 +378,13 @@ void write_run_info(const std::string& output_dir,
   f << "n_stars\t" << n_star << "\n";
   if (config.physics_package == "TPFCore") {
     double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-    if (config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence &&
+    if (true &&
         config.simulation_mode != SimulationMode::tpf_4d_static_residual_benchmark &&
         config.simulation_mode != SimulationMode::tpf_4d_static_motion_readout_benchmark &&
         config.simulation_mode != SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
       f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
       f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    } else if (false) {
       f << "v11_audit_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved config section above "
            "(configured vs effective; not operative)\n";
     } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
@@ -404,12 +404,12 @@ void write_run_info(const std::string& output_dir,
     f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
     f << "tpfcore_residual_method\tanalytic\n";
     f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
-    if (config.simulation_mode != SimulationMode::tpf_v11_weak_field_correspondence &&
+    if (true &&
         config.simulation_mode != SimulationMode::tpf_4d_static_residual_benchmark &&
         config.simulation_mode != SimulationMode::tpf_4d_static_motion_readout_benchmark &&
         config.simulation_mode != SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
       f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_v11_weak_field_correspondence) {
+    } else if (false) {
       f << "v11_audit_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved config section above\n";
     } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
       f << "tpf_4d_static_residual_benchmark_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved "
@@ -444,10 +444,8 @@ void write_run_info(const std::string& output_dir,
       f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
       f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
     }
-    if (config.simulation_mode == galaxy::SimulationMode::tpf_two_body_sweep)
-      f << "tpf_sweep_summary\tsee tpf_sweep_summary.csv, tpf_sweep_summary.txt\n";
     if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation)
-      f << "detailed_follow_up\tTPFCore bh_orbit_validation: full snapshots + regime + trajectory diagnostics (use after tpf_two_body_sweep to inspect a chosen speed_ratio)\n";
+      f << "detailed_follow_up\tTPFCore bh_orbit_validation: full snapshots + regime + trajectory diagnostics\n";
   }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";

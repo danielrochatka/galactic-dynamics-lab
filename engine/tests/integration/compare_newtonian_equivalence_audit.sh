@@ -23,7 +23,7 @@ COMMON_ARGS=(
 SINGLE="$OUT/single"
 COMPARE="$OUT/compare"
 ./galaxy_sim galaxy --output_dir="$SINGLE" --physics_package=Newtonian "${COMMON_ARGS[@]}" --yes >/dev/null
-./galaxy_sim galaxy --output_dir="$COMPARE" --physics_package=Newtonian --physics_package_compare=TPFCore --tpf_dynamics_mode=xi_kernel_deformed "${COMMON_ARGS[@]}" --yes >/dev/null
+./galaxy_sim galaxy --output_dir="$COMPARE" --physics_package=Newtonian --physics_package_compare=TPFCore --tpf_dynamics_mode=tpf_xi_theta_v1 "${COMMON_ARGS[@]}" --yes >/dev/null
 
 IMMUNE_A="$OUT/newtonian_tpf_neutral"
 IMMUNE_B="$OUT/newtonian_tpf_extreme"

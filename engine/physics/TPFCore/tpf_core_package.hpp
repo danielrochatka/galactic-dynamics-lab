@@ -4,22 +4,13 @@
 /**
  * TPFCore: Honest primitive TPF structure package.
  *
- * Current runtime field path uses legacy projected-vector / spatial-tensor objects with lambda fixed at 1/4.
+ * Active runtime route on this branch: `tpf_xi_theta_v1`.
+ * - Xi_total is accumulated from per-source Xi contributions.
+ * - Theta is the full unsymmetrized spatial Jacobian Theta_ij = d_j Xi_i,total.
+ * - Motion update uses Xi_total only; Theta is diagnostic-only.
  * Isolated 4D math/static residual benchmark helpers live in tpf_4d_field.* / tpf_4d_static_* and are not wired into dynamics.
- *
- * Parameter roles: fixed theory (lambda); numerical regularization (source eps);
- * provisional readout knobs (mode/scale/theta_tt/theta_tr); VDSG coupling (exploratory SI path).
- *
- * Dynamics routing: tpf_dynamics_mode legacy_readout uses provisional readout (+ optional VDSG); that path
- * requires tpfcore_enable_provisional_readout. direct_tpf is the canonical paper-facing tensor principal-part
- * route (Theta/I/kappa baseline; DeltaC omitted in current implementation scope); VDSG is an optional additive
- * extension on top of that baseline.
- * When tpf_vdsg_coupling != 0 on legacy_readout, ax, ay include the VDSG additive modifier on top of readout baseline.
- * When VDSG is off on legacy_readout, ax, ay come from provisional_readout closures for tpfcore_readout_mode.
- * Active branch identity: run_info / render_manifest (active_dynamics_branch, acceleration_code_path).
  */
 
-#include "../../accel_pipeline_stats.hpp"
 #include "../../types.hpp"
 #include "../physics_package.hpp"
 #include "derived_tpf_radial.hpp"
@@ -38,13 +29,7 @@ class TPFCorePackage : public PhysicsPackage {
 
   void init_from_config(const Config& config) override;
 
-  /**
-   * Particle accelerations. legacy_readout: requires provisional readout (else throws), then readout + optional VDSG.
-   * v11_weak_field_truncation: paper-backed weak-field scalar correspondence truncation (static/quasi-static limit).
-   * direct_tpf: canonical paper-facing tensor principal-part route with Theta/I/kappa baseline
-   * (DeltaC omitted in current implementation scope), strict non-readout/non-stabilizer guardrails
-   * (no provisional readout closures, no shunt, no cooling), and optional additive VDSG via tpf_vdsg_coupling.
-   */
+  /** Particle accelerations for `tpf_xi_theta_v1`: Xi_total-driven motion update; Theta is diagnostic-only. */
   void compute_accelerations(const State& state,
                             double bh_mass,
                             double softening,
@@ -95,22 +80,20 @@ class TPFCorePackage : public PhysicsPackage {
                                  const Config& config,
                                  const std::string& output_dir) const;
 
-  /** Per-snapshot pipeline metrics CSV (readout baseline, VDSG modifier, shunt); optional end-of-run pass. */
-  void write_accel_pipeline_diagnostics(const std::vector<Snapshot>& snapshots,
-                                          const Config& config,
-                                          const std::string& output_dir) const;
-
-  /** Last integrator-step pipeline stats (updated every compute_accelerations). */
-  const AccelPipelineStats& last_accel_pipeline_stats() const { return last_pipeline_; }
   struct XiRuntimeCounters {
     std::uint64_t theta_evaluations = 0;
     std::uint64_t invariant_I_evaluations = 0;
-    std::uint64_t direct_tpf_evaluations = 0;
-    std::uint64_t provisional_readout_evaluations = 0;
     std::uint64_t xi_last_call_pair_evaluations = 0;
     std::uint64_t xi_total_pair_evaluations = 0;
   };
   XiRuntimeCounters xi_runtime_counters() const { return xi_runtime_counters_; }
+  struct XiThetaV1Sample {
+    double xi_x = 0.0;
+    double xi_y = 0.0;
+    double xi_z = 0.0;
+    double theta[3][3] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
+  };
+  XiThetaV1Sample last_xi_theta_v1_sample() const { return last_xi_theta_v1_sample_; }
 
   /** Live orbit force audit for bh_orbit_validation (Newtonian vs TPF for the actual evolving state). */
   void write_live_orbit_force_audit(const std::vector<Snapshot>& snapshots,
@@ -168,37 +151,9 @@ class TPFCorePackage : public PhysicsPackage {
   double cooling_fraction_;
   bool shunt_enable_;
   double shunt_fraction_;
-  bool pipeline_diagnostics_csv_;
-  mutable AccelPipelineStats last_pipeline_;
   /** Legacy derived-radial closure ledger configuration (still fed from flat config keys). */
   tpfcore::DerivedTpfPoissonConfig derived_poisson_cfg_;
 
-  void eval_accel_pipeline(const State& state,
-                           double bh_mass,
-                           double softening,
-                           bool star_star,
-                           std::vector<double>& ax,
-                           std::vector<double>& ay,
-                           AccelPipelineStats* stats_out) const;
-
-  void compute_direct_tpf_accelerations(const State& state,
-                                        double bh_mass,
-                                        double softening,
-                                        bool star_star,
-                                        std::vector<double>& ax,
-                                        std::vector<double>& ay) const;
-  void compute_v11_weak_field_truncation_accelerations(const State& state,
-                                                       double bh_mass,
-                                                       double softening,
-                                                       bool star_star,
-                                                       std::vector<double>& ax,
-                                                       std::vector<double>& ay) const;
-  void apply_vdsg_additive_extension(const State& state,
-                                     double bh_mass,
-                                     double softening,
-                                     bool star_star,
-                                     std::vector<double>& ax,
-                                     std::vector<double>& ay) const;
   void compute_xi_kernel_deformed_accelerations(const State& state,
                                                 double bh_mass,
                                                 double softening,
@@ -221,6 +176,7 @@ class TPFCorePackage : public PhysicsPackage {
   double xi_source_speed_y_;
   double xi_source_speed_z_;
   mutable XiRuntimeCounters xi_runtime_counters_;
+  mutable XiThetaV1Sample last_xi_theta_v1_sample_;
 };
 
 /** Test-only: reset before compute_accelerations; counts per-particle caps in last apply_global_accel_magnitude_shunt. */

@@ -41,13 +41,9 @@ enum class SimulationMode {
   tpf_4d_static_residual_benchmark,
   tpf_4d_static_motion_readout_benchmark,
   tpf_4d_xi_motion_probe_benchmark,
-  tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
   tpf_diagnostic_consistency_audit,
-  tpf_bound_orbit_sweep,
-  /** v11 static weak-field correspondence audit (Ξ,Θ,I,C principal); not particle dynamics. */
-  tpf_v11_weak_field_correspondence,
   /** Canonical Earth–Moon SI benchmark (same IC as legacy two_body_orbit string). */
   earth_moon_benchmark,
   /** Single star + central mass; uses init_two_body_star_around_bh. */
@@ -58,6 +54,11 @@ SimulationMode parse_mode(const std::string& s);
 
 /** Return canonical string for mode (for display and run_info). */
 std::string mode_to_string(SimulationMode m);
+
+/** True for utility/inspection/benchmark modes that must not run generic run_simulation path. */
+bool is_tpf_utility_mode(SimulationMode m);
+/** True for all executable simulation modes; used to guard shared output-dir setup. */
+bool simulation_mode_requires_output_dir(SimulationMode m);
 
 struct Config;
 
@@ -152,14 +153,11 @@ struct Config {
   std::string physics_package_compare = "";
 
   /**
-   * TPFCore only: how dynamical accelerations are produced.
-   * - legacy_readout (deprecated legacy; explicit opt-in): provisional readout closures (+ optional VDSG); requires tpfcore_enable_provisional_readout=true for dynamics.
-   * - geodesic_correspondence: canonical static weak-field correspondence route (rho_Xi -> Poisson analytic -> geodesic) with fixed -G coefficient.
-   * - v11_weak_field_truncation: deprecated alias; forwards to geodesic_correspondence unless alpha_si is explicitly set (legacy free-parameter mode).
-   * - direct_tpf: principal-part implementation (Theta/I/kappa baseline, DeltaC omitted in current scope) with optional additive VDSG.
-   * - xi_kernel_deformed: Xi-direct runtime route using a=-K_xi*Xi_eff_spatial with per-source Xi-kernel deformation.
+   * TPFCore only: canonical v1 dynamics route.
+   * - tpf_xi_theta_v1: per-source Xi contributions are summed into Xi_total; motion uses Xi_total only.
+   *   Theta is the unsymmetrized spatial Jacobian Theta_ij = d_j Xi_i,total and is diagnostic-only in v1.
    */
-  std::string tpf_dynamics_mode = "xi_kernel_deformed";
+  std::string tpf_dynamics_mode = "tpf_xi_theta_v1";
   /**
    * TPFCore correspondence-helper dynamics coupling alpha [SI] in Eq. (42)-(44): nabla^2 phi = alpha rho.
    * Used only by tpf_dynamics_mode=v11_weak_field_truncation (legacy weak_field_correspondence alias resolves there).
@@ -220,7 +218,7 @@ struct Config {
    * Current implementation uses relative-speed scaling beta = |v_rel|/c with doppler_scale = 1 + λ_eff * beta.
    * λ_eff is mass-normalized (see tpf_vdsg_mass_baseline_kg).
    */
-  double tpf_vdsg_coupling = 1.0e-20;
+  double tpf_vdsg_coupling = 0.0;
   /**
    * VDSG mass baseline M_ref (kg) for log normalization: λ_eff = λ · log10(M_ref) / log10(M_source).
    * If <= 0, uses star_mass at runtime (same units as simulation).
@@ -254,7 +252,7 @@ struct Config {
    * TPFCore dynamical runs: fraction of n_steps using startup radial damping (1% per step).
    * Snapshots are not recorded during that interval. Ignored when physics_package != TPFCore.
    */
-  double tpf_cooling_fraction = 0.2;
+  double tpf_cooling_fraction = 0.0;
   /** TPFCore readout: dump debug CSV (tpf_readout_debug.csv) for dynamical runs. Default true. */
   bool tpfcore_dump_readout_debug = true;
   /** TPFCore diagnostics: enable live Newtonian-vs-TPF force audit for bh_orbit_validation runs. */
