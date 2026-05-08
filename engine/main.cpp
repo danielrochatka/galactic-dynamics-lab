@@ -159,8 +159,8 @@ void finalize_utility_mode_run(const galaxy::Config& config,
   const galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(config);
   galaxy::write_resolved_scenario_artifacts(config.output_dir, resolved);
   if (config.save_run_info) {
-    galaxy::write_run_info(config.output_dir, resolved.config, resolved.effective_n_steps, 0, resolved.initial_state.n(),
-                           run_config_path, package_defaults_path);
+    galaxy::write_run_info(config.output_dir, config, 0, 0, resolved.initial_state.n(),
+                           run_config_path, package_defaults_path, &config, &resolved);
   }
 }
 

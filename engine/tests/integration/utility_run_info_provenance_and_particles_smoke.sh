@@ -19,3 +19,7 @@ grep -q "^run_config\s\+$ROOT/../configs/smoke_test.cfg$" "$OUT/run_info.txt"
 grep -q "^package_defaults\s\+physics/Newtonian/defaults.cfg$" "$OUT/run_info.txt"
 # Particleless utility convention: resolver has no dynamic particle state; run_info records n_stars=0.
 grep -q "^n_stars\s\+0$" "$OUT/run_info.txt"
+grep -q "^effective_n_steps_done\s\+0$" "$OUT/run_info.txt"
+# configured_* reflects layered pre-resolution config, while effective_* comes from resolved runtime.
+grep -q "^configured_n_stars\s\+64$" "$OUT/run_info.txt"
+grep -q "^effective_particle_count\s\+0$" "$OUT/run_info.txt"
