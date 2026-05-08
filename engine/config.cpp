@@ -111,6 +111,30 @@ bool is_tpf_utility_mode(SimulationMode m) {
   }
 }
 
+bool simulation_mode_requires_output_dir(SimulationMode m) {
+  switch (m) {
+    case SimulationMode::galaxy:
+    case SimulationMode::two_body_orbit:
+    case SimulationMode::symmetric_pair:
+    case SimulationMode::small_n_conservation:
+    case SimulationMode::timestep_convergence:
+    case SimulationMode::tpf_single_source_inspect:
+    case SimulationMode::tpf_symmetric_pair_inspect:
+    case SimulationMode::tpf_source_field_benchmark:
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+    case SimulationMode::tpf_weak_field_calibration:
+    case SimulationMode::tpf_newtonian_force_compare:
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+    case SimulationMode::earth_moon_benchmark:
+    case SimulationMode::bh_orbit_validation:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
   if (key == "simulation_mode") {
     config.simulation_mode = parse_mode(val);

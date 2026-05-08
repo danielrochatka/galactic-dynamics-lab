@@ -410,6 +410,14 @@ TEST_CASE("tpf utility mode dispatch classification") {
   CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::earth_moon_benchmark));
 }
 
+TEST_CASE("all executable simulation modes require output directory setup") {
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::galaxy));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::earth_moon_benchmark));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::bh_orbit_validation));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_single_source_inspect));
+  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_newtonian_force_compare));
+}
+
 TEST_CASE("diagnostic_consistency_audit reports unavailable on v1 branch") {
   galaxy::Config c;
   CHECK_FALSE(galaxy::run_tpf_diagnostic_consistency_audit(c, "/tmp"));
