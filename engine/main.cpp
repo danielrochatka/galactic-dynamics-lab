@@ -438,7 +438,7 @@ int main(int argc, char** argv) {
                      "tpf_symmetric_pair_inspect, tpf_source_field_benchmark, tpf_4d_static_residual_benchmark, "
                      "tpf_4d_static_motion_readout_benchmark, tpf_4d_xi_motion_probe_benchmark, "
                      "tpf_weak_field_calibration, tpf_newtonian_force_compare, "
-                     "tpf_diagnostic_consistency_audit, "
+                     "tpf_diagnostic_consistency_audit.\n";
         return 1;
       }
     }
@@ -491,10 +491,6 @@ int main(int argc, char** argv) {
   std::cout << "SIMULATION MODE: " << galaxy::mode_to_string(config.simulation_mode) << "\n";
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
-  if (config.physics_package == "TPFCore") {
-  
-
-
   if (galaxy::simulation_mode_requires_output_dir(config.simulation_mode)) {
     if (!ensure_dir("../outputs") || !ensure_dir(config.output_dir)) {
       std::cerr << "Failed to create output directory for simulation_mode="
@@ -551,6 +547,13 @@ int main(int argc, char** argv) {
         break;
     }
   }
+
+  galaxy::PhysicsPackage* physics = galaxy::get_physics_package(config.physics_package);
+  if (!physics) {
+    std::cerr << "Unknown physics package: " << config.physics_package << "\n";
+    return 1;
+  }
+  physics->init_from_config(config);
 
   const galaxy::Config configured_after_layering = config;
   galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(configured_after_layering);
@@ -1079,7 +1082,6 @@ int main(int argc, char** argv) {
         if (rf) {
           rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
           rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
-          rf << "xi_runtime_direct_tpf_evaluations\t" << counters.direct_tpf_evaluations << "\n";
           rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
           rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
         }
