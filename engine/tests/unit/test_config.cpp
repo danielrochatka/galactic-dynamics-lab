@@ -381,10 +381,30 @@ TEST_CASE("utility simulation modes remain parseable") {
   const char* modes[] = {
       "tpf_single_source_inspect", "tpf_symmetric_pair_inspect", "tpf_source_field_benchmark",
       "tpf_4d_static_residual_benchmark", "tpf_4d_static_motion_readout_benchmark",
-      "tpf_4d_xi_motion_probe_benchmark", "tpf_two_body_sweep", "tpf_weak_field_calibration",
-      "tpf_newtonian_force_compare", "tpf_diagnostic_consistency_audit", "tpf_bound_orbit_sweep"};
+      "tpf_4d_xi_motion_probe_benchmark", "tpf_weak_field_calibration",
+      "tpf_newtonian_force_compare", "tpf_diagnostic_consistency_audit"};
   for (const char* m : modes) {
     galaxy::Config c;
     CHECK_NOTHROW(galaxy::apply_config_kv("simulation_mode", m, c));
   }
+}
+
+TEST_CASE("unsupported utility simulation modes are rejected") {
+  galaxy::Config c;
+  CHECK_THROWS(galaxy::apply_config_kv("simulation_mode", "tpf_two_body_sweep", c));
+  CHECK_THROWS(galaxy::apply_config_kv("simulation_mode", "tpf_bound_orbit_sweep", c));
+}
+
+TEST_CASE("tpf utility mode dispatch classification") {
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_single_source_inspect));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_symmetric_pair_inspect));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_source_field_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_residual_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_weak_field_calibration));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_newtonian_force_compare));
+  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
+  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::galaxy));
+  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::earth_moon_benchmark));
 }

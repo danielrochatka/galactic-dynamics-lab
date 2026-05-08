@@ -65,11 +65,9 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
   if (t == "tpf_4d_static_motion_readout_benchmark") return SimulationMode::tpf_4d_static_motion_readout_benchmark;
   if (t == "tpf_4d_xi_motion_probe_benchmark") return SimulationMode::tpf_4d_xi_motion_probe_benchmark;
-  if (t == "tpf_two_body_sweep") return SimulationMode::tpf_two_body_sweep;
   if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
   if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
   if (t == "tpf_diagnostic_consistency_audit") return SimulationMode::tpf_diagnostic_consistency_audit;
-  if (t == "tpf_bound_orbit_sweep") return SimulationMode::tpf_bound_orbit_sweep;
   throw std::runtime_error("Unknown simulation_mode: " + s);
 }
 
@@ -89,13 +87,28 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
     case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
     case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
-    case SimulationMode::tpf_two_body_sweep: return "tpf_two_body_sweep";
     case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
     case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
     case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
-    case SimulationMode::tpf_bound_orbit_sweep: return "tpf_bound_orbit_sweep";
   }
   return "unknown";
+}
+
+bool is_tpf_utility_mode(SimulationMode m) {
+  switch (m) {
+    case SimulationMode::tpf_single_source_inspect:
+    case SimulationMode::tpf_symmetric_pair_inspect:
+    case SimulationMode::tpf_source_field_benchmark:
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+    case SimulationMode::tpf_weak_field_calibration:
+    case SimulationMode::tpf_newtonian_force_compare:
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+      return true;
+    default:
+      return false;
+  }
 }
 
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {

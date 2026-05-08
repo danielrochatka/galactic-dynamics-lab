@@ -41,11 +41,9 @@ enum class SimulationMode {
   tpf_4d_static_residual_benchmark,
   tpf_4d_static_motion_readout_benchmark,
   tpf_4d_xi_motion_probe_benchmark,
-  tpf_two_body_sweep,
   tpf_weak_field_calibration,
   tpf_newtonian_force_compare,
   tpf_diagnostic_consistency_audit,
-  tpf_bound_orbit_sweep,
   /** Canonical Earth–Moon SI benchmark (same IC as legacy two_body_orbit string). */
   earth_moon_benchmark,
   /** Single star + central mass; uses init_two_body_star_around_bh. */
@@ -56,6 +54,9 @@ SimulationMode parse_mode(const std::string& s);
 
 /** Return canonical string for mode (for display and run_info). */
 std::string mode_to_string(SimulationMode m);
+
+/** True for utility/inspection/benchmark modes that must not run generic run_simulation path. */
+bool is_tpf_utility_mode(SimulationMode m);
 
 struct Config;
 

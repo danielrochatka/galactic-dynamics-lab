@@ -437,8 +437,8 @@ int main(int argc, char** argv) {
                      "symmetric_pair, small_n_conservation, timestep_convergence, tpf_single_source_inspect, "
                      "tpf_symmetric_pair_inspect, tpf_source_field_benchmark, tpf_4d_static_residual_benchmark, "
                      "tpf_4d_static_motion_readout_benchmark, tpf_4d_xi_motion_probe_benchmark, "
-                     "tpf_two_body_sweep, tpf_weak_field_calibration, "
-                     "tpf_newtonian_force_compare, tpf_diagnostic_consistency_audit, tpf_bound_orbit_sweep, "
+                     "tpf_weak_field_calibration, tpf_newtonian_force_compare, "
+                     "tpf_diagnostic_consistency_audit, "
         return 1;
       }
     }
@@ -496,6 +496,55 @@ int main(int argc, char** argv) {
 
 
 
+
+  if (galaxy::is_tpf_utility_mode(config.simulation_mode)) {
+    galaxy::PhysicsPackage* utility_physics = galaxy::get_physics_package(config.physics_package);
+    if (!utility_physics) {
+      std::cerr << "Unknown physics package: " << config.physics_package << "\n";
+      return 1;
+    }
+    utility_physics->init_from_config(config);
+    galaxy::TPFCorePackage* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(utility_physics);
+
+    switch (config.simulation_mode) {
+      case galaxy::SimulationMode::tpf_single_source_inspect:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_single_source_inspect requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_single_source_inspect(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_symmetric_pair_inspect requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_symmetric_pair_inspect(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_source_field_benchmark:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_source_field_benchmark requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_source_field_benchmark(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_residual_benchmark requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_4d_static_residual_benchmark(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_motion_readout_benchmark requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_4d_static_motion_readout_benchmark(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_xi_motion_probe_benchmark requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_4d_xi_motion_probe_benchmark(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_weak_field_calibration:
+        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_weak_field_calibration requires physics_package=TPFCore\n", 1;
+        tpf_pkg->run_weak_field_calibration(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_newtonian_force_compare:
+        galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
+        return 0;
+      case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
+        galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir);
+        return 0;
+      default:
+        break;
+    }
+  }
 
   const galaxy::Config configured_after_layering = config;
   galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(configured_after_layering);
