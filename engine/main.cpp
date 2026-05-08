@@ -128,6 +128,11 @@ std::vector<std::string> existing_tpf_4d_static_plot_pngs(const std::string& out
   return found;
 }
 
+void write_resolved_artifacts(const galaxy::Config& config) {
+  const galaxy::ResolvedScenario resolved = galaxy::resolve_scenario(config);
+  galaxy::write_resolved_scenario_artifacts(config.output_dir, resolved);
+}
+
 double L_z_total(const galaxy::State& s) {
   double L = 0;
   for (int i = 0; i < s.n(); ++i)
