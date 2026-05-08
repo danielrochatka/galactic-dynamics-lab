@@ -9,7 +9,7 @@ trap 'rm -rf "$OUT"' EXIT
 LOG="$OUT/run.log"
 set +e
 ./galaxy_sim galaxy --output_dir="$OUT" --physics_package=TPFCore \
-  --tpf_dynamics_mode=direct_tpf --yes \
+  --tpf_dynamics_mode=tpf_xi_theta_v1 --yes \
   --tpf_gdd_coupling=2.5e-42 \
   --n_stars=10 --n_steps=1 --snapshot_every=1 --save_run_info=true --yes >"$LOG" 2>&1
 status=$?
@@ -19,4 +19,4 @@ if [[ $status -eq 0 ]]; then
   echo "Expected --tpf_gdd_coupling to be rejected, but command succeeded." >&2
   exit 1
 fi
-grep -Eq "Unknown CLI config key: tpf_gdd_coupling|tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch" "$LOG"
+grep -q "Unknown CLI config key: tpf_gdd_coupling" "$LOG"
