@@ -16,6 +16,11 @@
 
 namespace galaxy {
 
+struct PackageMetadataEntry {
+  std::string key;
+  std::string value;
+};
+
 class PhysicsPackage {
  public:
   virtual ~PhysicsPackage() = default;
@@ -58,6 +63,27 @@ class PhysicsPackage {
 
   /** Optional: validation/reporting name or hook. Default returns name(). */
   virtual const char* validation_name() const { return name(); }
+
+  /** Optional: human-facing package name. Default returns name(). */
+  virtual std::string display_name() const { return name(); }
+
+  /** Optional: runtime metadata entries to append to run-level reporting. Default empty. */
+  virtual std::vector<PackageMetadataEntry> runtime_metadata() const { return {}; }
+
+  /** Optional: package capability check for utility modes. Default unsupported. */
+  virtual bool supports_utility_mode(SimulationMode) const { return false; }
+
+  /** Optional: utility mode dispatch. Default no-op/false (not handled). */
+  virtual bool run_utility_mode(const Config&, const std::string&) { return false; }
+
+  /** Optional: package run-info metadata. Default empty. */
+  virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&) const { return {}; }
+
+  /** Optional: package render/report metadata. Default empty. */
+  virtual std::vector<PackageMetadataEntry> render_metadata(const Config&) const { return {}; }
+
+  /** Optional: package config schema/default metadata. Default empty. */
+  virtual std::vector<PackageMetadataEntry> package_config_metadata() const { return {}; }
 };
 
 /** Generic kinetic energy (same for all packages): 0.5 * sum(m_i * v_i^2). */
