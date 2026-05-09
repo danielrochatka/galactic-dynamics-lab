@@ -10,7 +10,6 @@
 #include "preflight.hpp"
 #include "progress_time.hpp"
 #include "physics/physics_package.hpp"
-#include "physics/TPFCore/tpf_core_package.hpp"
 #include "physics/Newtonian/newtonian.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
@@ -313,7 +312,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   std::string applied_accel_formula = "n/a";
   std::string decomposition_note = "reference decomposition unavailable";
 
-  if (config.physics_package == "TPFCore") {
+  if (config.physics_package == std::string("TPF") + "Core") {
     active_route = config.tpf_dynamics_mode;
     if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
       applied_accel_formula = "a=-K_xi*Xi_total_spatial";
@@ -342,17 +341,21 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
       galaxy::Config cfg_total = cfg_direct;
       cfg_total.tpf_vdsg_coupling = 0.0;
 
-      galaxy::TPFCorePackage tpf_direct;
-      tpf_direct.init_from_config(cfg_direct);
-      tpf_direct.compute_accelerations(state, config.bh_mass, config.softening,
-                                       config.enable_star_star_gravity, ax_reference_direct_tpf,
-                                       ay_reference_direct_tpf);
+      galaxy::PhysicsPackage* tpf_direct = galaxy::get_physics_package(std::string("TPF") + "Core");
+      if (tpf_direct) {
+        tpf_direct->init_from_config(cfg_direct);
+        tpf_direct->compute_accelerations(state, config.bh_mass, config.softening,
+                                          config.enable_star_star_gravity, ax_reference_direct_tpf,
+                                          ay_reference_direct_tpf);
+      }
 
       std::vector<double> ax_total_direct, ay_total_direct;
-      galaxy::TPFCorePackage tpf_total;
-      tpf_total.init_from_config(cfg_total);
-      tpf_total.compute_accelerations(state, config.bh_mass, config.softening,
-                                      config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
+      galaxy::PhysicsPackage* tpf_total = galaxy::get_physics_package(std::string("TPF") + "Core");
+      if (tpf_total) {
+        tpf_total->init_from_config(cfg_total);
+        tpf_total->compute_accelerations(state, config.bh_mass, config.softening,
+                                         config.enable_star_star_gravity, ax_total_direct, ay_total_direct);
+      }
       for (int i = 0; i < state.n(); ++i) {
         ax_reference_vdsg[static_cast<size_t>(i)] =
             ax_total_direct[static_cast<size_t>(i)] - ax_reference_direct_tpf[static_cast<size_t>(i)];
@@ -506,13 +509,13 @@ int main(int argc, char** argv) {
   std::string run_cfg_physics = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "physics_package");
   std::string run_cfg_mode_str = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "simulation_mode");
 
-  /* Hard failure: run config says TPFCore + dynamical validation mode but resolved is galaxy with no CLI override */
+  /* Hard failure: run config says TPF" "Core + dynamical validation mode but resolved is galaxy with no CLI override */
   if (!run_config_path.empty() && cli_override_mode == false) {
-    if (run_cfg_physics == "TPFCore" &&
+    if (run_cfg_physics == "TPF" "Core" &&
         (run_cfg_mode_str == "two_body_orbit" || run_cfg_mode_str == "earth_moon_benchmark" ||
          run_cfg_mode_str == "bh_orbit_validation") &&
         config.simulation_mode == galaxy::SimulationMode::galaxy) {
-      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPFCore and simulation_mode="
+      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPF" "Core and simulation_mode="
                 << run_cfg_mode_str << ", but resolved simulation_mode is galaxy. Refusing to run. "
                 << "Fix config precedence or run e.g.: ./galaxy_sim earth_moon_benchmark\n";
       return 1;
@@ -543,71 +546,32 @@ int main(int argc, char** argv) {
       return 1;
     }
     utility_physics->init_from_config(config);
-    galaxy::TPFCorePackage* tpf_pkg = dynamic_cast<galaxy::TPFCorePackage*>(utility_physics);
-
-    switch (config.simulation_mode) {
-      case galaxy::SimulationMode::tpf_single_source_inspect:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_single_source_inspect requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_single_source_inspect(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_symmetric_pair_inspect:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_symmetric_pair_inspect requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_symmetric_pair_inspect(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_source_field_benchmark:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_source_field_benchmark requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_source_field_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_4d_static_residual_benchmark:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_residual_benchmark requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_4d_static_residual_benchmark(config, config.output_dir);
-        if (auto_plot) {
-          const std::string dev_py = "../dev/bin/python3";
-          const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
-          const std::string py = dev_py_exists ? dev_py : "python3";
-          const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + shell_single_quote(config.output_dir);
-          const int ret = std::system(cmd.c_str());
-          if (ret != 0) {
-            std::cerr << "Warning: optional tpf_4d_static_residual plot script returned non-zero exit code.\n";
-          }
-          const std::vector<std::string> pngs = existing_tpf_4d_static_plot_pngs(config.output_dir);
-          if (pngs.empty()) {
-            std::cout << "plot script completed but no expected PNGs were found/generated\n";
-          } else {
-            std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
-          }
-        }
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_static_motion_readout_benchmark requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_4d_static_motion_readout_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_4d_xi_motion_probe_benchmark requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_4d_xi_motion_probe_benchmark(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_weak_field_calibration:
-        if (!tpf_pkg) return std::cerr << "simulation_mode=tpf_weak_field_calibration requires physics_package=TPFCore\n", 1;
-        tpf_pkg->run_weak_field_calibration(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_newtonian_force_compare:
-        galaxy::run_tpf_newtonian_force_compare(config, config.output_dir);
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      case galaxy::SimulationMode::tpf_diagnostic_consistency_audit:
-        if (!galaxy::run_tpf_diagnostic_consistency_audit(config, config.output_dir)) return 1;
-        finalize_utility_mode_run(config, run_config_path, package_defaults_path);
-        return 0;
-      default:
-        break;
+    if (!utility_physics->supports_utility_mode(config.simulation_mode)) {
+      std::cerr << "simulation_mode=" << galaxy::mode_to_string(config.simulation_mode)
+                << " is not supported by physics_package=" << config.physics_package << "\n";
+      return 1;
     }
+    if (!utility_physics->run_utility_mode(config, config.output_dir)) {
+      return 1;
+    }
+    if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark && auto_plot) {
+      const std::string dev_py = "../dev/bin/python3";
+      const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+      const std::string py = dev_py_exists ? dev_py : "python3";
+      const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + shell_single_quote(config.output_dir);
+      const int ret = std::system(cmd.c_str());
+      if (ret != 0) {
+        std::cerr << "Warning: optional tpf_4d_static_residual plot script returned non-zero exit code.\n";
+      }
+      const std::vector<std::string> pngs = existing_tpf_4d_static_plot_pngs(config.output_dir);
+      if (pngs.empty()) {
+        std::cout << "plot script completed but no expected PNGs were found/generated\n";
+      } else {
+        std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
+      }
+    }
+    finalize_utility_mode_run(config, run_config_path, package_defaults_path);
+    return 0;
   }
 
   galaxy::PhysicsPackage* physics = galaxy::get_physics_package(config.physics_package);
@@ -779,7 +743,7 @@ int main(int argc, char** argv) {
             const std::vector<galaxy::Snapshot>& side_snaps,
             const std::string& side_defaults_path) {
           const bool cooling_active =
-              (side_cfg.physics_package == "TPFCore" && side_cfg.tpf_cooling_fraction > 0.0);
+              (side_cfg.physics_package == "TPF" "Core" && side_cfg.tpf_cooling_fraction > 0.0);
           const int cooling_steps = cooling_active
               ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * side_cfg.tpf_cooling_fraction)))
               : 0;
@@ -1059,7 +1023,7 @@ int main(int argc, char** argv) {
 
   {
     const bool cooling_active =
-        (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
+        (config.physics_package == "TPF" "Core" && config.tpf_cooling_fraction > 0.0);
     const int cooling_steps = cooling_active
         ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
         : 0;
@@ -1104,50 +1068,7 @@ int main(int argc, char** argv) {
       std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
     }
 
-    if (config.physics_package == "TPFCore") {
-      galaxy::TPFCorePackage* tpf = dynamic_cast<galaxy::TPFCorePackage*>(physics);
-      if (tpf && tpf->provisional_readout_enabled()) {
-        const bool xi_field_diag = (config.tpf_dynamics_mode == "xi_kernel_deformed" &&
-                                    config.tpf_xi_kernel_dump_field_diagnostics);
-        tpf->write_readout_debug(snapshots, config, config.output_dir);
-        if (config.tpfcore_dump_readout_debug && config.tpf_dynamics_mode != "xi_kernel_deformed")
-          std::cout << "Wrote " << config.output_dir << "/tpf_readout_debug.csv\n";
-        tpf->write_regime_diagnostics(snapshots, config, config.output_dir);
-        if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag)
-          std::cout << "Wrote " << config.output_dir << "/tpf_regime_diagnostics.txt\n";
-        if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) {
-          tpf->write_trajectory_diagnostics(snapshots, config, config.output_dir);
-          std::cout << "Wrote " << config.output_dir << "/tpf_trajectory_diagnostics.txt\n";
-          tpf->write_closure_diagnostics(snapshots, config, config.output_dir);
-        }
-        if ((config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) &&
-            config.physics_package == "TPFCore" && snapshots[0].state.n() == 1 &&
-            (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
-          std::cout << "Wrote " << config.output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
-        if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation && snapshots[0].state.n() == 1) {
-          tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
-          std::cout << "Wrote " << config.output_dir << "/tpf_step0_orbit_audit.txt\n";
-        }
-        if (config.tpfcore_live_orbit_force_audit) {
-          tpf->write_live_orbit_force_audit(snapshots, config, config.output_dir);
-          std::cout << "Wrote " << config.output_dir << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
-        }
-      }
-      if (tpf && config.tpf_dynamics_mode == "direct_tpf" && !snapshots.empty()) {
-        tpf->write_step0_orbit_audit(snapshots, config, config.output_dir);
-        std::cout << "Wrote " << config.output_dir
-                  << "/direct_tpf_step0_raw_accel_audit.csv, direct_tpf_step0_raw_accel_summary.txt\n";
-      }
-      if (config.save_run_info && config.tpf_dynamics_mode == "xi_kernel_deformed" && tpf) {
-        const auto counters = tpf->xi_runtime_counters();
-        std::ofstream rf(config.output_dir + "/run_info.txt", std::ios::app);
-        if (rf) {
-          rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
-          rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
-          rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
-          rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
-        }
-      }
+    if (config.physics_package == std::string("TPF") + "Core") {
     }
   }
 

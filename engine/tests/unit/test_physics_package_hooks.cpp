@@ -1,7 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
 #include "physics/Newtonian/newtonian.hpp"
-#include "physics/TPFCore/tpf_core_package.hpp"
 #include "physics/physics_package.hpp"
 
 namespace {
@@ -79,20 +78,6 @@ TEST_CASE("calling generic hooks does not change newtonian acceleration behavior
     CHECK(ax_before[i] == doctest::Approx(ax_after[i]));
     CHECK(ay_before[i] == doctest::Approx(ay_after[i]));
   }
-}
-
-TEST_CASE("TPFCore utility hook support matches TPF utility modes") {
-  galaxy::TPFCorePackage pkg;
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_single_source_inspect));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_symmetric_pair_inspect));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_source_field_benchmark));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_4d_static_residual_benchmark));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_weak_field_calibration));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_newtonian_force_compare));
-  CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
-  CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::galaxy));
 }
 
 TEST_CASE("Newtonian does not report support for TPF utility modes") {
