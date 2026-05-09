@@ -1,7 +1,6 @@
 #include "config.hpp"
 #include "doctest.h"
 #include "physics/Newtonian/newtonian.hpp"
-#include "physics/TPFCore/tpf_core_package.hpp"
 #include "physics/physics_package.hpp"
 
 namespace {
@@ -48,13 +47,10 @@ TEST_CASE("physics package default hooks are no-op/empty") {
   CHECK(pkg.package_config_metadata().empty());
 }
 
-TEST_CASE("package names still resolve through registry") {
+TEST_CASE("newtonian package name resolves through registry") {
   galaxy::PhysicsPackage* newtonian = galaxy::get_physics_package("Newtonian");
-  galaxy::PhysicsPackage* tpfcore = galaxy::get_physics_package("TPFCore");
   REQUIRE(newtonian != nullptr);
-  REQUIRE(tpfcore != nullptr);
   CHECK(std::string(newtonian->name()) == "Newtonian");
-  CHECK(std::string(tpfcore->name()) == "TPFCore");
 }
 
 TEST_CASE("calling generic hooks does not change newtonian acceleration behavior") {
