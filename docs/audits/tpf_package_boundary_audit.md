@@ -182,6 +182,22 @@ However, Python/tooling appears to carry package architecture debt and should be
 
 No Python/tooling behavior changes are made in this audit PR.
 
+
+## Phase 1 status (scaffold added)
+
+Implemented in Phase 1:
+- Added generic `PhysicsPackage` hooks for display/runtime metadata, utility-mode capability/dispatch, run-info metadata, render metadata, and package config metadata (all default no-op/empty).
+- Added minimal engine-level hook plumbing/tests to validate interface availability with Newtonian and TPFCore while preserving behavior.
+- Updated the package template README to reflect static self-registration and current Makefile source-inclusion requirements.
+
+Intentionally not moved in Phase 1:
+- TPF utility dispatch remains in `engine/main.cpp` (no behavior migration yet).
+- TPF-specific run-info/render field generation remains in existing engine paths.
+- No config schema migration or TPF config field relocation.
+
+Next phase target:
+- Move TPF utility dispatch out of `main.cpp` into package hook dispatch.
+
 ## Actionable phased plan
 
 ### Phase 1 (next implementation PR only)

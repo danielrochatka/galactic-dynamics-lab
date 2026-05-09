@@ -17,17 +17,30 @@ Copy this folder to create a new physics package (e.g. `MyCustomPhysics/`).
    ```
    Fill `ax[i]` and `ay[i]` for each particle `i`. The integrator calls this twice per step (velocity Verlet). `state` has `.x`, `.y`, `.vx`, `.vy`, `.mass` and `.n()`.
 
-## Optional overrides
+## Optional overrides (generic hooks)
 
+- **display_name()** – Human-facing package label.
+- **runtime_metadata()** – Generic package runtime key/value metadata.
+- **supports_utility_mode(mode)** – Capability check for utility-mode handling.
+- **run_utility_mode(config, output_dir)** – Package utility-mode entry point; default returns false.
+- **run_info_metadata(config)** – Additional run-info key/value metadata.
+- **render_metadata(config)** – Additional render/report key/value metadata.
+- **package_config_metadata()** – Package config schema/default metadata.
 - **compute_potential_energy(state, bh_mass, softening)** – For diagnostics/validation. Default returns 0.
 - **init()** – Called once before the run (e.g. load tables). Default no-op.
 - **validation_name()** – For reporting. Default returns `name()`.
 
-## Wiring your package into the binary
+## Registration model (current)
 
-1. Add your header to `physics/registry.cpp`:  
-   `#include "MyCustomPhysics/mycustom.hpp"`
-2. Instantiate your package (e.g. a static instance) and add it to the `s_packages` array in `registry.cpp`.
-3. Optionally add **`defaults.cfg`** in your package folder with package-specific keys. Users can override from the run config. See `physics/TPFCore/defaults.cfg` for an example.
+Packages register via static self-registration in package translation units by calling
+`register_physics_package_factory("PackageName", ...)`.
 
-Then set `physics_package = MyCustomPhysics` in your run config.
+You should **not** edit `physics/registry.cpp` to add package entries; the registry is factory-based.
+
+## Build inclusion note (current)
+
+The engine build is still source-list based. Add your package `.cpp` files to `engine/Makefile` (`LIB_SRCS`) so they are compiled and linked.
+
+## Optional package defaults
+
+You may add `defaults.cfg` in your package folder with package-specific keys. Users can override from run config. See `physics/TPFCore/defaults.cfg` for an example.
