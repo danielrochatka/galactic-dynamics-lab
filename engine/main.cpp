@@ -312,7 +312,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   std::string applied_accel_formula = "n/a";
   std::string decomposition_note = "reference decomposition unavailable";
 
-  if (config.physics_package == std::string("TPF") + "Core") {
+  if (config.physics_package == "TPFCore") {
     active_route = config.tpf_dynamics_mode;
     if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
       applied_accel_formula = "a=-K_xi*Xi_total_spatial";
@@ -341,7 +341,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
       galaxy::Config cfg_total = cfg_direct;
       cfg_total.tpf_vdsg_coupling = 0.0;
 
-      galaxy::PhysicsPackage* tpf_direct = galaxy::get_physics_package(std::string("TPF") + "Core");
+      galaxy::PhysicsPackage* tpf_direct = galaxy::get_physics_package("TPFCore");
       if (tpf_direct) {
         tpf_direct->init_from_config(cfg_direct);
         tpf_direct->compute_accelerations(state, config.bh_mass, config.softening,
@@ -350,7 +350,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
       }
 
       std::vector<double> ax_total_direct, ay_total_direct;
-      galaxy::PhysicsPackage* tpf_total = galaxy::get_physics_package(std::string("TPF") + "Core");
+      galaxy::PhysicsPackage* tpf_total = galaxy::get_physics_package("TPFCore");
       if (tpf_total) {
         tpf_total->init_from_config(cfg_total);
         tpf_total->compute_accelerations(state, config.bh_mass, config.softening,
@@ -1068,7 +1068,7 @@ int main(int argc, char** argv) {
       std::cout << "Wrote " << config.output_dir << "/snapshot_*.csv\n";
     }
 
-    if (config.physics_package == std::string("TPF") + "Core") {
+    if (config.physics_package == "TPFCore") {
     }
   }
 
