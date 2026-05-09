@@ -510,13 +510,13 @@ int main(int argc, char** argv) {
   std::string run_cfg_physics = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "physics_package");
   std::string run_cfg_mode_str = run_config_path.empty() ? "" : galaxy::probe_config_key(run_config_path, "simulation_mode");
 
-  /* Hard failure: run config says TPF" "Core + dynamical validation mode but resolved is galaxy with no CLI override */
+  /* Hard failure: run config says TPFCore + dynamical validation mode but resolved is galaxy with no CLI override */
   if (!run_config_path.empty() && cli_override_mode == false) {
-    if (run_cfg_physics == "TPF" "Core" &&
+    if (run_cfg_physics == "TPFCore" &&
         (run_cfg_mode_str == "two_body_orbit" || run_cfg_mode_str == "earth_moon_benchmark" ||
          run_cfg_mode_str == "bh_orbit_validation") &&
         config.simulation_mode == galaxy::SimulationMode::galaxy) {
-      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPF" "Core and simulation_mode="
+      std::cerr << "Config mismatch: " << run_config_path << " specifies physics_package=TPFCore and simulation_mode="
                 << run_cfg_mode_str << ", but resolved simulation_mode is galaxy. Refusing to run. "
                 << "Fix config precedence or run e.g.: ./galaxy_sim earth_moon_benchmark\n";
       return 1;
@@ -744,7 +744,7 @@ int main(int argc, char** argv) {
             const std::vector<galaxy::Snapshot>& side_snaps,
             const std::string& side_defaults_path) {
           const bool cooling_active =
-              (side_cfg.physics_package == "TPF" "Core" && side_cfg.tpf_cooling_fraction > 0.0);
+              (side_cfg.physics_package == "TPFCore" && side_cfg.tpf_cooling_fraction > 0.0);
           const int cooling_steps = cooling_active
               ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * side_cfg.tpf_cooling_fraction)))
               : 0;
@@ -1024,7 +1024,7 @@ int main(int argc, char** argv) {
 
   {
     const bool cooling_active =
-        (config.physics_package == "TPF" "Core" && config.tpf_cooling_fraction > 0.0);
+        (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
     const int cooling_steps = cooling_active
         ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
         : 0;
