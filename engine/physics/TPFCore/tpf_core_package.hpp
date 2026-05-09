@@ -28,6 +28,8 @@ class TPFCorePackage : public PhysicsPackage {
   const char* name() const override { return "TPFCore"; }
 
   void init_from_config(const Config& config) override;
+  bool supports_utility_mode(SimulationMode mode) const override;
+  bool run_utility_mode(const Config& config, const std::string& output_dir) override;
 
   /** Particle accelerations for `tpf_xi_theta_v1`: Xi_total-driven motion update; Theta is diagnostic-only. */
   void compute_accelerations(const State& state,
