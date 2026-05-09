@@ -131,7 +131,7 @@ Baseline note: keep `dev/**` excluded for comparable leak tracking over time. Py
 | `configs/bh_orbit_validation_newtonian_baseline.cfg` | 1 | direct_tpf, VDSG | C | Keep as package-scoped example config; align wording after hooks land. | low | Phase 6 |
 | `engine/init_conditions.hpp` | 1 | TPF | B | Introduce generic package hook/metadata boundary; remove TPF-specific branching from engine layer incrementally. | medium | Phase 1-4 |
 | `engine/tests/integration/newtonian_stability_matrix_audit.sh` | 1 | tpf_, TPF | F | Move/retarget to package test targets where TPF-specific; keep only generic contract tests in engine suite. | medium | Phase 5 |
-| `engine/physics/Template/README.md` | 1 | TPF | D | Keep as historical/audit reference; optionally trim stale naming later. | low | Phase 6 |
+| `engine/physics/Template/README.md` | 1 | TPF | B/E | Update template docs in Phase 1 to describe the current static self-registration model and the new generic package hooks; remove stale instructions about editing registry.cpp / s_packages. | medium | Phase 1 |
 
 ## Package registration / autoload audit (audit-only)
 
