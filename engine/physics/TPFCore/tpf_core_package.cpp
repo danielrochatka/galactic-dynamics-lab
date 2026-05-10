@@ -322,6 +322,64 @@ std::vector<PackageMetadataEntry> TPFCorePackage::run_info_metadata(const Config
   return metadata;
 }
 
+
+std::vector<PackageMetadataEntry> TPFCorePackage::run_info_supplement_metadata(const Config& config) const {
+  std::vector<PackageMetadataEntry> metadata;
+  auto add = [&metadata](const std::string& key, const std::string& value) {
+    PackageMetadataEntry e;
+    e.key = key;
+    e.value = value;
+    metadata.push_back(e);
+  };
+
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark ||
+      config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark ||
+      config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return metadata;
+  }
+
+  add("tpf_dynamics_mode", config.tpf_dynamics_mode);
+  if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    add("tpf_runtime_path_tier", "active_supported");
+    add("tpf_core_dynamics_route", "xi_kernel_deformed");
+    add("tpf_core_law_mode", "xi_kernel_deformed");
+    add("acceleration_formula", "a=-K_xi*Xi_eff_spatial");
+    add("K_xi", "tpf_4d_xi_motion_readout_scale");
+    add("tpf_4d_xi_motion_readout_scale", std::to_string(config.tpf_4d_xi_motion_readout_scale));
+    add("xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
+    add("xi_kernel_label",
+        (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
+            ? "VDSG transverse wake Xi-kernel deformation"
+            : "standard Xi-kernel deformation");
+    add("xi_kernel_coupling", std::to_string(config.tpf_4d_xi_kernel_coupling));
+    add("xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+    add("xi_kernel_metric_min", std::to_string(config.tpf_4d_xi_kernel_metric_min));
+    add("xi_kernel_metric_max", std::to_string(config.tpf_4d_xi_kernel_metric_max));
+    add("xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+  } else if (config.tpf_dynamics_mode == "direct_tpf") {
+    add("tpf_runtime_path_tier", "paper_facing");
+    add("tpf_core_law_mode", "direct_tpf");
+    add("tpf_truncation_status", "tensor_principal_part_route_Theta_I_kappa_baseline");
+    add("tpf_higher_order_status", "DeltaC_omitted");
+    add("tpf_extension_status", "VDSG_additive_extension_continuous_in_coupling");
+    add("tpf_provisional_readout_status", "off_required");
+    add("tpf_readout_closure_knobs_status", "rejected_on_direct_tpf");
+    add("tpf_stabilizer_status", "shunt_off_and_cooling_off_required");
+  } else if (config.tpf_dynamics_mode == "legacy_readout") {
+    add("tpf_runtime_path_tier", "deprecated_legacy");
+    add("tpf_runtime_deprecation_note", "legacy_readout/provisional_readout_path_is_deprecated_and_retained_for_transition_only");
+  }
+
+  if (config.tpf_dynamics_mode == "legacy_readout") {
+    add("tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout ? "1" : "0");
+    add("tpfcore_readout_mode", config.tpfcore_readout_mode);
+  } else {
+    add("tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
+    add("tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
+  }
+  return metadata;
+}
+
 std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& config) const {
   std::vector<PackageMetadataEntry> metadata;
   auto add_string = [&metadata](const std::string& key,

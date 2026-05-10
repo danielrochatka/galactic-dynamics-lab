@@ -39,6 +39,7 @@ class TPFCorePackage : public PhysicsPackage {
                                   const std::string& output_dir) override;
   std::vector<PackageMetadataEntry> run_info_metadata(const Config& config,
                                                       const std::string& package_defaults_path) const override;
+  std::vector<PackageMetadataEntry> run_info_supplement_metadata(const Config& config) const override;
   std::vector<PackageMetadataEntry> render_metadata(const Config& config) const override;
 
   /** Particle accelerations for `tpf_xi_theta_v1`: Xi_total-driven motion update; Theta is diagnostic-only. */

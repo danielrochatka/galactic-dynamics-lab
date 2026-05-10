@@ -88,6 +88,9 @@ class PhysicsPackage {
   /** Optional: package run-info metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&, const std::string&) const { return {}; }
 
+  /** Optional: package run-info supplement metadata emitted in branch/physics supplements section. */
+  virtual std::vector<PackageMetadataEntry> run_info_supplement_metadata(const Config&) const { return {}; }
+
   /** Optional: package render/report metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> render_metadata(const Config&) const { return {}; }
 
