@@ -428,5 +428,19 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
                            "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved);
     const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
     CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);
+    const size_t dyn = run_info.find("tpf_dynamics_mode\tdirect_tpf");
+    const size_t tier = run_info.find("tpf_runtime_path_tier\tpaper_facing");
+    const size_t law = run_info.find("tpf_core_law_mode\tdirect_tpf");
+    const size_t trunc = run_info.find("tpf_truncation_status\ttensor_principal_part_route_Theta_I_kappa_baseline");
+    const size_t status = run_info.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime");
+    REQUIRE(dyn != std::string::npos);
+    REQUIRE(tier != std::string::npos);
+    REQUIRE(law != std::string::npos);
+    REQUIRE(trunc != std::string::npos);
+    REQUIRE(status != std::string::npos);
+    CHECK(dyn < tier);
+    CHECK(tier < law);
+    CHECK(law < trunc);
+    CHECK(trunc < status);
   }
 }
