@@ -238,48 +238,10 @@ void write_run_info(const std::string& output_dir,
       f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_xi_motion_probe_benchmark\n";
       f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
       f << "tpf_4d_xi_motion_probe_benchmark_readout_scalars_note\tbenchmark uses tpf_4d_xi_motion_readout_scale with Xi_spatial only\n";
-    } else {
-      f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
-      if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-        f << "tpf_runtime_path_tier\tactive_supported\n";
-      } else if (config.tpf_dynamics_mode == "direct_tpf") {
-        f << "tpf_runtime_path_tier\tpaper_facing\n";
-      } else if (config.tpf_dynamics_mode == "legacy_readout") {
-        f << "tpf_runtime_path_tier\tdeprecated_legacy\n";
-        f << "tpf_runtime_deprecation_note\tlegacy_readout/provisional_readout_path_is_deprecated_and_retained_for_transition_only\n";
-      }
-      if (config.tpf_dynamics_mode == "direct_tpf") {
-        f << "tpf_core_law_mode\tdirect_tpf\n";
-        f << "tpf_truncation_status\ttensor_principal_part_route_Theta_I_kappa_baseline\n";
-        f << "tpf_higher_order_status\tDeltaC_omitted\n";
-        f << "tpf_extension_status\tVDSG_additive_extension_continuous_in_coupling\n";
-        f << "tpf_provisional_readout_status\toff_required\n";
-        f << "tpf_readout_closure_knobs_status\trejected_on_direct_tpf\n";
-        f << "tpf_stabilizer_status\tshunt_off_and_cooling_off_required\n";
-      } else if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-        f << "tpf_core_dynamics_route\txi_kernel_deformed\n";
-        f << "tpf_core_law_mode\txi_kernel_deformed\n";
-        f << "acceleration_formula\ta=-K_xi*Xi_eff_spatial\n";
-        f << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
-        f << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
-        f << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
-        f << "xi_kernel_label\t"
-          << ((config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
-                  ? "VDSG transverse wake Xi-kernel deformation"
-                  : "standard Xi-kernel deformation")
-          << "\n";
-        f << "xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
-        f << "xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
-        f << "xi_kernel_metric_min\t" << config.tpf_4d_xi_kernel_metric_min << "\n";
-        f << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
-        f << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
-      }
-      if (config.tpf_dynamics_mode == "legacy_readout") {
-        f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-        f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
-      } else {
-        f << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
-        f << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
+    } else if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+      const auto supplement = physics->run_info_supplement_metadata(config);
+      for (const auto& entry : supplement) {
+        f << entry.key << "\t" << entry.value << "\n";
       }
     }
     if (config.tpf_dynamics_mode == "legacy_readout") {

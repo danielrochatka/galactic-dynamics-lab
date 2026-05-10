@@ -251,7 +251,6 @@ std::vector<PackageMetadataEntry> TPFCorePackage::run_info_metadata(const Config
     e.value = value;
     metadata.push_back(e);
   };
-
   if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
     add("=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===", "");
     add("tpf_4d_static_residual_benchmark_mode", "diagnostic_only");
@@ -331,6 +330,11 @@ std::vector<PackageMetadataEntry> TPFCorePackage::run_info_supplement_metadata(c
     e.value = value;
     metadata.push_back(e);
   };
+  auto add_number = [&add](const std::string& key, double value) {
+    std::ostringstream oss;
+    oss << value;
+    add(key, oss.str());
+  };
 
   if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark ||
       config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark ||
@@ -345,16 +349,16 @@ std::vector<PackageMetadataEntry> TPFCorePackage::run_info_supplement_metadata(c
     add("tpf_core_law_mode", "xi_kernel_deformed");
     add("acceleration_formula", "a=-K_xi*Xi_eff_spatial");
     add("K_xi", "tpf_4d_xi_motion_readout_scale");
-    add("tpf_4d_xi_motion_readout_scale", std::to_string(config.tpf_4d_xi_motion_readout_scale));
+    add_number("tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
     add("xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
     add("xi_kernel_label",
         (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
             ? "VDSG transverse wake Xi-kernel deformation"
             : "standard Xi-kernel deformation");
-    add("xi_kernel_coupling", std::to_string(config.tpf_4d_xi_kernel_coupling));
+    add_number("xi_kernel_coupling", config.tpf_4d_xi_kernel_coupling);
     add("xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
-    add("xi_kernel_metric_min", std::to_string(config.tpf_4d_xi_kernel_metric_min));
-    add("xi_kernel_metric_max", std::to_string(config.tpf_4d_xi_kernel_metric_max));
+    add_number("xi_kernel_metric_min", config.tpf_4d_xi_kernel_metric_min);
+    add_number("xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
     add("xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
   } else if (config.tpf_dynamics_mode == "direct_tpf") {
     add("tpf_runtime_path_tier", "paper_facing");

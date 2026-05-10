@@ -88,3 +88,26 @@ rg -n 'physics_package ==|get_physics_package|run_info_metadata|render_metadata|
 
 rg -n 'tpf_last_|AccelPipelineStats|tpf_accel_pipeline|pipeline' engine/output.cpp engine/main.cpp engine/physics/TPFCore
 ```
+
+
+## Phase 5D-B status (implemented)
+
+Phase 5D-B completed for safe selected-package run_info supplement metadata ownership.
+
+### Candidate inventory and disposition
+
+| key/block | current condition | original output location/order | proposed owner | class | moved in 5D-B? |
+|---|---|---|---|---|---|
+| `tpf_dynamics_mode` | `physics_package==TPFCore` and non-benchmark branch | branch/physics supplement block, before route/readout status lines | `TPFCorePackage::run_info_supplement_metadata` | A | yes |
+| `tpf_runtime_path_tier` | same, mode-conditional (`direct_tpf`/`legacy_readout`/`xi_kernel_deformed`) | immediately after `tpf_dynamics_mode` | package | A | yes |
+| `tpf_runtime_deprecation_note` | `legacy_readout` | after `tpf_runtime_path_tier` in legacy path | package | A | yes |
+| `tpf_core_law_mode` | `direct_tpf` or `xi_kernel_deformed` | route-status lines | package | A | yes |
+| `tpf_core_dynamics_route` | `xi_kernel_deformed` | route-status lines | package | A | yes |
+| `acceleration_formula`, `K_xi` | `xi_kernel_deformed` | route-status lines | package | A | yes |
+| `tpf_4d_xi_motion_readout_scale` (supplement copy) | `xi_kernel_deformed` | xi route block | package | A | yes |
+| `xi_kernel_mode`, `xi_kernel_label`, `xi_kernel_coupling`, `xi_kernel_factor_mode`, `xi_kernel_metric_min`, `xi_kernel_metric_max`, `xi_temporal_mode` | `xi_kernel_deformed` | xi route block | package | A | yes |
+| `tpf_truncation_status`, `tpf_higher_order_status`, `tpf_extension_status`, `tpf_provisional_readout_status`, `tpf_readout_closure_knobs_status`, `tpf_stabilizer_status` | `direct_tpf` | direct route status lines | package | A | yes |
+| `tpfcore_enable_provisional_readout` / `tpfcore_readout_mode` or `*_status` variants | legacy/non-legacy mode split | end of moved route/status subset | package | A | yes |
+| `tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, `tpf_cooling_fraction`, `tpf_global_accel_shunt_*`, `tpf_accel_pipeline_diagnostics_csv` | same enclosing TPF block | after moved subset | mixed config/pipeline/schema | C/E/D | deferred |
+| `tpf_last_*` and `AccelPipelineStats` section | pipeline stats block | later dedicated section | runtime stats context | E | deferred |
+| benchmark compatibility fallback | non-TPF + benchmark modes | earlier compatibility branch | generic compatibility | D | deferred |

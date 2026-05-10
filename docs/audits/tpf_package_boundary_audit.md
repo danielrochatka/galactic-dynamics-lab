@@ -327,3 +327,19 @@ Phase 5D-A completed as an audit-only step. Added a file/function-level classifi
 - `docs/audits/tpf_remaining_architecture_leaks_audit.md`
 
 No runtime/output/config/test behavior changes were made in this phase.
+
+
+## Phase 5D-B status note
+
+Completed in 5D-B:
+- Selected-package TPFCore run_info supplement metadata is now package-owned via `TPFCorePackage::run_info_supplement_metadata(...)`, with generic emission retained in `engine/output.cpp` at the original supplement location for parity.
+
+Deferred after 5D-B:
+- pipeline stats migration (`tpf_last_*` / `AccelPipelineStats` context),
+- config isolation,
+- render_audit semantic ownership,
+- `main.cpp` diagnostics migration,
+- simulation integrator policy boundary,
+- package autoload/discovery,
+- broader test relocation,
+- Python/tooling cleanup.

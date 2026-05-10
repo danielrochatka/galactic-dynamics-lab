@@ -127,3 +127,15 @@ Added a dedicated remaining-leaks architecture audit for Phase 5D-A:
 - `docs/audits/tpf_remaining_architecture_leaks_audit.md`
 
 This phase is audit-only and intentionally performs no metadata moves or runtime/schema changes.
+
+
+## Phase 5D-B status (run_info supplement ownership)
+
+Implemented:
+- Selected-package TPFCore run_info supplement metadata ownership moved from generic `engine/output.cpp` emission to `TPFCorePackage::run_info_supplement_metadata(...)` and emitted generically in the same supplement location.
+- Moved keys: `tpf_dynamics_mode`, `tpf_runtime_path_tier`, `tpf_runtime_deprecation_note`, `tpf_core_law_mode`, `tpf_core_dynamics_route`, `acceleration_formula`, `K_xi`, `tpf_4d_xi_motion_readout_scale` (supplement line), `xi_kernel_*` route labels/knobs, `tpf_truncation_status`, `tpf_higher_order_status`, `tpf_extension_status`, `tpf_provisional_readout_status`, `tpf_readout_closure_knobs_status`, `tpf_stabilizer_status`, and `tpfcore_enable_provisional_readout` / `tpfcore_readout_mode` plus non-legacy status keys.
+
+Deferred groups (unchanged):
+- Pipeline/runtime stats (`tpf_last_*`, `AccelPipelineStats`).
+- Config/provenance-coupled and schema-stability fields (`tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, cooling/shunt/diagnostics toggles in mixed block).
+- Benchmark compatibility fallback behavior from Phase 5C.
