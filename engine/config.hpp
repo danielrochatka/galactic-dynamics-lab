@@ -2,6 +2,7 @@
 #define GALAXY_CONFIG_HPP
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -119,6 +120,7 @@ struct Config {
   } explicit_overrides;
 
   SimulationMode simulation_mode = SimulationMode::galaxy;
+  std::string mode_token = "galaxy";
 
   int n_stars = 5000;
   double star_mass = kSolarMassKg;
@@ -151,6 +153,8 @@ struct Config {
    * Empty => single-package run (default). Non-empty + different from physics_package => compare mode.
    */
   std::string physics_package_compare = "";
+
+  std::unordered_map<std::string, std::string> package_options;
 
   /**
    * TPFCore only: canonical v1 dynamics route.

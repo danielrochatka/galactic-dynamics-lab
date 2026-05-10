@@ -1,4 +1,6 @@
 #include "config.hpp"
+#include "package_discovery.hpp"
+#include "physics/TPFCore/tpf_core_config.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -41,6 +43,25 @@ std::string lower_copy(std::string s) {
 bool in_list(const std::string& s, const std::initializer_list<const char*>& vals) {
   for (const char* v : vals)
     if (s == v) return true;
+  return false;
+}
+
+
+
+bool key_claimed_by_package(const std::string& key, const std::string& preferred, std::string& owner) {
+  if (const PackageMetadata* md = find_package_metadata(preferred)) {
+    if (md->schema_keys.count(key) > 0) {
+      owner = md->name.empty() ? md->folder_name : md->name;
+      return true;
+    }
+  }
+  static const std::vector<PackageMetadata> all = discover_packages();
+  for (const auto& md : all) {
+    if (md.schema_keys.count(key) > 0) {
+      owner = md.name.empty() ? md.folder_name : md.name;
+      return true;
+    }
+  }
   return false;
 }
 
@@ -137,6 +158,7 @@ bool simulation_mode_requires_output_dir(SimulationMode m) {
 
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
   if (key == "simulation_mode") {
+    config.mode_token = trim(val);
     config.simulation_mode = parse_mode(val);
     return true;
   }
@@ -211,6 +233,10 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "physics_package") {
     config.physics_package = val;
+    if (const PackageMetadata* md = find_package_metadata(config.physics_package)) {
+      for (const auto& kv : md->defaults) config.package_options[kv.first] = kv.second;
+      if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+    }
     return true;
   }
   if (key == "physics_package_compare") {
@@ -221,41 +247,9 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.tpfcore_enable_provisional_readout = parse_bool(val);
     return true;
   }
-  if (key == "tpfcore_readout_mode") {
-    config.tpfcore_readout_mode = trim(val);
-    return true;
-  }
-  if (key == "tpfcore_readout_scale") {
-    config.tpfcore_readout_scale = std::stod(val);
-    return true;
-  }
-  if (key == "tpfcore_theta_tt_scale") {
-    config.tpfcore_theta_tt_scale = std::stod(val);
-    return true;
-  }
-  if (key == "tpfcore_theta_tr_scale") {
-    config.tpfcore_theta_tr_scale = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_dynamics_mode") {
-    std::string s = trim(val);
-    if (s != "tpf_xi_theta_v1") {
-      throw std::runtime_error("tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch, got: " + val);
-    }
-    config.tpf_dynamics_mode = s;
-    return true;
-  }
   if (key == "tpf_weak_field_correspondence_alpha_si") {
     config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
     config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
-    return true;
-  }
-  if (key == "tpf_analysis_mode") {
-    std::string s = trim(val);
-    if (s != "none" && s != "v11_weak_field_correspondence") {
-      throw std::runtime_error("tpf_analysis_mode must be none or v11_weak_field_correspondence, got: " + val);
-    }
-    config.tpf_analysis_mode = s;
     return true;
   }
   if (key == "v11_weak_field_correspondence_benchmark") {
@@ -289,14 +283,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "v11_em_calib_surface_g_m_s2") {
     config.v11_em_calib_surface_g_m_s2 = std::stod(val);
-    return true;
-  }
-  if (key == "tpfcore_closure_kappa" || key == "tpf_kappa") {
-    config.tpf_kappa = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_vdsg_coupling") {
-    config.tpf_vdsg_coupling = std::stod(val);
     return true;
   }
   if (key == "tpf_vdsg_mass_baseline_kg") {
@@ -797,6 +783,12 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.output_dir = trim(val);
     return true;
   }
+  std::string owner;
+  if (key_claimed_by_package(key, config.physics_package, owner)) {
+    config.package_options[key] = trim(val);
+    if (owner == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+    return true;
+  }
   return false;
 }
 
@@ -825,6 +817,7 @@ bool load_config_file(const std::string& path, Config& config) {
           " (key=" + key + "): " + e.what());
     }
   }
+  if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
   return true;
 }
 
