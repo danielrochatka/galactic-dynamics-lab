@@ -84,6 +84,16 @@ class PhysicsPackage {
 
   /** Optional: package config schema/default metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> package_config_metadata() const { return {}; }
+
+  /** Optional: package-owned post-run diagnostics emission. Default no-op/success. */
+  virtual bool write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
+                                          const Config& config,
+                                          const std::string& output_dir) {
+    (void)snapshots;
+    (void)config;
+    (void)output_dir;
+    return true;
+  }
 };
 
 /** Generic kinetic energy (same for all packages): 0.5 * sum(m_i * v_i^2). */

@@ -14,3 +14,12 @@ TEST_CASE("TPFCore utility hooks advertise supported utility modes") {
   CHECK(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
   CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::galaxy));
 }
+
+TEST_CASE("TPFCore post-run diagnostics hook is safe for empty snapshots") {
+  galaxy::TPFCorePackage pkg;
+  galaxy::Config cfg;
+  cfg.physics_package = "TPFCore";
+  cfg.output_dir = ".";
+  std::vector<galaxy::Snapshot> snapshots;
+  CHECK(pkg.write_post_run_diagnostics(snapshots, cfg, cfg.output_dir));
+}
