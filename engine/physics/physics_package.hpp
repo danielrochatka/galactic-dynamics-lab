@@ -19,6 +19,10 @@ namespace galaxy {
 struct PackageMetadataEntry {
   std::string key;
   std::string value;
+  enum class ValueType { String, Number, Bool };
+  ValueType value_type = ValueType::String;
+  double number_value = 0.0;
+  bool bool_value = false;
 };
 
 class PhysicsPackage {

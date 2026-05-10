@@ -37,6 +37,7 @@ class TPFCorePackage : public PhysicsPackage {
   bool write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
                                   const Config& config,
                                   const std::string& output_dir) override;
+  std::vector<PackageMetadataEntry> render_metadata(const Config& config) const override;
 
   /** Particle accelerations for `tpf_xi_theta_v1`: Xi_total-driven motion update; Theta is diagnostic-only. */
   void compute_accelerations(const State& state,

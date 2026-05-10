@@ -1,4 +1,4 @@
-# TPF Metadata Ownership Audit (Phase 5A)
+# TPF Metadata Ownership Audit (Phase 5A/5B)
 
 ## Scope
 Audit only. No runtime code or schema changes.
@@ -81,3 +81,20 @@ rg -n "f << \"tpf_|json_kv\(.*\"tpf_|tf << \"tpf_|TPFCore|legacy_readout|direct_
 
 ## 5A conclusion
 Phase 5A is complete as an audit-only step. No runtime behavior should change in this PR.
+
+
+## Phase 5B status (render_manifest A-class moved)
+
+Completed in Phase 5B:
+- Moved A-class render-manifest TPF metadata emission from `engine/render_audit.cpp` into `TPFCorePackage::render_metadata(...)`.
+- Generic render-manifest emission now iterates package-provided metadata entries for both JSON and TXT outputs.
+- Preserved key/value parity for moved keys, including legacy-readout status keys/labels.
+
+Deferred to Phase 5C/5D:
+- A-class `run_info` metadata migration in `engine/output.cpp`.
+- Any config-isolation-dependent C-class items.
+
+Remaining `render_audit` TPF references and class:
+- C: cooling-active/cooling-fraction context and alias/effective-mode helpers.
+- D: `compute_active_*` generic diagnostics strings.
+- F: false-guarded v11 blocks.

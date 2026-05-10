@@ -289,3 +289,17 @@ Non-goals in Phase 1:
 - Added `docs/audits/tpf_metadata_ownership_audit.md` with A/B/C/D/E/F classification and proposed Phase 5B safe scope.
 - No runtime/output behavior changed in this phase.
 - Phase 5B will migrate only safe A-class metadata entries.
+
+
+## Phase 5B status (render metadata ownership)
+
+Implemented in Phase 5B:
+- `render_manifest` TPF-specific metadata ownership moved to the package hook (`TPFCorePackage::render_metadata(...)`).
+- Generic render audit emission now consumes package-provided metadata entries for JSON/TXT output.
+
+Deferred:
+- `run_info` metadata ownership migration.
+- Config isolation/migration.
+- Package autoload/discovery.
+- Broader test relocation.
+- Python/tooling boundary cleanup.
