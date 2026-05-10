@@ -343,3 +343,9 @@ Deferred after 5D-B:
 - package autoload/discovery,
 - broader test relocation,
 - Python/tooling cleanup.
+
+## Phase 5D-C-A status (audit/design only)
+- Phase 5D-C-A completed as audit/design only; no runtime or output behavior changed.
+- Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
+- Implementation is explicitly deferred to Phase 5D-C-B.
+- See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.

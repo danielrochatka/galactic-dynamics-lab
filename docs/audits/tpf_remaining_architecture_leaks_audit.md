@@ -111,3 +111,9 @@ Phase 5D-B completed for safe selected-package run_info supplement metadata owne
 | `tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, `tpf_cooling_fraction`, `tpf_global_accel_shunt_*`, `tpf_accel_pipeline_diagnostics_csv` | same enclosing TPF block | after moved subset | mixed config/pipeline/schema | C/E/D | deferred |
 | `tpf_last_*` and `AccelPipelineStats` section | pipeline stats block | later dedicated section | runtime stats context | E | deferred |
 | benchmark compatibility fallback | non-TPF + benchmark modes | earlier compatibility branch | generic compatibility | D | deferred |
+
+## Phase 5D-C-A status (audit/design only)
+- Phase 5D-C-A completed as audit/design only; no runtime or output behavior changed.
+- Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
+- Implementation is explicitly deferred to Phase 5D-C-B.
+- See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.

@@ -139,3 +139,9 @@ Deferred groups (unchanged):
 - Pipeline/runtime stats (`tpf_last_*`, `AccelPipelineStats`).
 - Config/provenance-coupled and schema-stability fields (`tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, cooling/shunt/diagnostics toggles in mixed block).
 - Benchmark compatibility fallback behavior from Phase 5C.
+
+## Phase 5D-C-A status (audit/design only)
+- Phase 5D-C-A completed as audit/design only; no runtime or output behavior changed.
+- Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
+- Implementation is explicitly deferred to Phase 5D-C-B.
+- See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.
