@@ -1,34 +1,8 @@
 #include "simulation.hpp"
 #include "integrator.hpp"
 #include <algorithm>
-#include <cmath>
 
 namespace galaxy {
-
-namespace {
-
-/** 1% radial velocity damping per step (TPF artificial cooling). */
-constexpr double kTpfRadialCoolingDampingFactor = 0.99;
-
-void apply_radial_cooling_damping(State& state, double damping_factor) {
-  const int n = state.n();
-  for (int i = 0; i < n; ++i) {
-    double x = state.x[i];
-    double y = state.y[i];
-    double r = std::sqrt(x * x + y * y);
-    if (r > 0.0) {
-      double vx = state.vx[i];
-      double vy = state.vy[i];
-      double v_rad = (vx * x + vy * y) / r;
-      double damped_v_rad = v_rad * damping_factor;
-      double v_rad_diff = v_rad - damped_v_rad;
-      state.vx[i] -= v_rad_diff * (x / r);
-      state.vy[i] -= v_rad_diff * (y / r);
-    }
-  }
-}
-
-}  // namespace
 
 std::vector<Snapshot> run_simulation(const Config& config,
                                      State state,
@@ -64,12 +38,13 @@ std::vector<Snapshot> run_simulation(const Config& config,
       velocity_verlet_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
     }
 
-    if (cooling_on && step < cooling_steps) {
-      apply_radial_cooling_damping(state, kTpfRadialCoolingDampingFactor);
+    if (cooling_on) {
+      physics->apply_cooling_step(state, config, step, cooling_steps);
     }
 
     /* Suppress snapshot collection during cooling (saves memory and disk when snapshots are written). */
-    const bool skip_snapshot_for_cooling = cooling_on && step < cooling_steps;
+    const bool skip_snapshot_for_cooling =
+        cooling_on && physics->suppress_snapshot_for_cooling(config, step, cooling_steps);
     if (!skip_snapshot_for_cooling && step % snapshot_every == 0) {
       Snapshot snap;
       snap.step = step;

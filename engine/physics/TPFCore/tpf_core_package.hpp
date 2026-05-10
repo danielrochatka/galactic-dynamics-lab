@@ -32,6 +32,8 @@ class TPFCorePackage : public PhysicsPackage {
   bool run_utility_mode(const Config& config, const std::string& output_dir) override;
   bool cooling_active(const Config& config) const override;
   int cooling_steps(const Config& config, int n_steps) const override;
+  void apply_cooling_step(State& state, const Config& config, int step, int cooling_steps) const override;
+  bool suppress_snapshot_for_cooling(const Config& config, int step, int cooling_steps) const override;
   bool write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
                                   const Config& config,
                                   const std::string& output_dir) override;

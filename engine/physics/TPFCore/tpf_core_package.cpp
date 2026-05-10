@@ -38,6 +38,11 @@
 
 namespace galaxy {
 
+namespace {
+const double kRadialCoolingDampingFactor = 0.99;
+void apply_radial_cooling_damping(State& state, double damping_factor);
+}
+
 /** Single place that maps simulator Config -> TPFCore params. Keeps TPFCore decoupled from Config. */
 static tpfcore::TPFCoreParams build_params(const Config& config, const std::string& output_dir) {
   tpfcore::TPFCoreParams p;
@@ -227,9 +232,37 @@ int TPFCorePackage::cooling_steps(const Config& config, int n_steps) const {
   return std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)));
 }
 
+void TPFCorePackage::apply_cooling_step(State& state, const Config&, int step, int cooling_steps) const {
+  if (step < cooling_steps) {
+    apply_radial_cooling_damping(state, kRadialCoolingDampingFactor);
+  }
+}
+
+bool TPFCorePackage::suppress_snapshot_for_cooling(const Config&, int step, int cooling_steps) const {
+  return step < cooling_steps;
+}
+
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
+
+void apply_radial_cooling_damping(State& state, double damping_factor) {
+  const int n = state.n();
+  for (int i = 0; i < n; ++i) {
+    double x = state.x[i];
+    double y = state.y[i];
+    double r = std::sqrt(x * x + y * y);
+    if (r > 0.0) {
+      double vx = state.vx[i];
+      double vy = state.vy[i];
+      double v_rad = (vx * x + vy * y) / r;
+      double damped_v_rad = v_rad * damping_factor;
+      double v_rad_diff = v_rad - damped_v_rad;
+      state.vx[i] -= v_rad_diff * (x / r);
+      state.vy[i] -= v_rad_diff * (y / r);
+    }
+  }
+}
 
 struct XiKernelRuntimeSource {
   double x = 0.0, y = 0.0, z = 0.0;
