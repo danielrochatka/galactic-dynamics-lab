@@ -250,8 +250,10 @@ Still deferred (intentional):
 ## Phase 5C status (benchmark run_info metadata boundary move)
 
 Implemented in Phase 5C:
-- TPF benchmark run_info metadata ownership moved from generic `engine/output.cpp` to `TPFCorePackage::run_info_metadata(...)`.
-- Generic run-info emission now uses package-provided metadata entries for those benchmark blocks.
+- TPFCore selected-package benchmark run_info metadata moved from generic `engine/output.cpp` to `TPFCorePackage::run_info_metadata(...)`.
+- Generic `write_run_info(...)` now uses package-provided metadata first for benchmark run_info emission.
+- Non-TPF selected-package benchmark modes continue to use a temporary legacy compatibility fallback in `engine/output.cpp` so historical simulation_mode-based run_info output remains unchanged.
+- This fallback is a deferred schema/compatibility leak and not fully package-owned yet.
 
 Deferred (unchanged):
 - General run_info dynamics metadata migration.

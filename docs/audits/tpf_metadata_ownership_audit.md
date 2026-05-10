@@ -109,7 +109,10 @@ Completed in Phase 5C:
   - `tpf_4d_static_residual_benchmark_*`
   - `tpf_4d_static_motion_readout_benchmark_*`
   - `tpf_4d_xi_motion_probe_benchmark_*`
-- Generic `write_run_info(...)` now iterates package-provided run-info metadata entries.
+- For selected `TPFCore` runs, benchmark run_info metadata is now package-owned through `TPFCorePackage::run_info_metadata(...)`.
+- Generic `write_run_info(...)` now queries package-provided run-info metadata first.
+- Non-TPF selected-package benchmark modes retain a temporary legacy compatibility fallback in `engine/output.cpp` to preserve historical simulation_mode-based benchmark run_info output parity.
+- This fallback is a deferred schema/compatibility leak and is not fully package-owned yet.
 - Preserved benchmark run_info key/value output parity and benchmark-section ordering.
 
 Deferred to Phase 5D+:
