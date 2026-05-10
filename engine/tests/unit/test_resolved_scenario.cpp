@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "accel_pipeline_stats.hpp"
 #include "doctest.h"
 #include "output.hpp"
 #include "resolved_scenario.hpp"
@@ -442,5 +443,77 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     CHECK(tier < law);
     CHECK(law < trunc);
     CHECK(trunc < status);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_last_pipeline_runtime_section";
+    configured.simulation_mode = galaxy::SimulationMode::galaxy;
+    configured.physics_package = "TPFCore";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::AccelPipelineStats stats;
+    stats.valid = true;
+    stats.mean_baseline_mag = 1.25;
+    stats.mean_vdsg_mag = 2.5;
+    stats.vdsg_over_baseline_ratio = 2.0;
+    stats.shunt_events_last_step = 7;
+    stats.frac_capped_last_step = 0.125;
+    stats.shunt_enabled = true;
+    stats.shunt_fraction = 0.3;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved, nullptr,
+                           nullptr, &stats);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    const size_t sec = run_info.find("=== TPF acceleration pipeline (last integrator step) ===");
+    const size_t k1 = run_info.find("tpf_last_mean_baseline_accel_mag\t1.25");
+    const size_t k2 = run_info.find("tpf_last_mean_vdsg_accel_mag\t2.5");
+    const size_t k3 = run_info.find("tpf_last_vdsg_over_baseline_ratio\t2");
+    const size_t k4 = run_info.find("tpf_last_shunt_events\t7");
+    const size_t k5 = run_info.find("tpf_last_frac_capped\t0.125");
+    const size_t k6 = run_info.find("tpf_last_global_accel_shunt_enabled\t1");
+    const size_t k7 = run_info.find("tpf_last_global_accel_shunt_fraction\t0.3");
+    const size_t end = run_info.find("=== End TPF acceleration pipeline ===");
+    REQUIRE(sec != std::string::npos);
+    REQUIRE(k1 != std::string::npos);
+    REQUIRE(k2 != std::string::npos);
+    REQUIRE(k3 != std::string::npos);
+    REQUIRE(k4 != std::string::npos);
+    REQUIRE(k5 != std::string::npos);
+    REQUIRE(k6 != std::string::npos);
+    REQUIRE(k7 != std::string::npos);
+    REQUIRE(end != std::string::npos);
+    CHECK(sec < k1);
+    CHECK(k1 < k2);
+    CHECK(k2 < k3);
+    CHECK(k3 < k4);
+    CHECK(k4 < k5);
+    CHECK(k5 < k6);
+    CHECK(k6 < k7);
+    CHECK(k7 < end);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_last_pipeline_runtime_section_invalid";
+    configured.simulation_mode = galaxy::SimulationMode::galaxy;
+    configured.physics_package = "TPFCore";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::AccelPipelineStats invalid_stats;
+    invalid_stats.valid = false;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved, nullptr,
+                           nullptr, &invalid_stats);
+    const std::string run_info_invalid = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info_invalid.find("=== TPF acceleration pipeline (last integrator step) ===") == std::string::npos);
+
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved, nullptr,
+                           nullptr, nullptr);
+    const std::string run_info_missing = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info_missing.find("=== TPF acceleration pipeline (last integrator step) ===") == std::string::npos);
   }
 }

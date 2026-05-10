@@ -346,16 +346,21 @@ void write_run_info(const std::string& output_dir,
     f << "first_saved_snapshot_step\t" << cooling_audit->first_saved_snapshot_step << "\n";
     f << "first_saved_snapshot_time\t" << cooling_audit->first_saved_snapshot_time << "\n";
   }
-  if (config.physics_package == "TPFCore" && tpf_pipeline && tpf_pipeline->valid) {
-    f << "\n=== TPF acceleration pipeline (last integrator step) ===\n";
-    f << "tpf_last_mean_baseline_accel_mag\t" << tpf_pipeline->mean_baseline_mag << "\n";
-    f << "tpf_last_mean_vdsg_accel_mag\t" << tpf_pipeline->mean_vdsg_mag << "\n";
-    f << "tpf_last_vdsg_over_baseline_ratio\t" << tpf_pipeline->vdsg_over_baseline_ratio << "\n";
-    f << "tpf_last_shunt_events\t" << tpf_pipeline->shunt_events_last_step << "\n";
-    f << "tpf_last_frac_capped\t" << tpf_pipeline->frac_capped_last_step << "\n";
-    f << "tpf_last_global_accel_shunt_enabled\t" << (tpf_pipeline->shunt_enabled ? 1 : 0) << "\n";
-    f << "tpf_last_global_accel_shunt_fraction\t" << tpf_pipeline->shunt_fraction << "\n";
-    f << "=== End TPF acceleration pipeline ===\n";
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    RunInfoContext runtime_context;
+    runtime_context.package_runtime_stats = tpf_pipeline;
+    runtime_context.package_runtime_stats_kind = "tpf_accel_pipeline_stats";
+    const auto runtime_metadata = physics->run_info_runtime_metadata(config, runtime_context);
+    if (!runtime_metadata.empty()) {
+      f << "\n";
+      for (const auto& entry : runtime_metadata) {
+        if (entry.value.empty() && entry.key.rfind("===", 0) == 0) {
+          f << entry.key << "\n";
+        } else {
+          f << entry.key << "\t" << entry.value << "\n";
+        }
+      }
+    }
   }
   f << "n_stars\t" << n_star << "\n";
   if (config.physics_package == "TPFCore") {

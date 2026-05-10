@@ -145,3 +145,8 @@ Deferred groups (unchanged):
 - Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
 - Implementation is explicitly deferred to Phase 5D-C-B.
 - See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.
+
+## Phase 5D-C-B status note
+- Implemented package-owned runtime run_info metadata emission for the `tpf_last_*` section using a new generic runtime context/hook (`RunInfoContext` + `run_info_runtime_metadata`).
+- No run_info schema changes were made.
+- No `engine/main.cpp`, `engine/simulation.cpp`, `engine/render_audit.cpp`, or `engine/config.*` behavior was changed.

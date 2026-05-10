@@ -30,6 +30,11 @@ struct PackageMetadataEntry {
   RenderPlacement render_placement = RenderPlacement::AfterAccelerationCodePath;
 };
 
+struct RunInfoContext {
+  const void* package_runtime_stats = nullptr;
+  const char* package_runtime_stats_kind = nullptr;
+};
+
 class PhysicsPackage {
  public:
   virtual ~PhysicsPackage() = default;
@@ -90,6 +95,12 @@ class PhysicsPackage {
 
   /** Optional: package run-info supplement metadata emitted in branch/physics supplements section. */
   virtual std::vector<PackageMetadataEntry> run_info_supplement_metadata(const Config&) const { return {}; }
+
+  /** Optional: package run-info metadata that depends on runtime context/stats. */
+  virtual std::vector<PackageMetadataEntry> run_info_runtime_metadata(const Config&,
+                                                                      const RunInfoContext&) const {
+    return {};
+  }
 
   /** Optional: package render/report metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> render_metadata(const Config&) const { return {}; }

@@ -117,3 +117,7 @@ Phase 5D-B completed for safe selected-package run_info supplement metadata owne
 - Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
 - Implementation is explicitly deferred to Phase 5D-C-B.
 - See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.
+
+## Phase 5D-C-B status
+- `tpf_last_*` runtime pipeline stats ownership has been moved from generic `engine/output.cpp` to `TPFCorePackage::run_info_runtime_metadata(...)` via generic runtime context/hook.
+- Deferred leaks remain unchanged for `engine/render_audit.cpp`, `engine/main.cpp`, `engine/simulation.cpp`, and `engine/config.*` scope items.

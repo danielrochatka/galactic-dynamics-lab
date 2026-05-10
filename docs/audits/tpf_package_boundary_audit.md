@@ -349,3 +349,8 @@ Deferred after 5D-B:
 - Pipeline/runtime run_info metadata (`tpf_last_*` and related runtime counter context) was inventoried for future package ownership.
 - Implementation is explicitly deferred to Phase 5D-C-B.
 - See: `docs/audits/tpf_pipeline_run_info_metadata_audit.md`.
+
+## Phase 5D-C-B status note
+- Runtime/pipeline `tpf_last_*` run_info metadata ownership moved behind package boundary to `TPFCorePackage::run_info_runtime_metadata(...)`.
+- Generic writer now emits package-provided runtime metadata through a generic runtime context/hook without exposing `AccelPipelineStats` in the `PhysicsPackage` hook signature.
+- No output schema changes and no config/render/main/simulation behavior changes were introduced.
