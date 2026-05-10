@@ -320,6 +320,56 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   }
 
   {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_4d_static_motion_readout";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark;
+    configured.physics_package = "TPFCore";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    const size_t sec = run_info.find("=== TPF 4D static motion readout benchmark ===");
+    const size_t key = run_info.find("tpf_4d_static_motion_readout_benchmark_mode\tprobe_motion_readout_benchmark");
+    REQUIRE(sec != std::string::npos);
+    REQUIRE(key != std::string::npos);
+    CHECK(sec < key);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_4d_xi_motion_probe";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark;
+    configured.physics_package = "TPFCore";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("=== TPF 4D Xi motion probe benchmark ===") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_xi_motion_probe_benchmark_readout\tGravityXiMotionReadout_v1") != std::string::npos);
+  }
+
+  {
+    galaxy::Config configured;
+    configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual_non_tpf_package";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
+    configured.physics_package = "Newtonian";
+    auto resolved = galaxy::resolve_scenario(configured);
+    const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
+    (void)mk_ok;
+    galaxy::write_run_info(configured.output_dir, resolved.config, resolved.effective_n_steps, 0, 0,
+                           "configs/my.local.cfg", "physics/Newtonian/defaults.cfg", &configured, &resolved);
+    const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
+    CHECK(run_info.find("=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===") !=
+          std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_mode\tdiagnostic_only") != std::string::npos);
+    CHECK(run_info.find("tpf_4d_static_residual_benchmark_package_defaults_note\t") != std::string::npos);
+  }
+
+  {
     const std::string plot_script = slurp("../plot_tpf_4d_static_residual.py");
     CHECK(plot_script.find("not full spatial-support physics domain") == std::string::npos);
     CHECK(plot_script.find("rendered from full spatial-support static 4D residual evaluation") != std::string::npos);
