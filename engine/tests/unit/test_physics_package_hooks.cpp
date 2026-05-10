@@ -45,6 +45,8 @@ TEST_CASE("physics package default hooks are no-op/empty") {
   CHECK(pkg.run_info_metadata(cfg).empty());
   CHECK(pkg.render_metadata(cfg).empty());
   CHECK(pkg.package_config_metadata().empty());
+  std::vector<galaxy::Snapshot> snapshots;
+  CHECK(pkg.write_post_run_diagnostics(snapshots, cfg, "test_output_dir"));
 }
 
 TEST_CASE("newtonian package name resolves through registry") {
@@ -68,6 +70,8 @@ TEST_CASE("calling generic hooks does not change newtonian acceleration behavior
   (void)pkg.run_info_metadata(cfg);
   (void)pkg.render_metadata(cfg);
   (void)pkg.package_config_metadata();
+  std::vector<galaxy::Snapshot> snapshots;
+  CHECK(pkg.write_post_run_diagnostics(snapshots, cfg, "test_output_dir"));
 
   std::vector<double> ax_after, ay_after;
   pkg.compute_accelerations(s, 5.0, 0.01, true, ax_after, ay_after);

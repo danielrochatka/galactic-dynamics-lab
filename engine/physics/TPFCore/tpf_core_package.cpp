@@ -760,6 +760,56 @@ void TPFCorePackage::compute_accelerations(const State& state,
   throw std::runtime_error("Unsupported tpf_dynamics_mode for this branch; expected tpf_xi_theta_v1.");
 }
 
+bool TPFCorePackage::write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
+                                                const Config& config,
+                                                const std::string& output_dir) {
+  if (provisional_readout_enabled()) {
+    const bool xi_field_diag = (config.tpf_dynamics_mode == "xi_kernel_deformed" &&
+                                config.tpf_xi_kernel_dump_field_diagnostics);
+    write_readout_debug(snapshots, config, output_dir);
+    if (config.tpfcore_dump_readout_debug && config.tpf_dynamics_mode != "xi_kernel_deformed")
+      std::cout << "Wrote " << output_dir << "/tpf_readout_debug.csv\n";
+    write_regime_diagnostics(snapshots, config, output_dir);
+    if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag)
+      std::cout << "Wrote " << output_dir << "/tpf_regime_diagnostics.txt\n";
+    if (config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) {
+      write_trajectory_diagnostics(snapshots, config, output_dir);
+      std::cout << "Wrote " << output_dir << "/tpf_trajectory_diagnostics.txt\n";
+      write_closure_diagnostics(snapshots, config, output_dir);
+    }
+    if ((config.tpf_dynamics_mode != "xi_kernel_deformed" || xi_field_diag) &&
+        !snapshots.empty() && snapshots[0].state.n() == 1 &&
+        (config.tpfcore_readout_mode == "tr_coherence_readout" || config.tpfcore_readout_mode == "experimental_radial_r_scaling"))
+      std::cout << "Wrote " << output_dir << "/tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt\n";
+    if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation && !snapshots.empty() &&
+        snapshots[0].state.n() == 1) {
+      write_step0_orbit_audit(snapshots, config, output_dir);
+      std::cout << "Wrote " << output_dir << "/tpf_step0_orbit_audit.txt\n";
+    }
+    if (config.tpfcore_live_orbit_force_audit) {
+      write_live_orbit_force_audit(snapshots, config, output_dir);
+      std::cout << "Wrote " << output_dir
+                << "/tpf_live_orbit_force_audit.csv, tpf_live_orbit_force_audit.txt\n";
+    }
+  }
+  if (config.tpf_dynamics_mode == "direct_tpf" && !snapshots.empty()) {
+    write_step0_orbit_audit(snapshots, config, output_dir);
+    std::cout << "Wrote " << output_dir
+              << "/direct_tpf_step0_raw_accel_audit.csv, direct_tpf_step0_raw_accel_summary.txt\n";
+  }
+  if (config.save_run_info && config.tpf_dynamics_mode == "xi_kernel_deformed") {
+    const auto counters = xi_runtime_counters();
+    std::ofstream rf(output_dir + "/run_info.txt", std::ios::app);
+    if (rf) {
+      rf << "xi_runtime_theta_evaluations\t" << counters.theta_evaluations << "\n";
+      rf << "xi_runtime_invariant_I_evaluations\t" << counters.invariant_I_evaluations << "\n";
+      rf << "xi_last_call_pair_evaluations\t" << counters.xi_last_call_pair_evaluations << "\n";
+      rf << "xi_total_pair_evaluations\t" << counters.xi_total_pair_evaluations << "\n";
+    }
+  }
+  return true;
+}
+
 void TPFCorePackage::write_readout_debug(const std::vector<Snapshot>& snapshots,
                                          const Config& config,
                                          const std::string& output_dir) const {

@@ -210,6 +210,20 @@ Not moved yet (intentionally deferred):
 - Config isolation/migration remains deferred.
 - Broader test relocation and Python/tooling boundary cleanup remain deferred.
 
+## Phase 3 status (post-run diagnostics/readout moved to package hook)
+
+Implemented in Phase 3:
+- TPF post-run diagnostics/readout emission was moved from `engine/main.cpp` into `TPFCorePackage::write_post_run_diagnostics(...)`.
+- `engine/main.cpp` now invokes the generic `PhysicsPackage::write_post_run_diagnostics(...)` hook and no longer includes `TPFCore` headers or uses `dynamic_cast` for post-run diagnostics.
+- Ownership moved for: readout debug, regime diagnostics, trajectory diagnostics, closure diagnostics, step-0 orbit audit, live orbit force audit, `direct_tpf` step-0 raw accel audit emission, and `xi_runtime_counters` run-info append.
+
+Still deferred (intentional):
+- Config isolation/migration.
+- Cooling policy migration.
+- Plotting/Python boundary cleanup.
+- Package autoload/discovery.
+- Broader test relocation to package-local suites.
+
 ## Actionable phased plan
 
 ### Phase 1 (next implementation PR only)
