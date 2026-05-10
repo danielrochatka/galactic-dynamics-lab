@@ -297,34 +297,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   if (key == "tpf_vdsg_weak_field_a0") { config.tpf_vdsg_weak_field_a0 = std::stod(val); return true; }
   if (key == "tpf_vdsg_weak_field_power") { config.tpf_vdsg_weak_field_power = std::stod(val); return true; }
   if (key == "tpf_vdsg_bounded_amplitude") { config.tpf_vdsg_bounded_amplitude = std::stod(val); return true; }
-  if (key == "tpf_global_accel_shunt_enable") {
-    config.tpf_global_accel_shunt_enable = parse_bool(val);
-    return true;
-  }
-  if (key == "tpf_global_accel_shunt_fraction") {
-    config.tpf_global_accel_shunt_fraction = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_accel_pipeline_diagnostics_csv") {
-    config.tpf_accel_pipeline_diagnostics_csv = parse_bool(val);
-    return true;
-  }
-  if (key == "tpf_poisson_bins") {
-    config.tpf_poisson_bins = std::stoi(val);
-    return true;
-  }
-  if (key == "tpf_poisson_max_radius") {
-    config.tpf_poisson_max_radius = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_cooling_fraction") {
-    config.tpf_cooling_fraction = std::stod(val);
-    return true;
-  }
-  if (key == "tpfcore_dump_readout_debug") {
-    config.tpfcore_dump_readout_debug = parse_bool(val);
-    return true;
-  }
   if (key == "tpfcore_probe_radius_min") {
     config.tpfcore_probe_radius_min = std::stod(val);
     return true;
@@ -560,10 +532,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   }
   if (key == "tpf_xi_constraint_tol") {
     config.tpf_xi_constraint_tol = std::stod(val);
-    return true;
-  }
-  if (key == "tpfcore_live_orbit_force_audit") {
-    config.tpfcore_live_orbit_force_audit = parse_bool(val);
     return true;
   }
   if (key == "galaxy_init_template") {
