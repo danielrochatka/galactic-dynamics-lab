@@ -1,6 +1,7 @@
 #include "render_audit.hpp"
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
+#include "physics/physics_package.hpp"
 #include "physics/TPFCore/derived_tpf_radial.hpp"
 #include <cmath>
 #include <fstream>
@@ -184,9 +185,30 @@ void write_render_manifest(const std::string& output_dir,
       (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
        config.simulation_mode == SimulationMode::galaxy &&
        !geodesic_correspondence_effective(config) && !v11_legacy_free_parameter_active(config));
-  const bool legacy_readout_metadata_active =
-      config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "legacy_readout" &&
-      true;
+  PhysicsPackage* physics = get_physics_package(config.physics_package);
+  const std::vector<PackageMetadataEntry> package_render_metadata =
+      physics ? physics->render_metadata(config) : std::vector<PackageMetadataEntry>{};
+  const bool needs_legacy_readout_schema_fallback = (config.physics_package != "TPFCore");
+  auto emit_json_entry = [](std::ostream& out, bool& first, const PackageMetadataEntry& entry) {
+    if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
+      json_kv_num(out, first, entry.key.c_str(), entry.number_value);
+    } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
+      json_kv_bool(out, first, entry.key.c_str(), entry.bool_value);
+    } else {
+      json_kv(out, first, entry.key.c_str(), entry.value);
+    }
+  };
+  auto emit_txt_entry = [](std::ostream& out, const PackageMetadataEntry& entry) {
+    out << entry.key << "\t";
+    if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
+      out << entry.number_value;
+    } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
+      out << (entry.bool_value ? 1 : 0);
+    } else {
+      out << entry.value;
+    }
+    out << "\n";
+  };
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -237,22 +259,9 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_dynamics_branch", dyn);
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
-    const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
-    if (config.physics_package == "TPFCore" &&
-        true) {
-      json_kv(jf, first, "tpf_core_law_mode", is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1");
-      if (is_v1) {
-        json_kv(jf, first, "acceleration_formula", "a=-K_xi*Xi_total_spatial");
-        json_kv(jf, first, "K_xi", "tpf_4d_xi_motion_readout_scale");
-        json_kv_num(jf, first, "tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
-        json_kv(jf, first, "xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
-        json_kv_num(jf, first, "xi_kernel_coupling", config.tpf_4d_xi_kernel_coupling);
-        json_kv(jf, first, "xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
-        json_kv_num(jf, first, "xi_kernel_metric_min", config.tpf_4d_xi_kernel_metric_min);
-        json_kv_num(jf, first, "xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
-        json_kv(jf, first, "xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
-      } else {
-        json_kv(jf, first, "tpf_runtime_route_status", "unsupported_non_v1");
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+        emit_json_entry(jf, first, entry);
       }
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
@@ -260,10 +269,12 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
-    if (legacy_readout_metadata_active) {
-      json_kv_bool(jf, first, "tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
-      json_kv(jf, first, "tpfcore_readout_mode", config.tpfcore_readout_mode);
-    } else {
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
+        emit_json_entry(jf, first, entry);
+      }
+    }
+    if (needs_legacy_readout_schema_fallback) {
       json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
       json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
     }
@@ -318,22 +329,9 @@ void write_render_manifest(const std::string& output_dir,
     tf << "active_dynamics_branch\t" << dyn << "\n";
     tf << "active_metrics_branch\t" << met << "\n";
     tf << "acceleration_code_path\t" << acc << "\n";
-    if (config.physics_package == "TPFCore" &&
-        true) {
-      const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
-      tf << "tpf_core_law_mode\t" << (is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1") << "\n";
-      if (is_v1) {
-        tf << "acceleration_formula\ta=-K_xi*Xi_total_spatial\n";
-        tf << "K_xi\ttpf_4d_xi_motion_readout_scale\n";
-        tf << "tpf_4d_xi_motion_readout_scale\t" << config.tpf_4d_xi_motion_readout_scale << "\n";
-        tf << "xi_kernel_mode\t" << config.tpf_4d_xi_kernel_mode << "\n";
-        tf << "xi_kernel_coupling\t" << config.tpf_4d_xi_kernel_coupling << "\n";
-        tf << "xi_kernel_factor_mode\t" << config.tpf_4d_xi_kernel_factor_mode << "\n";
-        tf << "xi_kernel_metric_min\t" << config.tpf_4d_xi_kernel_metric_min << "\n";
-        tf << "xi_kernel_metric_max\t" << config.tpf_4d_xi_kernel_metric_max << "\n";
-        tf << "xi_temporal_mode\t" << config.tpf_4d_xi_temporal_mode << "\n";
-      } else {
-        tf << "tpf_runtime_route_status	unsupported_non_v1\n";
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+        emit_txt_entry(tf, entry);
       }
     }
     tf << "physics_package\t" << config.physics_package << "\n";
@@ -380,10 +378,12 @@ void write_render_manifest(const std::string& output_dir,
     } else {
       tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     }
-    if (legacy_readout_metadata_active) {
-      tf << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-      tf << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
-    } else {
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
+        emit_txt_entry(tf, entry);
+      }
+    }
+    if (needs_legacy_readout_schema_fallback) {
       tf << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
       tf << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
     }

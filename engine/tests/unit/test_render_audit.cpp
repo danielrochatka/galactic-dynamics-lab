@@ -222,6 +222,64 @@ TEST_CASE("write_render_manifest: JSON/TXT readout metadata parity by dynamics m
   run_case("legacy_readout", galaxy::SimulationMode::galaxy, true);
 }
 
+TEST_CASE("write_render_manifest: moved package metadata keeps legacy placement ordering") {
+  char dir_template[] = "/tmp/render_audit_phase5b_order_XXXXXX";
+  char* out_dir_c = mkdtemp(dir_template);
+  REQUIRE(out_dir_c != nullptr);
+  const std::string out_dir(out_dir_c);
+
+  Config c;
+  c.physics_package = "TPFCore";
+  c.simulation_mode = galaxy::SimulationMode::galaxy;
+  c.tpf_dynamics_mode = "tpf_xi_theta_v1";
+  c.tpfcore_enable_provisional_readout = false;
+  galaxy::write_render_manifest(out_dir, c, 1, 1, 8, nullptr);
+
+  const std::string txt = slurp_file(out_dir + "/render_manifest.txt");
+  const std::string json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(txt.find("tpf_core_law_mode\ttpf_xi_theta_v1") != std::string::npos);
+  CHECK(json.find("\"tpf_core_law_mode\": \"tpf_xi_theta_v1\"") != std::string::npos);
+  CHECK(txt.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime") !=
+        std::string::npos);
+  CHECK(json.find("\"tpfcore_enable_provisional_readout_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+        std::string::npos);
+
+  const size_t txt_dyn = txt.find("tpf_dynamics_mode\t");
+  const size_t txt_legacy_status =
+      txt.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime");
+  REQUIRE(txt_dyn != std::string::npos);
+  REQUIRE(txt_legacy_status != std::string::npos);
+  CHECK(txt_legacy_status > txt_dyn);
+
+  const size_t json_cooling = json.find("\"tpf_cooling_active_this_run\": ");
+  const size_t json_legacy_status =
+      json.find("\"tpfcore_enable_provisional_readout_status\": \"configured_inactive_on_non_legacy_runtime\"");
+  REQUIRE(json_cooling != std::string::npos);
+  REQUIRE(json_legacy_status != std::string::npos);
+  CHECK(json_legacy_status > json_cooling);
+
+  Config n;
+  n.physics_package = "Newtonian";
+  n.simulation_mode = galaxy::SimulationMode::galaxy;
+  galaxy::write_render_manifest(out_dir, n, 1, 1, 8, nullptr);
+  const std::string newtonian_txt = slurp_file(out_dir + "/render_manifest.txt");
+  const std::string newtonian_json = slurp_file(out_dir + "/render_manifest.json");
+  CHECK(newtonian_txt.find("tpf_core_law_mode\t") == std::string::npos);
+  CHECK(newtonian_json.find("\"tpf_core_law_mode\":") == std::string::npos);
+  CHECK(newtonian_txt.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime") !=
+        std::string::npos);
+  CHECK(newtonian_txt.find("tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime") !=
+        std::string::npos);
+  CHECK(newtonian_json.find("\"tpfcore_enable_provisional_readout_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+        std::string::npos);
+  CHECK(newtonian_json.find("\"tpfcore_readout_mode_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+        std::string::npos);
+
+  std::remove((out_dir + "/render_manifest.txt").c_str());
+  std::remove((out_dir + "/render_manifest.json").c_str());
+  rmdir(out_dir.c_str());
+}
+
 TEST_CASE("write_render_manifest: tpf_4d_static_residual_benchmark uses diagnostic-only audit labels") {
   char dir_template[] = "/tmp/render_audit_static4d_XXXXXX";
   char* out_dir_c = mkdtemp(dir_template);

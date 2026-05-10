@@ -242,6 +242,75 @@ bool TPFCorePackage::suppress_snapshot_for_cooling(const Config&, int step, int 
   return step < cooling_steps;
 }
 
+std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& config) const {
+  std::vector<PackageMetadataEntry> metadata;
+  auto add_string = [&metadata](const std::string& key,
+                                const std::string& value,
+                                PackageMetadataEntry::RenderPlacement placement =
+                                    PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+    PackageMetadataEntry e;
+    e.key = key;
+    e.value = value;
+    e.render_placement = placement;
+    metadata.push_back(e);
+  };
+  auto add_number = [&metadata](const std::string& key,
+                                double value,
+                                PackageMetadataEntry::RenderPlacement placement =
+                                    PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+    PackageMetadataEntry e;
+    e.key = key;
+    e.value_type = PackageMetadataEntry::ValueType::Number;
+    e.number_value = value;
+    e.render_placement = placement;
+    metadata.push_back(e);
+  };
+  auto add_bool = [&metadata](const std::string& key,
+                              bool value,
+                              PackageMetadataEntry::RenderPlacement placement =
+                                  PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+    PackageMetadataEntry e;
+    e.key = key;
+    e.value_type = PackageMetadataEntry::ValueType::Bool;
+    e.bool_value = value;
+    e.render_placement = placement;
+    metadata.push_back(e);
+  };
+  const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
+  add_string("tpf_core_law_mode", is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1");
+  if (is_v1) {
+    add_string("acceleration_formula", "a=-K_xi*Xi_total_spatial");
+    add_string("K_xi", "tpf_4d_xi_motion_readout_scale");
+    add_number("tpf_4d_xi_motion_readout_scale", config.tpf_4d_xi_motion_readout_scale);
+    add_string("xi_kernel_mode", config.tpf_4d_xi_kernel_mode);
+    add_number("xi_kernel_coupling", config.tpf_4d_xi_kernel_coupling);
+    add_string("xi_kernel_factor_mode", config.tpf_4d_xi_kernel_factor_mode);
+    add_number("xi_kernel_metric_min", config.tpf_4d_xi_kernel_metric_min);
+    add_number("xi_kernel_metric_max", config.tpf_4d_xi_kernel_metric_max);
+    add_string("xi_temporal_mode", config.tpf_4d_xi_temporal_mode);
+  } else {
+    add_string("tpf_runtime_route_status", "unsupported_non_v1");
+  }
+
+  const bool legacy_readout_metadata_active = config.tpf_dynamics_mode == "legacy_readout";
+  if (legacy_readout_metadata_active) {
+    add_bool("tpfcore_enable_provisional_readout",
+             config.tpfcore_enable_provisional_readout,
+             PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+    add_string("tpfcore_readout_mode",
+               config.tpfcore_readout_mode,
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+  } else {
+    add_string("tpfcore_enable_provisional_readout_status",
+               "configured_inactive_on_non_legacy_runtime",
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+    add_string("tpfcore_readout_mode_status",
+               "configured_inactive_on_non_legacy_runtime",
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+  }
+  return metadata;
+}
+
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;
