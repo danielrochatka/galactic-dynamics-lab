@@ -247,6 +247,20 @@ Still deferred (intentional):
 - Broader test relocation to package-local suites.
 - Python/tooling boundary cleanup.
 
+## Phase 5C status (benchmark run_info metadata boundary move)
+
+Implemented in Phase 5C:
+- TPF benchmark run_info metadata ownership moved from generic `engine/output.cpp` to `TPFCorePackage::run_info_metadata(...)`.
+- Generic run-info emission now uses package-provided metadata entries for those benchmark blocks.
+
+Deferred (unchanged):
+- General run_info dynamics metadata migration.
+- Pipeline runtime stats (`tpf_last_*`) migration.
+- Config isolation work.
+- Package autoload/discovery.
+- Broader test relocation.
+- Python/tooling cleanup.
+
 ## Actionable phased plan
 
 ### Phase 1 (next implementation PR only)
