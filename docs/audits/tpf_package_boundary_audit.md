@@ -283,3 +283,9 @@ Non-goals in Phase 1:
 - [x] Package-registration/autoload blockers identified explicitly.
 - [x] Runtime code unchanged (audit-only).
 - [x] No behavior changes.
+
+## Phase 5A status (metadata ownership audit only)
+- Phase 5 implementation split for safety.
+- Added `docs/audits/tpf_metadata_ownership_audit.md` with A/B/C/D/E/F classification and proposed Phase 5B safe scope.
+- No runtime/output behavior changed in this phase.
+- Phase 5B will migrate only safe A-class metadata entries.
