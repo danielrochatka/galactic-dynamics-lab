@@ -86,7 +86,7 @@ class PhysicsPackage {
   virtual bool run_utility_mode(const Config&, const std::string&) { return false; }
 
   /** Optional: package run-info metadata. Default empty. */
-  virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&) const { return {}; }
+  virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&, const std::string&) const { return {}; }
 
   /** Optional: package render/report metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> render_metadata(const Config&) const { return {}; }

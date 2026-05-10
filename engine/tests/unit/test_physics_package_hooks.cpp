@@ -42,7 +42,7 @@ TEST_CASE("physics package default hooks are no-op/empty") {
   CHECK(pkg.runtime_metadata().empty());
   CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::galaxy));
   CHECK_FALSE(pkg.run_utility_mode(cfg, ""));
-  CHECK(pkg.run_info_metadata(cfg).empty());
+  CHECK(pkg.run_info_metadata(cfg, "").empty());
   CHECK(pkg.render_metadata(cfg).empty());
   CHECK(pkg.package_config_metadata().empty());
   std::vector<galaxy::Snapshot> snapshots;
@@ -67,7 +67,7 @@ TEST_CASE("calling generic hooks does not change newtonian acceleration behavior
   (void)pkg.runtime_metadata();
   (void)pkg.supports_utility_mode(galaxy::SimulationMode::galaxy);
   (void)pkg.run_utility_mode(cfg, "");
-  (void)pkg.run_info_metadata(cfg);
+  (void)pkg.run_info_metadata(cfg, "");
   (void)pkg.render_metadata(cfg);
   (void)pkg.package_config_metadata();
   std::vector<galaxy::Snapshot> snapshots;

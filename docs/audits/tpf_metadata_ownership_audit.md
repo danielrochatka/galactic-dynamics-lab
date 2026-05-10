@@ -101,3 +101,21 @@ Remaining `render_audit` TPF references and class:
 - C: cooling-active/cooling-fraction context and alias/effective-mode helpers.
 - D: `compute_active_*` generic diagnostics strings.
 - F: false-guarded v11 blocks.
+
+## Phase 5C status (benchmark run_info A-class moved)
+
+Completed in Phase 5C:
+- Moved only benchmark run_info metadata blocks from `engine/output.cpp` into `TPFCorePackage::run_info_metadata(...)`:
+  - `tpf_4d_static_residual_benchmark_*`
+  - `tpf_4d_static_motion_readout_benchmark_*`
+  - `tpf_4d_xi_motion_probe_benchmark_*`
+- For selected `TPFCore` runs, benchmark run_info metadata is now package-owned through `TPFCorePackage::run_info_metadata(...)`.
+- Generic `write_run_info(...)` now queries package-provided run-info metadata first.
+- Non-TPF selected-package benchmark modes retain a temporary legacy compatibility fallback in `engine/output.cpp` to preserve historical simulation_mode-based benchmark run_info output parity.
+- This fallback is a deferred schema/compatibility leak and is not fully package-owned yet.
+- Preserved benchmark run_info key/value output parity and benchmark-section ordering.
+
+Deferred to Phase 5D+:
+- General TPF dynamics run_info metadata (`tpf_dynamics_mode`, `tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, `tpfcore_*` diagnostics blocks).
+- `tpf_last_*` pipeline runtime keys remain deferred because the generic hook shape does not carry pipeline stats.
+- Config-isolation-coupled run_info entries remain deferred.
