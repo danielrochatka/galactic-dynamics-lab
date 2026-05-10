@@ -23,3 +23,10 @@ engine/tests/**/*.o
 engine/tests/**/*.d
 engine/physics/**/*.o
 engine/physics/**/*.d
+
+# Root-level generated plot artifacts (store images under outputs/<run_id>/ or docs/assets/ instead)
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.gif
