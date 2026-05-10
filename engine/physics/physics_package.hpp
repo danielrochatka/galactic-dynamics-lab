@@ -17,12 +17,17 @@
 namespace galaxy {
 
 struct PackageMetadataEntry {
+  enum class RenderPlacement {
+    AfterAccelerationCodePath,
+    AfterDynamicsMode
+  };
   std::string key;
   std::string value;
   enum class ValueType { String, Number, Bool };
   ValueType value_type = ValueType::String;
   double number_value = 0.0;
   bool bool_value = false;
+  RenderPlacement render_placement = RenderPlacement::AfterAccelerationCodePath;
 };
 
 class PhysicsPackage {

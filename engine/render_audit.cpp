@@ -188,6 +188,26 @@ void write_render_manifest(const std::string& output_dir,
   PhysicsPackage* physics = get_physics_package(config.physics_package);
   const std::vector<PackageMetadataEntry> package_render_metadata =
       physics ? physics->render_metadata(config) : std::vector<PackageMetadataEntry>{};
+  auto emit_json_entry = [](std::ostream& out, bool& first, const PackageMetadataEntry& entry) {
+    if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
+      json_kv_num(out, first, entry.key.c_str(), entry.number_value);
+    } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
+      json_kv_bool(out, first, entry.key.c_str(), entry.bool_value);
+    } else {
+      json_kv(out, first, entry.key.c_str(), entry.value);
+    }
+  };
+  auto emit_txt_entry = [](std::ostream& out, const PackageMetadataEntry& entry) {
+    out << entry.key << "\t";
+    if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
+      out << entry.number_value;
+    } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
+      out << (entry.bool_value ? 1 : 0);
+    } else {
+      out << entry.value;
+    }
+    out << "\n";
+  };
 
   std::ostringstream json_path;
   json_path << output_dir << "/render_manifest.json";
@@ -239,12 +259,8 @@ void write_render_manifest(const std::string& output_dir,
     json_kv(jf, first, "active_metrics_branch", met);
     json_kv(jf, first, "acceleration_code_path", acc);
     for (const auto& entry : package_render_metadata) {
-      if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
-        json_kv_num(jf, first, entry.key.c_str(), entry.number_value);
-      } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
-        json_kv_bool(jf, first, entry.key.c_str(), entry.bool_value);
-      } else {
-        json_kv(jf, first, entry.key.c_str(), entry.value);
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+        emit_json_entry(jf, first, entry);
       }
     }
     json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
@@ -252,6 +268,11 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
     json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
     json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
+        emit_json_entry(jf, first, entry);
+      }
+    }
     if (false) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
       json_kv_bool(jf, first, "tpfcore_enable_provisional_readout_operative_for_this_run", false);
@@ -304,15 +325,9 @@ void write_render_manifest(const std::string& output_dir,
     tf << "active_metrics_branch\t" << met << "\n";
     tf << "acceleration_code_path\t" << acc << "\n";
     for (const auto& entry : package_render_metadata) {
-      tf << entry.key << "\t";
-      if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
-        tf << entry.number_value;
-      } else if (entry.value_type == PackageMetadataEntry::ValueType::Bool) {
-        tf << (entry.bool_value ? 1 : 0);
-      } else {
-        tf << entry.value;
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
+        emit_txt_entry(tf, entry);
       }
-      tf << "\n";
     }
     tf << "physics_package\t" << config.physics_package << "\n";
     tf << "physics_package_compare\t" << config.physics_package_compare << "\n";
@@ -357,6 +372,11 @@ void write_render_manifest(const std::string& output_dir,
       tf << "tpf_dynamics_mode_operative_for_this_run\tnone_audit_only\n";
     } else {
       tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
+    }
+    for (const auto& entry : package_render_metadata) {
+      if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
+        emit_txt_entry(tf, entry);
+      }
     }
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";

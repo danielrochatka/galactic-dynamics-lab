@@ -244,24 +244,36 @@ bool TPFCorePackage::suppress_snapshot_for_cooling(const Config&, int step, int 
 
 std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& config) const {
   std::vector<PackageMetadataEntry> metadata;
-  auto add_string = [&metadata](const std::string& key, const std::string& value) {
+  auto add_string = [&metadata](const std::string& key,
+                                const std::string& value,
+                                PackageMetadataEntry::RenderPlacement placement =
+                                    PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
     PackageMetadataEntry e;
     e.key = key;
     e.value = value;
+    e.render_placement = placement;
     metadata.push_back(e);
   };
-  auto add_number = [&metadata](const std::string& key, double value) {
+  auto add_number = [&metadata](const std::string& key,
+                                double value,
+                                PackageMetadataEntry::RenderPlacement placement =
+                                    PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
     PackageMetadataEntry e;
     e.key = key;
     e.value_type = PackageMetadataEntry::ValueType::Number;
     e.number_value = value;
+    e.render_placement = placement;
     metadata.push_back(e);
   };
-  auto add_bool = [&metadata](const std::string& key, bool value) {
+  auto add_bool = [&metadata](const std::string& key,
+                              bool value,
+                              PackageMetadataEntry::RenderPlacement placement =
+                                  PackageMetadataEntry::RenderPlacement::AfterAccelerationCodePath) {
     PackageMetadataEntry e;
     e.key = key;
     e.value_type = PackageMetadataEntry::ValueType::Bool;
     e.bool_value = value;
+    e.render_placement = placement;
     metadata.push_back(e);
   };
   const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
@@ -282,11 +294,19 @@ std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& 
 
   const bool legacy_readout_metadata_active = config.tpf_dynamics_mode == "legacy_readout";
   if (legacy_readout_metadata_active) {
-    add_bool("tpfcore_enable_provisional_readout", config.tpfcore_enable_provisional_readout);
-    add_string("tpfcore_readout_mode", config.tpfcore_readout_mode);
+    add_bool("tpfcore_enable_provisional_readout",
+             config.tpfcore_enable_provisional_readout,
+             PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+    add_string("tpfcore_readout_mode",
+               config.tpfcore_readout_mode,
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
   } else {
-    add_string("tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
-    add_string("tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
+    add_string("tpfcore_enable_provisional_readout_status",
+               "configured_inactive_on_non_legacy_runtime",
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+    add_string("tpfcore_readout_mode_status",
+               "configured_inactive_on_non_legacy_runtime",
+               PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
   }
   return metadata;
 }
