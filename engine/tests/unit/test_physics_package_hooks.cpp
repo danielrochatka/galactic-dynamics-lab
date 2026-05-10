@@ -79,3 +79,10 @@ TEST_CASE("calling generic hooks does not change newtonian acceleration behavior
     CHECK(ay_before[i] == doctest::Approx(ay_after[i]));
   }
 }
+
+TEST_CASE("Newtonian does not report support for TPF utility modes") {
+  galaxy::NewtonianPackage pkg;
+  CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_single_source_inspect));
+  CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_4d_static_residual_benchmark));
+  CHECK_FALSE(pkg.supports_utility_mode(galaxy::SimulationMode::tpf_newtonian_force_compare));
+}

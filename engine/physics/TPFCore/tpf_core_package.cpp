@@ -9,7 +9,9 @@
  */
 
 #include "tpf_core_package.hpp"
+#include "../../compare_orchestration.hpp"
 #include "../../config.hpp"
+#include "../../force_compare.hpp"
 #include "../../softening_policy.hpp"
 #include "../physics_package.hpp"  /* get_physics_package for Newtonian benchmark and live audits */
 #include "derived_tpf_radial.hpp"
@@ -163,6 +165,56 @@ void TPFCorePackage::init_from_config(const Config& config) {
   }
   if (config.tpf_4d_xi_kernel_coupling != 0.0) {
     throw std::runtime_error("tpf_xi_theta_v1 currently requires tpf_4d_xi_kernel_coupling=0.0 on this branch.");
+  }
+}
+
+bool TPFCorePackage::supports_utility_mode(SimulationMode mode) const {
+  switch (mode) {
+    case SimulationMode::tpf_single_source_inspect:
+    case SimulationMode::tpf_symmetric_pair_inspect:
+    case SimulationMode::tpf_source_field_benchmark:
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+    case SimulationMode::tpf_weak_field_calibration:
+    case SimulationMode::tpf_newtonian_force_compare:
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool TPFCorePackage::run_utility_mode(const Config& config, const std::string& output_dir) {
+  switch (config.simulation_mode) {
+    case SimulationMode::tpf_single_source_inspect:
+      run_single_source_inspect(config, output_dir);
+      return true;
+    case SimulationMode::tpf_symmetric_pair_inspect:
+      run_symmetric_pair_inspect(config, output_dir);
+      return true;
+    case SimulationMode::tpf_source_field_benchmark:
+      run_source_field_benchmark(config, output_dir);
+      return true;
+    case SimulationMode::tpf_4d_static_residual_benchmark:
+      run_4d_static_residual_benchmark(config, output_dir);
+      return true;
+    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
+      run_4d_static_motion_readout_benchmark(config, output_dir);
+      return true;
+    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
+      run_4d_xi_motion_probe_benchmark(config, output_dir);
+      return true;
+    case SimulationMode::tpf_weak_field_calibration:
+      run_weak_field_calibration(config, output_dir);
+      return true;
+    case SimulationMode::tpf_newtonian_force_compare:
+      run_tpf_newtonian_force_compare(config, output_dir);
+      return true;
+    case SimulationMode::tpf_diagnostic_consistency_audit:
+      return run_tpf_diagnostic_consistency_audit(config, output_dir);
+    default:
+      return false;
   }
 }
 

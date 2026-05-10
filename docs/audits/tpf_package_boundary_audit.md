@@ -198,6 +198,18 @@ Intentionally not moved in Phase 1:
 Next phase target:
 - Move TPF utility dispatch out of `main.cpp` into package hook dispatch.
 
+## Phase 2 status (utility dispatch moved to package hook)
+
+Implemented in Phase 2:
+- TPF utility-mode dispatch was removed from `engine/main.cpp` and replaced with generic package hook dispatch via `supports_utility_mode(...)` and `run_utility_mode(...)`.
+- `TPFCorePackage` now owns utility-mode hook dispatch internally for all existing TPF utility modes, including force-compare and diagnostic-consistency-audit routes.
+- `--plot` behavior for `tpf_4d_static_residual_benchmark` remains in `main.cpp` post-utility handling to preserve existing optional PNG generation behavior.
+
+Not moved yet (intentionally deferred):
+- TPF run-info/render metadata migration remains in existing engine paths.
+- Config isolation/migration remains deferred.
+- Broader test relocation and Python/tooling boundary cleanup remain deferred.
+
 ## Actionable phased plan
 
 ### Phase 1 (next implementation PR only)
