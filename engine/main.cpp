@@ -743,9 +743,9 @@ int main(int argc, char** argv) {
             const std::vector<galaxy::Snapshot>& side_snaps,
             const std::string& side_defaults_path) {
           const bool cooling_active =
-              (side_cfg.physics_package == "TPFCore" && side_cfg.tpf_cooling_fraction > 0.0);
+              side_physics->cooling_active(side_cfg);
           const int cooling_steps = cooling_active
-              ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * side_cfg.tpf_cooling_fraction)))
+              ? side_physics->cooling_steps(side_cfg, n_steps)
               : 0;
           galaxy::CoolingAuditInfo cooling_audit;
           cooling_audit.cooling_active = cooling_active;
@@ -1023,9 +1023,9 @@ int main(int argc, char** argv) {
 
   {
     const bool cooling_active =
-        (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
+        physics->cooling_active(config);
     const int cooling_steps = cooling_active
-        ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
+        ? physics->cooling_steps(config, n_steps)
         : 0;
     galaxy::CoolingAuditInfo cooling_audit;
     cooling_audit.cooling_active = cooling_active;

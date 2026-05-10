@@ -224,6 +224,29 @@ Still deferred (intentional):
 - Package autoload/discovery.
 - Broader test relocation to package-local suites.
 
+## Phase 4 status (cooling policy moved to package hook)
+
+Implemented in Phase 4:
+- Added a small generic cooling policy hook surface on `PhysicsPackage`:
+  - `cooling_active(const Config&) const` (default `false`)
+  - `cooling_steps(const Config&, int n_steps) const` (default `0`)
+  - `apply_cooling_step(State&, const Config&, int step, int cooling_steps) const` (default no-op)
+  - `suppress_snapshot_for_cooling(const Config&, int step, int cooling_steps) const` (default `false`)
+- Implemented cooling policy ownership in `TPFCorePackage` with the existing behavior:
+  - activation uses `tpf_cooling_fraction > 0.0`
+  - step count uses the existing clamp and cast semantics (`min/max` + `int(n_steps * fraction)`)
+- Moved both cooling decision and cooling runtime application ownership into package hooks:
+  - engine-level cooling audit logic now queries package hooks in `main.cpp`
+  - generic simulation flow calls package hooks for per-step cooling application and cooling snapshot-suppression policy
+  - no TPF-named cooling helper/constant remains in generic `simulation.cpp`
+
+Still deferred (intentional):
+- Config isolation/migration.
+- Output/render metadata migration.
+- Package autoload/discovery.
+- Broader test relocation to package-local suites.
+- Python/tooling boundary cleanup.
+
 ## Actionable phased plan
 
 ### Phase 1 (next implementation PR only)

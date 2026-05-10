@@ -94,6 +94,35 @@ class PhysicsPackage {
     (void)output_dir;
     return true;
   }
+
+  /** Optional: package-owned cooling policy activation. Default inactive. */
+  virtual bool cooling_active(const Config& config) const {
+    (void)config;
+    return false;
+  }
+
+  /** Optional: package-owned cooling policy step count. Default zero. */
+  virtual int cooling_steps(const Config& config, int n_steps) const {
+    (void)config;
+    (void)n_steps;
+    return 0;
+  }
+
+  /** Optional: package-owned per-step cooling application. Default no-op. */
+  virtual void apply_cooling_step(State& state, const Config& config, int step, int cooling_steps) const {
+    (void)state;
+    (void)config;
+    (void)step;
+    (void)cooling_steps;
+  }
+
+  /** Optional: package-owned cooling snapshot suppression policy. Default false (keep snapshots). */
+  virtual bool suppress_snapshot_for_cooling(const Config& config, int step, int cooling_steps) const {
+    (void)config;
+    (void)step;
+    (void)cooling_steps;
+    return false;
+  }
 };
 
 /** Generic kinetic energy (same for all packages): 0.5 * sum(m_i * v_i^2). */
