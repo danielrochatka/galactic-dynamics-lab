@@ -218,6 +218,15 @@ bool TPFCorePackage::run_utility_mode(const Config& config, const std::string& o
   }
 }
 
+bool TPFCorePackage::cooling_active(const Config& config) const {
+  return config.tpf_cooling_fraction > 0.0;
+}
+
+int TPFCorePackage::cooling_steps(const Config& config, int n_steps) const {
+  if (!cooling_active(config)) return 0;
+  return std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)));
+}
+
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;

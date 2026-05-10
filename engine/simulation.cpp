@@ -51,14 +51,11 @@ std::vector<Snapshot> run_simulation(const Config& config,
   const bool star_star = config.enable_star_star_gravity;
   const bool use_progress = (progress_interval > 0 && progress_callback);
 
-  const bool tpf_cooling_on =
-      (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0);
+  const bool cooling_on = physics->cooling_active(config);
   const bool xi_kernel_deformation_active =
       (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "tpf_xi_theta_v1" &&
        config.tpf_4d_xi_kernel_mode != "off" && config.tpf_4d_xi_kernel_coupling != 0.0);
-  const int cooling_steps = tpf_cooling_on
-      ? std::min(n_steps, std::max(0, static_cast<int>(n_steps * config.tpf_cooling_fraction)))
-      : 0;
+  const int cooling_steps = cooling_on ? physics->cooling_steps(config, n_steps) : 0;
 
   for (int step = 1; step <= n_steps; ++step) {
     if (xi_kernel_deformation_active) {
@@ -67,12 +64,12 @@ std::vector<Snapshot> run_simulation(const Config& config,
       velocity_verlet_step(state, physics, bh_mass, softening, star_star, dt, ax, ay);
     }
 
-    if (tpf_cooling_on && step < cooling_steps) {
+    if (cooling_on && step < cooling_steps) {
       apply_radial_cooling_damping(state, kTpfRadialCoolingDampingFactor);
     }
 
     /* Suppress snapshot collection during cooling (saves memory and disk when snapshots are written). */
-    const bool skip_snapshot_for_cooling = tpf_cooling_on && step < cooling_steps;
+    const bool skip_snapshot_for_cooling = cooling_on && step < cooling_steps;
     if (!skip_snapshot_for_cooling && step % snapshot_every == 0) {
       Snapshot snap;
       snap.step = step;

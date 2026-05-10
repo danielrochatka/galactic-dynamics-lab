@@ -94,6 +94,19 @@ class PhysicsPackage {
     (void)output_dir;
     return true;
   }
+
+  /** Optional: package-owned cooling policy activation. Default inactive. */
+  virtual bool cooling_active(const Config& config) const {
+    (void)config;
+    return false;
+  }
+
+  /** Optional: package-owned cooling policy step count. Default zero. */
+  virtual int cooling_steps(const Config& config, int n_steps) const {
+    (void)config;
+    (void)n_steps;
+    return 0;
+  }
 };
 
 /** Generic kinetic energy (same for all packages): 0.5 * sum(m_i * v_i^2). */

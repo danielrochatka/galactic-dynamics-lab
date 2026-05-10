@@ -30,6 +30,8 @@ class TPFCorePackage : public PhysicsPackage {
   void init_from_config(const Config& config) override;
   bool supports_utility_mode(SimulationMode mode) const override;
   bool run_utility_mode(const Config& config, const std::string& output_dir) override;
+  bool cooling_active(const Config& config) const override;
+  int cooling_steps(const Config& config, int n_steps) const override;
   bool write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
                                   const Config& config,
                                   const std::string& output_dir) override;
