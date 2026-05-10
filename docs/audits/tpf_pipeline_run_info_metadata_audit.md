@@ -114,3 +114,13 @@ Why:
 
 ## 6) Test/check result
 - `cd engine && make test_unit` — pass in this phase after doc-only edits.
+
+## Phase 5D-C-B status (implemented)
+- Implemented `RunInfoContext` + `PhysicsPackage::run_info_runtime_metadata(const Config&, const RunInfoContext&)`.
+- Generic `engine/output.cpp` now passes runtime context and emits package-provided runtime metadata entries.
+- Moved exactly this section into TPFCore package runtime metadata ownership:
+  - Header: `=== TPF acceleration pipeline (last integrator step) ===`
+  - Keys in preserved order: `tpf_last_mean_baseline_accel_mag`, `tpf_last_mean_vdsg_accel_mag`, `tpf_last_vdsg_over_baseline_ratio`, `tpf_last_shunt_events`, `tpf_last_frac_capped`, `tpf_last_global_accel_shunt_enabled`, `tpf_last_global_accel_shunt_fraction`
+  - Footer: `=== End TPF acceleration pipeline ===`
+- Preserved emission condition parity: emitted only when runtime pipeline stats exist and are valid.
+- Deferred unchanged: `xi_runtime_*`, `tpf_accel_pipeline_diagnostics_csv`, config/provenance fields.

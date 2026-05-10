@@ -9,6 +9,7 @@
  */
 
 #include "tpf_core_package.hpp"
+#include "../../accel_pipeline_stats.hpp"
 #include "../../compare_orchestration.hpp"
 #include "../../config.hpp"
 #include "../../force_compare.hpp"
@@ -381,6 +382,43 @@ std::vector<PackageMetadataEntry> TPFCorePackage::run_info_supplement_metadata(c
     add("tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
     add("tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
   }
+  return metadata;
+}
+
+std::vector<PackageMetadataEntry> TPFCorePackage::run_info_runtime_metadata(const Config& config,
+                                                                            const RunInfoContext& context) const {
+  std::vector<PackageMetadataEntry> metadata;
+  if (config.physics_package != "TPFCore" ||
+      context.package_runtime_stats_kind == nullptr ||
+      std::string(context.package_runtime_stats_kind) != "tpf_accel_pipeline_stats" ||
+      context.package_runtime_stats == nullptr) {
+    return metadata;
+  }
+  const auto* tpf_pipeline = static_cast<const AccelPipelineStats*>(context.package_runtime_stats);
+  if (!tpf_pipeline->valid) return metadata;
+
+  auto add = [&metadata](const std::string& key, const std::string& value) {
+    PackageMetadataEntry e;
+    e.key = key;
+    e.value = value;
+    metadata.push_back(e);
+  };
+  auto add_number = [&add](const std::string& key, double value) {
+    std::ostringstream oss;
+    oss << value;
+    add(key, oss.str());
+  };
+  auto add_uint = [&add](const std::string& key, std::uint64_t value) { add(key, std::to_string(value)); };
+
+  add("=== TPF acceleration pipeline (last integrator step) ===", "");
+  add_number("tpf_last_mean_baseline_accel_mag", tpf_pipeline->mean_baseline_mag);
+  add_number("tpf_last_mean_vdsg_accel_mag", tpf_pipeline->mean_vdsg_mag);
+  add_number("tpf_last_vdsg_over_baseline_ratio", tpf_pipeline->vdsg_over_baseline_ratio);
+  add_uint("tpf_last_shunt_events", tpf_pipeline->shunt_events_last_step);
+  add_number("tpf_last_frac_capped", tpf_pipeline->frac_capped_last_step);
+  add("tpf_last_global_accel_shunt_enabled", tpf_pipeline->shunt_enabled ? "1" : "0");
+  add_number("tpf_last_global_accel_shunt_fraction", tpf_pipeline->shunt_fraction);
+  add("=== End TPF acceleration pipeline ===", "");
   return metadata;
 }
 
