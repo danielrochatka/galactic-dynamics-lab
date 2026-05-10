@@ -119,3 +119,11 @@ Deferred to Phase 5D+:
 - General TPF dynamics run_info metadata (`tpf_dynamics_mode`, `tpf_kappa`, `tpf_vdsg_*`, `tpf_poisson_*`, `tpfcore_*` diagnostics blocks).
 - `tpf_last_*` pipeline runtime keys remain deferred because the generic hook shape does not carry pipeline stats.
 - Config-isolation-coupled run_info entries remain deferred.
+
+
+## Phase 5D-A status note
+
+Added a dedicated remaining-leaks architecture audit for Phase 5D-A:
+- `docs/audits/tpf_remaining_architecture_leaks_audit.md`
+
+This phase is audit-only and intentionally performs no metadata moves or runtime/schema changes.
