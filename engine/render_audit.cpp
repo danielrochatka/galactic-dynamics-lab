@@ -188,6 +188,7 @@ void write_render_manifest(const std::string& output_dir,
   PhysicsPackage* physics = get_physics_package(config.physics_package);
   const std::vector<PackageMetadataEntry> package_render_metadata =
       physics ? physics->render_metadata(config) : std::vector<PackageMetadataEntry>{};
+  const bool needs_legacy_readout_schema_fallback = (config.physics_package != "TPFCore");
   auto emit_json_entry = [](std::ostream& out, bool& first, const PackageMetadataEntry& entry) {
     if (entry.value_type == PackageMetadataEntry::ValueType::Number) {
       json_kv_num(out, first, entry.key.c_str(), entry.number_value);
@@ -272,6 +273,10 @@ void write_render_manifest(const std::string& output_dir,
       if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
         emit_json_entry(jf, first, entry);
       }
+    }
+    if (needs_legacy_readout_schema_fallback) {
+      json_kv(jf, first, "tpfcore_enable_provisional_readout_status", "configured_inactive_on_non_legacy_runtime");
+      json_kv(jf, first, "tpfcore_readout_mode_status", "configured_inactive_on_non_legacy_runtime");
     }
     if (false) {
       json_kv_bool(jf, first, "v11_weak_field_correspondence_audit_only", true);
@@ -377,6 +382,10 @@ void write_render_manifest(const std::string& output_dir,
       if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
         emit_txt_entry(tf, entry);
       }
+    }
+    if (needs_legacy_readout_schema_fallback) {
+      tf << "tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime\n";
+      tf << "tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime\n";
     }
     tf << "render_overlay_mode\t" << config.render_overlay_mode << "\n";
     tf << "galaxy_init_template\t" << config.galaxy_init_template << "\n";

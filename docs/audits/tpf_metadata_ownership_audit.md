@@ -89,10 +89,13 @@ Completed in Phase 5B:
 - Moved A-class render-manifest TPF metadata emission from `engine/render_audit.cpp` into `TPFCorePackage::render_metadata(...)`.
 - Generic render-manifest emission now iterates package-provided metadata entries for both JSON and TXT outputs.
 - Preserved key/value parity for moved keys, including legacy-readout status keys/labels.
+- Law/Xi render metadata and TPFCore selected-package legacy-readout metadata are now package-owned.
+- Non-TPF inactive legacy-readout schema keys remain temporarily in generic `render_audit.cpp` for backward-compatible manifest schema parity.
 
 Deferred to Phase 5C/5D:
 - A-class `run_info` metadata migration in `engine/output.cpp`.
 - Any config-isolation-dependent C-class items.
+- Render-manifest schema compatibility redesign needed before fully removing generic fallback for non-TPF inactive legacy-readout keys.
 
 Remaining `render_audit` TPF references and class:
 - C: cooling-active/cooling-fraction context and alias/effective-mode helpers.

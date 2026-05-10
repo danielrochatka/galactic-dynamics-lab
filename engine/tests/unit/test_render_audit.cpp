@@ -266,6 +266,14 @@ TEST_CASE("write_render_manifest: moved package metadata keeps legacy placement 
   const std::string newtonian_json = slurp_file(out_dir + "/render_manifest.json");
   CHECK(newtonian_txt.find("tpf_core_law_mode\t") == std::string::npos);
   CHECK(newtonian_json.find("\"tpf_core_law_mode\":") == std::string::npos);
+  CHECK(newtonian_txt.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime") !=
+        std::string::npos);
+  CHECK(newtonian_txt.find("tpfcore_readout_mode_status\tconfigured_inactive_on_non_legacy_runtime") !=
+        std::string::npos);
+  CHECK(newtonian_json.find("\"tpfcore_enable_provisional_readout_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+        std::string::npos);
+  CHECK(newtonian_json.find("\"tpfcore_readout_mode_status\": \"configured_inactive_on_non_legacy_runtime\"") !=
+        std::string::npos);
 
   std::remove((out_dir + "/render_manifest.txt").c_str());
   std::remove((out_dir + "/render_manifest.json").c_str());
