@@ -319,3 +319,11 @@ Deferred:
 - Package autoload/discovery.
 - Broader test relocation.
 - Python/tooling boundary cleanup.
+
+
+## Phase 5D-A status (remaining architecture leaks audit)
+
+Phase 5D-A completed as an audit-only step. Added a file/function-level classification of remaining runtime/output/package-boundary leaks and a narrowly-scoped next-step recommendation for 5D-B:
+- `docs/audits/tpf_remaining_architecture_leaks_audit.md`
+
+No runtime/output/config/test behavior changes were made in this phase.
