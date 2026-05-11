@@ -258,15 +258,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.physics_package_compare = trim(val);
     return true;
   }
-  if (key == "tpfcore_enable_provisional_readout") {
-    config.tpfcore_enable_provisional_readout = parse_bool(val);
-    return true;
-  }
-  if (key == "tpf_weak_field_correspondence_alpha_si") {
-    config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
-    config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
-    return true;
-  }
   if (key == "v11_weak_field_correspondence_benchmark") {
     std::string s = trim(val);
     if (s != "axis_monopole" && s != "earth_moon_line_of_centers") {
@@ -300,11 +291,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.v11_em_calib_surface_g_m_s2 = std::stod(val);
     return true;
   }
-  if (key == "tpf_vdsg_mass_baseline_kg") {
-    config.tpf_vdsg_mass_baseline_kg = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_vdsg_mode") { config.tpf_vdsg_mode = val; return true; }
   if (key == "tpf_vdsg_mass_gate_m0_kg") { config.tpf_vdsg_mass_gate_m0_kg = std::stod(val); return true; }
   if (key == "tpf_vdsg_mass_gate_alpha") { config.tpf_vdsg_mass_gate_alpha = std::stod(val); return true; }
   if (key == "tpf_vdsg_x_clamp") { config.tpf_vdsg_x_clamp = std::stod(val); return true; }
@@ -769,7 +755,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   std::string owner;
   if (key_claimed_by_package(key, config.physics_package, owner)) {
     config.package_options[key] = trim(val);
-    if (owner == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+    if (owner == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config, key == "tpf_dynamics_mode");
     return true;
   }
   return false;
@@ -923,7 +909,6 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("physics_package", config.physics_package);
   kv.emplace_back("physics_package_compare", config.physics_package_compare);
   kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
-  kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
   kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
   kv.emplace_back("v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
   kv.emplace_back("v11_em_mass_earth_kg", d(config.v11_em_mass_earth_kg));
@@ -932,15 +917,12 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("v11_em_sidereal_period_s", d(config.v11_em_sidereal_period_s));
   kv.emplace_back("v11_em_calib_surface_radius_m", d(config.v11_em_calib_surface_radius_m));
   kv.emplace_back("v11_em_calib_surface_g_m_s2", d(config.v11_em_calib_surface_g_m_s2));
-  kv.emplace_back("tpfcore_enable_provisional_readout", b(config.tpfcore_enable_provisional_readout));
   kv.emplace_back("tpfcore_readout_mode", config.tpfcore_readout_mode);
   kv.emplace_back("tpfcore_readout_scale", d(config.tpfcore_readout_scale));
   kv.emplace_back("tpfcore_theta_tt_scale", d(config.tpfcore_theta_tt_scale));
   kv.emplace_back("tpfcore_theta_tr_scale", d(config.tpfcore_theta_tr_scale));
   kv.emplace_back("tpf_kappa", d(config.tpf_kappa));
   kv.emplace_back("tpf_vdsg_coupling", d(config.tpf_vdsg_coupling));
-  kv.emplace_back("tpf_vdsg_mass_baseline_kg", d(config.tpf_vdsg_mass_baseline_kg));
-  kv.emplace_back("tpf_vdsg_mode", config.tpf_vdsg_mode);
   kv.emplace_back("tpf_vdsg_mass_gate_m0_kg", d(config.tpf_vdsg_mass_gate_m0_kg));
   kv.emplace_back("tpf_vdsg_mass_gate_alpha", d(config.tpf_vdsg_mass_gate_alpha));
   kv.emplace_back("tpf_vdsg_x_clamp", d(config.tpf_vdsg_x_clamp));

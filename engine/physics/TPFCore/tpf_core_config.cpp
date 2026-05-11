@@ -61,10 +61,10 @@ TPFCoreConfig build_tpfcore_config(const Config& config) {
   return out;
 }
 
-void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
+void sync_tpfcore_legacy_fields_from_package_options(Config& config, bool validate_dynamics_mode) {
   std::string v;
   if (get_opt(config, "tpf_dynamics_mode", v)) {
-    if (v != "tpf_xi_theta_v1") {
+    if (validate_dynamics_mode && v != "tpf_xi_theta_v1") {
       throw std::runtime_error("tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch, got: " + v);
     }
     config.tpf_dynamics_mode = v;
@@ -74,6 +74,11 @@ void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
       throw std::runtime_error("tpf_analysis_mode must be none or v11_weak_field_correspondence, got: " + v);
     }
     config.tpf_analysis_mode = v;
+  }
+  if (get_opt(config, "tpfcore_enable_provisional_readout", v)) config.tpfcore_enable_provisional_readout = (v == "1" || v == "true" || v == "yes");
+  if (get_opt(config, "tpf_weak_field_correspondence_alpha_si", v)) {
+    config.tpf_weak_field_correspondence_alpha_si = std::stod(v);
+    config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
   }
   if (get_opt(config, "tpfcore_readout_mode", v)) config.tpfcore_readout_mode = v;
   if (get_opt(config, "tpfcore_readout_scale", v)) config.tpfcore_readout_scale = std::stod(v);
