@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include "doctest.h"
 #include "force_compare.hpp"
+#include "physics/TPFCore/tpf_core_config.hpp"
 #include <algorithm>
 #include <fstream>
 
@@ -184,6 +185,20 @@ TEST_CASE("tpfcore_enable_provisional_readout parses true for non-galaxy diagnos
   Config c;
   CHECK(apply_config_kv("tpfcore_enable_provisional_readout", "true", c));
   CHECK(c.tpfcore_enable_provisional_readout == true);
+}
+
+TEST_CASE("TPF package-routed migrated keys hydrate both TPFCoreConfig and temporary legacy Config bridge fields") {
+  Config c;
+  CHECK(apply_config_kv("physics_package", "TPFCore", c));
+  CHECK(apply_config_kv("tpf_vdsg_mass_baseline_kg", "1.25e30", c));
+  CHECK(apply_config_kv("tpf_vdsg_mode", "radial_signed", c));
+
+  const galaxy::TPFCoreConfig tpf_cfg = galaxy::build_tpfcore_config(c);
+  CHECK(tpf_cfg.tpf_vdsg_mass_baseline_kg == doctest::Approx(1.25e30));
+  CHECK(tpf_cfg.tpf_vdsg_mode == "radial_signed");
+
+  CHECK(c.tpf_vdsg_mass_baseline_kg == doctest::Approx(1.25e30));
+  CHECK(c.tpf_vdsg_mode == "radial_signed");
 }
 TEST_CASE("tpf_xi_constraint_exterior inspection config keys parse") {
   Config c;

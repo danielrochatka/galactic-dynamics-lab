@@ -87,6 +87,8 @@ void sync_tpfcore_legacy_fields_from_package_options(Config& config, bool valida
   if (get_opt(config, "tpf_kappa", v)) config.tpf_kappa = std::stod(v);
   if (get_opt(config, "tpfcore_closure_kappa", v)) config.tpf_kappa = std::stod(v);
   if (get_opt(config, "tpf_vdsg_coupling", v)) config.tpf_vdsg_coupling = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mass_baseline_kg", v)) config.tpf_vdsg_mass_baseline_kg = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mode", v)) config.tpf_vdsg_mode = v;
   if (get_opt(config, "tpf_global_accel_shunt_enable", v)) config.tpf_global_accel_shunt_enable = (v == "1" || v == "true" || v == "yes");
   if (get_opt(config, "tpf_global_accel_shunt_fraction", v)) config.tpf_global_accel_shunt_fraction = std::stod(v);
   if (get_opt(config, "tpf_cooling_fraction", v)) config.tpf_cooling_fraction = std::stod(v);
