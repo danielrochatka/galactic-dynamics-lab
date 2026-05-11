@@ -23,6 +23,7 @@
 #include "runtime_package_helpers.hpp"
 #include "source_ansatz.hpp"
 #include "tpf_core_params.hpp"
+#include "tpf_core_config.hpp"
 #include "tpf_4d_static_residual.hpp"
 #include "xi_constraint_exterior_solver.hpp"
 #include "source_iteration.hpp"
@@ -108,26 +109,27 @@ TPFCorePackage::TPFCorePackage()
       xi_source_speed_z_(0.0) {}
 
 void TPFCorePackage::init_from_config(const Config& config) {
-  tpf_dynamics_mode_ = config.tpf_dynamics_mode;
+  const TPFCoreConfig tpfcfg = build_tpfcore_config(config);
+  tpf_dynamics_mode_ = tpfcfg.tpf_dynamics_mode;
   if (tpf_dynamics_mode_ != "tpf_xi_theta_v1") {
     throw std::runtime_error("TPFCore on this branch supports only tpf_dynamics_mode=tpf_xi_theta_v1.");
   }
-  provisional_readout_ = config.tpfcore_enable_provisional_readout;
-  readout_mode_ = config.tpfcore_readout_mode;
-  readout_scale_ = config.tpfcore_readout_scale;
-  theta_tt_scale_ = config.tpfcore_theta_tt_scale;
-  theta_tr_scale_ = config.tpfcore_theta_tr_scale;
+  provisional_readout_ = tpfcfg.tpfcore_enable_provisional_readout;
+  readout_mode_ = tpfcfg.tpfcore_readout_mode;
+  readout_scale_ = tpfcfg.tpfcore_readout_scale;
+  theta_tt_scale_ = tpfcfg.tpfcore_theta_tt_scale;
+  theta_tr_scale_ = tpfcfg.tpfcore_theta_tr_scale;
   source_softening_ = config.tpfcore_source_softening;  /* 0 => use global softening at runtime */
-  weak_field_correspondence_alpha_si_ = config.tpf_weak_field_correspondence_alpha_si;
-  kappa_ = config.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
-  derived_poisson_cfg_.kappa = config.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
-  derived_poisson_cfg_.bins = config.tpf_poisson_bins;
-  derived_poisson_cfg_.max_radius = config.tpf_poisson_max_radius;
+  weak_field_correspondence_alpha_si_ = tpfcfg.tpf_weak_field_correspondence_alpha_si;
+  kappa_ = tpfcfg.tpf_kappa;                // external flat key tpf_kappa -> internal direct_tpf paper coupling
+  derived_poisson_cfg_.kappa = tpfcfg.tpf_kappa;  // same incoming key also feeds derived-radial closure ledger
+  derived_poisson_cfg_.bins = tpfcfg.tpf_poisson_bins;
+  derived_poisson_cfg_.max_radius = tpfcfg.tpf_poisson_max_radius;
   derived_poisson_cfg_.galaxy_radius = config.galaxy_radius;
-  vdsg_coupling_ = config.tpf_vdsg_coupling;
+  vdsg_coupling_ = tpfcfg.tpf_vdsg_coupling;
   vdsg_mass_baseline_resolved_kg_ =
-      (config.tpf_vdsg_mass_baseline_kg > 0.0) ? config.tpf_vdsg_mass_baseline_kg : config.star_mass;
-  vdsg_mode_ = config.tpf_vdsg_mode;
+      (tpfcfg.tpf_vdsg_mass_baseline_kg > 0.0) ? tpfcfg.tpf_vdsg_mass_baseline_kg : config.star_mass;
+  vdsg_mode_ = tpfcfg.tpf_vdsg_mode;
   if (!tpfcore::is_valid_vdsg_mode(vdsg_mode_)) {
     throw std::runtime_error("invalid tpf_vdsg_mode: " + vdsg_mode_ +
                              "; expected legacy_speed, radial_doppler_rational, radial_doppler_exp, or radial_doppler_bounded");
@@ -140,10 +142,10 @@ void TPFCorePackage::init_from_config(const Config& config) {
   vdsg_weak_field_power_ = config.tpf_vdsg_weak_field_power;
   vdsg_bounded_amplitude_ = config.tpf_vdsg_bounded_amplitude;
   simulation_dt_ = config.dt;
-  cooling_fraction_ = config.tpf_cooling_fraction;
-  shunt_enable_ = config.tpf_global_accel_shunt_enable;
-  shunt_fraction_ = (config.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(config.tpf_global_accel_shunt_fraction))
-                        ? config.tpf_global_accel_shunt_fraction
+  cooling_fraction_ = tpfcfg.tpf_cooling_fraction;
+  shunt_enable_ = tpfcfg.tpf_global_accel_shunt_enable;
+  shunt_fraction_ = (tpfcfg.tpf_global_accel_shunt_fraction > 0.0 && std::isfinite(tpfcfg.tpf_global_accel_shunt_fraction))
+                        ? tpfcfg.tpf_global_accel_shunt_fraction
                         : 0.001;
   xi_motion_readout_scale_ = config.tpf_4d_xi_motion_readout_scale;
   xi_kernel_mode_ = config.tpf_4d_xi_kernel_mode;
@@ -157,13 +159,13 @@ void TPFCorePackage::init_from_config(const Config& config) {
   xi_source_speed_x_ = config.tpf_4d_xi_source_speed_x;
   xi_source_speed_y_ = config.tpf_4d_xi_source_speed_y;
   xi_source_speed_z_ = config.tpf_4d_xi_source_speed_z;
-  if (config.tpf_cooling_fraction > 0.0) {
+  if (tpfcfg.tpf_cooling_fraction > 0.0) {
     throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_cooling_fraction > 0; cooling is not part of strict v1 dynamics.");
   }
-  if (config.tpf_global_accel_shunt_enable) {
+  if (tpfcfg.tpf_global_accel_shunt_enable) {
     throw std::runtime_error("tpf_xi_theta_v1 rejects tpf_global_accel_shunt_enable=true; global acceleration shunt is not part of strict v1 dynamics.");
   }
-  if (config.tpf_vdsg_coupling != 0.0) {
+  if (tpfcfg.tpf_vdsg_coupling != 0.0) {
     throw std::runtime_error("tpf_xi_theta_v1 rejects nonzero tpf_vdsg_coupling; additive VDSG modifier is not part of strict v1 dynamics.");
   }
   if (config.tpf_4d_xi_kernel_mode != "off") {

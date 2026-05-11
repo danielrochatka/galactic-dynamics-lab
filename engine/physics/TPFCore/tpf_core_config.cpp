@@ -16,6 +16,49 @@ bool get_opt(const Config& c, const std::string& k, std::string& out) {
   return true;
 }
 
+bool parse_bool_opt(const std::string& v) {
+  return v == "1" || v == "true" || v == "yes";
+}
+
+}
+
+TPFCoreConfig build_tpfcore_config(const Config& config) {
+  TPFCoreConfig out;
+  std::string v;
+  out.tpf_dynamics_mode = config.tpf_dynamics_mode;
+  out.tpfcore_enable_provisional_readout = config.tpfcore_enable_provisional_readout;
+  out.tpfcore_readout_mode = config.tpfcore_readout_mode;
+  out.tpfcore_readout_scale = config.tpfcore_readout_scale;
+  out.tpfcore_theta_tt_scale = config.tpfcore_theta_tt_scale;
+  out.tpfcore_theta_tr_scale = config.tpfcore_theta_tr_scale;
+  out.tpf_kappa = config.tpf_kappa;
+  out.tpf_weak_field_correspondence_alpha_si = config.tpf_weak_field_correspondence_alpha_si;
+  out.tpf_vdsg_coupling = config.tpf_vdsg_coupling;
+  out.tpf_vdsg_mass_baseline_kg = config.tpf_vdsg_mass_baseline_kg;
+  out.tpf_vdsg_mode = config.tpf_vdsg_mode;
+  out.tpf_cooling_fraction = config.tpf_cooling_fraction;
+  out.tpf_global_accel_shunt_enable = config.tpf_global_accel_shunt_enable;
+  out.tpf_global_accel_shunt_fraction = config.tpf_global_accel_shunt_fraction;
+  out.tpf_poisson_bins = config.tpf_poisson_bins;
+  out.tpf_poisson_max_radius = config.tpf_poisson_max_radius;
+
+  if (get_opt(config, "tpf_dynamics_mode", v)) out.tpf_dynamics_mode = v;
+  if (get_opt(config, "tpfcore_enable_provisional_readout", v)) out.tpfcore_enable_provisional_readout = parse_bool_opt(v);
+  if (get_opt(config, "tpfcore_readout_mode", v)) out.tpfcore_readout_mode = v;
+  if (get_opt(config, "tpfcore_readout_scale", v)) out.tpfcore_readout_scale = std::stod(v);
+  if (get_opt(config, "tpfcore_theta_tt_scale", v)) out.tpfcore_theta_tt_scale = std::stod(v);
+  if (get_opt(config, "tpfcore_theta_tr_scale", v)) out.tpfcore_theta_tr_scale = std::stod(v);
+  if (get_opt(config, "tpf_kappa", v)) out.tpf_kappa = std::stod(v);
+  if (get_opt(config, "tpf_weak_field_correspondence_alpha_si", v)) out.tpf_weak_field_correspondence_alpha_si = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_coupling", v)) out.tpf_vdsg_coupling = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mass_baseline_kg", v)) out.tpf_vdsg_mass_baseline_kg = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mode", v)) out.tpf_vdsg_mode = v;
+  if (get_opt(config, "tpf_cooling_fraction", v)) out.tpf_cooling_fraction = std::stod(v);
+  if (get_opt(config, "tpf_global_accel_shunt_enable", v)) out.tpf_global_accel_shunt_enable = parse_bool_opt(v);
+  if (get_opt(config, "tpf_global_accel_shunt_fraction", v)) out.tpf_global_accel_shunt_fraction = std::stod(v);
+  if (get_opt(config, "tpf_poisson_bins", v)) out.tpf_poisson_bins = std::stoi(v);
+  if (get_opt(config, "tpf_poisson_max_radius", v)) out.tpf_poisson_max_radius = std::stod(v);
+  return out;
 }
 
 void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
