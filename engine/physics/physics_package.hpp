@@ -30,6 +30,14 @@ struct PackageMetadataEntry {
   RenderPlacement render_placement = RenderPlacement::AfterAccelerationCodePath;
 };
 
+
+struct PackageModeInfo {
+  bool recognized = false;
+  std::string canonical_token;
+  bool requires_output_dir = true;
+  bool is_utility_mode = false;
+};
+
 struct RunInfoContext {
   const void* package_runtime_stats = nullptr;
   const char* package_runtime_stats_kind = nullptr;
@@ -83,6 +91,11 @@ class PhysicsPackage {
 
   /** Optional: runtime metadata entries to append to run-level reporting. Default empty. */
   virtual std::vector<PackageMetadataEntry> runtime_metadata() const { return {}; }
+
+  virtual PackageModeInfo resolve_mode_token(const std::string& mode_token) const {
+    (void)mode_token;
+    return {};
+  }
 
   /** Optional: package capability check for utility modes. Default unsupported. */
   virtual bool supports_utility_mode(SimulationMode) const { return false; }
@@ -168,6 +181,9 @@ using PhysicsPackageFactory = std::function<std::unique_ptr<PhysicsPackage>()>;
  * Returns false if name is empty, factory is null, or the name is already registered.
  */
 bool register_physics_package_factory(const std::string& name, PhysicsPackageFactory factory);
+
+PackageModeInfo resolve_package_mode_token(const std::string& package_name,
+                                           const std::string& mode_token);
 
 }  // namespace galaxy
 

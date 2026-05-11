@@ -378,6 +378,20 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
 }
 
 
+
+TEST_CASE("package-owned utility simulation mode maps to compatibility enum") {
+  Config c;
+  CHECK(apply_config_kv("simulation_mode", "tpf_single_source_inspect", c));
+  CHECK(c.mode_token == "tpf_single_source_inspect");
+  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_single_source_inspect);
+  CHECK(c.simulation_mode != galaxy::SimulationMode::galaxy);
+}
+
+TEST_CASE("invalid generic simulation mode typo throws") {
+  Config c;
+  CHECK_THROWS(apply_config_kv("simulation_mode", "galaxi", c));
+}
+
 TEST_CASE("utility simulation modes remain parseable") {
   const char* modes[] = {
       "tpf_single_source_inspect", "tpf_symmetric_pair_inspect", "tpf_source_field_benchmark",

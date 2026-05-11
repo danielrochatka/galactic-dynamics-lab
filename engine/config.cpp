@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include "package_discovery.hpp"
 #include "physics/TPFCore/tpf_core_config.hpp"
+#include "physics/physics_package.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -65,6 +66,19 @@ bool key_claimed_by_package(const std::string& key, const std::string& preferred
   return false;
 }
 
+bool map_mode_token_to_compat_enum(const std::string& token, SimulationMode& out) {
+  if (token == "tpf_single_source_inspect") { out = SimulationMode::tpf_single_source_inspect; return true; }
+  if (token == "tpf_symmetric_pair_inspect") { out = SimulationMode::tpf_symmetric_pair_inspect; return true; }
+  if (token == "tpf_source_field_benchmark") { out = SimulationMode::tpf_source_field_benchmark; return true; }
+  if (token == "tpf_4d_static_residual_benchmark") { out = SimulationMode::tpf_4d_static_residual_benchmark; return true; }
+  if (token == "tpf_4d_static_motion_readout_benchmark") { out = SimulationMode::tpf_4d_static_motion_readout_benchmark; return true; }
+  if (token == "tpf_4d_xi_motion_probe_benchmark") { out = SimulationMode::tpf_4d_xi_motion_probe_benchmark; return true; }
+  if (token == "tpf_weak_field_calibration") { out = SimulationMode::tpf_weak_field_calibration; return true; }
+  if (token == "tpf_newtonian_force_compare") { out = SimulationMode::tpf_newtonian_force_compare; return true; }
+  if (token == "tpf_diagnostic_consistency_audit") { out = SimulationMode::tpf_diagnostic_consistency_audit; return true; }
+  return false;
+}
+
 }  // namespace
 
 SimulationMode parse_mode(const std::string& s) {
@@ -80,16 +94,7 @@ SimulationMode parse_mode(const std::string& s) {
   if (t == "symmetric_pair") return SimulationMode::symmetric_pair;
   if (t == "small_n_conservation") return SimulationMode::small_n_conservation;
   if (t == "timestep_convergence") return SimulationMode::timestep_convergence;
-  if (t == "tpf_single_source_inspect") return SimulationMode::tpf_single_source_inspect;
-  if (t == "tpf_symmetric_pair_inspect") return SimulationMode::tpf_symmetric_pair_inspect;
-  if (t == "tpf_source_field_benchmark") return SimulationMode::tpf_source_field_benchmark;
-  if (t == "tpf_4d_static_residual_benchmark") return SimulationMode::tpf_4d_static_residual_benchmark;
-  if (t == "tpf_4d_static_motion_readout_benchmark") return SimulationMode::tpf_4d_static_motion_readout_benchmark;
-  if (t == "tpf_4d_xi_motion_probe_benchmark") return SimulationMode::tpf_4d_xi_motion_probe_benchmark;
-  if (t == "tpf_weak_field_calibration") return SimulationMode::tpf_weak_field_calibration;
-  if (t == "tpf_newtonian_force_compare") return SimulationMode::tpf_newtonian_force_compare;
-  if (t == "tpf_diagnostic_consistency_audit") return SimulationMode::tpf_diagnostic_consistency_audit;
-  throw std::runtime_error("Unknown simulation_mode: " + s);
+  throw std::runtime_error("Unknown generic simulation_mode: " + s);
 }
 
 std::string mode_to_string(SimulationMode m) {
@@ -159,7 +164,17 @@ bool simulation_mode_requires_output_dir(SimulationMode m) {
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
   if (key == "simulation_mode") {
     config.mode_token = trim(val);
-    config.simulation_mode = parse_mode(val);
+    const std::string t = trim(val);
+    try {
+      config.simulation_mode = parse_mode(val);
+    } catch (...) {
+      if (t.rfind("tpf_", 0) != 0) throw;
+      PackageModeInfo info = resolve_package_mode_token(config.physics_package, t);
+      if (!info.recognized && !tpfcore_owns_mode_token(t)) throw std::runtime_error("Unknown simulation_mode: " + t);
+      if (!map_mode_token_to_compat_enum(t, config.simulation_mode)) {
+        throw std::runtime_error("No temporary enum compatibility mapping for package mode: " + t);
+      }
+    }
     return true;
   }
   if (key == "n_stars") {
@@ -786,6 +801,12 @@ bool load_config_file(const std::string& path, Config& config) {
     }
   }
   if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+  bool generic_ok = true;
+  try { (void)parse_mode(config.mode_token); } catch (...) { generic_ok = false; }
+  if (!generic_ok) {
+    PackageModeInfo info = resolve_package_mode_token(config.physics_package, config.mode_token);
+    if (!info.recognized) throw std::runtime_error("Unknown simulation_mode: " + config.mode_token);
+  }
   return true;
 }
 

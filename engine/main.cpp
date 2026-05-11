@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "physics/TPFCore/tpf_core_config.hpp"
 #include "compare_orchestration.hpp"
 #include "force_compare.hpp"
 #include "galaxy_init.hpp"
@@ -287,6 +288,7 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   if (config.simulation_mode != galaxy::SimulationMode::galaxy) return;
   if (!physics) return;
 
+  const auto tpf_cfg = build_tpfcore_config(config);
   std::ofstream csv(config.output_dir + "/galaxy_step0_accel_audit.csv");
   if (!csv) return;
   csv << std::scientific << std::setprecision(17);
@@ -313,8 +315,8 @@ void write_galaxy_step0_accel_audit(const galaxy::Config& config,
   std::string decomposition_note = "reference decomposition unavailable";
 
   if (config.physics_package == "TPFCore") {
-    active_route = config.tpf_dynamics_mode;
-    if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
+    active_route = tpf_cfg.tpf_dynamics_mode;
+    if (tpf_cfg.tpf_dynamics_mode == "tpf_xi_theta_v1") {
       applied_accel_formula = "a=-K_xi*Xi_total_spatial";
       decomposition_note =
           "v1 route: Xi_total-driven motion; Theta=grad(Xi_total) is diagnostic-only";
