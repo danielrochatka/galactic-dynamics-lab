@@ -2,6 +2,7 @@
 
 #include "galaxy_init.hpp"
 #include "init_conditions.hpp"
+#include "physics/physics_package.hpp"
 #include "scenario_defaults.hpp"
 #include <algorithm>
 #include <iomanip>
@@ -128,20 +129,11 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
     os << std::setprecision(17) << v;
     return os.str();
   };
-  std::string effective_tpf_dynamics_mode = resolved.config.tpf_dynamics_mode;
-  if (resolved.config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-    effective_tpf_dynamics_mode = "none_static_residual_diagnostic_only";
-  } else if (resolved.config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-    effective_tpf_dynamics_mode = "none_static_motion_readout_benchmark_only";
-  } else if (resolved.config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-    effective_tpf_dynamics_mode = "none_xi_motion_probe_benchmark_only";
-  }
   std::vector<std::pair<std::string, std::string>> kv;
   kv.reserve(16);
   kv.emplace_back("effective_simulation_mode", resolved.mode_label);
   kv.emplace_back("effective_initializer_used", resolved.initializer_used);
   kv.emplace_back("effective_physics_package", resolved.config.physics_package);
-  kv.emplace_back("effective_tpf_dynamics_mode", effective_tpf_dynamics_mode);
   kv.emplace_back("effective_dt", d(resolved.config.dt));
   kv.emplace_back("effective_n_steps", i(resolved.effective_n_steps));
   kv.emplace_back("effective_snapshot_every", i(resolved.effective_snapshot_every));
@@ -167,6 +159,11 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("auto_softening_max_capped", b(resolved.softening.max_capped));
   kv.emplace_back("auto_softening_min_floored", b(resolved.softening.min_floored));
   kv.emplace_back("auto_softening_max_cap_source", resolved.softening.max_cap_source);
+  if (PhysicsPackage* package = get_physics_package(resolved.config.physics_package)) {
+    for (const auto& entry : package->resolved_runtime_metadata(resolved.config, resolved.config.simulation_mode)) {
+      kv.emplace_back(entry.key, entry.value);
+    }
+  }
   return kv;
 }
 

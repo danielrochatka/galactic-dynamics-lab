@@ -512,6 +512,23 @@ std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& 
   return metadata;
 }
 
+std::vector<PackageMetadataEntry> TPFCorePackage::resolved_runtime_metadata(const Config& config,
+                                                                            SimulationMode mode) const {
+  std::vector<PackageMetadataEntry> metadata;
+  PackageMetadataEntry entry;
+  entry.key = "effective_tpf_dynamics_mode";
+  entry.value = config.tpf_dynamics_mode;
+  if (mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+    entry.value = "none_static_residual_diagnostic_only";
+  } else if (mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    entry.value = "none_static_motion_readout_benchmark_only";
+  } else if (mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    entry.value = "none_xi_motion_probe_benchmark_only";
+  }
+  metadata.push_back(entry);
+  return metadata;
+}
+
 namespace {
 
 const double C_SI_LIGHT = 299792458.0;

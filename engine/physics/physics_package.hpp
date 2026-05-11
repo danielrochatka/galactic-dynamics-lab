@@ -121,6 +121,14 @@ class PhysicsPackage {
   /** Optional: package config schema/default metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> package_config_metadata() const { return {}; }
 
+  /** Optional: package-owned resolved/effective runtime metadata. Default empty. */
+  virtual std::vector<PackageMetadataEntry> resolved_runtime_metadata(const Config& config,
+                                                                      SimulationMode mode) const {
+    (void)config;
+    (void)mode;
+    return {};
+  }
+
   /** Optional: package-owned post-run diagnostics emission. Default no-op/success. */
   virtual bool write_post_run_diagnostics(const std::vector<Snapshot>& snapshots,
                                           const Config& config,
