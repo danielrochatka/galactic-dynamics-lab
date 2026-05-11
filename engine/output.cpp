@@ -190,7 +190,7 @@ void write_run_info(const std::string& output_dir,
         }
       }
       f << "\n";
-    } else {
+    } else if (config.physics_package != "TPFCore") {
       emit_legacy_benchmark_run_info_fallback(f, config, package_defaults_path);
     }
   }
@@ -206,38 +206,6 @@ void write_run_info(const std::string& output_dir,
       f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
       f << "v11_audit_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are inherited layered-config "
            "artifacts; not used for particle accelerations in this mode\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-      f << "tpf_4d_static_residual_benchmark_tpfcore_dynamics_note\tno particle integration; TPFCore acceleration API "
-           "(legacy_readout / direct_tpf / v11_weak_field_truncation) not used in this mode\n";
-      f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
-      f << "tpf_dynamics_mode_effective_for_this_run\tnone_static_residual_diagnostic_only\n";
-      f << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_static_residual_benchmark\n";
-      f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
-      f << "tpf_4d_static_residual_benchmark_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are "
-           "inherited layered-config artifacts; not used for particle accelerations in this mode\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-      f << "tpf_4d_static_motion_readout_benchmark_tpfcore_dynamics_note\tno particle integration; TPFCore acceleration API "
-           "(legacy_readout / direct_tpf / v11_weak_field_truncation) not used in this mode\n";
-      f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
-      f << "tpf_dynamics_mode_effective_for_this_run\tnone_static_motion_readout_benchmark_only\n";
-      f << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_static_motion_readout_benchmark\n";
-      f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
-      f << "tpf_4d_static_motion_readout_benchmark_readout_scalars_note\tthe benchmark uses tpf_4d_motion_kappa and "
-           "tpf_4d_motion_readout_scale for GravityStaticMotionReadout_v1\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-      f << "tpf_4d_xi_motion_probe_benchmark_tpfcore_dynamics_note\tbenchmark uses internal Xi-only integrator path; "
-           "TPFCore acceleration API (legacy_readout / direct_tpf / v11_weak_field_truncation) not used\n";
-      f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
-      f << "tpf_dynamics_mode_effective_for_this_run\tnone_xi_motion_probe_benchmark_only\n";
-      f << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_xi_motion_probe_benchmark\n";
-      f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
-      f << "tpf_4d_xi_motion_probe_benchmark_readout_scalars_note\tbenchmark uses tpf_4d_xi_motion_readout_scale with Xi_spatial only\n";
     } else if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
       const auto supplement = physics->run_info_supplement_metadata(config);
       for (const auto& entry : supplement) {
