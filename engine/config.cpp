@@ -84,6 +84,16 @@ SimulationMode parse_mode(const std::string& s) {
 }
 
 std::string mode_to_string(SimulationMode m) {
+  const int mi = static_cast<int>(m);
+  if (mi == 5) return "tpf_single_source_inspect";
+  if (mi == 6) return "tpf_symmetric_pair_inspect";
+  if (mi == 7) return "tpf_source_field_benchmark";
+  if (mi == 8) return "tpf_4d_static_residual_benchmark";
+  if (mi == 9) return "tpf_4d_static_motion_readout_benchmark";
+  if (mi == 10) return "tpf_4d_xi_motion_probe_benchmark";
+  if (mi == 11) return "tpf_weak_field_calibration";
+  if (mi == 12) return "tpf_newtonian_force_compare";
+  if (mi == 13) return "tpf_diagnostic_consistency_audit";
   switch (m) {
     case SimulationMode::galaxy: return "galaxy";
     /* Legacy enum value (int 1 in old run_info): same physics as earth_moon_benchmark. */
@@ -93,52 +103,24 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::symmetric_pair: return "symmetric_pair";
     case SimulationMode::small_n_conservation: return "small_n_conservation";
     case SimulationMode::timestep_convergence: return "timestep_convergence";
-    case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
-    case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
-    case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
-    case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
-    case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
-    case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
-    case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
   }
   return "unknown";
 }
 
 bool is_tpf_utility_mode(SimulationMode m) {
-  switch (m) {
-    case SimulationMode::tpf_single_source_inspect:
-    case SimulationMode::tpf_symmetric_pair_inspect:
-    case SimulationMode::tpf_source_field_benchmark:
-    case SimulationMode::tpf_4d_static_residual_benchmark:
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-    case SimulationMode::tpf_weak_field_calibration:
-    case SimulationMode::tpf_newtonian_force_compare:
-    case SimulationMode::tpf_diagnostic_consistency_audit:
-      return true;
-    default:
-      return false;
-  }
+  const int mi = static_cast<int>(m);
+  return mi >= 5 && mi <= 13;
 }
 
 bool simulation_mode_requires_output_dir(SimulationMode m) {
+  const int mi = static_cast<int>(m);
+  if (mi >= 5 && mi <= 13) return true;
   switch (m) {
     case SimulationMode::galaxy:
     case SimulationMode::two_body_orbit:
     case SimulationMode::symmetric_pair:
     case SimulationMode::small_n_conservation:
     case SimulationMode::timestep_convergence:
-    case SimulationMode::tpf_single_source_inspect:
-    case SimulationMode::tpf_symmetric_pair_inspect:
-    case SimulationMode::tpf_source_field_benchmark:
-    case SimulationMode::tpf_4d_static_residual_benchmark:
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-    case SimulationMode::tpf_weak_field_calibration:
-    case SimulationMode::tpf_newtonian_force_compare:
-    case SimulationMode::tpf_diagnostic_consistency_audit:
     case SimulationMode::earth_moon_benchmark:
     case SimulationMode::bh_orbit_validation:
       return true;
