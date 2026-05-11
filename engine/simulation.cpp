@@ -1,5 +1,6 @@
 #include "simulation.hpp"
 #include "integrator.hpp"
+#include "physics/TPFCore/tpf_core_config.hpp"
 #include <algorithm>
 
 namespace galaxy {
@@ -25,9 +26,10 @@ std::vector<Snapshot> run_simulation(const Config& config,
   const bool star_star = config.enable_star_star_gravity;
   const bool use_progress = (progress_interval > 0 && progress_callback);
 
+  const auto tpf_cfg = build_tpfcore_config(config);
   const bool cooling_on = physics->cooling_active(config);
   const bool xi_kernel_deformation_active =
-      (config.physics_package == "TPFCore" && config.tpf_dynamics_mode == "tpf_xi_theta_v1" &&
+      (config.physics_package == "TPFCore" && tpf_cfg.tpf_dynamics_mode == "tpf_xi_theta_v1" &&
        config.tpf_4d_xi_kernel_mode != "off" && config.tpf_4d_xi_kernel_coupling != 0.0);
   const int cooling_steps = cooling_on ? physics->cooling_steps(config, n_steps) : 0;
 

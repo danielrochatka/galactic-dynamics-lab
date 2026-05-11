@@ -6,6 +6,7 @@
 #include "force_compare.hpp"
 #include "init_conditions.hpp"
 #include "physics/physics_package.hpp"
+#include "physics/TPFCore/tpf_core_config.hpp"
 #include "simulation.hpp"
 #include "types.hpp"
 #include <cmath>
@@ -275,6 +276,7 @@ void write_summary(const CircleAuditStats& circle_stats, std::ostream& txt) {
 }  // namespace
 
 void run_tpf_newtonian_force_compare(const Config& config, const std::string& output_dir) {
+  const auto tpf_cfg = build_tpfcore_config(config);
   PhysicsPackage* newton = get_physics_package("Newtonian");
   PhysicsPackage* tpf = get_physics_package("TPFCore");
   if (!newton || !tpf) {
@@ -296,8 +298,8 @@ void run_tpf_newtonian_force_compare(const Config& config, const std::string& ou
   std::ostream& txt = txt_file;
   txt << "Newtonian vs TPF acceleration comparison (diagnostics only)\n";
   txt << "Same positions/states; same softening; TPF uses current readout mode and calibrated scale.\n\n";
-  txt << "TPF readout_mode (from config): " << config.tpfcore_readout_mode << "\n";
-  txt << "TPF readout_scale: " << std::scientific << config.tpfcore_readout_scale << "\n";
+  txt << "TPF readout_mode (from config): " << tpf_cfg.tpfcore_readout_mode << "\n";
+  txt << "TPF readout_scale: " << std::scientific << tpf_cfg.tpfcore_readout_scale << "\n";
   txt << "softening: " << config.softening << ", bh_mass: " << config.bh_mass << "\n\n";
 
   csv << "audit_type,r,theta,step,time,x,y,ax_newt,ay_newt,ax_tpf,ay_tpf,"
