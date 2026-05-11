@@ -532,7 +532,7 @@ int main(int argc, char** argv) {
   std::cout << "SIMULATION MODE: " << galaxy::mode_to_string(config.simulation_mode) << "\n";
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
-  if (galaxy::simulation_mode_requires_output_dir(config.simulation_mode)) {
+  if (galaxy::config_mode_requires_output_dir(config)) {
     if (!ensure_dir_recursive(config.output_dir)) {
       std::cerr << "Failed to create output directory for simulation_mode="
                 << galaxy::mode_to_string(config.simulation_mode)
@@ -541,7 +541,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (galaxy::is_tpf_utility_mode(config.simulation_mode)) {
+  if (galaxy::config_mode_is_utility(config)) {
     galaxy::PhysicsPackage* utility_physics = galaxy::get_physics_package(config.physics_package);
     if (!utility_physics) {
       std::cerr << "Unknown physics package: " << config.physics_package << "\n";

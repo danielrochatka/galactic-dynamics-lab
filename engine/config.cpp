@@ -160,6 +160,24 @@ bool simulation_mode_requires_output_dir(SimulationMode m) {
   }
 }
 
+PackageModeInfo resolve_mode_for_config(const Config& config) {
+  if (!config.mode_is_package_owned) return {};
+  const std::string& owner = config.mode_owner_package.empty() ? config.physics_package : config.mode_owner_package;
+  PackageModeInfo info = resolve_package_mode_token(owner, config.mode_token);
+  if (!info.recognized) throw std::runtime_error("Unknown package-owned simulation_mode: " + config.mode_token);
+  return info;
+}
+
+bool config_mode_is_utility(const Config& config) {
+  if (!config.mode_is_package_owned) return is_tpf_utility_mode(config.simulation_mode);
+  return resolve_mode_for_config(config).is_utility_mode;
+}
+
+bool config_mode_requires_output_dir(const Config& config) {
+  if (!config.mode_is_package_owned) return simulation_mode_requires_output_dir(config.simulation_mode);
+  return resolve_mode_for_config(config).requires_output_dir;
+}
+
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
   if (key == "simulation_mode") {
     config.mode_token = trim(val);

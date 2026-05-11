@@ -7,6 +7,8 @@
 #include <vector>
 
 namespace galaxy {
+struct PackageModeInfo;
+struct Config;
 
 /** SI speed of light (m/s). TPF bounce closure (Sec. IX, Eq. 31). */
 constexpr double c = 299792458.0;
@@ -60,8 +62,9 @@ std::string mode_to_string(SimulationMode m);
 bool is_tpf_utility_mode(SimulationMode m);
 /** True for all executable simulation modes; used to guard shared output-dir setup. */
 bool simulation_mode_requires_output_dir(SimulationMode m);
-
-struct Config;
+PackageModeInfo resolve_mode_for_config(const Config& config);
+bool config_mode_is_utility(const Config& config);
+bool config_mode_requires_output_dir(const Config& config);
 
 /** One key occurrence found in a config file (in file order). */
 struct ConfigKeyOccurrence {
