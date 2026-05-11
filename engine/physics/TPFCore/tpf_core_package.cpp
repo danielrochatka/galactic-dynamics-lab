@@ -478,6 +478,17 @@ std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& 
     metadata.push_back(e);
   };
   const bool is_v1 = (config.tpf_dynamics_mode == "tpf_xi_theta_v1");
+  const bool cooling_on = (config.tpf_cooling_fraction > 0.0 && config.simulation_mode == SimulationMode::galaxy);
+  add_number("tpf_vdsg_coupling", config.tpf_vdsg_coupling);
+  add_number("tpfcore_closure_kappa", config.tpf_kappa);
+  add_number("tpf_kappa", config.tpf_kappa);
+  add_number("tpf_cooling_fraction", config.tpf_cooling_fraction);
+  add_bool("tpf_cooling_active_this_run", cooling_on);
+  add_string("tpf_dynamics_mode", config.tpf_dynamics_mode, PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
+  add_number("tpf_vdsg_mass_baseline_kg", config.tpf_vdsg_mass_baseline_kg);
+  add_bool("tpf_global_accel_shunt_enable", config.tpf_global_accel_shunt_enable);
+  add_number("tpf_global_accel_shunt_fraction", config.tpf_global_accel_shunt_fraction);
+  add_bool("tpf_accel_pipeline_diagnostics_csv", config.tpf_accel_pipeline_diagnostics_csv);
   add_string("tpf_core_law_mode", is_v1 ? "tpf_xi_theta_v1" : "unsupported_non_v1");
   if (is_v1) {
     add_string("acceleration_formula", "a=-K_xi*Xi_total_spatial");
@@ -510,6 +521,57 @@ std::vector<PackageMetadataEntry> TPFCorePackage::render_metadata(const Config& 
                PackageMetadataEntry::RenderPlacement::AfterDynamicsMode);
   }
   return metadata;
+}
+
+std::string TPFCorePackage::render_active_dynamics_branch(const Config& config) const {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+    return "TPF_4D_static_residual_benchmark (diagnostic-only; no particle integration; no acceleration path)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+    return "TPF_4D_static_motion_readout_benchmark (static field -> principal tensor -> probe acceleration readout)";
+  }
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+    return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
+  }
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
+    std::ostringstream os;
+    const std::string kernel_desc = (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
+                                        ? "VDSG transverse wake Xi-kernel deformation"
+                                        : "standard Xi-kernel deformation";
+    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=tpf_xi_theta_v1; Xi_total-driven motion; Theta=grad(Xi_total) diagnostic_only; K_xi=tpf_4d_xi_motion_readout_scale="
+       << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
+       << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode << "; xi_kernel_label=" << kernel_desc
+       << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
+       << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
+       << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
+       << "; motion_update=Xi_total_only; theta_role=diagnostic_only";
+    return os.str();
+  }
+  return "tpf_runtime_path_tier=unsupported_non_v1";
+}
+
+std::string TPFCorePackage::render_active_metrics_branch(const Config& config) const {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark)
+    return "static_4D_field_residual: Xi4/Theta4 full spatial-support diagnostic";
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark)
+    return "static_4D_motion_readout: GravityStaticMotionReadout_v1 over probe grid";
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark)
+    return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1")
+    return "tpf_xi_theta_v1 metrics; Xi_total and full unsymmetrized Theta=grad(Xi_total)";
+  return "unsupported_non_v1";
+}
+
+std::string TPFCorePackage::render_acceleration_code_path(const Config& config) const {
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark)
+    return "none (tpf_4d_static_residual_benchmark uses evaluate_static_configuration_residual_4d; no compute_accelerations call)";
+  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark)
+    return "none (tpf_4d_static_motion_readout_benchmark uses evaluate_static_sources_field_4d + GravityStaticMotionReadout_v1; no compute_accelerations call)";
+  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark)
+    return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
+  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1")
+    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (v1 Xi route; per-source Xi contributions sum into Xi_total; motion uses Xi_total only; Theta=grad(Xi_total) is diagnostic only)";
+  return "unsupported_non_v1";
 }
 
 std::vector<PackageMetadataEntry> TPFCorePackage::resolved_runtime_metadata(const Config& config,

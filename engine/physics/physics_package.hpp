@@ -117,6 +117,9 @@ class PhysicsPackage {
 
   /** Optional: package render/report metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> render_metadata(const Config&) const { return {}; }
+  virtual std::string render_active_dynamics_branch(const Config&) const { return {}; }
+  virtual std::string render_active_metrics_branch(const Config&) const { return {}; }
+  virtual std::string render_acceleration_code_path(const Config&) const { return {}; }
 
   /** Optional: package config schema/default metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> package_config_metadata() const { return {}; }
