@@ -65,19 +65,6 @@ bool key_claimed_by_package(const std::string& key, const std::string& preferred
   return false;
 }
 
-bool map_mode_token_to_compat_enum(const std::string& token, SimulationMode& out) {
-  if (token == "tpf_single_source_inspect") { out = SimulationMode::tpf_single_source_inspect; return true; }
-  if (token == "tpf_symmetric_pair_inspect") { out = SimulationMode::tpf_symmetric_pair_inspect; return true; }
-  if (token == "tpf_source_field_benchmark") { out = SimulationMode::tpf_source_field_benchmark; return true; }
-  if (token == "tpf_4d_static_residual_benchmark") { out = SimulationMode::tpf_4d_static_residual_benchmark; return true; }
-  if (token == "tpf_4d_static_motion_readout_benchmark") { out = SimulationMode::tpf_4d_static_motion_readout_benchmark; return true; }
-  if (token == "tpf_4d_xi_motion_probe_benchmark") { out = SimulationMode::tpf_4d_xi_motion_probe_benchmark; return true; }
-  if (token == "tpf_weak_field_calibration") { out = SimulationMode::tpf_weak_field_calibration; return true; }
-  if (token == "tpf_newtonian_force_compare") { out = SimulationMode::tpf_newtonian_force_compare; return true; }
-  if (token == "tpf_diagnostic_consistency_audit") { out = SimulationMode::tpf_diagnostic_consistency_audit; return true; }
-  return false;
-}
-
 }  // namespace
 
 SimulationMode parse_mode(const std::string& s) {
