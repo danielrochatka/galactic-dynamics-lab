@@ -213,33 +213,6 @@ void write_run_info(const std::string& output_dir,
     RunInfoContext section_context;
     physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::LateRuntimeDetails);
   }
-  if (config.physics_package == "TPFCore") {
-    f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
-    f << "tpfcore_readout_scale_note\tcorrespondence-calibrated effective scale (K_eff); benchmark/readout mapping only, not proof of final TPF dynamics or full Eq. (10) validation\n";
-    f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
-    f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
-    f << "tpf_kappa\t" << config.tpf_kappa << "\n";
-    f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
-    f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
-    f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
-    f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
-    f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
-    f << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
-    f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
-    f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
-    f << "tpfcore_dump_readout_debug\t" << (config.tpfcore_dump_readout_debug ? 1 : 0) << "\n";
-    if (config.tpf_dynamics_mode == "xi_kernel_deformed") {
-      if (config.tpf_xi_kernel_dump_field_diagnostics) {
-        f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (xi diagnostic override enabled)\n";
-      }
-    } else {
-      f << "tpf_regime_diagnostics\tsee tpf_regime_diagnostics.txt (dynamical runs with provisional readout)\n";
-      f << "tpf_trajectory_diagnostics\tsee tpf_trajectory_diagnostics.txt (dynamical runs; single-body only)\n";
-      f << "tpf_closure_diagnostics\tsee tpf_closure_diagnostics.csv, tpf_closure_diagnostics.txt (tr_coherence_readout, single-body dynamical runs)\n";
-    }
-    if (config.simulation_mode == galaxy::SimulationMode::bh_orbit_validation)
-      f << "detailed_follow_up\tTPFCore bh_orbit_validation: full snapshots + regime + trajectory diagnostics\n";
-  }
   if (!run_config_path.empty())
     f << "config_loaded_run\t" << run_config_path << "\n";
   if (!package_defaults_path.empty())
@@ -325,7 +298,7 @@ void write_resolved_scenario_artifacts(const std::string& output_dir,
       txt << "simulation_mode\t" << resolved.mode_label << "\n";
       txt << "initializer_used\t" << resolved.initializer_used << "\n";
       txt << "physics_package\t" << resolved.config.physics_package << "\n";
-      txt << "tpf_dynamics_mode\t" << resolved.config.tpf_dynamics_mode << "\n";
+      txt << "effective_package_mode_token\t" << resolved.config.mode_token << "\n";
       txt << "effective_bh_mass\t" << resolved.config.bh_mass << "\n";
       txt << "effective_enable_star_star_gravity\t" << (resolved.config.enable_star_star_gravity ? 1 : 0) << "\n";
       txt << "effective_dt\t" << resolved.config.dt << "\n";
@@ -353,7 +326,7 @@ void write_resolved_scenario_artifacts(const std::string& output_dir,
   js << "  \"simulation_mode\": \"" << resolved.mode_label << "\",\n";
   js << "  \"initializer_used\": \"" << resolved.initializer_used << "\",\n";
   js << "  \"physics_package\": \"" << resolved.config.physics_package << "\",\n";
-  js << "  \"tpf_dynamics_mode\": \"" << resolved.config.tpf_dynamics_mode << "\",\n";
+  js << "  \"effective_package_mode_token\": \"" << resolved.config.mode_token << "\",\n";
   js << "  \"effective\": {\n";
   js << "    \"bh_mass\": " << resolved.config.bh_mass << ",\n";
   js << "    \"enable_star_star_gravity\": " << (resolved.config.enable_star_star_gravity ? "true" : "false") << ",\n";
