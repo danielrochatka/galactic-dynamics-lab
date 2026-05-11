@@ -174,6 +174,25 @@ void TPFCorePackage::init_from_config(const Config& config) {
   }
 }
 
+
+PackageModeInfo TPFCorePackage::resolve_mode_token(const std::string& mode_token) const {
+  static const std::vector<std::string> kModes = {
+      "tpf_single_source_inspect",
+      "tpf_symmetric_pair_inspect",
+      "tpf_source_field_benchmark",
+      "tpf_4d_static_residual_benchmark",
+      "tpf_4d_static_motion_readout_benchmark",
+      "tpf_4d_xi_motion_probe_benchmark",
+      "tpf_weak_field_calibration",
+      "tpf_newtonian_force_compare",
+      "tpf_diagnostic_consistency_audit",
+  };
+  for (const auto& m : kModes) {
+    if (mode_token == m) { PackageModeInfo info; info.recognized=true; info.canonical_token=m; info.requires_output_dir=true; info.is_utility_mode=true; return info; }
+  }
+  return {};
+}
+
 bool TPFCorePackage::supports_utility_mode(SimulationMode mode) const {
   switch (mode) {
     case SimulationMode::tpf_single_source_inspect:

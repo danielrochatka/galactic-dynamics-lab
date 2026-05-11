@@ -28,6 +28,7 @@ class TPFCorePackage : public PhysicsPackage {
   const char* name() const override { return "TPFCore"; }
 
   void init_from_config(const Config& config) override;
+  PackageModeInfo resolve_mode_token(const std::string& mode_token) const override;
   bool supports_utility_mode(SimulationMode mode) const override;
   bool run_utility_mode(const Config& config, const std::string& output_dir) override;
   bool cooling_active(const Config& config) const override;
