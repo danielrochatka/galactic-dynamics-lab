@@ -134,6 +134,11 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("effective_simulation_mode", resolved.mode_label);
   kv.emplace_back("effective_initializer_used", resolved.initializer_used);
   kv.emplace_back("effective_physics_package", resolved.config.physics_package);
+  if (PhysicsPackage* package = get_physics_package(resolved.config.physics_package)) {
+    for (const auto& entry : package->resolved_runtime_metadata(resolved.config, resolved.config.simulation_mode)) {
+      kv.emplace_back(entry.key, entry.value);
+    }
+  }
   kv.emplace_back("effective_dt", d(resolved.config.dt));
   kv.emplace_back("effective_n_steps", i(resolved.effective_n_steps));
   kv.emplace_back("effective_snapshot_every", i(resolved.effective_snapshot_every));
@@ -159,11 +164,6 @@ std::vector<std::pair<std::string, std::string>> serialize_effective_runtime_kv(
   kv.emplace_back("auto_softening_max_capped", b(resolved.softening.max_capped));
   kv.emplace_back("auto_softening_min_floored", b(resolved.softening.min_floored));
   kv.emplace_back("auto_softening_max_cap_source", resolved.softening.max_cap_source);
-  if (PhysicsPackage* package = get_physics_package(resolved.config.physics_package)) {
-    for (const auto& entry : package->resolved_runtime_metadata(resolved.config, resolved.config.simulation_mode)) {
-      kv.emplace_back(entry.key, entry.value);
-    }
-  }
   return kv;
 }
 
