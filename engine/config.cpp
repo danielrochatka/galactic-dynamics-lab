@@ -203,9 +203,7 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
       if (!info.recognized) throw std::runtime_error("Unknown simulation_mode: " + t);
       config.mode_owner_package = mode_owner;
       config.mode_is_package_owned = true;
-      if (!map_mode_token_to_compat_enum(t, config.simulation_mode)) {
-        throw std::runtime_error("No temporary enum compatibility mapping for package mode: " + t);
-      }
+      config.simulation_mode = SimulationMode::galaxy;
     }
     return true;
   }

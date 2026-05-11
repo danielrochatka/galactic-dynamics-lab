@@ -394,12 +394,13 @@ TEST_CASE("tpf_4d_xi_motion_probe_benchmark config keys parse and serialize") {
 
 
 
-TEST_CASE("package-owned utility simulation mode maps to compatibility enum") {
+TEST_CASE("package-owned utility simulation mode keeps package-owned mode state") {
   Config c;
   CHECK(apply_config_kv("simulation_mode", "tpf_single_source_inspect", c));
   CHECK(c.mode_token == "tpf_single_source_inspect");
-  CHECK(c.simulation_mode == galaxy::SimulationMode::tpf_single_source_inspect);
-  CHECK(c.simulation_mode != galaxy::SimulationMode::galaxy);
+  CHECK(c.mode_is_package_owned == true);
+  CHECK(c.mode_owner_package == "TPFCore");
+  CHECK(c.simulation_mode == galaxy::SimulationMode::galaxy);
 }
 
 TEST_CASE("invalid generic simulation mode typo throws") {
