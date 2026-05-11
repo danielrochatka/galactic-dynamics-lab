@@ -15,7 +15,8 @@ namespace {
 void emit_legacy_benchmark_run_info_fallback(std::ofstream& f,
                                              const Config& config,
                                              const std::string& package_defaults_path) {
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
+  if (config.mode_token == "tpf_4d_static_residual_benchmark" ||
+      config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
     f << "\n=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===\n";
     f << "tpf_4d_static_residual_benchmark_mode\tdiagnostic_only\n";
     f << "tpf_4d_static_residual_benchmark_particle_integration\t0\n";
@@ -45,7 +46,8 @@ void emit_legacy_benchmark_run_info_fallback(std::ofstream& f,
            "selection_and_not_the_active_residual_evaluator_path\n";
     }
     f << "=== End TPF 4D static residual benchmark note ===\n\n";
-  } else if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
+  } else if (config.mode_token == "tpf_4d_static_motion_readout_benchmark" ||
+             config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
     f << "\n=== TPF 4D static motion readout benchmark ===\n";
     f << "tpf_4d_static_motion_readout_benchmark_mode\tprobe_motion_readout_benchmark\n";
     f << "tpf_4d_static_motion_readout_benchmark_evaluator\tevaluate_static_sources_field_4d(...)\n";
@@ -60,7 +62,8 @@ void emit_legacy_benchmark_run_info_fallback(std::ofstream& f,
     f << "tpf_4d_static_motion_readout_benchmark_scope\tstatic_field_to_candidate_probe_motion_readout_pipeline\n";
     f << "tpf_4d_static_motion_readout_benchmark_unexercised_scope\tdynamics_moving_sources_orbits_physical_coupling_and_full_DeltaC_closure\n";
     f << "=== End TPF 4D static motion readout benchmark note ===\n\n";
-  } else if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
+  } else if (config.mode_token == "tpf_4d_xi_motion_probe_benchmark" ||
+             config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
     f << "\n=== TPF 4D Xi motion probe benchmark ===\n";
     f << "tpf_4d_xi_motion_probe_benchmark_mode\tdynamic_probe_motion_benchmark\n";
     f << "tpf_4d_xi_motion_probe_benchmark_readout\tGravityXiMotionReadout_v1\n";
