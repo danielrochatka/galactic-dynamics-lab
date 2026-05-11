@@ -195,37 +195,14 @@ void write_run_info(const std::string& output_dir,
     }
   }
   if (config.physics_package == "TPFCore") {
-    if (false) {
-      f << "v11_audit_tpfcore_dynamics_note\tno particle integration; TPFCore acceleration API (legacy_readout / "
-           "direct_tpf) not used in this mode\n";
-      f << "tpf_dynamics_mode_configured_in_layered_config\t" << config.tpf_dynamics_mode << "\n";
-      f << "tpf_dynamics_mode_effective_for_this_run\tnone_audit_only_no_integrator\n";
-      f << "tpfcore_enable_provisional_readout_configured\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0)
-         << "\n";
-      f << "tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_v11_audit_mode\n";
-      f << "tpfcore_readout_mode_configured\t" << config.tpfcore_readout_mode << "\n";
-      f << "v11_audit_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are inherited layered-config "
-           "artifacts; not used for particle accelerations in this mode\n";
-    } else if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
       const auto supplement = physics->run_info_supplement_metadata(config);
       for (const auto& entry : supplement) {
         f << entry.key << "\t" << entry.value << "\n";
       }
+      RunInfoContext section_context;
+      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::BranchDiagnosticsSupplement);
     }
-    if (config.tpf_dynamics_mode == "legacy_readout") {
-      f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
-      f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
-      f << "tpfcore_theta_tr_scale\t" << config.tpfcore_theta_tr_scale << "\n";
-    }
-    f << "tpf_kappa\t" << config.tpf_kappa << "\n";
-    f << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
-    f << "tpf_vdsg_mass_baseline_kg\t" << config.tpf_vdsg_mass_baseline_kg << "\n";
-    f << "tpf_poisson_bins\t" << config.tpf_poisson_bins << "\n";
-    f << "tpf_poisson_max_radius\t" << config.tpf_poisson_max_radius << "\n";
-    f << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
-    f << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
-    f << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
-    f << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
   }
   f << "=== End branch / physics / diagnostics metadata supplements ===\n\n";
 
@@ -238,56 +215,11 @@ void write_run_info(const std::string& output_dir,
   f << "code_version_label\t" << gp.code_version_label << "\n";
   f << "=== End code provenance ===\n\n";
 
-  if (config.physics_package == "TPFCore") {
-    if (false) {
-      f << "=== TPFCore (v11 correspondence audit only: dynamics routing not operative) ===\n";
-      f << "note\tlayered config may still set tpf_dynamics_mode, tpfcore_enable_provisional_readout, readout_mode; "
-           "they are inherited only and not used for particle accelerations in this audit-only mode\n";
-      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-      f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi) — not used "
-           "by all v11 benchmarks\n";
-      f << "inspection\ttpfcore_probe_radius_min/max, probe_samples (sampling range for correspondence audit)\n";
-      f << "=== End TPFCore v11 audit note ===\n\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-      f << "=== TPFCore (4D static residual benchmark only: dynamics routing not operative) ===\n";
-      f << "note\tlayered config may still set tpf_dynamics_mode, tpfcore_enable_provisional_readout, readout_mode; "
-           "they are inherited only and not used for particle accelerations in this static benchmark mode\n";
-      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-      f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-      f << "inspection\ttpfcore_probe_radius_min/max, probe_samples (sampling range for static residual benchmark)\n";
-      f << "=== End TPFCore 4D static residual benchmark note ===\n\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-      f << "=== TPFCore (4D static motion readout benchmark only: dynamics routing not operative) ===\n";
-      f << "note\tbenchmark evaluates frozen static Xi4/Theta4 field points and computes GravityStaticMotionReadout_v1\n";
-      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-      f << "numerical_regularization\ttpf_4d_motion_field_softening (eps in evaluate_static_sources_field_4d)\n";
-      f << "benchmark_knobs\ttpf_4d_motion_probe_grid_n/half_extent/source_exclusion_radius/field_softening/kappa/readout_scale/bin_count\n";
-      f << "=== End TPFCore 4D static motion readout benchmark note ===\n\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-      f << "=== TPFCore (4D Xi motion probe benchmark only: production dynamics routing not operative) ===\n";
-      f << "note\tdynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation\n";
-      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-      f << "numerical_regularization\ttpf_4d_xi_motion_field_softening (eps in evaluate_static_sources_field_4d)\n";
-      f << "benchmark_knobs\ttpf_4d_xi_motion_dt/steps/readout_scale/field_softening/source_exclusion_radius/probe_layout/probe_count/probe_radius/probe_speed/integrator/dump_every\n";
-      f << "=== End TPFCore 4D Xi motion probe benchmark note ===\n\n";
-    } else {
-      f << "=== TPFCore parameter roles (theory vs regularization vs exploratory vs provisional) ===\n";
-      f << "fixed_theory\tlambda=1/4 (LAMBDA_4D; fixed in code; not tunable)\n";
-      f << "numerical_regularization\ttpfcore_source_softening, effective_source_softening (eps for Phi)\n";
-      f << "dynamics_routing\ttpf_dynamics_mode (legacy_readout vs v11_weak_field_truncation vs direct_tpf); "
-           "xi_kernel_deformed uses runtime Xi-kernel deformation with a=-tpf_4d_xi_motion_readout_scale*Xi_eff_spatial and no additive VDSG; "
-           "legacy_readout uses tpfcore_enable_provisional_readout as gate; "
-           "v11_weak_field_truncation is the Eq.42-44 weak-field correspondence helper (alpha_si correspondence path); "
-           "direct_tpf is canonical paper-facing tensor principal-part route "
-           "(field_evaluation -> Theta3D -> principal_Cij -> Xi_directed_tensor_readout; DeltaC omitted; additive VDSG extension)\n";
-      f << "provisional_readout\ttpfcore_enable_provisional_readout (gate to legacy_readout accelerations), readout_mode "
-           "(configured label; may differ from integrator ax,ay path when tpf_vdsg_coupling != 0 on legacy_readout), "
-           "readout_scale, theta_tt_scale, theta_tr_scale, dump_readout_debug (experimental readout closures; "
-           "diagnostics)\n";
-      f << "inspection\ttpfcore_probe_radius_min/max, probe_samples, dump_theta_profile, dump_invariant_profile\n";
-      f << "=== End TPFCore parameter roles ===\n\n";
+  if (config.physics_package == "TPFCore")
+    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+      RunInfoContext section_context;
+      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::PostCodeProvenance);
     }
-  }
 
   if (config.simulation_mode == SimulationMode::earth_moon_benchmark ||
       config.simulation_mode == SimulationMode::bh_orbit_validation ||
@@ -332,49 +264,9 @@ void write_run_info(const std::string& output_dir,
   }
   f << "n_stars\t" << n_star << "\n";
   if (config.physics_package == "TPFCore") {
-    double src_eps = (config.tpfcore_source_softening > 0.0) ? config.tpfcore_source_softening : config.softening;
-    if (true &&
-        config.simulation_mode != SimulationMode::tpf_4d_static_residual_benchmark &&
-        config.simulation_mode != SimulationMode::tpf_4d_static_motion_readout_benchmark &&
-        config.simulation_mode != SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-      f << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
-      f << "tpfcore_enable_provisional_readout\t" << (config.tpfcore_enable_provisional_readout ? 1 : 0) << "\n";
-    } else if (false) {
-      f << "v11_audit_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved config section above "
-           "(configured vs effective; not operative)\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-      f << "tpf_4d_static_residual_benchmark_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved "
-           "config section above (configured vs effective; not operative)\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-      f << "tpf_4d_static_motion_readout_benchmark_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved "
-           "config section above (configured vs effective; not operative)\n";
-    } else {
-      f << "tpf_4d_xi_motion_probe_benchmark_repeat_note\ttpf_dynamics_mode / provisional readout: see resolved "
-           "config section above (configured vs effective; not operative)\n";
-    }
-    f << "tpfcore_provisional_source_ansatz\t1\n";
-    f << "tpfcore_source_softening\t" << src_eps << "\n";
-    f << "tpfcore_probe_radius_min\t" << config.tpfcore_probe_radius_min << "\n";
-    f << "tpfcore_probe_radius_max\t" << config.tpfcore_probe_radius_max << "\n";
-    f << "tpfcore_probe_samples\t" << config.tpfcore_probe_samples << "\n";
-    f << "tpfcore_residual_method\tanalytic\n";
-    f << "tpfcore_residual_step\t" << config.tpfcore_residual_step << "\n";
-    if (true &&
-        config.simulation_mode != SimulationMode::tpf_4d_static_residual_benchmark &&
-        config.simulation_mode != SimulationMode::tpf_4d_static_motion_readout_benchmark &&
-        config.simulation_mode != SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-      f << "tpfcore_readout_mode\t" << config.tpfcore_readout_mode << "\n";
-    } else if (false) {
-      f << "v11_audit_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved config section above\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-      f << "tpf_4d_static_residual_benchmark_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved "
-           "config section above\n";
-    } else if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-      f << "tpf_4d_static_motion_readout_benchmark_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved "
-           "config section above\n";
-    } else {
-      f << "tpf_4d_xi_motion_probe_benchmark_repeat_readout_mode\tsee tpfcore_readout_mode_configured in resolved "
-           "config section above\n";
+    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+      RunInfoContext section_context;
+      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::LateRuntimeDetails);
     }
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_readout_scale_note\tcorrespondence-calibrated effective scale (K_eff); benchmark/readout mapping only, not proof of final TPF dynamics or full Eq. (10) validation\n";

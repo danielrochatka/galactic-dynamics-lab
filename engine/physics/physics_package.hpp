@@ -11,6 +11,7 @@
 #include "../types.hpp"
 #include <functional>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,12 @@ struct PackageModeInfo {
 struct RunInfoContext {
   const void* package_runtime_stats = nullptr;
   const char* package_runtime_stats_kind = nullptr;
+};
+
+enum class PackageRunInfoSection {
+  BranchDiagnosticsSupplement,
+  PostCodeProvenance,
+  LateRuntimeDetails
 };
 
 class PhysicsPackage {
@@ -113,6 +120,15 @@ class PhysicsPackage {
   virtual std::vector<PackageMetadataEntry> run_info_runtime_metadata(const Config&,
                                                                       const RunInfoContext&) const {
     return {};
+  }
+  virtual void write_run_info_section(std::ostream& out,
+                                      const Config& config,
+                                      const RunInfoContext& context,
+                                      PackageRunInfoSection section) const {
+    (void)out;
+    (void)config;
+    (void)context;
+    (void)section;
   }
 
   /** Optional: package render/report metadata. Default empty. */
