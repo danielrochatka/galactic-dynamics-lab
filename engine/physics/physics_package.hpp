@@ -116,6 +116,11 @@ class PhysicsPackage {
 
   /** Optional: utility mode dispatch. Default no-op/false (not handled). */
   virtual bool run_utility_mode(const Config&, const std::string&) { return false; }
+  virtual bool should_auto_plot_utility_mode(const Config& config, const PackageModeInfo& mode_info) const {
+    (void)config;
+    (void)mode_info;
+    return false;
+  }
 
   /** Optional: package run-info metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&, const std::string&) const { return {}; }

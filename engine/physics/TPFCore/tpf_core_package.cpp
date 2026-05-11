@@ -249,6 +249,10 @@ bool TPFCorePackage::run_utility_mode(const Config& config, const std::string& o
   }
 }
 
+bool TPFCorePackage::should_auto_plot_utility_mode(const Config&, const PackageModeInfo& mode_info) const {
+  return mode_info.recognized && mode_info.canonical_token == "tpf_4d_static_residual_benchmark";
+}
+
 bool TPFCorePackage::cooling_active(const Config& config) const {
   return config.tpf_cooling_fraction > 0.0;
 }

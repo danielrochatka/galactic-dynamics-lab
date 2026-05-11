@@ -551,7 +551,10 @@ int main(int argc, char** argv) {
     if (!utility_physics->run_utility_mode(config, config.output_dir)) {
       return 1;
     }
-    if (config.mode_token == "tpf_4d_static_residual_benchmark" && auto_plot) {
+    if (auto_plot) {
+      galaxy::PackageModeInfo mode_info;
+      try { mode_info = galaxy::resolve_mode_for_config(config); } catch (...) {}
+      if (utility_physics->should_auto_plot_utility_mode(config, mode_info)) {
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
@@ -565,6 +568,7 @@ int main(int argc, char** argv) {
         std::cout << "plot script completed but no expected PNGs were found/generated\n";
       } else {
         std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
+      }
       }
     }
     finalize_utility_mode_run(config, run_config_path, package_defaults_path);

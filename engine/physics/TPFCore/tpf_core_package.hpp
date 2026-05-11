@@ -32,6 +32,7 @@ class TPFCorePackage : public PhysicsPackage {
   PackageModeInfo resolve_mode_token(const std::string& mode_token) const override;
   bool supports_utility_mode(SimulationMode mode) const override;
   bool run_utility_mode(const Config& config, const std::string& output_dir) override;
+  bool should_auto_plot_utility_mode(const Config& config, const PackageModeInfo& mode_info) const override;
   bool cooling_active(const Config& config) const override;
   int cooling_steps(const Config& config, int n_steps) const override;
   void apply_cooling_step(State& state, const Config& config, int step, int cooling_steps) const override;
