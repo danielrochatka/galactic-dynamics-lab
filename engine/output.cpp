@@ -200,9 +200,11 @@ void write_run_info(const std::string& output_dir,
       for (const auto& entry : supplement) {
         f << entry.key << "\t" << entry.value << "\n";
       }
-      RunInfoContext section_context;
-      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::BranchDiagnosticsSupplement);
     }
+  }
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    RunInfoContext section_context;
+    physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::BranchDiagnosticsSupplement);
   }
   f << "=== End branch / physics / diagnostics metadata supplements ===\n\n";
 
@@ -215,11 +217,10 @@ void write_run_info(const std::string& output_dir,
   f << "code_version_label\t" << gp.code_version_label << "\n";
   f << "=== End code provenance ===\n\n";
 
-  if (config.physics_package == "TPFCore")
-    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
-      RunInfoContext section_context;
-      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::PostCodeProvenance);
-    }
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    RunInfoContext section_context;
+    physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::PostCodeProvenance);
+  }
 
   if (config.simulation_mode == SimulationMode::earth_moon_benchmark ||
       config.simulation_mode == SimulationMode::bh_orbit_validation ||
@@ -263,11 +264,11 @@ void write_run_info(const std::string& output_dir,
     }
   }
   f << "n_stars\t" << n_star << "\n";
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    RunInfoContext section_context;
+    physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::LateRuntimeDetails);
+  }
   if (config.physics_package == "TPFCore") {
-    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
-      RunInfoContext section_context;
-      physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::LateRuntimeDetails);
-    }
     f << "tpfcore_readout_scale\t" << config.tpfcore_readout_scale << "\n";
     f << "tpfcore_readout_scale_note\tcorrespondence-calibrated effective scale (K_eff); benchmark/readout mapping only, not proof of final TPF dynamics or full Eq. (10) validation\n";
     f << "tpfcore_theta_tt_scale\t" << config.tpfcore_theta_tt_scale << "\n";
