@@ -426,26 +426,24 @@ TEST_CASE("unsupported utility simulation modes are rejected") {
   CHECK_THROWS(galaxy::apply_config_kv("simulation_mode", "tpf_bound_orbit_sweep", c));
 }
 
-TEST_CASE("tpf utility mode dispatch classification") {
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_single_source_inspect));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_symmetric_pair_inspect));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_source_field_benchmark));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_residual_benchmark));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_weak_field_calibration));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_newtonian_force_compare));
-  CHECK(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::tpf_diagnostic_consistency_audit));
-  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::galaxy));
-  CHECK_FALSE(galaxy::is_tpf_utility_mode(galaxy::SimulationMode::earth_moon_benchmark));
+TEST_CASE("package-owned utility mode classification") {
+  galaxy::Config tpf_cfg;
+  CHECK(galaxy::apply_config_kv("simulation_mode", "tpf_single_source_inspect", tpf_cfg));
+  CHECK(galaxy::config_mode_is_utility(tpf_cfg));
+
+  galaxy::Config generic_cfg;
+  CHECK(galaxy::apply_config_kv("simulation_mode", "galaxy", generic_cfg));
+  CHECK_FALSE(galaxy::config_mode_is_utility(generic_cfg));
 }
 
 TEST_CASE("all executable simulation modes require output directory setup") {
   CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::galaxy));
   CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::earth_moon_benchmark));
   CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::bh_orbit_validation));
-  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_single_source_inspect));
-  CHECK(galaxy::simulation_mode_requires_output_dir(galaxy::SimulationMode::tpf_newtonian_force_compare));
+
+  galaxy::Config tpf_cfg;
+  CHECK(galaxy::apply_config_kv("simulation_mode", "tpf_newtonian_force_compare", tpf_cfg));
+  CHECK(galaxy::config_mode_requires_output_dir(tpf_cfg));
 }
 
 TEST_CASE("diagnostic_consistency_audit reports unavailable on v1 branch") {

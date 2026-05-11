@@ -58,8 +58,6 @@ SimulationMode parse_mode(const std::string& s);
 /** Return canonical string for mode (for display and run_info). */
 std::string mode_to_string(SimulationMode m);
 
-/** True for utility/inspection/benchmark modes that must not run generic run_simulation path. */
-bool is_tpf_utility_mode(SimulationMode m);
 /** True for all executable simulation modes; used to guard shared output-dir setup. */
 bool simulation_mode_requires_output_dir(SimulationMode m);
 PackageModeInfo resolve_mode_for_config(const Config& config);

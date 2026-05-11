@@ -93,13 +93,8 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::symmetric_pair: return "symmetric_pair";
     case SimulationMode::small_n_conservation: return "small_n_conservation";
     case SimulationMode::timestep_convergence: return "timestep_convergence";
+    default: return "unknown";
   }
-  return "unknown";
-}
-
-bool is_tpf_utility_mode(SimulationMode m) {
-  (void)m;
-  return false;
 }
 
 bool simulation_mode_requires_output_dir(SimulationMode m) {
