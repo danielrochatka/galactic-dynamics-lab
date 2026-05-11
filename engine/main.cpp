@@ -425,7 +425,6 @@ int main(int argc, char** argv) {
     std::cout << "[startup_diag][softening_trace] run_config_path="
               << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   print_key_occurrences(run_config_path, "softening");
-  print_key_occurrences(run_config_path, "tpfcore_source_softening");
 
   std::string package_defaults_path = galaxy::find_package_defaults_path(physics_pkg);
   if (!package_defaults_path.empty()) {
@@ -434,8 +433,6 @@ int main(int argc, char** argv) {
   if (enable_softening_trace) {
     std::cout << "[startup_diag][softening_trace] final softening after package defaults: "
               << config.softening << "\n";
-    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after package defaults: "
-              << config.tpfcore_source_softening << "\n";
   }
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
@@ -443,8 +440,6 @@ int main(int argc, char** argv) {
   if (enable_softening_trace) {
     std::cout << "[startup_diag][softening_trace] final softening after run config: "
               << config.softening << "\n";
-    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after run config: "
-              << config.tpfcore_source_softening << "\n";
   }
 
   config.run_id = run_id_from_time();
@@ -556,7 +551,7 @@ int main(int argc, char** argv) {
     if (!utility_physics->run_utility_mode(config, config.output_dir)) {
       return 1;
     }
-    if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark && auto_plot) {
+    if (config.mode_token == "tpf_4d_static_residual_benchmark" && auto_plot) {
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
