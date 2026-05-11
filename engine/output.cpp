@@ -2,6 +2,7 @@
 #include "accel_pipeline_stats.hpp"
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
+#include "package_discovery.hpp"
 #include "physics/physics_package.hpp"
 #include "render_audit.hpp"
 #include <fstream>
@@ -11,79 +12,7 @@
 
 namespace galaxy {
 
-namespace {
-void emit_legacy_benchmark_run_info_fallback(std::ofstream& f,
-                                             const Config& config,
-                                             const std::string& package_defaults_path) {
-  if (config.mode_token == "tpf_4d_static_residual_benchmark" ||
-      config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-    f << "\n=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===\n";
-    f << "tpf_4d_static_residual_benchmark_mode\tdiagnostic_only\n";
-    f << "tpf_4d_static_residual_benchmark_particle_integration\t0\n";
-    f << "tpf_4d_static_residual_benchmark_acceleration_path\tnone\n";
-    f << "tpf_4d_static_residual_benchmark_evaluator\tevaluate_static_configuration_residual_4d(...)\n";
-    f << "tpf_4d_static_residual_benchmark_field_objects\tstatic_Xi4_ordered_Theta4\n";
-    f << "tpf_4d_static_residual_benchmark_residual_support\tfull_spatial_support_x_y_z_stencil\n";
-    f << "tpf_4d_static_residual_benchmark_time_terms\tintentionally_zero_by_static_assumption\n";
-    f << "tpf_4d_static_residual_benchmark_artifacts\ttpf_4d_static_residual_summary.txt;"
-         "tpf_4d_static_residual_slice.csv;tpf_4d_static_residual_slice_xy.csv;tpf_4d_static_residual_slice_xz.csv;"
-         "tpf_4d_static_residual_slice_yz.csv;tpf_4d_static_residual_sources.csv;"
-         "tpf_4d_static_residual_bins_nearest_source.csv;tpf_4d_static_residual_bins_origin.csv\n";
-    f << "tpf_4d_static_residual_benchmark_visualization_note\t"
-         "view_plane_renderings_derived_from_full_spatial_support_static_4d_residual_evaluation\n";
-    f << "tpf_4d_static_residual_benchmark_plot_png_note\toptional_view_plane_diagnostic_pngs_generated_only_when_"
-         "plot_flag_supplied_and_plot_script_succeeds\n";
-    f << "tpf_4d_static_residual_benchmark_bins_note\tbinned_residual_files_provide_quantitative_static_field_"
-         "evidence_for_the_4d_residual_benchmark_and_support_regression_comparison_across_runs\n";
-    f << "tpf_4d_static_residual_benchmark_scope\t"
-         "static_residual_benchmark_exercises_static_Xi4_ordered_Theta4_full_spatial_support_x_y_z_stencil\n";
-    f << "tpf_4d_static_residual_benchmark_unexercised_scope\t"
-         "dynamics_moving_sources_physical_coupling_orbital_behavior_and_DeltaC_closure_are_not_exercised_by_this_"
-         "benchmark\n";
-    if (!package_defaults_path.empty() && package_defaults_path.find("TPFCore") == std::string::npos) {
-      f << "tpf_4d_static_residual_benchmark_package_defaults_note\tresidual_evaluator_path_is_tpfcore_static_4d_"
-           "evaluate_static_configuration_residual_4d; layered_package_defaults_provenance_line_is_inherited_loader_"
-           "selection_and_not_the_active_residual_evaluator_path\n";
-    }
-    f << "=== End TPF 4D static residual benchmark note ===\n\n";
-  } else if (config.mode_token == "tpf_4d_static_motion_readout_benchmark" ||
-             config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-    f << "\n=== TPF 4D static motion readout benchmark ===\n";
-    f << "tpf_4d_static_motion_readout_benchmark_mode\tprobe_motion_readout_benchmark\n";
-    f << "tpf_4d_static_motion_readout_benchmark_evaluator\tevaluate_static_sources_field_4d(...)\n";
-    f << "tpf_4d_static_motion_readout_benchmark_readout_name\tGravityStaticMotionReadout_v1\n";
-    f << "tpf_4d_static_motion_readout_benchmark_field_objects\tstatic_Xi4_ordered_Theta4\n";
-    f << "tpf_4d_static_motion_readout_benchmark_principal_tensor\tspatial_principal_tensor_readout_with_DeltaC_omitted_for_named_benchmark\n";
-    f << "tpf_4d_static_motion_readout_benchmark_newtonian_acceleration_calls\t0\n";
-    f << "tpf_4d_static_motion_readout_benchmark_compute_accelerations_calls\t0\n";
-    f << "tpf_4d_static_motion_readout_benchmark_particle_integration\t0\n";
-    f << "tpf_4d_static_motion_readout_benchmark_artifacts\ttpf_4d_static_motion_readout_summary.txt;"
-         "tpf_4d_static_motion_readout_probe_grid.csv;tpf_4d_static_motion_readout_bins_origin.csv\n";
-    f << "tpf_4d_static_motion_readout_benchmark_scope\tstatic_field_to_candidate_probe_motion_readout_pipeline\n";
-    f << "tpf_4d_static_motion_readout_benchmark_unexercised_scope\tdynamics_moving_sources_orbits_physical_coupling_and_full_DeltaC_closure\n";
-    f << "=== End TPF 4D static motion readout benchmark note ===\n\n";
-  } else if (config.mode_token == "tpf_4d_xi_motion_probe_benchmark" ||
-             config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-    f << "\n=== TPF 4D Xi motion probe benchmark ===\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_mode\tdynamic_probe_motion_benchmark\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_readout\tGravityXiMotionReadout_v1\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_acceleration_formula\ta=-K_xi*Xi_spatial\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_evaluator\tevaluate_static_sources_field_4d(...)\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_source_behavior\tfixed_sources_for_stage_7b\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_probe_behavior\tmoving_probes\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_newtonian_acceleration_calls\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_compute_accelerations_calls\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_compute_direct_tpf_accelerations_calls\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_principal_c_tensor_acceleration\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_vdsg_shunt_cooling\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_production_dynamics_route\t0\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_artifacts\ttpf_4d_xi_motion_probe_summary.txt;"
-         "tpf_4d_xi_motion_probe_trajectories.csv;tpf_4d_xi_motion_probe_initial_readout.csv\n";
-    f << "tpf_4d_xi_motion_probe_benchmark_scope\tdynamic_probe-motion_benchmark_using_Xi-direct_acceleration_readout_from_fixed-source_4D_field_evaluation\n";
-    f << "=== End TPF 4D Xi motion probe benchmark note ===\n\n";
-  }
-}
-}  // namespace
+namespace {}  // namespace
 
 void write_run_info(const std::string& output_dir,
                     const Config& config,
@@ -182,7 +111,24 @@ void write_run_info(const std::string& output_dir,
     f << "v11_delta_c_note\tDeltaC_mu_nu omitted per manuscript v11 (connection-variation terms deferred)\n";
     f << "=== End v11 weak-field audit header ===\n\n";
   }
-  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+  std::string metadata_package =
+      (config.mode_is_package_owned && !config.mode_owner_package.empty()) ? config.mode_owner_package : config.physics_package;
+  const std::string effective_mode_token = config.mode_is_package_owned ? config.mode_token : mode_to_string(config.simulation_mode);
+  if (!effective_mode_token.empty()) {
+    PackageModeInfo info = resolve_package_mode_token(metadata_package, effective_mode_token);
+    if (!info.recognized) {
+      static const std::vector<PackageMetadata> all = discover_packages();
+      for (const auto& md : all) {
+        const std::string candidate = md.name.empty() ? md.folder_name : md.name;
+        info = resolve_package_mode_token(candidate, effective_mode_token);
+        if (info.recognized) {
+          metadata_package = candidate;
+          break;
+        }
+      }
+    }
+  }
+  if (PhysicsPackage* physics = get_physics_package(metadata_package)) {
     const auto metadata = physics->run_info_metadata(config, package_defaults_path);
     if (!metadata.empty()) {
       for (const auto& entry : metadata) {
@@ -193,19 +139,15 @@ void write_run_info(const std::string& output_dir,
         }
       }
       f << "\n";
-    } else if (config.physics_package != "TPFCore") {
-      emit_legacy_benchmark_run_info_fallback(f, config, package_defaults_path);
     }
   }
-  if (config.physics_package == "TPFCore") {
-    if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
-      const auto supplement = physics->run_info_supplement_metadata(config);
-      for (const auto& entry : supplement) {
-        f << entry.key << "\t" << entry.value << "\n";
-      }
+  if (PhysicsPackage* physics = get_physics_package(metadata_package)) {
+    const auto supplement = physics->run_info_supplement_metadata(config);
+    for (const auto& entry : supplement) {
+      f << entry.key << "\t" << entry.value << "\n";
     }
   }
-  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+  if (PhysicsPackage* physics = get_physics_package(metadata_package)) {
     RunInfoContext section_context;
     physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::BranchDiagnosticsSupplement);
   }
@@ -220,7 +162,7 @@ void write_run_info(const std::string& output_dir,
   f << "code_version_label\t" << gp.code_version_label << "\n";
   f << "=== End code provenance ===\n\n";
 
-  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+  if (PhysicsPackage* physics = get_physics_package(metadata_package)) {
     RunInfoContext section_context;
     physics->write_run_info_section(f, config, section_context, PackageRunInfoSection::PostCodeProvenance);
   }
@@ -250,7 +192,7 @@ void write_run_info(const std::string& output_dir,
     f << "first_saved_snapshot_step\t" << cooling_audit->first_saved_snapshot_step << "\n";
     f << "first_saved_snapshot_time\t" << cooling_audit->first_saved_snapshot_time << "\n";
   }
-  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+  if (PhysicsPackage* physics = get_physics_package(metadata_package)) {
     RunInfoContext runtime_context;
     runtime_context.package_runtime_stats = tpf_pipeline;
     runtime_context.package_runtime_stats_kind = "tpf_accel_pipeline_stats";
