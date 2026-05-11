@@ -43,6 +43,10 @@ class TPFCorePackage : public PhysicsPackage {
   std::vector<PackageMetadataEntry> run_info_supplement_metadata(const Config& config) const override;
   std::vector<PackageMetadataEntry> run_info_runtime_metadata(const Config& config,
                                                               const RunInfoContext& context) const override;
+  void write_run_info_section(std::ostream& out,
+                              const Config& config,
+                              const RunInfoContext& context,
+                              PackageRunInfoSection section) const override;
   std::vector<PackageMetadataEntry> render_metadata(const Config& config) const override;
   std::string render_active_dynamics_branch(const Config& config) const override;
   std::string render_active_metrics_branch(const Config& config) const override;
