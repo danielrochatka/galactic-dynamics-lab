@@ -318,6 +318,56 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     CHECK(run_info.find("inspection only") == std::string::npos);
     CHECK(run_info.find("does not add physics validation") == std::string::npos);
     CHECK(run_info.find("tpf_dynamics_mode_effective_for_this_run\tdirect_tpf") == std::string::npos);
+    const size_t pkg = run_info.find("effective_physics_package\tTPFCore");
+    const size_t mode = run_info.find("effective_tpf_dynamics_mode\tnone_static_residual_diagnostic_only");
+    const size_t dt = run_info.find("effective_dt\t");
+    REQUIRE(pkg != std::string::npos);
+    REQUIRE(mode != std::string::npos);
+    REQUIRE(dt != std::string::npos);
+    CHECK(pkg < mode);
+    CHECK(mode < dt);
+
+    const size_t benchmark_section =
+        run_info.find("=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===");
+    const size_t benchmark_key =
+        run_info.find("tpf_4d_static_residual_benchmark_mode\tdiagnostic_only");
+    const size_t supplement_note =
+        run_info.find("tpf_4d_static_residual_benchmark_tpfcore_dynamics_note\t");
+    const size_t configured_mode =
+        run_info.find("tpf_dynamics_mode_configured_in_layered_config\tdirect_tpf");
+    const size_t effective_mode =
+        run_info.find("tpf_dynamics_mode_effective_for_this_run\tnone_static_residual_diagnostic_only");
+    const size_t configured_provisional =
+        run_info.find("tpfcore_enable_provisional_readout_configured\t1");
+    const size_t effective_provisional =
+        run_info.find("tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_static_residual_benchmark");
+    const size_t configured_readout_mode =
+        run_info.find("tpfcore_readout_mode_configured\tderived_tpf_radial_readout");
+    const size_t scalars_note =
+        run_info.find("tpf_4d_static_residual_benchmark_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are inherited layered-config artifacts; not used for particle accelerations in this mode");
+    const size_t tpf_kappa = run_info.find("tpf_kappa\t", scalars_note);
+    const size_t tpf_vdsg = run_info.find("tpf_vdsg_coupling\t", scalars_note);
+    REQUIRE(benchmark_section != std::string::npos);
+    REQUIRE(benchmark_key != std::string::npos);
+    REQUIRE(supplement_note != std::string::npos);
+    REQUIRE(configured_mode != std::string::npos);
+    REQUIRE(effective_mode != std::string::npos);
+    REQUIRE(configured_provisional != std::string::npos);
+    REQUIRE(effective_provisional != std::string::npos);
+    REQUIRE(configured_readout_mode != std::string::npos);
+    REQUIRE(scalars_note != std::string::npos);
+    REQUIRE(tpf_kappa != std::string::npos);
+    REQUIRE(tpf_vdsg != std::string::npos);
+    CHECK(benchmark_section < benchmark_key);
+    CHECK(benchmark_key < supplement_note);
+    CHECK(supplement_note < configured_mode);
+    CHECK(configured_mode < effective_mode);
+    CHECK(effective_mode < configured_provisional);
+    CHECK(configured_provisional < effective_provisional);
+    CHECK(effective_provisional < configured_readout_mode);
+    CHECK(configured_readout_mode < scalars_note);
+    CHECK(scalars_note < tpf_kappa);
+    CHECK(scalars_note < tpf_vdsg);
   }
 
   {
@@ -333,6 +383,8 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
     const size_t sec = run_info.find("=== TPF 4D static motion readout benchmark ===");
     const size_t key = run_info.find("tpf_4d_static_motion_readout_benchmark_mode\tprobe_motion_readout_benchmark");
+    CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_static_motion_readout_benchmark_only") !=
+          std::string::npos);
     REQUIRE(sec != std::string::npos);
     REQUIRE(key != std::string::npos);
     CHECK(sec < key);
@@ -351,6 +403,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
     CHECK(run_info.find("=== TPF 4D Xi motion probe benchmark ===") != std::string::npos);
     CHECK(run_info.find("tpf_4d_xi_motion_probe_benchmark_readout\tGravityXiMotionReadout_v1") != std::string::npos);
+    CHECK(run_info.find("effective_tpf_dynamics_mode\tnone_xi_motion_probe_benchmark_only") != std::string::npos);
   }
 
   {
@@ -429,16 +482,24 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
                            "configs/my.local.cfg", "physics/TPFCore/defaults.cfg", &configured, &resolved);
     const std::string run_info = slurp(configured.output_dir + "/run_info.txt");
     CHECK(run_info.find("effective_tpf_dynamics_mode\tdirect_tpf") != std::string::npos);
+    const size_t pkg = run_info.find("effective_physics_package\tTPFCore");
+    const size_t mode = run_info.find("effective_tpf_dynamics_mode\tdirect_tpf");
+    const size_t dt = run_info.find("effective_dt\t");
     const size_t dyn = run_info.find("tpf_dynamics_mode\tdirect_tpf");
     const size_t tier = run_info.find("tpf_runtime_path_tier\tpaper_facing");
     const size_t law = run_info.find("tpf_core_law_mode\tdirect_tpf");
     const size_t trunc = run_info.find("tpf_truncation_status\ttensor_principal_part_route_Theta_I_kappa_baseline");
     const size_t status = run_info.find("tpfcore_enable_provisional_readout_status\tconfigured_inactive_on_non_legacy_runtime");
     REQUIRE(dyn != std::string::npos);
+    REQUIRE(pkg != std::string::npos);
+    REQUIRE(mode != std::string::npos);
+    REQUIRE(dt != std::string::npos);
     REQUIRE(tier != std::string::npos);
     REQUIRE(law != std::string::npos);
     REQUIRE(trunc != std::string::npos);
     REQUIRE(status != std::string::npos);
+    CHECK(pkg < mode);
+    CHECK(mode < dt);
     CHECK(dyn < tier);
     CHECK(tier < law);
     CHECK(law < trunc);

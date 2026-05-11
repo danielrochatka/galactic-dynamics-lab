@@ -2,7 +2,6 @@
 #include "galaxy_init.hpp"
 #include "git_provenance.hpp"
 #include "physics/physics_package.hpp"
-#include "physics/TPFCore/derived_tpf_radial.hpp"
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -66,107 +65,31 @@ std::string run_id_from_paths(const std::string& output_dir, const Config& confi
 
 }  // namespace
 
-namespace {
-
-bool tpf_vdsg_active_for_audit(const Config& config) {
-  return std::isfinite(config.tpf_vdsg_coupling) && (config.tpf_vdsg_coupling != 0.0);
-}
-
-bool geodesic_correspondence_requested(const Config& config) { return config.tpf_dynamics_mode == "geodesic_correspondence"; }
-bool v11_weak_field_truncation_requested(const Config& config) { return config.tpf_dynamics_mode == "v11_weak_field_truncation"; }
-bool v11_legacy_free_parameter_active(const Config& config) {
-  return v11_weak_field_truncation_requested(config) && config.tpf_weak_field_correspondence_alpha_si_explicitly_set;
-}
-bool geodesic_correspondence_effective(const Config& config) {
-  return geodesic_correspondence_requested(config) ||
-         (v11_weak_field_truncation_requested(config) && !config.tpf_weak_field_correspondence_alpha_si_explicitly_set);
-}
-
-}  // namespace
-
 std::string compute_active_dynamics_branch(const Config& config) {
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-    return "TPF_4D_static_residual_benchmark (diagnostic-only; no particle integration; no acceleration path)";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-    return "TPF_4D_static_motion_readout_benchmark (static field -> principal tensor -> probe acceleration readout)";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-    return "TPF_4D_xi_motion_probe_benchmark (dynamic probe-motion benchmark using Xi-direct acceleration readout from fixed-source 4D field evaluation)";
-  }
-  if (false) {
-    if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
-      return "TPF_v11_weak_field_correspondence_audit_earth_moon_line_benchmark (correspondence-only; not "
-             "legacy_readout; not direct_tpf dynamics; not orbit integration)";
-    }
-    return "TPF_v11_weak_field_correspondence_audit (correspondence-only; not legacy_readout; not direct_tpf "
-           "dynamics)";
-  }
   if (config.physics_package == "Newtonian") return "Newtonian_pairwise_G_SI";
-  if (config.physics_package != "TPFCore") return config.physics_package + " (non-TPFCore)";
-  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
-    std::ostringstream os;
-    const std::string kernel_desc =
-        (config.tpf_4d_xi_kernel_mode == "metric_transverse_wake")
-            ? "VDSG transverse wake Xi-kernel deformation"
-            : "standard Xi-kernel deformation";
-    os << "tpf_runtime_path_tier=active_supported; tpf_dynamics_mode=tpf_xi_theta_v1; Xi_total-driven motion; Theta=grad(Xi_total) diagnostic_only; K_xi=tpf_4d_xi_motion_readout_scale="
-       << std::scientific << std::setprecision(6) << config.tpf_4d_xi_motion_readout_scale
-       << "; xi_kernel_mode=" << config.tpf_4d_xi_kernel_mode
-       << "; xi_kernel_label=" << kernel_desc
-       << "; xi_kernel_coupling=" << std::scientific << std::setprecision(6) << config.tpf_4d_xi_kernel_coupling
-       << "; factor_mode=" << config.tpf_4d_xi_kernel_factor_mode
-       << "; temporal_mode=" << config.tpf_4d_xi_temporal_mode
-       << "; motion_update=Xi_total_only; theta_role=diagnostic_only";
-    return os.str();
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    const std::string v = physics->render_active_dynamics_branch(config);
+    if (!v.empty()) return v;
   }
-  return "tpf_runtime_path_tier=unsupported_non_v1";
+  return config.physics_package + " (non-TPFCore)";
 }
 
 std::string compute_active_metrics_branch(const Config& config) {
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-    return "static_4D_field_residual: Xi4/Theta4 full spatial-support diagnostic";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-    return "static_4D_motion_readout: GravityStaticMotionReadout_v1 over probe grid";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-    return "dynamic_4D_xi_motion_readout: GravityXiMotionReadout_v1 over moving probes";
-  }
-  if (false) {
-    if (config.v11_weak_field_correspondence_benchmark == "earth_moon_line_of_centers") {
-      return "v11_earth_moon_line_benchmark (phi Eq.44-45 vs Newtonian Eq.46 CSV; correspondence; DeltaC omitted)";
-    }
-    return "v11_paper_tensors (Xi,Theta,I,C_principal per Eq.(10) minus DeltaC; DeltaC omitted per v11 scope)";
-  }
   if (config.physics_package == "Newtonian") return "none";
-  if (config.physics_package == "TPFCore") {
-    if (config.tpf_dynamics_mode == "tpf_xi_theta_v1")
-      return "tpf_xi_theta_v1 metrics; Xi_total and full unsymmetrized Theta=grad(Xi_total)";
-    return "unsupported_non_v1";
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    const std::string v = physics->render_active_metrics_branch(config);
+    if (!v.empty()) return v;
   }
   return "unknown";
 }
 
 std::string compute_acceleration_code_path(const Config& config) {
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_residual_benchmark) {
-    return "none (tpf_4d_static_residual_benchmark uses evaluate_static_configuration_residual_4d; no compute_accelerations call)";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_static_motion_readout_benchmark) {
-    return "none (tpf_4d_static_motion_readout_benchmark uses evaluate_static_sources_field_4d + GravityStaticMotionReadout_v1; no compute_accelerations call)";
-  }
-  if (config.simulation_mode == SimulationMode::tpf_4d_xi_motion_probe_benchmark) {
-    return "none (tpf_4d_xi_motion_probe_benchmark uses evaluate_static_sources_field_4d + GravityXiMotionReadout_v1; no compute_accelerations call)";
-  }
-  if (false) {
-    return "none (v11_weak_field_correspondence audit-only; no particle acceleration from this path)";
-  }
   if (config.physics_package == "Newtonian") return "NewtonianPackage::compute_accelerations";
-  if (config.physics_package != "TPFCore") return "unknown_package";
-  if (config.tpf_dynamics_mode == "tpf_xi_theta_v1") {
-    return "TPFCorePackage::compute_xi_kernel_deformed_accelerations (v1 Xi route; per-source Xi contributions sum into Xi_total; motion uses Xi_total only; Theta=grad(Xi_total) is diagnostic only)";
+  if (PhysicsPackage* physics = get_physics_package(config.physics_package)) {
+    const std::string v = physics->render_acceleration_code_path(config);
+    if (!v.empty()) return v;
   }
-  return "unsupported_non_v1";
+  return "unknown_package";
 }
 
 void write_render_manifest(const std::string& output_dir,
@@ -181,10 +104,6 @@ void write_render_manifest(const std::string& output_dir,
   const std::string met = compute_active_metrics_branch(config);
   const std::string acc = compute_acceleration_code_path(config);
   const GitProvenance gp = resolve_git_provenance();
-  const bool cooling_on =
-      (config.physics_package == "TPFCore" && config.tpf_cooling_fraction > 0.0 &&
-       config.simulation_mode == SimulationMode::galaxy &&
-       !geodesic_correspondence_effective(config) && !v11_legacy_free_parameter_active(config));
   PhysicsPackage* physics = get_physics_package(config.physics_package);
   const std::vector<PackageMetadataEntry> package_render_metadata =
       physics ? physics->render_metadata(config) : std::vector<PackageMetadataEntry>{};
@@ -264,11 +183,6 @@ void write_render_manifest(const std::string& output_dir,
         emit_json_entry(jf, first, entry);
       }
     }
-    json_kv_num(jf, first, "tpf_vdsg_coupling", config.tpf_vdsg_coupling);
-    json_kv_num(jf, first, "tpfcore_closure_kappa", config.tpf_kappa);
-    json_kv_num(jf, first, "tpf_kappa", config.tpf_kappa);
-    json_kv_num(jf, first, "tpf_cooling_fraction", config.tpf_cooling_fraction);
-    json_kv_bool(jf, first, "tpf_cooling_active_this_run", cooling_on);
     for (const auto& entry : package_render_metadata) {
       if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
         emit_json_entry(jf, first, entry);
@@ -301,10 +215,6 @@ void write_render_manifest(const std::string& output_dir,
     json_kv_num(jf, first, "galaxy_init_spiral_winding", config.galaxy_init_spiral_winding);
     json_kv_num(jf, first, "galaxy_init_spiral_phase", config.galaxy_init_spiral_phase);
     json_kv_bool(jf, first, "enable_star_star_gravity", config.enable_star_star_gravity);
-    json_kv_num(jf, first, "tpf_vdsg_mass_baseline_kg", config.tpf_vdsg_mass_baseline_kg);
-    json_kv_bool(jf, first, "tpf_global_accel_shunt_enable", config.tpf_global_accel_shunt_enable);
-    json_kv_num(jf, first, "tpf_global_accel_shunt_fraction", config.tpf_global_accel_shunt_fraction);
-    json_kv_bool(jf, first, "tpf_accel_pipeline_diagnostics_csv", config.tpf_accel_pipeline_diagnostics_csv);
     json_kv(jf, first, "git_commit_full", gp.git_commit_full);
     json_kv(jf, first, "git_commit_short", gp.git_commit_short);
     json_kv(jf, first, "git_branch", gp.git_branch);
@@ -365,18 +275,11 @@ void write_render_manifest(const std::string& output_dir,
     tf << "star_mass\t" << config.star_mass << "\n";
     tf << "galaxy_radius\t" << config.galaxy_radius << "\n";
     tf << "enable_star_star_gravity\t" << (config.enable_star_star_gravity ? 1 : 0) << "\n";
-    tf << "tpf_vdsg_coupling\t" << config.tpf_vdsg_coupling << "\n";
-    tf << "tpfcore_closure_kappa\t" << config.tpf_kappa << "\n";
-    tf << "tpf_kappa\t" << config.tpf_kappa << "\n";
-    tf << "tpf_cooling_fraction\t" << config.tpf_cooling_fraction << "\n";
-    tf << "tpf_cooling_active_this_run\t" << (cooling_on ? 1 : 0) << "\n";
     if (false) {
       tf << "v11_weak_field_correspondence_audit_only\t1\n";
       tf << "v11_audit_tpfcore_dynamics_note\tno particle integration; configured legacy_readout/direct_tpf fields not operative\n";
       tf << "tpf_dynamics_mode_configured\t" << config.tpf_dynamics_mode << "\n";
       tf << "tpf_dynamics_mode_operative_for_this_run\tnone_audit_only\n";
-    } else {
-      tf << "tpf_dynamics_mode\t" << config.tpf_dynamics_mode << "\n";
     }
     for (const auto& entry : package_render_metadata) {
       if (entry.render_placement == PackageMetadataEntry::RenderPlacement::AfterDynamicsMode) {
@@ -404,9 +307,6 @@ void write_render_manifest(const std::string& output_dir,
     tf << "galaxy_init_spiral_amplitude\t" << config.galaxy_init_spiral_amplitude << "\n";
     tf << "galaxy_init_spiral_winding\t" << config.galaxy_init_spiral_winding << "\n";
     tf << "galaxy_init_spiral_phase\t" << config.galaxy_init_spiral_phase << "\n";
-    tf << "tpf_global_accel_shunt_enable\t" << (config.tpf_global_accel_shunt_enable ? 1 : 0) << "\n";
-    tf << "tpf_global_accel_shunt_fraction\t" << config.tpf_global_accel_shunt_fraction << "\n";
-    tf << "tpf_accel_pipeline_diagnostics_csv\t" << (config.tpf_accel_pipeline_diagnostics_csv ? 1 : 0) << "\n";
     tf << "git_commit_full\t" << gp.git_commit_full << "\n";
     tf << "git_commit_short\t" << gp.git_commit_short << "\n";
     tf << "git_branch\t" << gp.git_branch << "\n";
