@@ -1,6 +1,5 @@
 #include "config.hpp"
 #include "package_discovery.hpp"
-#include "physics/TPFCore/tpf_core_config.hpp"
 #include "physics/physics_package.hpp"
 #include <fstream>
 #include <iostream>
@@ -167,10 +166,25 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     const std::string t = trim(val);
     try {
       config.simulation_mode = parse_mode(val);
+      config.mode_is_package_owned = false;
+      config.mode_owner_package.clear();
     } catch (...) {
-      if (t.rfind("tpf_", 0) != 0) throw;
       PackageModeInfo info = resolve_package_mode_token(config.physics_package, t);
-      if (!info.recognized && !tpfcore_owns_mode_token(t)) throw std::runtime_error("Unknown simulation_mode: " + t);
+      std::string mode_owner = config.physics_package;
+      if (!info.recognized) {
+        static const std::vector<PackageMetadata> all = discover_packages();
+        for (const auto& md : all) {
+          const std::string candidate = md.name.empty() ? md.folder_name : md.name;
+          info = resolve_package_mode_token(candidate, t);
+          if (info.recognized) {
+            mode_owner = candidate;
+            break;
+          }
+        }
+      }
+      if (!info.recognized) throw std::runtime_error("Unknown simulation_mode: " + t);
+      config.mode_owner_package = mode_owner;
+      config.mode_is_package_owned = true;
       if (!map_mode_token_to_compat_enum(t, config.simulation_mode)) {
         throw std::runtime_error("No temporary enum compatibility mapping for package mode: " + t);
       }
@@ -250,7 +264,9 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.physics_package = val;
     if (const PackageMetadata* md = find_package_metadata(config.physics_package)) {
       for (const auto& kv : md->defaults) config.package_options[kv.first] = kv.second;
-      if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+      if (PhysicsPackage* pkg = get_physics_package(config.physics_package)) {
+        pkg->sync_config_from_package_options(config, "physics_package");
+      }
     }
     return true;
   }
@@ -755,7 +771,9 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   std::string owner;
   if (key_claimed_by_package(key, config.physics_package, owner)) {
     config.package_options[key] = trim(val);
-    if (owner == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config, key == "tpf_dynamics_mode");
+    if (PhysicsPackage* pkg = get_physics_package(owner)) {
+      pkg->sync_config_from_package_options(config, key);
+    }
     return true;
   }
   return false;
@@ -786,7 +804,9 @@ bool load_config_file(const std::string& path, Config& config) {
           " (key=" + key + "): " + e.what());
     }
   }
-  if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+  if (PhysicsPackage* pkg = get_physics_package(config.physics_package)) {
+    pkg->sync_config_from_package_options(config, "load_config_file");
+  }
   bool generic_ok = true;
   try { (void)parse_mode(config.mode_token); } catch (...) { generic_ok = false; }
   if (!generic_ok) {

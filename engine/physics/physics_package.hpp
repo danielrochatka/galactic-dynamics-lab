@@ -104,6 +104,13 @@ class PhysicsPackage {
     return {};
   }
 
+  /** Optional: synchronize package-owned options into any package-owned compatibility state. Default no-op. */
+  virtual void sync_config_from_package_options(Config& config,
+                                                const std::string& changed_key) const {
+    (void)config;
+    (void)changed_key;
+  }
+
   /** Optional: package capability check for utility modes. Default unsupported. */
   virtual bool supports_utility_mode(SimulationMode) const { return false; }
 

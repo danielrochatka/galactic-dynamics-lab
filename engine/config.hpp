@@ -121,6 +121,8 @@ struct Config {
 
   SimulationMode simulation_mode = SimulationMode::galaxy;
   std::string mode_token = "galaxy";
+  bool mode_is_package_owned = false;
+  std::string mode_owner_package = "";
 
   int n_stars = 5000;
   double star_mass = kSolarMassKg;

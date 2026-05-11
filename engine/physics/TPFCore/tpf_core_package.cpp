@@ -176,6 +176,10 @@ void TPFCorePackage::init_from_config(const Config& config) {
   }
 }
 
+void TPFCorePackage::sync_config_from_package_options(Config& config, const std::string& changed_key) const {
+  sync_tpfcore_legacy_fields_from_package_options(config, changed_key == "tpf_dynamics_mode");
+}
+
 
 PackageModeInfo TPFCorePackage::resolve_mode_token(const std::string& mode_token) const {
   static const std::vector<std::string> kModes = {
