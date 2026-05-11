@@ -326,6 +326,48 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
     REQUIRE(dt != std::string::npos);
     CHECK(pkg < mode);
     CHECK(mode < dt);
+
+    const size_t benchmark_section =
+        run_info.find("=== TPF 4D static residual benchmark (diagnostic only; no integrator dynamics) ===");
+    const size_t benchmark_key =
+        run_info.find("tpf_4d_static_residual_benchmark_mode\tdiagnostic_only");
+    const size_t supplement_note =
+        run_info.find("tpf_4d_static_residual_benchmark_tpfcore_dynamics_note\t");
+    const size_t configured_mode =
+        run_info.find("tpf_dynamics_mode_configured_in_layered_config\tdirect_tpf");
+    const size_t effective_mode =
+        run_info.find("tpf_dynamics_mode_effective_for_this_run\tnone_static_residual_diagnostic_only");
+    const size_t configured_provisional =
+        run_info.find("tpfcore_enable_provisional_readout_configured\t1");
+    const size_t effective_provisional =
+        run_info.find("tpfcore_enable_provisional_readout_effective_for_this_run\t0_unused_in_static_residual_benchmark");
+    const size_t configured_readout_mode =
+        run_info.find("tpfcore_readout_mode_configured\tderived_tpf_radial_readout");
+    const size_t scalars_note =
+        run_info.find("tpf_4d_static_residual_benchmark_readout_scalars_note\ttpfcore_readout_scale/kappa/etc. below are inherited layered-config artifacts; not used for particle accelerations in this mode");
+    const size_t tpf_kappa = run_info.find("tpf_kappa\t", scalars_note);
+    const size_t tpf_vdsg = run_info.find("tpf_vdsg_coupling\t", scalars_note);
+    REQUIRE(benchmark_section != std::string::npos);
+    REQUIRE(benchmark_key != std::string::npos);
+    REQUIRE(supplement_note != std::string::npos);
+    REQUIRE(configured_mode != std::string::npos);
+    REQUIRE(effective_mode != std::string::npos);
+    REQUIRE(configured_provisional != std::string::npos);
+    REQUIRE(effective_provisional != std::string::npos);
+    REQUIRE(configured_readout_mode != std::string::npos);
+    REQUIRE(scalars_note != std::string::npos);
+    REQUIRE(tpf_kappa != std::string::npos);
+    REQUIRE(tpf_vdsg != std::string::npos);
+    CHECK(benchmark_section < benchmark_key);
+    CHECK(benchmark_key < supplement_note);
+    CHECK(supplement_note < configured_mode);
+    CHECK(configured_mode < effective_mode);
+    CHECK(effective_mode < configured_provisional);
+    CHECK(configured_provisional < effective_provisional);
+    CHECK(effective_provisional < configured_readout_mode);
+    CHECK(configured_readout_mode < scalars_note);
+    CHECK(scalars_note < tpf_kappa);
+    CHECK(scalars_note < tpf_vdsg);
   }
 
   {
