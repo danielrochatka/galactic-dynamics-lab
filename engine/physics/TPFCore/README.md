@@ -20,7 +20,7 @@ Current branch status: runtime dynamics use a single canonical route, `tpf_xi_th
 - **Static 4D motion-readout benchmark (Stage 7A, spike branch)**: simulator-exploratory path that evaluates static Xi4 / ordered Theta4 field data and computes candidate probe-motion readout accelerations via `GravityStaticMotionReadout_v1`; this is a candidate future paper-expansion path if benchmark behavior continues to pass regression tests.
 - **I = Θ_{μν}Θ^{μν} − λ Θ²** with **λ = 1/4** in 4D (**fixed**, not a tunable “theory knob” in the sense of fitting data).
 - **Static residual benchmark outputs**: `tpf_4d_static_residual_summary.txt`, `tpf_4d_static_residual_slice.csv` (legacy alias for central xy view-plane), `tpf_4d_static_residual_slice_xy.csv`, `tpf_4d_static_residual_slice_xz.csv`, `tpf_4d_static_residual_slice_yz.csv`, `tpf_4d_static_residual_sources.csv`, `tpf_4d_static_residual_bins_nearest_source.csv`, and `tpf_4d_static_residual_bins_origin.csv`; slice CSVs are central view-plane diagnostic renderings from full spatial-support static 4D residual evaluation, and binned CSVs provide quantitative static-field residual evidence for cross-run regression comparison.
-- **Optional plot outputs**: when `--plot` is supplied and plotting dependencies are available, `plot_tpf_4d_static_residual.py` emits PNG view-plane diagnostic renderings from full spatial-support static 4D residual evaluation.
+- **Optional plot outputs**: when `--plot` is supplied and plotting dependencies are available, `engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py` emits PNG view-plane diagnostic renderings from full spatial-support static 4D residual evaluation.
 - **Exercised and unexercised scope**: plots visualize the static 4D residual benchmark. Dynamics, moving sources, source velocities, time evolution, source worldlines, physical coupling, orbital behavior, and DeltaC closure are outside this benchmark’s exercised scope.
 
 ---
@@ -161,7 +161,7 @@ tpf_4d_xi_kernel_metric_min = 0.5
 tpf_4d_xi_kernel_metric_max = 2.0
 ```
 
-**Optional trajectory visualization PNGs** — `plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:
+**Optional trajectory visualization PNGs** — `engine/physics/TPFCore/plots/plot_tpf_4d_xi_motion_probe.py` reads the already-computed Xi-direct trajectory CSV and can emit:
 `tpf_4d_xi_motion_probe_xy_trajectories.png`,
 `tpf_4d_xi_motion_probe_xz_trajectories.png`,
 `tpf_4d_xi_motion_probe_yz_trajectories.png`,

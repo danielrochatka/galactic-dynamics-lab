@@ -558,7 +558,7 @@ int main(int argc, char** argv) {
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
-      const std::string cmd = py + " ../plot_tpf_4d_static_residual.py " + shell_single_quote(config.output_dir);
+      const std::string cmd = py + " ../engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py " + shell_single_quote(config.output_dir);
       const int ret = std::system(cmd.c_str());
       if (ret != 0) {
         std::cerr << "Warning: optional tpf_4d_static_residual plot script returned non-zero exit code.\n";

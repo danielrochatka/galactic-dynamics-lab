@@ -368,7 +368,7 @@ TEST_CASE("4d static residual benchmark writes summary and slice artifacts") {
 }
 
 TEST_CASE("4d static residual benchmark plot script parses under py_compile") {
-  const int ret = std::system("python3 -m py_compile ../plot_tpf_4d_static_residual.py");
+  const int ret = std::system("python3 -m py_compile ../engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py");
   CHECK(ret == 0);
 }
 

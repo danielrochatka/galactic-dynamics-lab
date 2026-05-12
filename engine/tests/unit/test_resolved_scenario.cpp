@@ -427,7 +427,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   }
 
   {
-    const std::string plot_script = slurp("../plot_tpf_4d_static_residual.py");
+    const std::string plot_script = slurp("../engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py");
     CHECK(plot_script.find("not full spatial-support physics domain") == std::string::npos);
     CHECK(plot_script.find("rendered from full spatial-support static 4D residual evaluation") != std::string::npos);
   }

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "plot_tpf_4d_xi_motion_probe.py"
+SCRIPT = REPO_ROOT / "engine/physics/TPFCore/plots/plot_tpf_4d_xi_motion_probe.py"
 
 
 def _write_fake_csv(out_dir: Path) -> None:

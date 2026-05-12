@@ -16,7 +16,7 @@ step,time,probe_id,x,y,z,vx,vy,vz,ax,ay,az,a_norm,xi_x,xi_y,xi_z,xi_spatial_norm
 CSV
 
 set +e
-python3 "$ROOT_DIR/plot_tpf_4d_xi_motion_probe.py" "$OUT_DIR" >"$OUT_DIR/stdout.log" 2>"$OUT_DIR/stderr.log"
+python3 "$ROOT_DIR/engine/physics/TPFCore/plots/plot_tpf_4d_xi_motion_probe.py" "$OUT_DIR" >"$OUT_DIR/stdout.log" 2>"$OUT_DIR/stderr.log"
 RET=$?
 set -e
 
