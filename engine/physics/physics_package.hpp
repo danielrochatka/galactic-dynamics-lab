@@ -116,9 +116,12 @@ class PhysicsPackage {
 
   /** Optional: utility mode dispatch. Default no-op/false (not handled). */
   virtual bool run_utility_mode(const Config&, const std::string&) { return false; }
-  virtual bool should_auto_plot_utility_mode(const Config& config, const PackageModeInfo& mode_info) const {
+  virtual bool run_auto_plot_for_utility_mode(const Config& config,
+                                              const PackageModeInfo& mode_info,
+                                              const std::string& output_dir) const {
     (void)config;
     (void)mode_info;
+    (void)output_dir;
     return false;
   }
 

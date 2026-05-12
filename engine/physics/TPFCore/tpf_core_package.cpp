@@ -43,6 +43,19 @@ namespace galaxy {
 namespace {
 const double kRadialCoolingDampingFactor = 0.99;
 void apply_radial_cooling_damping(State& state, double damping_factor);
+
+std::string shell_single_quote(const std::string& raw) {
+  std::string out = "'";
+  for (std::size_t i = 0; i < raw.size(); ++i) {
+    if (raw[i] == '\'') {
+      out += "'\"'\"'";
+    } else {
+      out += raw[i];
+    }
+  }
+  out += "'";
+  return out;
+}
 }
 
 /** Single place that maps simulator Config -> TPFCore params. Keeps TPFCore decoupled from Config. */
@@ -249,8 +262,20 @@ bool TPFCorePackage::run_utility_mode(const Config& config, const std::string& o
   }
 }
 
-bool TPFCorePackage::should_auto_plot_utility_mode(const Config&, const PackageModeInfo& mode_info) const {
-  return mode_info.recognized && mode_info.canonical_token == "tpf_4d_static_residual_benchmark";
+bool TPFCorePackage::run_auto_plot_for_utility_mode(const Config&, const PackageModeInfo& mode_info, const std::string& output_dir) const {
+  if (!(mode_info.recognized && mode_info.canonical_token == "tpf_4d_static_residual_benchmark")) {
+    return false;
+  }
+  const std::string dev_py = "../dev/bin/python3";
+  const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
+  const std::string py = dev_py_exists ? dev_py : "python3";
+  const std::string cmd = py + " ../engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py " + shell_single_quote(output_dir);
+  const int ret = std::system(cmd.c_str());
+  if (ret != 0) {
+    std::cerr << "Warning: optional tpf_4d_static_residual plot script returned non-zero exit code.\n";
+    return false;
+  }
+  return true;
 }
 
 bool TPFCorePackage::cooling_active(const Config& config) const {
