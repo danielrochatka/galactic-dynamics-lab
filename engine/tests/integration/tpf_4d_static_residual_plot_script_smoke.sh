@@ -69,7 +69,7 @@ CSV
   esac
 done
 
-python3 "$ROOT_DIR/plot_tpf_4d_static_residual.py" "$OUT_DIR" >/dev/null
+python3 "$ROOT_DIR/engine/physics/TPFCore/plots/plot_tpf_4d_static_residual.py" "$OUT_DIR" >/dev/null
 
 test -f "$OUT_DIR/tpf_4d_static_residual_xy_normalized_residual.png"
 test -f "$OUT_DIR/tpf_4d_static_residual_xz_xi_spatial_norm.png"
