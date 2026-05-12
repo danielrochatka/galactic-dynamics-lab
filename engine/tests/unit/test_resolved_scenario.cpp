@@ -273,7 +273,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
     configured.physics_package = "TPFCore";
     configured.tpf_dynamics_mode = "direct_tpf";
     configured.tpfcore_enable_provisional_readout = true;
@@ -373,7 +373,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_static_motion_readout";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_4d_static_motion_readout_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_motion_readout_benchmark;
     configured.physics_package = "TPFCore";
     auto resolved = galaxy::resolve_scenario(configured);
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
@@ -393,7 +393,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_xi_motion_probe";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_4d_xi_motion_probe_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_xi_motion_probe_benchmark;
     configured.physics_package = "TPFCore";
     auto resolved = galaxy::resolve_scenario(configured);
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
@@ -409,7 +409,10 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual_non_tpf_package";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", configured));
+    configured.mode_token = "tpf_4d_static_residual_benchmark";
+    configured.mode_is_package_owned = true;
+    configured.mode_owner_package = "TPFCore";
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
     configured.physics_package = "Newtonian";
     auto resolved = galaxy::resolve_scenario(configured);
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
@@ -441,7 +444,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual_defaults_provenance_note";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_4d_static_residual_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
     configured.physics_package = "TPFCore";
     auto resolved = galaxy::resolve_scenario(configured);
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
@@ -459,7 +462,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_n_particles_fallback";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_source_field_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_source_field_benchmark;
     configured.physics_package = "TPFCore";
     configured.n_stars = 123;
     const int mk_ok = std::system((std::string("mkdir -p ") + configured.output_dir).c_str());
@@ -472,7 +475,7 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_direct_runtime_mode";
-    REQUIRE(galaxy::apply_config_kv("simulation_mode", "tpf_source_field_benchmark", configured));
+    configured.simulation_mode = galaxy::SimulationMode::tpf_source_field_benchmark;
     configured.physics_package = "TPFCore";
     configured.tpf_dynamics_mode = "direct_tpf";
     auto resolved = galaxy::resolve_scenario(configured);
