@@ -409,6 +409,9 @@ TEST_CASE("run_info audit includes configured and effective sections and resolve
   {
     galaxy::Config configured;
     configured.output_dir = "../outputs/test_run_info_tpf_4d_static_residual_non_tpf_package";
+    configured.mode_token = "tpf_4d_static_residual_benchmark";
+    configured.mode_is_package_owned = true;
+    configured.mode_owner_package = "TPFCore";
     configured.simulation_mode = galaxy::SimulationMode::tpf_4d_static_residual_benchmark;
     configured.physics_package = "Newtonian";
     auto resolved = galaxy::resolve_scenario(configured);

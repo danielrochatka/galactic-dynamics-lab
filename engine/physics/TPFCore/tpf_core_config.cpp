@@ -61,10 +61,10 @@ TPFCoreConfig build_tpfcore_config(const Config& config) {
   return out;
 }
 
-void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
+void sync_tpfcore_legacy_fields_from_package_options(Config& config, bool validate_dynamics_mode) {
   std::string v;
   if (get_opt(config, "tpf_dynamics_mode", v)) {
-    if (v != "tpf_xi_theta_v1") {
+    if (validate_dynamics_mode && v != "tpf_xi_theta_v1") {
       throw std::runtime_error("tpf_dynamics_mode must be tpf_xi_theta_v1 on this branch, got: " + v);
     }
     config.tpf_dynamics_mode = v;
@@ -75,6 +75,11 @@ void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
     }
     config.tpf_analysis_mode = v;
   }
+  if (get_opt(config, "tpfcore_enable_provisional_readout", v)) config.tpfcore_enable_provisional_readout = (v == "1" || v == "true" || v == "yes");
+  if (get_opt(config, "tpf_weak_field_correspondence_alpha_si", v)) {
+    config.tpf_weak_field_correspondence_alpha_si = std::stod(v);
+    config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
+  }
   if (get_opt(config, "tpfcore_readout_mode", v)) config.tpfcore_readout_mode = v;
   if (get_opt(config, "tpfcore_readout_scale", v)) config.tpfcore_readout_scale = std::stod(v);
   if (get_opt(config, "tpfcore_theta_tt_scale", v)) config.tpfcore_theta_tt_scale = std::stod(v);
@@ -82,6 +87,8 @@ void sync_tpfcore_legacy_fields_from_package_options(Config& config) {
   if (get_opt(config, "tpf_kappa", v)) config.tpf_kappa = std::stod(v);
   if (get_opt(config, "tpfcore_closure_kappa", v)) config.tpf_kappa = std::stod(v);
   if (get_opt(config, "tpf_vdsg_coupling", v)) config.tpf_vdsg_coupling = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mass_baseline_kg", v)) config.tpf_vdsg_mass_baseline_kg = std::stod(v);
+  if (get_opt(config, "tpf_vdsg_mode", v)) config.tpf_vdsg_mode = v;
   if (get_opt(config, "tpf_global_accel_shunt_enable", v)) config.tpf_global_accel_shunt_enable = (v == "1" || v == "true" || v == "yes");
   if (get_opt(config, "tpf_global_accel_shunt_fraction", v)) config.tpf_global_accel_shunt_fraction = std::stod(v);
   if (get_opt(config, "tpf_cooling_fraction", v)) config.tpf_cooling_fraction = std::stod(v);

@@ -176,6 +176,10 @@ void TPFCorePackage::init_from_config(const Config& config) {
   }
 }
 
+void TPFCorePackage::sync_config_from_package_options(Config& config, const std::string& changed_key) const {
+  sync_tpfcore_legacy_fields_from_package_options(config, changed_key == "tpf_dynamics_mode");
+}
+
 
 PackageModeInfo TPFCorePackage::resolve_mode_token(const std::string& mode_token) const {
   static const std::vector<std::string> kModes = {
@@ -243,6 +247,10 @@ bool TPFCorePackage::run_utility_mode(const Config& config, const std::string& o
     default:
       return false;
   }
+}
+
+bool TPFCorePackage::should_auto_plot_utility_mode(const Config&, const PackageModeInfo& mode_info) const {
+  return mode_info.recognized && mode_info.canonical_token == "tpf_4d_static_residual_benchmark";
 }
 
 bool TPFCorePackage::cooling_active(const Config& config) const {

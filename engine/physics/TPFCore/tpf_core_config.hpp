@@ -27,7 +27,7 @@ struct TPFCoreConfig {
 
 TPFCoreConfig build_tpfcore_config(const Config& config);
 
-void sync_tpfcore_legacy_fields_from_package_options(Config& config);
+void sync_tpfcore_legacy_fields_from_package_options(Config& config, bool validate_dynamics_mode = true);
 
 bool tpfcore_owns_mode_token(const std::string& mode_token);
 

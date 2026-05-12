@@ -425,7 +425,6 @@ int main(int argc, char** argv) {
     std::cout << "[startup_diag][softening_trace] run_config_path="
               << (run_config_path.empty() ? "(none)" : run_config_path) << "\n";
   print_key_occurrences(run_config_path, "softening");
-  print_key_occurrences(run_config_path, "tpfcore_source_softening");
 
   std::string package_defaults_path = galaxy::find_package_defaults_path(physics_pkg);
   if (!package_defaults_path.empty()) {
@@ -434,8 +433,6 @@ int main(int argc, char** argv) {
   if (enable_softening_trace) {
     std::cout << "[startup_diag][softening_trace] final softening after package defaults: "
               << config.softening << "\n";
-    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after package defaults: "
-              << config.tpfcore_source_softening << "\n";
   }
   if (!run_config_path.empty()) {
     galaxy::load_config_file(run_config_path, config);
@@ -443,8 +440,6 @@ int main(int argc, char** argv) {
   if (enable_softening_trace) {
     std::cout << "[startup_diag][softening_trace] final softening after run config: "
               << config.softening << "\n";
-    std::cout << "[startup_diag][softening_trace] final tpfcore_source_softening after run config: "
-              << config.tpfcore_source_softening << "\n";
   }
 
   config.run_id = run_id_from_time();
@@ -532,7 +527,7 @@ int main(int argc, char** argv) {
   std::cout << "SIMULATION MODE: " << galaxy::mode_to_string(config.simulation_mode) << "\n";
   std::cout << "OUTPUT DIR: " << config.output_dir << "\n";
   std::cout << "n_stars: " << config.n_stars << "  bh_mass: " << config.bh_mass << "\n";
-  if (galaxy::simulation_mode_requires_output_dir(config.simulation_mode)) {
+  if (galaxy::config_mode_requires_output_dir(config)) {
     if (!ensure_dir_recursive(config.output_dir)) {
       std::cerr << "Failed to create output directory for simulation_mode="
                 << galaxy::mode_to_string(config.simulation_mode)
@@ -541,7 +536,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (galaxy::is_tpf_utility_mode(config.simulation_mode)) {
+  if (galaxy::config_mode_is_utility(config)) {
     galaxy::PhysicsPackage* utility_physics = galaxy::get_physics_package(config.physics_package);
     if (!utility_physics) {
       std::cerr << "Unknown physics package: " << config.physics_package << "\n";
@@ -556,7 +551,10 @@ int main(int argc, char** argv) {
     if (!utility_physics->run_utility_mode(config, config.output_dir)) {
       return 1;
     }
-    if (config.simulation_mode == galaxy::SimulationMode::tpf_4d_static_residual_benchmark && auto_plot) {
+    if (auto_plot) {
+      galaxy::PackageModeInfo mode_info;
+      try { mode_info = galaxy::resolve_mode_for_config(config); } catch (...) {}
+      if (utility_physics->should_auto_plot_utility_mode(config, mode_info)) {
       const std::string dev_py = "../dev/bin/python3";
       const bool dev_py_exists = static_cast<bool>(std::ifstream(dev_py).good());
       const std::string py = dev_py_exists ? dev_py : "python3";
@@ -570,6 +568,7 @@ int main(int argc, char** argv) {
         std::cout << "plot script completed but no expected PNGs were found/generated\n";
       } else {
         std::cout << "Generated optional PNGs in " << config.output_dir << "\n";
+      }
       }
     }
     finalize_utility_mode_run(config, run_config_path, package_defaults_path);

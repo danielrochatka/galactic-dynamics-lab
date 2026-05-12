@@ -104,11 +104,23 @@ class PhysicsPackage {
     return {};
   }
 
+  /** Optional: synchronize package-owned options into any package-owned compatibility state. Default no-op. */
+  virtual void sync_config_from_package_options(Config& config,
+                                                const std::string& changed_key) const {
+    (void)config;
+    (void)changed_key;
+  }
+
   /** Optional: package capability check for utility modes. Default unsupported. */
   virtual bool supports_utility_mode(SimulationMode) const { return false; }
 
   /** Optional: utility mode dispatch. Default no-op/false (not handled). */
   virtual bool run_utility_mode(const Config&, const std::string&) { return false; }
+  virtual bool should_auto_plot_utility_mode(const Config& config, const PackageModeInfo& mode_info) const {
+    (void)config;
+    (void)mode_info;
+    return false;
+  }
 
   /** Optional: package run-info metadata. Default empty. */
   virtual std::vector<PackageMetadataEntry> run_info_metadata(const Config&, const std::string&) const { return {}; }

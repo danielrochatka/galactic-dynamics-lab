@@ -1,6 +1,5 @@
 #include "config.hpp"
 #include "package_discovery.hpp"
-#include "physics/TPFCore/tpf_core_config.hpp"
 #include "physics/physics_package.hpp"
 #include <fstream>
 #include <iostream>
@@ -66,19 +65,6 @@ bool key_claimed_by_package(const std::string& key, const std::string& preferred
   return false;
 }
 
-bool map_mode_token_to_compat_enum(const std::string& token, SimulationMode& out) {
-  if (token == "tpf_single_source_inspect") { out = SimulationMode::tpf_single_source_inspect; return true; }
-  if (token == "tpf_symmetric_pair_inspect") { out = SimulationMode::tpf_symmetric_pair_inspect; return true; }
-  if (token == "tpf_source_field_benchmark") { out = SimulationMode::tpf_source_field_benchmark; return true; }
-  if (token == "tpf_4d_static_residual_benchmark") { out = SimulationMode::tpf_4d_static_residual_benchmark; return true; }
-  if (token == "tpf_4d_static_motion_readout_benchmark") { out = SimulationMode::tpf_4d_static_motion_readout_benchmark; return true; }
-  if (token == "tpf_4d_xi_motion_probe_benchmark") { out = SimulationMode::tpf_4d_xi_motion_probe_benchmark; return true; }
-  if (token == "tpf_weak_field_calibration") { out = SimulationMode::tpf_weak_field_calibration; return true; }
-  if (token == "tpf_newtonian_force_compare") { out = SimulationMode::tpf_newtonian_force_compare; return true; }
-  if (token == "tpf_diagnostic_consistency_audit") { out = SimulationMode::tpf_diagnostic_consistency_audit; return true; }
-  return false;
-}
-
 }  // namespace
 
 SimulationMode parse_mode(const std::string& s) {
@@ -107,33 +93,7 @@ std::string mode_to_string(SimulationMode m) {
     case SimulationMode::symmetric_pair: return "symmetric_pair";
     case SimulationMode::small_n_conservation: return "small_n_conservation";
     case SimulationMode::timestep_convergence: return "timestep_convergence";
-    case SimulationMode::tpf_single_source_inspect: return "tpf_single_source_inspect";
-    case SimulationMode::tpf_symmetric_pair_inspect: return "tpf_symmetric_pair_inspect";
-    case SimulationMode::tpf_source_field_benchmark: return "tpf_source_field_benchmark";
-    case SimulationMode::tpf_4d_static_residual_benchmark: return "tpf_4d_static_residual_benchmark";
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark: return "tpf_4d_static_motion_readout_benchmark";
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark: return "tpf_4d_xi_motion_probe_benchmark";
-    case SimulationMode::tpf_weak_field_calibration: return "tpf_weak_field_calibration";
-    case SimulationMode::tpf_newtonian_force_compare: return "tpf_newtonian_force_compare";
-    case SimulationMode::tpf_diagnostic_consistency_audit: return "tpf_diagnostic_consistency_audit";
-  }
-  return "unknown";
-}
-
-bool is_tpf_utility_mode(SimulationMode m) {
-  switch (m) {
-    case SimulationMode::tpf_single_source_inspect:
-    case SimulationMode::tpf_symmetric_pair_inspect:
-    case SimulationMode::tpf_source_field_benchmark:
-    case SimulationMode::tpf_4d_static_residual_benchmark:
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-    case SimulationMode::tpf_weak_field_calibration:
-    case SimulationMode::tpf_newtonian_force_compare:
-    case SimulationMode::tpf_diagnostic_consistency_audit:
-      return true;
-    default:
-      return false;
+    default: return "unknown";
   }
 }
 
@@ -144,15 +104,6 @@ bool simulation_mode_requires_output_dir(SimulationMode m) {
     case SimulationMode::symmetric_pair:
     case SimulationMode::small_n_conservation:
     case SimulationMode::timestep_convergence:
-    case SimulationMode::tpf_single_source_inspect:
-    case SimulationMode::tpf_symmetric_pair_inspect:
-    case SimulationMode::tpf_source_field_benchmark:
-    case SimulationMode::tpf_4d_static_residual_benchmark:
-    case SimulationMode::tpf_4d_static_motion_readout_benchmark:
-    case SimulationMode::tpf_4d_xi_motion_probe_benchmark:
-    case SimulationMode::tpf_weak_field_calibration:
-    case SimulationMode::tpf_newtonian_force_compare:
-    case SimulationMode::tpf_diagnostic_consistency_audit:
     case SimulationMode::earth_moon_benchmark:
     case SimulationMode::bh_orbit_validation:
       return true;
@@ -161,19 +112,50 @@ bool simulation_mode_requires_output_dir(SimulationMode m) {
   }
 }
 
+PackageModeInfo resolve_mode_for_config(const Config& config) {
+  if (!config.mode_is_package_owned) return {};
+  const std::string& owner = config.mode_owner_package.empty() ? config.physics_package : config.mode_owner_package;
+  PackageModeInfo info = resolve_package_mode_token(owner, config.mode_token);
+  if (!info.recognized) throw std::runtime_error("Unknown package-owned simulation_mode: " + config.mode_token);
+  return info;
+}
+
+bool config_mode_is_utility(const Config& config) {
+  if (!config.mode_is_package_owned) return false;
+  return resolve_mode_for_config(config).is_utility_mode;
+}
+
+bool config_mode_requires_output_dir(const Config& config) {
+  if (!config.mode_is_package_owned) return simulation_mode_requires_output_dir(config.simulation_mode);
+  return resolve_mode_for_config(config).requires_output_dir;
+}
+
 bool apply_config_kv(const std::string& key, const std::string& val, Config& config) {
   if (key == "simulation_mode") {
     config.mode_token = trim(val);
     const std::string t = trim(val);
     try {
       config.simulation_mode = parse_mode(val);
+      config.mode_is_package_owned = false;
+      config.mode_owner_package.clear();
     } catch (...) {
-      if (t.rfind("tpf_", 0) != 0) throw;
       PackageModeInfo info = resolve_package_mode_token(config.physics_package, t);
-      if (!info.recognized && !tpfcore_owns_mode_token(t)) throw std::runtime_error("Unknown simulation_mode: " + t);
-      if (!map_mode_token_to_compat_enum(t, config.simulation_mode)) {
-        throw std::runtime_error("No temporary enum compatibility mapping for package mode: " + t);
+      std::string mode_owner = config.physics_package;
+      if (!info.recognized) {
+        static const std::vector<PackageMetadata> all = discover_packages();
+        for (const auto& md : all) {
+          const std::string candidate = md.name.empty() ? md.folder_name : md.name;
+          info = resolve_package_mode_token(candidate, t);
+          if (info.recognized) {
+            mode_owner = candidate;
+            break;
+          }
+        }
       }
+      if (!info.recognized) throw std::runtime_error("Unknown simulation_mode: " + t);
+      config.mode_owner_package = mode_owner;
+      config.mode_is_package_owned = true;
+      config.simulation_mode = SimulationMode::galaxy;
     }
     return true;
   }
@@ -250,21 +232,14 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.physics_package = val;
     if (const PackageMetadata* md = find_package_metadata(config.physics_package)) {
       for (const auto& kv : md->defaults) config.package_options[kv.first] = kv.second;
-      if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+      if (PhysicsPackage* pkg = get_physics_package(config.physics_package)) {
+        pkg->sync_config_from_package_options(config, "physics_package");
+      }
     }
     return true;
   }
   if (key == "physics_package_compare") {
     config.physics_package_compare = trim(val);
-    return true;
-  }
-  if (key == "tpfcore_enable_provisional_readout") {
-    config.tpfcore_enable_provisional_readout = parse_bool(val);
-    return true;
-  }
-  if (key == "tpf_weak_field_correspondence_alpha_si") {
-    config.tpf_weak_field_correspondence_alpha_si = std::stod(val);
-    config.tpf_weak_field_correspondence_alpha_si_explicitly_set = true;
     return true;
   }
   if (key == "v11_weak_field_correspondence_benchmark") {
@@ -300,11 +275,6 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
     config.v11_em_calib_surface_g_m_s2 = std::stod(val);
     return true;
   }
-  if (key == "tpf_vdsg_mass_baseline_kg") {
-    config.tpf_vdsg_mass_baseline_kg = std::stod(val);
-    return true;
-  }
-  if (key == "tpf_vdsg_mode") { config.tpf_vdsg_mode = val; return true; }
   if (key == "tpf_vdsg_mass_gate_m0_kg") { config.tpf_vdsg_mass_gate_m0_kg = std::stod(val); return true; }
   if (key == "tpf_vdsg_mass_gate_alpha") { config.tpf_vdsg_mass_gate_alpha = std::stod(val); return true; }
   if (key == "tpf_vdsg_x_clamp") { config.tpf_vdsg_x_clamp = std::stod(val); return true; }
@@ -769,7 +739,9 @@ bool apply_config_kv(const std::string& key, const std::string& val, Config& con
   std::string owner;
   if (key_claimed_by_package(key, config.physics_package, owner)) {
     config.package_options[key] = trim(val);
-    if (owner == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+    if (PhysicsPackage* pkg = get_physics_package(owner)) {
+      pkg->sync_config_from_package_options(config, key);
+    }
     return true;
   }
   return false;
@@ -800,7 +772,9 @@ bool load_config_file(const std::string& path, Config& config) {
           " (key=" + key + "): " + e.what());
     }
   }
-  if (config.physics_package == "TPFCore") sync_tpfcore_legacy_fields_from_package_options(config);
+  if (PhysicsPackage* pkg = get_physics_package(config.physics_package)) {
+    pkg->sync_config_from_package_options(config, "load_config_file");
+  }
   bool generic_ok = true;
   try { (void)parse_mode(config.mode_token); } catch (...) { generic_ok = false; }
   if (!generic_ok) {
@@ -923,7 +897,6 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("physics_package", config.physics_package);
   kv.emplace_back("physics_package_compare", config.physics_package_compare);
   kv.emplace_back("tpf_dynamics_mode", config.tpf_dynamics_mode);
-  kv.emplace_back("tpf_weak_field_correspondence_alpha_si", d(config.tpf_weak_field_correspondence_alpha_si));
   kv.emplace_back("tpf_analysis_mode", config.tpf_analysis_mode);
   kv.emplace_back("v11_weak_field_correspondence_benchmark", config.v11_weak_field_correspondence_benchmark);
   kv.emplace_back("v11_em_mass_earth_kg", d(config.v11_em_mass_earth_kg));
@@ -932,15 +905,12 @@ std::vector<std::pair<std::string, std::string>> serialize_config_kv(const Confi
   kv.emplace_back("v11_em_sidereal_period_s", d(config.v11_em_sidereal_period_s));
   kv.emplace_back("v11_em_calib_surface_radius_m", d(config.v11_em_calib_surface_radius_m));
   kv.emplace_back("v11_em_calib_surface_g_m_s2", d(config.v11_em_calib_surface_g_m_s2));
-  kv.emplace_back("tpfcore_enable_provisional_readout", b(config.tpfcore_enable_provisional_readout));
   kv.emplace_back("tpfcore_readout_mode", config.tpfcore_readout_mode);
   kv.emplace_back("tpfcore_readout_scale", d(config.tpfcore_readout_scale));
   kv.emplace_back("tpfcore_theta_tt_scale", d(config.tpfcore_theta_tt_scale));
   kv.emplace_back("tpfcore_theta_tr_scale", d(config.tpfcore_theta_tr_scale));
   kv.emplace_back("tpf_kappa", d(config.tpf_kappa));
   kv.emplace_back("tpf_vdsg_coupling", d(config.tpf_vdsg_coupling));
-  kv.emplace_back("tpf_vdsg_mass_baseline_kg", d(config.tpf_vdsg_mass_baseline_kg));
-  kv.emplace_back("tpf_vdsg_mode", config.tpf_vdsg_mode);
   kv.emplace_back("tpf_vdsg_mass_gate_m0_kg", d(config.tpf_vdsg_mass_gate_m0_kg));
   kv.emplace_back("tpf_vdsg_mass_gate_alpha", d(config.tpf_vdsg_mass_gate_alpha));
   kv.emplace_back("tpf_vdsg_x_clamp", d(config.tpf_vdsg_x_clamp));
